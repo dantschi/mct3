@@ -1,5 +1,5 @@
 ---
-title: "01 · Speicherphysik (Teil 1: Non-Volatile)"
+title: "01 · Speicherphysik & RAM-Typen"
 subtitle: "Mikrocomputertechnik 3 · DHBW Stuttgart"
 author: "Prof. Dr.-Ing. Daniel Klünder"
 # Vortrag:  quarto preview vorlesungen/01_speicherphysik.qmd
@@ -590,31 +590,683 @@ Wir brauchen Speicher, der:
 Antwort: volatiler Speicher (RAM).\
 Zwei Technologien: **SRAM** und **DRAM**.
 
-*(Fortsetzung in Termin 2: RAM-Typen, Spezialspeicher, Linker)*
-
 ::: notes
-Für Variablen, Zwischenergebnisse der ALU und den Stack brauchen wir ein perfektes Kurzzeitgedächtnis. Das bringt uns zum volatilen Arbeitsspeicher — den zweiten großen Block. SRAM und DRAM behandeln wir in Termin 2.
+Für Variablen, Zwischenergebnisse der ALU und den Stack brauchen wir ein perfektes Kurzzeitgedächtnis. Als Nächstes öffnen wir den volatilen Arbeitsspeicher: zuerst SRAM, dann DRAM.
 :::
 
-## Fragen?
+## Fragen? — Non-Volatile
 
 - Flash-Architektur?
 - Execute-in-Place (XIP)?
 - Wear Leveling?
 
 ::: notes
-Bevor wir in Termin 2 in die Transistorebene von SRAM und DRAM eintauchen: Ist das Konzept klar, warum wir auf einem Mikrocontroller nicht einfach NAND-Flash verwenden können, um Code auszuführen?
+Bevor wir in die Transistorebene von SRAM und DRAM eintauchen: Ist klar, warum Mikrocontroller Code typischerweise aus NOR-Flash (XIP) ausführen und nicht aus NAND?
 :::
 
-## Kurze Pause — Fortsetzung in Termin 2
+## Kurze Pause
 
-10 Minuten Pause bzw. Ende von Termin 1.\
-In Termin 2 geht es weiter mit:
+10 Minuten Pause.\
+Danach:
 
 - SRAM (6-Transistor-Zelle)
 - DRAM (1-Transistor-Zelle und Refresh)
 - Spezialspeicher (FIFOs und Dual-Ported RAM)
 
 ::: notes
-Atmen Sie kurz durch. Termin 1 schließt hier mit dem non-volatilen Speicher. In Termin 2 folgt die Physik des Arbeitsspeichers — SRAM, DRAM und Spezialspeicher im SoC.
+Atmen Sie kurz durch. Nach der Pause folgt die Physik des Arbeitsspeichers.
 :::
+
+## Volatiler Speicher: RAM
+
+- Arbeitsspeicher: Kurzzeitgedächtnis des Prozessors
+- Volatil: Daten weg ohne Versorgungsspannung
+- Wahlfreier Zugriff: jede Adresse gleich schnell
+- Zwei Architekturen: SRAM (Static RAM) und DRAM (Dynamic RAM)
+- Gleicher Zweck, grundlegend andere Physik
+
+::: notes
+Nachdem wir geklärt haben, wie Code den Stromausfall überlebt, widmen wir uns den flüchtigen Speichern. Wenn Sie in C ein Array anlegen oder eine Variable definieren, leben diese im RAM. Damit der Prozessor nicht unnötig wartet, muss dieser Speicher schnell sein. Wir unterscheiden statischen und dynamischen RAM.
+:::
+
+## RAM: SRAM und DRAM
+
+```{mermaid}
+%%| fig-width: 4.2
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[RAM] --> B[SRAM]
+  A --> C[DRAM]
+  B --> D[Sehr schnell, teuer, CPU-nah]
+  C --> E[Langsamer, billig, Hauptspeicher]
+  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Schematisch: SRAM sitzt nahe an der CPU (Caches, Register), DRAM bildet den großen Hauptspeicher. Beides speichert Bits — mit völlig unterschiedlichen Bauteilen.
+:::
+
+## SRAM — Prinzip
+
+- Statisch: Wert bleibt ohne Auffrischen, solange Strom anliegt
+- Kein Refresh nötig (im Gegensatz zu DRAM)
+- Schnellste verfügbare Speichertechnologie
+- Latenz oft unter $1\,\mathrm{ns}$
+- Kehrseite: geringe Dichte — viele Transistoren pro Zelle
+
+::: notes
+„Statisch“ bedeutet hier nicht, dass Daten bei Stromausfall erhalten bleiben, sondern dass das Bit im Transistornetzwerk stabil liegt, solange die Betriebsspannung da ist. SRAM ist das Rückgrat schneller Caches und Register.
+:::
+
+## Refresher: Das D-Flip-Flop (MCT1)
+
+- Register in MCT1: D-Flip-Flops
+- Master-Slave-D-FF: oft über 20 Transistoren
+- 1 MB mit Flip-Flops: Hunderte Millionen Transistoren
+- Zu viel Fläche und Abwärme
+- Lösung: Design auf das physikalische Minimum eindampfen
+
+::: notes
+Für 32 Register sind Flip-Flops vertretbar. Für Megabyte-Caches im Die brauchen wir eine radikal kleinere Zelle.
+:::
+
+## D-Flip-Flop: Master und Slave
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TD
+  D[Daten D] --> M[Master-Latch]
+  CLK[Clock] --> M
+  CLK --> S[Slave-Latch]
+  M --> S
+  S --> Q[Ausgang Q]
+  style M fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+  style S fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Schematisch: Zwei Latches hintereinander. Funktional stark — flächenmäßig zu teuer für großen SRAM.
+:::
+
+## Die 6T-SRAM-Zelle
+
+- Klassisches SRAM-Bit: exakt 6 Transistoren (6T)
+- Vier Transistoren: zwei kreuzgekoppelte Inverter
+- Zwei Access-Transistoren als „Türsteher“
+- Wordline (WL): öffnet die Zelle
+- Bitlines (BL / $\overline{\mathrm{BL}}$): Daten hinein und heraus
+
+::: notes
+Statt rund 20 Transistoren bleiben sechs: zwei Inverter im Ring und zwei Schalter zu den Bitlines. Eine der am häufigsten gebauten Zellen der Welt.
+:::
+
+## 6T-Zelle: Überblick
+
+```{mermaid}
+%%| fig-width: 4.0
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TD
+  WL[Wordline] --> M5[Access M5]
+  WL --> M6[Access M6]
+  M5 --> Inv1[Inverter 1]
+  M6 --> Inv2[Inverter 2]
+  Inv1 <-->|Kreuzkopplung| Inv2
+  BL[Bitline] --- M5
+  BLB[Bitline Inverse] --- M6
+  style Inv1 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+  style Inv2 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Wordline steuert die Access-Transistoren; die gekreuzten Inverter halten das Bit. Bitline und inverse Bitline tragen Lesen und Schreiben.
+:::
+
+## Der kreuzgekoppelte Inverter-Ring
+
+- Bit speichern ohne Taktsignal
+- Inverter: $1 \rightarrow 0$, $0 \rightarrow 1$
+- Ausgang von Inverter 1 $\rightarrow$ Eingang von Inverter 2 und zurück
+- Stabiler Ring: Zustand hält sich selbst
+- Bistabilität: Gleichgewicht, solange Strom anliegt
+
+::: notes
+Zwei NOT-Gatter im Kreis: Die linke 1 erzwingt rechts 0, die 0 erzwingt links wieder 1. Das System stabilisiert sich selbst — angetrieben von der Versorgungsspannung.
+:::
+
+## Zustand halten (Hold State)
+
+- Wordline $= 0\,\mathrm{V}$: Hold State
+- Access-Transistoren sperren
+- Zelle von den Bitlines isoliert
+- Strom nur im Inverter-Ring
+- Ruhestrom theoretisch sehr gering
+
+::: notes
+Die meiste Zeit bleibt die Zelle im Hold State: Türen zu, Bit im Ring gefangen. Aktivität auf den Bitlines berührt die Zelle nicht.
+:::
+
+## Hold State — Schema
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A["Wordline = 0 V"] --> B[M5 gesperrt]
+  A --> C[M6 gesperrt]
+  B -.-> D[Inverter-Ring isoliert]
+  C -.-> D
+  D --> E[Bit bleibt gespeichert]
+  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Schematisch: Gesperrte Access-Transistoren trennen den Ring von den Bitlines.
+:::
+
+## SRAM Lesen
+
+- Precharge: BL und $\overline{\mathrm{BL}}$ auf hohe Spannung
+- Wordline High: Access-Transistoren öffnen
+- Zelle mit Bitlines verbunden
+- Gespeicherte 0 saugt eine Bitline leicht leer
+- Sense Amplifier erkennt die Differenz und liefert das Bit
+
+::: notes
+Beim Lesen öffnet die Wordline die Türen. Die Null-Seite zieht die Bitline minimal nach unten; Sense Amplifier erkennen die Differenz und melden 0 oder 1 an die ALU.
+:::
+
+## SRAM Schreiben
+
+- Überwältigung durch stärkere Schreibtreiber
+- CPU legt hart 1 auf BL und 0 auf $\overline{\mathrm{BL}}$ (oder umgekehrt)
+- Wordline High: Türen öffnen
+- Schreibtreiber sind größer als die Zell-Inverter
+- Inverter kippen — neues Bit ist gefangen
+
+::: notes
+Schreiben ist ein physikalischer Kraftakt: Die großen Treiber des Controllers zwingen die winzigen Zell-Inverter um. Nach dem Schließen der Wordline bleibt der neue Zustand im Ring.
+:::
+
+## Vorteile von SRAM
+
+- Extrem hohe Geschwindigkeit (Sub-Nanosekunden)
+- Kein Refresh — keine erzwungenen Pausen
+- Einfache Schnittstelle: Adresse anlegen, Daten abholen
+- Geringer Stromverbrauch bei Inaktivität
+- Integration im selben Logic-Prozess wie die ALU
+
+::: notes
+SRAM bremst die Pipeline kaum und lässt sich im gleichen Silizium-Prozess wie die Rechenlogik fertigen — ideal für Caches.
+:::
+
+## Nachteile von SRAM
+
+- Geringe Datendichte: 6 Transistoren pro Bit brauchen Fläche
+- Hohe Kosten: Chipfläche ist teuer
+- Kapazitäts-Limit: selten mehr als einige Dutzend MB SRAM als Cache
+- Ungeeignet für Massenspeicher (Laptop mit 16 GB SRAM wäre unrealistisch)
+
+::: notes
+Sechs Transistoren pro Bit reichen für Caches, nicht für Gigabyte-Hauptspeicher. Deshalb bleibt DRAM unverzichtbar.
+:::
+
+## Die Leckströme (Leakage)
+
+- Moderne Nodes (z. B. 3 nm): Transistoren sperren nicht mehr perfekt
+- Static Leakage auch im Hold State (Quantentunneling)
+- Folge: Strom und Wärme nur zum Datenhalten
+- Mobile SoCs: Power Gating ganzer SRAM-Blöcke im Standby
+
+::: notes
+Bei wenigen Nanometern „lecken“ Transistoren. Große SRAM-Caches können im Standby spürbar Energie ziehen — deshalb Power Gating in Smartphones.
+:::
+
+## Einsatzgebiet von SRAM im SoC
+
+- Register File: `x0`–`x31` im RISC-V-Kern
+- L1-Cache: 32–64 KB, extrem niedrige Latenz
+- L2-/L3-Cache: geteilt, mehrere MB
+- Tightly Coupled Memory (TCM): Echtzeit-Routinen in MCUs
+
+::: notes
+SRAM sitzt an der Spitze der Speicherpyramide: Register und Caches. Nur bei Miss geht es weiter zum DRAM.
+:::
+
+## SRAM in der Hierarchie
+
+```{mermaid}
+%%| fig-width: 4.2
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  CPU[CPU] --> L1[L1 Cache SRAM]
+  L1 --> L2[L2 Cache SRAM]
+  L2 --> L3[L3 Cache SRAM]
+  L3 --> RAM[Main Memory DRAM]
+  style L1 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Schematisch: Jede Stufe fragt die nächste, wenn Daten fehlen. Moderne Kerne sind oft von großen SRAM-Caches umgeben.
+:::
+
+## Ansicht eines Chip-Dies
+
+- Blick auf ein modernes Silizium-Die unter dem Mikroskop
+- Dunkle, regelmäßige Flächen: typischerweise SRAM (L2/L3)
+- Unregelmäßige Bereiche: Rechenlogik (ALU, Steuerwerk)
+- Moderne Server-/Desktop-CPUs: oft ein großer Anteil der Fläche ist SRAM
+
+::: notes
+Bei Die-Shots fallen regelmäßige Gitterstrukturen auf — meist Cache-SRAM. Die eigentliche Logik wirkt unregelmäßiger und belegt oft weniger Fläche als die Caches.
+:::
+
+## Zusammenfassung SRAM
+
+- Typ: volatiler Arbeitsspeicher
+- Zelle: 6T (Inverter-Ring)
+- Vorteile: kein Refresh, sehr schnell
+- Nachteile: flächenintensiv, Leckströme bei kleinen Nodes
+- Einsatz: Caches und CPU-naher Speicher im SoC
+
+::: notes
+SRAM ist teuer und schnell — unverzichtbar für die Pipeline. Für den großen Hauptspeicher brauchen wir dichtere Technik: DRAM.
+:::
+
+## Fragen? — SRAM
+
+- Aufbau der 6T-Zelle?
+- Schreib- oder Lesevorgang?
+- Warum kein Refresh bei SRAM?
+
+::: notes
+Ist das Konzept des selbst-erhaltenden Inverter-Rings klar, bevor wir zu DRAM wechseln?
+:::
+
+## Volatiler Speicher: DRAM
+
+- Ziel: Gigabyte Arbeitsspeicher zu akzeptablen Kosten
+- Weg: Bauteile pro Bit radikal reduzieren
+- Ergebnis: Dynamic RAM (DRAM)
+- Dynamisch: Zelle hält den Zustand nicht allein — Ladung geht in Millisekunden verloren
+- Zelle einfach, Controller komplex
+
+::: notes
+Ein 16-GB-Riegel ist DRAM. Maximale Dichte erfordert komplexe Controller, weil die Zellen ihre Ladung nicht dauerhaft halten.
+:::
+
+## Die 1T1C-Zelle
+
+- Flip-Flop: $\approx 20$ Transistoren; SRAM: 6; DRAM: 1 Transistor + 1 Kondensator
+- Kondensator: speichert Ladung („Eimer“)
+- Transistor: Schalter zum Füllen/Leeren
+- Weniger Bauteile pro Bit sind kaum möglich
+
+::: notes
+1T1C ist der Dichte-Kompromiss: Ein Transistor, ein Kondensator. Maximale Packungsdichte — um den Preis von Refresh und komplexer Ansteuerung.
+:::
+
+## 1T1C — Schema
+
+```{mermaid}
+%%| fig-width: 3.6
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TD
+  WL[Wordline] --> T1[Access-Transistor]
+  BL[Bitline] --- T1
+  T1 --- C1[Kondensator]
+  C1 --- GND[Masse]
+  style C1 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Wordline öffnet den Transistor; der Kondensator speichert die Ladung gegen Masse.
+:::
+
+## Kondensator als Speicher
+
+- Geladen (hohe Spannung) $\rightarrow$ logische 1
+- Entladen ($\approx 0\,\mathrm{V}$) $\rightarrow$ logische 0
+- Kapazitäten im Femtofarad-Bereich — wenige Tausend Elektronen
+- 3D-Fertigung: Trench-/Stack-Kondensatoren für Dichte
+
+::: notes
+Um Kapazität bei kleinem Fußabdruck zu gewinnen, werden Kondensatoren als Gräben oder Stapelstrukturen gefertigt — hochpräzise Halbleitertechnik.
+:::
+
+## Was bedeutet „dynamisch“?
+
+- Isolation ist nie perfekt — Ladung sickert ab
+- Spannung einer „1“ sinkt kontinuierlich
+- Nach ca. $64\,\mathrm{ms}$ oft kritisch für die Sensorik
+- Ohne Pflege löscht sich DRAM selbst
+
+::: notes
+Das „D“ steht für dynamisch: Die Zelle vergisst ohne periodisches Auffrischen. Metapher: Eimer mit kleinem Leck.
+:::
+
+## Der Refresh-Zyklus
+
+- Memory Controller muss Zellen regelmäßig auffrischen
+- Typisch: innerhalb von $\approx 64\,\mathrm{ms}$ jede Zelle lesen und zurückschreiben
+- Während Refresh: RAM oft blockiert — CPU kann warten müssen
+- Energie: Refresh kostet Strom auch im Standby
+
+::: notes
+Bevor die Ladung kritisch wird, liest und schreibt der Controller zurück. Das passiert dauernd im Hintergrund — deshalb verbraucht DRAM auch ohne „sichtbare“ Arbeit Energie.
+:::
+
+## Refresh — Schema
+
+```{mermaid}
+%%| fig-width: 4.0
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A["t = 0 ms\nLadung hoch"] --> B["t ≈ 30 ms"]
+  B --> C["t ≈ 60 ms\nkritisch"]
+  C --> D[REFRESH]
+  D --> A
+  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Schematisch: Ladung sinkt, Refresh stellt den Pegel wieder her. Zeiten sind typische Größenordnungen, keine Messdaten.
+:::
+
+## DRAM-Lesen ist destruktiv
+
+- Lesen: restliche Ladung fließt auf die Bitline
+- Spannungsausgleich: Kondensator danach weitgehend leer
+- Destructive Read: die Information wird durchs Messen zerstört
+- Pflicht: Wert sofort zurückschreiben
+
+::: notes
+Wie ein Tropfen in einem großen Rohr: Nach dem Messen ist der Tropfen „zerlaufen“. Hardware muss die Zelle neu füllen.
+:::
+
+## Sense Amplifiers
+
+- Leseverstärker am Rand der Matrix
+- Vergleichen winzige Bitline-Schwankung mit Referenz
+- Kippen auf volle digitale Pegel ($0$ / $1$)
+- Nebeneffekt: oft automatisches Zurückschreiben der Ladung
+
+::: notes
+Ohne Sense Amplifier wäre DRAM unbrauchbar. Sie verstärken Millivolt-Differenzen und stellen dabei typischerweise die Zellenladung wieder her.
+:::
+
+## DRAM Schreiben
+
+- Bitline hart auf High oder Low treiben
+- Wordline öffnet den Access-Transistor
+- Kondensator füllt/entleert sich schnell
+- Wordline zu — Bit gefangen (bis zum nächsten Refresh)
+
+::: notes
+Schreiben ist der einfachere Teil: Treiber setzen den Pegel, Transistor verbindet, Kondensator übernimmt.
+:::
+
+## Adress-Matrix und Multiplexing
+
+- Milliarden Adressen — nicht Milliarden Pins
+- Zellen in Rows und Columns (2D-Gitter)
+- 32-Bit-Adresse wird geteilt: erst Row, dann Column über dieselben Pins
+
+::: notes
+Multiplexing spart Gehäuse-Pins: Zuerst Zeile, dann Spalte — nacheinander über denselben Adressbus.
+:::
+
+## Multiplexing — Schema
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TD
+  A[32-Bit-Adresse] --> B[ROW-Hälfte]
+  A --> C[COLUMN-Hälfte]
+  B -->|Takt 1| D[RAM-Pins]
+  C -->|Takt 2| D
+  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Schematische Aufteilung; konkrete Bitbreiten hängen vom Modul ab.
+:::
+
+## RAS und CAS
+
+- RAS (Row Address Strobe): „jetzt kommt die Zeile“
+- CAS (Column Address Strobe): „jetzt kommt die Spalte“
+- Nacheinander senden kostet Takte — Teil der DRAM-Latenz
+
+::: notes
+RAS/CAS kennen Sie ggf. aus BIOS-Timings. Niedrigere CAS-Latenz bedeutet schnelleres Auffinden der Spalte — bei gleichen übrigen Randbedingungen.
+:::
+
+## Warum DRAM langsamer ist als SRAM
+
+- Adress-Multiplexing (Row, dann Column)
+- Analoges Auslesen und Sense Amplifier
+- Destruktives Lesen inkl. Zurückschreiben / Precharge
+- Mögliche Wartezeiten während Refresh
+
+::: notes
+Die Latenz folgt aus Physik und Organisation — nicht aus „Böswilligkeit“. Der Inverter-Ring des SRAM antwortet deutlich direkter.
+:::
+
+## SDRAM und DDR
+
+- SDRAM: Taktsignal, synchrone Zugriffe, Pipelining möglich
+- DDR: Daten bei steigender und fallender Flanke
+- Bandbreite steigt bei gleichem Takt spürbar
+- LPDDR: energieoptimierte Varianten für Mobile
+
+::: notes
+DDR4/DDR5 bleiben 1T1C-Zellen im Kern. „Double Data Rate“ betrifft die Schnittstelle, nicht die Zellphysik.
+:::
+
+## Einsatzgebiet von DRAM im SoC
+
+- Meist nicht auf dem Logic-Die (anderer Prozess)
+- Separater Chip oder Package-on-Package
+- Main Memory: OS, Heap (`malloc`), große Arrays
+- Kleine MCUs: oft nur interner SRAM, kein DRAM
+
+::: notes
+Große SoCs (z. B. Linux-fähig) brauchen DRAM. Kleine Sensor-MCUs kommen oft mit Kilobyte-SRAM aus.
+:::
+
+## Vergleich: SRAM vs. DRAM
+
+|  | SRAM | DRAM |
+|--|------|------|
+| Zelle | 6T Inverter-Ring | 1T1C |
+| Datenerhalt | stabil (mit Strom) | Refresh nötig |
+| Geschwindigkeit | sehr hoch | mittel |
+| Dichte | gering | sehr hoch |
+| Einsatz | Caches, Register | Hauptspeicher |
+| Kosten / Bit | hoch | niedrig |
+
+::: notes
+Kein „besser“ oder „schlechter“ — beide sind für ihre Ebene in der Hierarchie optimiert. SRAM ist der schnelle Kurier, DRAM das Containerschiff.
+:::
+
+## Spickzettel SRAM / DRAM
+
+| Eigenschaft | SRAM | DRAM |
+|-------------|------|------|
+| Zellen-Architektur | 6 Transistoren | 1T + 1C |
+| Datenerhalt | stabil (Strom an) | flüchtig (Refresh) |
+| Geschwindigkeit | $< 1\,\mathrm{ns}$ (typ.) | $\approx 50$–$100\,\mathrm{ns}$ (typ.) |
+| Speicherdichte | gering | extrem hoch |
+| Einsatz im SoC | L1/L2/L3, Register | Main Memory |
+| Kosten pro Bit | hoch | niedrig |
+
+*Angaben schematisch — typische Größenordnungen.*
+
+::: notes
+Diese Dimensionen reichen oft für Klausur und Interview: Cache vs. Hauptspeicher physikalisch begründet.
+:::
+
+## Fragen? — DRAM
+
+- Kondensator-Prinzip?
+- Destruktives Lesen?
+- Refresh-Zyklus klar?
+
+::: notes
+Ist verständlich, warum Refresh und Multiplexing die Pipeline verzögern können?
+:::
+
+## Spezialspeicher im SoC
+
+- Neben Cache und Main Memory: spezialisierte RAM-Zellen
+- Problem: CPU und Peripherie mit unterschiedlichen Takten
+- Wie Daten austauschen ohne gegenseitiges Blockieren?
+- Lösungen: Dual-Ported RAM (DPRAM) und FIFOs
+
+::: notes
+Manchmal müssen zwei Module gleichzeitig auf denselben Puffer zugreifen. Normales Single-Port-RAM reicht dann nicht.
+:::
+
+## Dual-Ported RAM (DPRAM)
+
+- SRAM mit zwei unabhängigen Ports
+- Eigene Adress-/Daten-/Steuerleitungen pro Port
+- Gleichzeitig lesen/schreiben an verschiedenen Adressen möglich
+- Physik oft 8T (zusätzliche Access-Transistoren)
+- Einsatz: Shared Memory, Videopuffer, …
+
+::: notes
+Port A und Port B können parallel arbeiten — teurer in Fläche, aber ohne Bus-Streit bei getrennten Adressen.
+:::
+
+## DPRAM — Schema
+
+```{mermaid}
+%%| fig-width: 4.0
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  CPU[CPU Port A] <--> DPRAM[(Dual-Ported RAM)]
+  IO[Peripherie Port B] <--> DPRAM
+  style DPRAM fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Zwei Ports, ein Speicherblock — Grundlage für nebenläufige Produzenten/Konsumenten auf dem Chip.
+:::
+
+## Kollisionsvermeidung im DPRAM
+
+- Gleichzeitiges Schreiben derselben Zelle: Ergebnis undefiniert
+- Arbitration Logic als Schiedsrichter
+- Busy-Flag: zweiter Zugriff verzögert / Stall
+
+::: notes
+Bei Adresskonflikt entscheidet Hardware, wer wartet — sonst Metastabilität.
+:::
+
+## FIFO-Puffer
+
+- First-In-First-Out: Warteschlange
+- Keine expliziten Adressen für Push/Pop
+- Hardware: SRAM mit Write-/Read-Pointer (Ringpuffer)
+
+::: notes
+FIFO ist die Standard-Schnittstelle zwischen unterschiedlichen Taktraten und Datenraten.
+:::
+
+## FIFO — Schema
+
+```{mermaid}
+%%| fig-width: 4.0
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  In[Eingang] -->|Push| Q1[Byte 1] --> Q2[Byte 2] --> Q3[Byte 3]
+  Q3 -->|Pop| Out[Ausgang]
+  style Q2 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Daten werden eingeschoben und in derselben Reihenfolge entnommen — ohne dass Software jede Adresse verwaltet.
+:::
+
+## Hardware-FIFOs für I/O
+
+- Beispiel UART: Bytes kommen langsam an
+- Ohne FIFO: Interrupt pro Byte/Bit — hohe CPU-Last
+- Mit FIFO: füllen bis Watermark, dann CPU wecken
+- Grundlage für effiziente Bus-Peripherie (später Block 5)
+
+::: notes
+FIFOs entkoppeln schnelle CPU und langsame I/O. In späteren Blöcken nutzen wir das bei seriellen Schnittstellen.
+:::
+
+## Brückenschlag zur Software
+
+- CPU sieht keinen Kondensator — nur linearen 32-Bit-Adressraum
+- Adress-Decoder lenkt Bereiche an physische Bausteine
+- Beispiel: Pointer auf Flash vs. Pointer auf SRAM/DRAM
+
+::: notes
+Memory-Mapping verbindet C-Pointer mit der Physik. Der Compiler kennt Transistoren nicht — der Decoder schon.
+:::
+
+## Memory Map eines Mikrocontrollers
+
+Typische Aufteilung (Beispiel, schematisch):
+
+- `0x0000_0000`: Boot-ROM
+- `0x0800_0000`: Flash (Programm)
+- `0x2000_0000`: SRAM (Variablen)
+- `0x4000_0000`: Peripherie / MMIO
+
+Ohne Datenblatt-Memory-Map kein zuverlässiges Booten.
+
+::: notes
+Falsche Adressen führen zu Bus Faults. Die Memory Map ist Pflichtlektüre jedes MCU-Projekts.
+:::
+
+## Das Linker-Skript
+
+- `.ld`-Datei beschreibt die Memory Map für den Linker
+- `.text` → Flash; `.data` / `.bss` → SRAM
+- Ohne Skript keine korrekte Firmware-Platzierung
+
+```ld
+/* Beispiel eines simplen Linker-Skripts (Ausschnitt) */
+MEMORY {
+  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K
+  RAM (rwx)  : ORIGIN = 0x20000000, LENGTH = 64K
+}
+```
+
+::: notes
+Das Linker-Skript weist Abschnitte den physischen Regionen zu. So landet Code im Flash und Variablen im SRAM.
+:::
+
+## Ausblick Labor (Renode)
+
+Geplantes Laborziel (Details folgen mit dem Übungsblatt):
+
+- C-Projekt für einen RISC-V-SoC kompilieren
+- Linker-Skript und Memory Map untersuchen
+- Binary in Renode laden
+- Speicherinhalte beobachten
+
+::: notes
+Sobald das Übungsblatt steht, verifizieren Sie die Konzepte im Simulator — nicht nur „Kompilieren und hoffen“.
+:::
+
+## Zusammenfassung Block 1
+
+- Speicherphysik: Kompromisse aus Kosten, Geschwindigkeit, Dichte
+- Flash (non-volatil): Firmware; NOR oft mit XIP in MCUs
+- SRAM (6T): schnell, teuer — Caches und Register
+- DRAM (1T1C): dicht, Refresh — Hauptspeicher
+- Linker-Skript verteilt Software auf physische Zonen
+
+::: notes
+Damit ist Block 1 geschlossen. In Block 2 (Vorlesung 2) sehen wir, wie Caches die DRAM-Latenz verbergen. Vielen Dank für Ihre Aufmerksamkeit.
+:::
+

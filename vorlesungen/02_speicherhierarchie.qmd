@@ -12,7 +12,7 @@ format: revealjs
 ## Willkommen zu Block 2!
 
 - Willkommen zurück zur zweiten Vorlesung in Mikrocomputertechnik 3
-- Rückblick: letzte Einheit hat Speicher auf Transistorebene untersucht
+- Rückblick: Block 1 hat Speicher auf Transistor-/Kondensatorebene untersucht (Flash, SRAM, DRAM)
 - Heute: Bindeglied zwischen schneller CPU und langsamem RAM
 - Fokus: das Konzept der Caches
 - Ziel: verstehen, warum die Art Ihres C-Codes die Hardware massiv beeinflusst
@@ -27,33 +27,34 @@ flowchart LR
 ```
 
 ::: notes
-Herzlich willkommen zur zweiten Einheit! Letzte Woche haben wir in die tiefsten physikalischen Ebenen der Speicherbausteine geblickt. Wir haben Transistoren und Kondensatoren gesehen. Heute verlassen wir die reine Physik und begeben uns in die Architektur. Wir werden ein System bauen, das die Schwächen der physikalischen Bausteine versteckt. Sie werden lernen, warum ein simples Vertauschen von zwei Zeilen in Ihrem C-Code Ihr Programm plötzlich hundertmal schneller oder langsamer machen kann.
+Herzlich willkommen zur zweiten Einheit! In Block 1 haben wir Speicher auf Transistor- und Kondensatorebene betrachtet (Flash, SRAM, DRAM). Heute verlassen wir die reine Physik und gehen zur Architektur: Caches verbergen die DRAM-Latenz. Dabei sehen Sie auch, warum die Struktur Ihres C-Codes die Hit Rate — und damit die Laufzeit — stark beeinflussen kann.
 :::
 
-## Rückblick auf das Labor
+## Anknüpfung: Memory Map und Linker
 
-- Memory Mapping: Speicherlandkarte unseres SoC kennengelernt
-- Linker: Code wird in den Flash-Speicher gelegt
-- Variablen im RAM: globale Variablen beim Booten korrekt in den SRAM kopiert
-- Renode: Speicherzugriffe live auf virtueller Hardware beobachtet
-- Erkenntnis: die CPU spricht über physikalische Adressen mit der Außenwelt
+Kurz-Recap aus Block 1 (Labor folgt mit dem Übungsblatt):
+
+- Memory Map: Flash, SRAM und MMIO belegen feste Adressbereiche
+- Linker-Skript legt `.text` in den Flash, Variablen in den SRAM
+- C-Pointer adressieren physische Bausteine über denselben Adressraum
 
 ```c
-// Aus dem letzten Labor:
-int global_var = 42;   // landet im RAM
-const int config = 1;  // landet im Flash
+// Prinzip aus Block 1:
+int global_var = 42;   // typisch: SRAM (.data)
+const int config = 1;  // typisch: Flash (.rodata)
 ```
 
 ::: notes
-Ein kurzer Rückblick auf unser erstes Labor mit Renode. Sie haben erfolgreich C-Code kompiliert und das Linker-Skript analysiert. Sie haben bewiesen, dass der C-Compiler keine magische Blackbox ist, sondern Ihre Variablen knallhart auf physikalische Speicherbausteine verteilt. Heute werden wir sehen, was passiert, wenn die CPU versucht, diese Variablen rasend schnell auszulesen.
+In Block 1 haben wir Memory Map und Linker-Skript konzeptionell eingeführt; das zugehörige Renode-Labor steht als Übungsblatt noch aus. Für heute reicht der Anschluss: Die CPU greift über Adressen auf SRAM/DRAM zu — und genau dort setzen Caches an.
 :::
 
-## Das SRAM- vs. DRAM-Dilemma
+## Kurz-Recap: SRAM vs. DRAM
 
-- Physikalische Realität: wir können nicht alles haben
-- SRAM (6T): extrem schnell (Sub-Nanosekunde), teuer und flächenintensiv
-- DRAM (1T1C): billig und große Kapazität, aber hohe Latenz (Refresh, Multiplexing)
-- Wunsch: 16 GB SRAM — Realität: unbezahlbar und passt auf keinen Chip
+Aus Block 1 (Spickzettel) — die Motivation für Caches:
+
+- SRAM (6T): extrem schnell, teuer, flächenintensiv → Caches/Register
+- DRAM (1T1C): dicht und günstig, aber hohe Latenz (Refresh, Multiplexing)
+- Wunsch „alles SRAM“ ist wirtschaftlich und flächenmäßig unrealistisch
 
 |  | SRAM | DRAM |
 |--|------|------|
@@ -61,10 +62,10 @@ Ein kurzer Rückblick auf unser erstes Labor mit Renode. Sie haben erfolgreich C
 | Kosten / Bit | hoch | niedrig |
 | Typische Rolle | Cache | Hauptspeicher |
 
-*Schematisch — Trendillustration, keine Messdaten.*
+*Schematisch — Trendillustration aus Block 1.*
 
 ::: notes
-Erinnern wir uns an das magische Dreieck aus der letzten Vorlesung. SRAM ist der Porsche: schnell, aber er hat keinen Kofferraum und kostet ein Vermögen. DRAM ist der Güterzug: Er transportiert Gigabytes an Daten, braucht aber ewig, um in Fahrt zu kommen. Wenn wir unseren PC nur aus SRAM bauen, kostet er Millionen. Wenn wir ihn nur aus DRAM bauen, ist er unerträglich langsam.
+Kurz wiederholt aus Block 1: SRAM ist schnell, aber teuer; DRAM fasst Gigabytes, ist aber langsam. Genau dieses Spannungsfeld erzwingt die Speicherhierarchie und den Cache als Zwischenschicht.
 :::
 
 ## Die CPU hungert — das Latenz-Problem
@@ -93,6 +94,12 @@ Hier ist unser fundamentales Problem. Unsere RISC-V Pipeline aus dem letzten Sem
 - Name: Cache (französisch: geheimes Versteck)
 - Ideal: CPU merkt kaum, dass DRAM existiert
 
+::: notes
+Da wir die Physik nicht ändern können, bedienen wir uns einer Illusion. Wir geben der CPU einen winzigen, aber extrem schnellen Schreibtisch (den Cache). Den riesigen Aktenschrank (den DRAM) stellen wir in den Keller. Die Kunst besteht nun darin, immer genau die Akten auf den Schreibtisch zu legen, die die CPU in den nächsten Millisekunden brauchen wird. Wenn das klappt, rechnet die CPU mit maximaler Geschwindigkeit.
+:::
+
+## Cache als Zwischenschicht
+
 ```{mermaid}
 %%| fig-width: 4.2
 %%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
@@ -103,7 +110,7 @@ flowchart LR
 ```
 
 ::: notes
-Da wir die Physik nicht ändern können, bedienen wir uns einer Illusion. Wir geben der CPU einen winzigen, aber extrem schnellen Schreibtisch (den Cache). Den riesigen Aktenschrank (den DRAM) stellen wir in den Keller. Die Kunst besteht nun darin, immer genau die Akten auf den Schreibtisch zu legen, die die CPU in den nächsten Millisekunden brauchen wird. Wenn das klappt, rechnet die CPU mit maximaler Geschwindigkeit.
+Schematisch: Die CPU spricht zuerst mit dem Cache. Nur bei einem Miss geht der Weg zum DRAM — oft hunderte Takte. Genau diese Zwischenschicht macht die Memory Wall handhabbar.
 :::
 
 ## Agenda für den heutigen Tag
@@ -113,7 +120,7 @@ Da wir die Physik nicht ändern können, bedienen wir uns einer Illusion. Wir ge
 3. Cache-Mapping I: Direct Mapped
 4. Cache-Mapping II: Set-Associative
 5. Schreibstrategien: Write-Through vs. Write-Back
-6. Brückenschlag zum C-Code und Vorbereitung auf das Ripes-Labor
+6. Brückenschlag zum C-Code; Ausblick Labor (z. B. Ripes)
 
 ::: notes
 Um diese Illusion perfekt zu machen, müssen wir verstehen, wie der Cache organisiert ist. Wir starten mit der Theorie der Lokalität, klären dann die Vokabeln der Computerarchitekten und schauen uns danach die konkreten Hardware-Schaltungen an, die Daten im Cache wiederfinden. Am Ende übersetzen wir das alles in C-Code.
@@ -128,7 +135,7 @@ Um diese Illusion perfekt zu machen, müssen wir verstehen, wie der Cache organi
 - C-Code so schreiben, dass Cache-Hits maximiert werden
 
 ::: notes
-Am Ende dieser Vorlesung und des anschließenden Labors werden Sie nicht nur wissen, was ein L1-Cache ist. Sie werden in der Lage sein, mathematisch zu berechnen, wie sich ein Cache auf die Ausführungszeit Ihres Programms auswirkt, und Sie werden Ihren C-Code gezielt so umschreiben können, dass er die Hardware optimal ausnutzt.
+Am Ende dieser Vorlesung können Sie Memory Wall, Lokalität und AMAT erklären sowie Direct-Mapped von Set-Associative unterscheiden. Cache-freundlichen C-Code werden Sie im geplanten Labor (z. B. mit Ripes) weiter vertiefen, sobald das Übungsblatt vorliegt.
 :::
 
 ## Die Leitfrage des Tages
@@ -299,7 +306,7 @@ for (int i = 0; i < 100; i++) {
 ```
 
 ::: notes
-Warum stimmt diese Wette der Hardware fast immer? Weil Code sequenziell ist. Der Program Counter zählt fast immer einfach +4 weiter. Und bei Datenstrukturen lieben wir Arrays. Wenn Sie in C ein Array anlegen, liegen die Elemente im RAM physikalisch direkt nebeneinander. Wenn Sie das erste Element lesen, zieht der Cache den gesamten restlichen Datenblock in den schnellen SRAM. Der Zugriff auf Element 2, 3 und 4 kostet Sie dann null Wartezeit!
+Warum stimmt diese Wette der Hardware fast immer? Weil Code sequenziell ist. Der Program Counter zählt fast immer einfach +4 weiter. Und bei Datenstrukturen lieben wir Arrays. Wenn Sie in C ein Array anlegen, liegen die Elemente im RAM physikalisch direkt nebeneinander. Wenn Sie das erste Element lesen, zieht der Cache den gesamten restlichen Datenblock in den schnellen SRAM. Der Zugriff auf Element 2, 3 und 4 kostet dann in der Regel nur noch die Hit Time — ohne erneute Miss Penalty.
 :::
 
 ## Array vs. Linked List
@@ -309,6 +316,12 @@ Warum stimmt diese Wette der Hardware fast immer? Weil Code sequenziell ist. Der
 - Folge: räumliche Lokalität bricht zusammen
 - Cache lädt Blöcke — Nachbardaten sind für die Liste oft nutzlos
 - Linked Lists erzeugen viele Cache Misses; Arrays sind cache-freundlicher
+
+::: notes
+Das ist eine fundamentale Erkenntnis für Sie als Software-Entwickler. In der Informatik lernt man oft, dass verkettete Listen wegen flexibler Einfügeoperationen attraktiv sind. Aus Sicht der modernen Hardware sind sie problematisch: Die Knoten liegen quer im RAM verstreut. Der Cache lädt bei Knoten 1 oft Daten mit, die für Knoten 2 nutzlos sind. Arrays sind auf modernen CPUs deshalb oft um ein Vielfaches schneller — allein wegen besserer Cache-Nutzung.
+:::
+
+## Layout im Speicher: Array vs. Liste
 
 ```{mermaid}
 %%| fig-width: 4.2
@@ -323,7 +336,7 @@ flowchart LR
 ```
 
 ::: notes
-Das ist eine fundamentale Erkenntnis für Sie als Software-Entwickler! In der Informatik lernt man oft, dass verkettete Listen toll sind, weil man Elemente flexibel einfügen kann. Aus Sicht der modernen Hardware ist eine verkettete Liste eine Katastrophe. Die Knoten liegen quer im RAM verstreut. Der Cache lädt bei Knoten 1 sinnlos Daten mit ein, weil Knoten 2 völlig woanders liegt. Arrays sind auf modernen CPUs immer um ein Vielfaches schneller als Listen, allein wegen des Caches!
+Oben: Array-Elemente liegen physikalisch hintereinander — ideal für räumliche Lokalität. Unten: verkettete Liste mit Streuung im Adressraum — der Cache kann Nachbarn kaum sinnvoll mitnutzen.
 :::
 
 ## Die 90/10-Regel
@@ -530,6 +543,12 @@ Wir haben die Metriken und den logischen Aufbau einer Cache-Line besprochen. Im 
 - Herausforderung: Mapping in Hardware, idealerweise in höchstens 1 Takt
 - Drei grundlegende Strategien lösen dieses Problem
 
+::: notes
+Wir stehen vor einem logistischen Engpass. Wir haben Millionen von Aktenordnern im Keller, aber nur 512 freie Plätze auf unserem Schreibtisch. Wenn wir eine Akte hochholen, wo legen wir sie ab? Und wenn die CPU eine Akte sucht, wie findet sie diese in etwa 1 Nanosekunde wieder? Wenn die CPU jede der 512 Positionen nacheinander durchsuchen müsste, wäre der Zeitvorteil des Caches sofort wieder zerstört.
+:::
+
+## Mapping: Kapazität vs. Suche
+
 ```{mermaid}
 %%| fig-width: 4.0
 %%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
@@ -539,7 +558,7 @@ flowchart LR
 ```
 
 ::: notes
-Willkommen zurück. Wir stehen vor einem logistischen Albtraum. Wir haben Millionen von Aktenordnern im Keller, aber nur 512 freie Plätze auf unserem Schreibtisch. Wenn wir eine Akte hochholen, wo legen wir sie ab? Und wenn die CPU eine Akte sucht, wie findet sie diese in 1 Nanosekunde auf dem Schreibtisch wieder? Wenn die CPU jede der 512 Positionen nacheinander durchsuchen müsste, wäre der Zeitvorteil des Caches sofort wieder zerstört.
+Schematische Größenordnung: Der Hauptspeicher fasst Millionen Blöcke, der L1-Cache nur wenige hundert Zeilen. Die Mapping-Funktion muss deshalb in Hardware extrem schnell entscheiden, wohin ein Block gehört und wo er gesucht wird.
 :::
 
 ## Direct Mapped Cache
@@ -549,6 +568,12 @@ Willkommen zurück. Wir stehen vor einem logistischen Albtraum. Wir haben Millio
 - Parkhaus-Metapher: Parkplatznummer aus den letzten Ziffern des Nummernschilds
 - Endet das Schild auf 05 → nur Parkplatz 05
 - Vorteil: Suche nur an genau diesem einen Platz
+
+::: notes
+Direct Mapped ist die simpelste und schnellste Hardware-Lösung. Jedem RAM-Block wird mathematisch ein fester Platz im Cache diktiert. Das ist wie in einem Parkhaus, in dem Sie nicht frei parken dürfen. Wenn die CPU wissen will, ob Block 512 im Cache ist, weiß sie sofort: „Wenn er da ist, dann zwingend auf Platz 0.“ Die Hardware schaut nur auf Fach 0. Ist er da, Hit. Ist er nicht da, Miss.
+:::
+
+## Direct Mapped: feste Zuordnung
 
 ```{mermaid}
 %%| fig-width: 4.2
@@ -562,7 +587,7 @@ flowchart LR
 ```
 
 ::: notes
-Direct Mapped ist die simpelste und schnellste Hardware-Lösung. Jedem RAM-Block wird mathematisch ein fester Platz im Cache diktiert. Das ist wie in einem Parkhaus, in dem Sie nicht frei parken dürfen. Wenn die CPU wissen will, ob Block 512 im Cache ist, weiß sie sofort: „Wenn er da ist, dann zwingend auf Platz 0.“ Die Hardware schaut nur auf Fach 0. Ist er da, super (Hit). Ist er nicht da, dann ist er nirgendwo im Cache (Miss).
+Beispiel mit 512 Zeilen: Block 0 und Block 512 konkurrieren um dieselbe Cache-Zeile 0. Genau diese Kollision führt später zum Thrashing-Problem.
 :::
 
 ## Modulo-Arithmetik in Hardware
@@ -697,21 +722,21 @@ Hier scheitert der Direct Mapped Cache brutal. Wenn zwei Variablen, die Sie im C
 
 ## Thrashing-Beispiel in C
 
-Zwei Arrays, deren Adressen denselben Cache-Index treffen:
+Thrashing *kann* auftreten, wenn zwei heiß genutzte Arrays denselben Cache-Index treffen (abhängig von Alignment, Array-Größe und Cache-Organisation):
 
 ```c
-// A und B kollidieren im Direct Mapped Cache auf demselben Index
+// Kollision möglich, wenn A[i] und B[i] denselben Index abbilden
 int A[1000];
 int B[1000];
 
 for (int i = 0; i < 1000; i++) {
-    // ~100 % Miss Rate: A[i] und B[i] werfen sich gegenseitig raus
+    // im Konfliktfall: gegenseitiges Verdrängen → hohe Miss Rate
     A[i] = A[i] + B[i];
 }
 ```
 
 ::: notes
-Das ist der Albtraum jedes Performance-Engineers. Ein harmloses kleines C-Programm. Zwei Arrays, die addiert werden. Wenn der Linker diese beiden Arrays im SRAM so platziert, dass ihre Adressen exakt den gleichen Cache-Index berechnen, läuft dieses Programm 100-mal langsamer als normal. Und als Programmierer sehen Sie dem Code das Problem überhaupt nicht an!
+Ein harmlos wirkendes C-Programm: Zwei Arrays werden addiert. Wenn der Linker diese Arrays so platziert, dass ihre Adressen denselben Cache-Index ergeben — und der Cache Direct Mapped ist — können sich A und B gegenseitig verdrängen. Dann läuft das Programm deutlich langsamer. Ob die Kollision wirklich eintritt, hängt von Alignment, Größen und Cache-Parametern ab; dem Quelltext allein sieht man das oft nicht an.
 :::
 
 ## Fragen? — Direct Mapped
@@ -768,7 +793,7 @@ Wenn es keinen festen Parkplatz mehr gibt, muss die CPU jedes Mal das gesamte Pa
 - Fazit: für große L1-Caches in der Praxis unbrauchbar
 
 ::: notes
-Fully Associative Caches sind theoretisch perfekt, weil sie Hit-Raten maximieren, aber physikalisch sind sie ein Desaster. Die Hitzeentwicklung und der Platzbedarf der parallelen Vergleichslogik machen es unmöglich, diese Architektur für einen 32-Kilobyte-Cache zu verwenden. Wir brauchen also einen goldenen Kompromiss aus beiden Welten.
+Fully Associative Caches sind theoretisch attraktiv, weil sie Hit-Raten maximieren — physikalisch aber teuer: Hitzeentwicklung und Platzbedarf der parallelen Vergleichslogik machen die Architektur für große L1-Caches ungeeignet. Wir brauchen einen Kompromiss aus beiden Welten.
 :::
 
 ## Der Mittelweg: Set-Associative Cache
@@ -802,13 +827,16 @@ Das ist der Sweetspot. Wenn wir einen 4-Way Set-Associative Cache bauen, brauche
 
 ## Praxis: 2-Way und 4-Way
 
-- Moderne CPUs nutzen Set-Associative Caches
-- ARM Cortex-A: oft 4-Way oder 8-Way L1
-- Intel/AMD: oft 8-Way L1, höhere Assoziativität im L3 (z. B. 16-Way)
+- Moderne CPUs nutzen typischerweise Set-Associative Caches
+- Typische Größenordnungen (schematisch, je nach Generation/Produkt):
+  - L1: oft 4-Way oder 8-Way
+  - L3: oft höhere Assoziativität (z. B. 12–16-Way)
 - Größeres $N$: weniger Konflikt-Misses, aber mehr Komparatoren und Strom
 
+*Angaben schematisch — konkrete Werte den jeweiligen Microarchitecture-/Datenblättern entnehmen.*
+
 ::: notes
-Assoziativität ist das Stellrad der Computerarchitekten. Für den L1-Cache, der irre schnell sein muss, nimmt man vielleicht 4-Way. Für den L3-Cache, bei dem Kapazität und Hit-Rate wichtiger sind als die allerletzte Nanosekunde, verbaut man 16-Way-Strukturen.
+Assoziativität ist das Stellrad der Computerarchitekten. Für den L1-Cache, der extrem schnell sein muss, wählt man oft moderate Assoziativität (z. B. 4- oder 8-Way). Für den L3-Cache, bei dem Kapazität und Hit-Rate wichtiger sind als die letzte Nanosekunde, sind höhere Assoziativitäten üblich. Die konkreten Zahlen variieren stark zwischen Herstellern und Generationen.
 :::
 
 ## Adress-Zerlegung bei Set-Associative
@@ -919,7 +947,7 @@ Haben Sie das Konzept des Set-Associative Mappings verstanden? Wenn ja, haben Si
 - Cache hält dann einen neueren Wert als der RAM
 
 ::: notes
-Caches machen das Leben beim Lesen einfach. Aber das Schreiben bricht uns das Genick. Wenn Sie in C schreiben a = 5;, überschreibt die CPU den Wert im schnellen L1-Cache. Der Wert im Arbeitsspeicher tief unten im System bleibt aber auf dem alten Stand (z. B. 0). Das System ist asynchron geworden.
+Caches machen das Lesen effizient. Beim Schreiben entsteht jedoch ein Konsistenzproblem: Wenn Sie in C `a = 5;` schreiben, aktualisiert die CPU den Wert im L1-Cache. Der Wert im Hauptspeicher kann vorerst unverändert bleiben. Die Ebenen sind dann vorübergehend inkonsistent.
 :::
 
 ## Das Cache-Kohärenz-Problem
@@ -930,7 +958,7 @@ Caches machen das Leben beim Lesen einfach. Aber das Schreiben bricht uns das Ge
 - Architektur muss Updates rechtzeitig in den RAM bringen
 
 ::: notes
-Solange Sie nur einen einzigen CPU-Kern haben, der in seiner eigenen Welt lebt, geht das noch gut. Aber in dem Moment, wo ein zweiter Kern auf den RAM zugreift, brennt die Hütte. Core 2 fragt den RAM nach der Variable a und bekommt eine 0, obwohl Core 1 längst eine 5 ausgerechnet hat. Das nennt man das Cache-Kohärenz-Problem. Wir müssen also entscheiden, wann wir den RAM über das Update informieren.
+Solange nur ein CPU-Kern mit „seinen“ Daten arbeitet, bleibt das oft unsichtbar. Sobald ein zweiter Kern oder ein DMA-Controller auf denselben Speicher zugreift, wird die Inkonsistenz kritisch: Core 2 kann aus dem RAM noch den alten Wert lesen, obwohl Core 1 bereits aktualisiert hat. Das ist das Cache-Kohärenz-Problem — wir müssen entscheiden, wann der RAM aktualisiert wird.
 :::
 
 ## Schreibstrategie 1: Write-Through
@@ -939,6 +967,12 @@ Solange Sie nur einen einzigen CPU-Kern haben, der in seiner eigenen Welt lebt, 
 - Jeder Schreibvorgang geht synchron in L1 und Main Memory
 - Cache und RAM bleiben konsistent
 - Kein anderer Core liest veraltete Daten
+
+::: notes
+Die sicherste Methode ist das Durchschreiben. Jeder Store-Befehl geht nicht nur in den Cache, sondern wird sofort an den langsamen RAM durchgereicht. Das ist vorteilhaft für die Konsistenz: Es gibt keine Diskrepanzen zwischen den Ebenen.
+:::
+
+## Write-Through: Datenfluss
 
 ```{mermaid}
 %%| fig-width: 3.8
@@ -950,18 +984,18 @@ flowchart TD
 ```
 
 ::: notes
-Die sicherste Methode ist das Durchschreiben. Jeder Store-Befehl geht nicht nur in den Cache, sondern wird sofort an den langsamen RAM durchgereicht. Das ist phänomenal für die Sicherheit des Systems. Es gibt nie Diskrepanzen zwischen den Ebenen.
+Ohne Write Buffer muss jeder Store auch den DRAM-Pfad bedienen — konsistent, aber potenziell langsam. Der Write Buffer entschärft das später.
 :::
 
 ## Nachteile von Write-Through
 
-- Jedes `sw` wartet auf den langsamen DRAM ($\approx 300$ Takte)
+- Ohne Write Buffer: jedes `sw` wartet auf den langsamen DRAM ($\approx 300$ Takte)
 - Rückfall in die Memory Wall beim Schreiben
 - Schreibintensive Programme stark ausgebremst
 - Bus durch ständige Einzel-Updates überlastet
 
 ::: notes
-Der Haken ist offensichtlich: Wir verlieren jeglichen Performance-Vorteil des Caches beim Schreiben. Wenn unser C-Code eine Variable tausendmal überschreibt, warten wir tausendmal 300 Taktzyklen auf den DRAM. Write-Through allein würde unseren modernen SoC in die Steinzeit der Performance zurückkatapultieren.
+Ohne Puffer verlieren wir den Performance-Vorteil des Caches beim Schreiben weitgehend. Wenn der C-Code eine Variable tausendmal überschreibt und jeder Store synchron auf den DRAM wartet, zahlen wir tausendmal die lange Latenz. Write-Through allein ist deshalb für performante SoCs oft zu teuer — deshalb folgt der Write Buffer.
 :::
 
 ## Hardware-Hack: Write Buffer
@@ -972,7 +1006,7 @@ Der Haken ist offensichtlich: Wir verlieren jeglichen Performance-Vorteil des Ca
 - Wenn der Buffer voll läuft: CPU muss wieder stallen
 
 ::: notes
-Architekten haben sich einen Trick ausgedacht: den Write Buffer. Es ist wie ein Postausgangskorb auf dem Schreibtisch. Die CPU legt den neuen Wert in den Korb und arbeitet sofort weiter. Jemand anderes (der Controller) trägt den Korb dann langsam zum Keller (DRAM). Das rettet die Performance — solange der Korb nicht überläuft! Bei einem dichten Speicher-Kopier-Befehl ist der Korb sofort voll und wir müssen wieder stottern.
+Der Write Buffer wirkt wie ein Postausgangskorb: Die CPU legt den neuen Wert ab und arbeitet weiter; der Controller transportiert ihn asynchron zum DRAM. Das rettet die Performance — solange der Buffer nicht überläuft. Bei dichten Speicher-Kopien kann er schnell voll sein, dann stallen wir erneut.
 :::
 
 ## Schreibstrategie 2: Write-Back
@@ -980,6 +1014,12 @@ Architekten haben sich einen Trick ausgedacht: den Write Buffer. Es ist wie ein 
 - Write-Back (Zurückschreiben): Schreiben nur in den L1
 - CPU kann dieselbe Variable tausendfach schnell aktualisieren
 - Risiko: Cache ist „schmutzig“ — neuer als der RAM
+
+::: notes
+Der Industriestandard heute ist oft Write-Back. Die CPU aktualisiert Variablen im Cache, ohne bei jedem Store den RAM zu blockieren. Der Hauptspeicher kann vorübergehend veraltete Kopien halten — riskant für Kohärenz, aber vorteilhaft für die Ausführungsgeschwindigkeit.
+:::
+
+## Write-Back: Datenfluss
 
 ```{mermaid}
 %%| fig-width: 3.8
@@ -991,7 +1031,7 @@ flowchart TD
 ```
 
 ::: notes
-Der Industriestandard heute ist Write-Back. Wir lösen die Nabelschnur zum RAM beim Schreiben durch. Die CPU rechnet wild im Cache herum, updatet Variablen tausendfach. Der RAM unten im Keller verrottet mit alten Daten. Das ist riskant, aber für die Ausführungsgeschwindigkeit der CPU ein absoluter Segen.
+Schematisch: Der neue Wert liegt im Cache; der DRAM bleibt vorerst unverändert, bis eine Eviction oder ein Kohärenzprotokoll den Block zurückschreibt.
 :::
 
 ## Das Dirty-Bit
@@ -1058,7 +1098,7 @@ int bild[1000][1000];
 ```
 
 ::: notes
-Im Labor werden wir genau dieses Phänomen live in Ripes testen. Eine simple Matrix. Wir wollen alle Werte auf Null setzen. In C können wir das Array zeilenweise oder spaltenweise durchlaufen. Mathematisch ist das absolut identisch. Architektonisch ist es der Unterschied zwischen einem Porsche und einem Traktor.
+Genau dieses Phänomen eignet sich gut für ein späteres Labor: Eine Matrix auf Null setzen — zeilenweise oder spaltenweise. Mathematisch identisch, architektonisch oft stark unterschiedlich in der Miss Rate.
 :::
 
 ## 2D-Arrays im RAM — Row-Major Order
@@ -1123,22 +1163,22 @@ for (int row = 0; row < 1000; row++) {
 ```
 
 - `[0][0]`: Miss — Line lädt Nachbarn
-- `[0][1]`, `[0][2]`, …: Hits
-- Minimale Miss Rate — oft Vielfaches schneller
+- `[0][1]`, `[0][2]`, …: Hits (nur Hit Time)
+- Minimale Miss Rate — oft um ein Vielfaches schneller
 
 ::: notes
-Zwei Zeilen Code vertauscht, gleiche Mathematik, aber der Code ist unendlich viel schneller. Wir gehen zeilenweise durch. Die innere Schleife rückt immer genau vier Bytes weiter zum physikalischen Nachbarn. Ein einziger Miss erkauft uns 15 wunderbare Hits mit 0 Nanosekunden Wartezeit. Genau so programmieren Profis performanten Code für Bildverarbeitung oder KI-Modelle.
+Zwei Schleifen vertauscht, gleiche Mathematik — aber oft deutlich schneller. Wir gehen zeilenweise durch. Die innere Schleife rückt zum physikalischen Nachbarn. Ein Miss erkauft typischerweise mehrere Hits, die nur noch die Hit Time kosten. Genau so entsteht cache-freundlicher Code für Bildverarbeitung oder lineare Algebra.
 :::
 
-## Vorbereitung auf Ripes
+## Ausblick: Visualisierung im Labor
 
-- Labor visualisiert genau diesen Effekt
-- Ripes: Data-Cache-Tab
-- Matrix-Code laden, Hits/Misses live beobachten
-- Assoziativität und Write-Back konfigurieren, Hit-Raten messen
+- Geplantes Laborziel: denselben Effekt messbar machen
+- Werkzeugkandidat: Ripes (Data-Cache-Ansicht) — Details folgen mit dem Übungsblatt
+- Matrix-Code: Hits/Misses beobachten
+- Assoziativität und Schreibstrategie vergleichen
 
 ::: notes
-Das Schöne an Ripes ist, dass wir die Caches nicht nur theoretisch berechnen, sondern visuell sehen können. Im Labor werden Sie die Hit-Raten von Programmen messen. Sie können die Cache-Strategien mit einem Klick von Direct Mapped auf 4-Way umschalten und beobachten, wie die Miss-Raten plötzlich sinken.
+Die Theorie endet hier bewusst mit einem Ausblick. Sobald das Übungsblatt steht, können Sie Hit-Raten messen und z. B. Direct Mapped gegen 4-Way vergleichen. Bis dahin reicht es, Row-Major vs. Column-Major und die Mapping-Konzepte sicher zu beherrschen.
 :::
 
 ## Zusammenfassung Block 2
@@ -1152,6 +1192,6 @@ Das Schöne an Ripes ist, dass wir die Caches nicht nur theoretisch berechnen, s
 - Software: cache-freundliche Strukturen (z. B. Row-Major Traversal)
 
 ::: notes
-Wir haben heute das Geheimnis gelüftet, warum CPUs trotz lahmen Speichern so extrem leistungsfähig sind. Der Cache ist der heimliche Held der Rechnerarchitektur. Im nächsten Block werden wir das Caching kurz ruhen lassen und uns ansehen, wie das System auf externe Ereignisse in Echtzeit reagiert: Advanced Interrupts und System-Timer stehen auf dem Plan. Vielen Dank und viel Spaß beim Experimentieren in Ripes!
+Wir haben damit begründet, warum CPUs trotz relativ langsamem Hauptspeicher leistungsfähig bleiben: Der Cache nutzt Lokalität aus. Im nächsten Block folgen Advanced Interrupts und System-Timer. Vielen Dank — und viel Erfolg beim Üben der Konzepte.
 :::
 
