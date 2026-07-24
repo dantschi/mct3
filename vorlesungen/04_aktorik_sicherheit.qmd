@@ -68,17 +68,24 @@ Das Muster „Timer misst Zeit, Hauptschleife arbeitet“ ist die Blaupause viel
 - Aktorik: Steuern mechanischer/physikalischer Bauteile (Motoren, Heizungen, Leuchtmittel)
 - Ziel: Größen wie Geschwindigkeit oder Helligkeit stufenlos regeln
 
+::: notes
+Bei Robotern, 3D-Druckern oder Smart-Home muss der SoC Leistung stufenlos regulieren. Genau hier stoßen wir auf eine harte Grenze digitaler Pins.
+:::
+
+## EVA — Schema
+
 ```{mermaid}
-%%| fig-width: 3.6
+%%| fig-width: 4.0
 %%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
 flowchart LR
-  E[Sensor] --> V[SoC]
-  V --> A[Aktorik]
+  E[Eingabe: Sensor] --> V[Verarbeitung: SoC]
+  V --> A[Ausgabe: Aktorik]
+  A --> M[Motor / LED]
   style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
 ```
 
 ::: notes
-Bei Robotern, 3D-Druckern oder Smart-Home muss der SoC Leistung stufenlos regulieren. Genau hier stoßen wir auf eine harte Grenze digitaler Pins.
+Schematisch: Sensor → SoC → Aktor. Heute steht der Ausgangspfad im Vordergrund.
 :::
 
 ## Das Problem der digitalen Welt
@@ -145,8 +152,14 @@ Am Ende können Sie Leistungselektronik stufenlos ansteuern, ohne die CPU zu blo
 - Ohne externe Bauteile wie digitale Potentiometer
 - Wie dimmt man auf 50 %, wenn der Pin nur „Vollgas“ oder „Aus“ kennt?
 
+::: notes
+Wie erzeugen wir „Grau“, wenn wir nur Schwarz und Weiß haben? Die Antwort liegt in schneller Umschaltung — und in Hardware, die das ohne CPU-Last erledigt.
+:::
+
+## Leitfrage — Schema
+
 ```{mermaid}
-%%| fig-width: 3.4
+%%| fig-width: 3.8
 %%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
 flowchart LR
   H[3.3 V HIGH] -->|Trick?| M[Motor bei 50 %]
@@ -155,7 +168,7 @@ flowchart LR
 ```
 
 ::: notes
-Wie erzeugen wir „Grau“, wenn wir nur Schwarz und Weiß haben? Die Antwort liegt in schneller Umschaltung — und in Hardware, die das ohne CPU-Last erledigt.
+Schematisch: zwei Pegel, ein gewünschter Mittelwert — PWM ist der Weg.
 :::
 
 ## CLINT vs. Peripherie-Timer
@@ -182,23 +195,31 @@ In Datenblättern oft TIM1, TIM2, … — eigene kleine Zähl-Subsysteme mit rei
 
 ## Anatomie eines Hardware-Counters
 
-Drei Kernbausteine: Clock → Prescaler → Counter
+Drei Kernbausteine:
 
 - Clock Source: oft Systemtakt (z. B. $100\,\mathrm{MHz}$)
 - Prescaler (PSC): Vorteiler, drosselt den Takt
 - Counter-Register (CNT): Zählwert (typisch 16- oder 32-Bit)
 
+Jeder Tick hinter dem Prescaler erhöht `CNT` um 1.
+
+::: notes
+Ohne Prescaler würde ein 16-Bit-Zähler bei 100 MHz sehr schnell überlaufen — der PSC ist das Getriebe.
+:::
+
+## Counter-Kette — Schema
+
 ```{mermaid}
-%%| fig-width: 3.6
+%%| fig-width: 4.0
 %%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
 flowchart LR
-  A[System Clock] -->|Takt| B[Prescaler]
-  B -->|verlangsamt| C[CNT]
+  A[System Clock\n100 MHz] -->|Takt| B[Prescaler PSC]
+  B -->|verlangsamt| C[Counter CNT]
   style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
 ```
 
 ::: notes
-Ohne Prescaler würde ein 16-Bit-Zähler bei 100 MHz sehr schnell überlaufen — der PSC ist das Getriebe.
+Schematisch: Systemtakt → Prescaler → Counter.
 :::
 
 ## Der Prescaler (Vorteiler)
@@ -242,20 +263,56 @@ Im Labor müssen Sie $f_{\mathrm{cnt}}$ aus Datenblatt-Takt und Prescaler berech
 ARR ist das Limit. Ob die Periode $ARR$ oder $ARR+1$ Zählschritte hat, steht im Datenblatt (Hersteller unterscheiden sich) — vor Duty-Cycle-Rechnungen immer nachschlagen.
 :::
 
-## Zähl-Modi im Überblick
+## Zähl-Modus: Up-Counting
 
-- Up-Counting (Standard): 0 → ARR → Reset → Sägezahn; Basis für Edge-Aligned PWM
-- Down-Counting: ARR → 0 → neu laden; oft bei Timeouts
-- Center-Aligned: 0 → ARR → zurück nach 0 (Dreieck); relevant für Motor-/Wechselrichter-PWM
+- Standard für viele GPT-Anwendungen
+- Ablauf: 0 → hoch bis ARR → Reset auf 0
+- Signalform: Sägezahn
+- Einsatz: Zeitmessung, periodische Interrupts, einfache PWM
+
+| Phase | CNT |
+|-------|-----|
+| Start | 0 |
+| Mitte | steigt |
+| Grenze | ARR |
+| Danach | 0 (neu) |
 
 ::: notes
-Für LEDs und einfache Aktorik reicht Up-Counting. Center-Aligned (symmetrische Pulse) ist vor allem in der Antriebstechnik nützlich.
+Up-Counting zeichnet den klassischen Sägezahn — Basis für Edge-Aligned PWM später.
+:::
+
+## Zähl-Modus: Down-Counting
+
+- Umgekehrt: Start bei ARR, herunter bis 0
+- Bei 0 oft Event/Interrupt; Neu laden mit ARR
+- Signalform: fallender Sägezahn
+- Einsatz: Timeouts; verwandt mit manchen SysTick-Konzepten (z. B. Cortex-M)
+
+::: notes
+Vergleich mit 0 kann in Hardware einfach sein — funktional oft austauschbar mit Up-Counting plus ARR.
+:::
+
+## Zähl-Modus: Center-Aligned
+
+- Fortgeschrittener Modus: 0 → ARR → wieder zurück nach 0 (Richtungsumkehr)
+- Signalform: Dreieck
+- Einsatz: moderne Motorsteuerung (z. B. FOC), Wechselrichter
+
+| Phase | Verhalten |
+|-------|-----------|
+| Aufwärts | 0 → ARR |
+| Abwärts | ARR → 0 |
+| Form | Dreieck |
+
+::: notes
+Center-Aligned ist besonders relevant für BLDC/FOC — symmetrische PWM und weniger störende Schaltmuster.
 :::
 
 ## Fragen? — Counter und GPT
 
 - Rolle von Prescaler (PSC) und Auto-Reload (ARR) klar?
 - Zählfrequenz $f_{\mathrm{cnt}}$ berechnen können?
+- Up-Counting vs. Center-Aligned unterschieden?
 - Warum Datenblatt zu $ARR$ vs. $ARR+1$ prüfen?
 
 ::: notes
@@ -350,7 +407,7 @@ $$
 Bei induktiven Lasten (Motoren) ist das Verhalten komplexer — die Formel bleibt die Einstiegsnäherung.
 
 ::: notes
-Ein langsames Multimeter zeigt oft näherungsweise diesen Mittelwert. Optional: PWM + RC-Tiefpass glättet zu einer echten Analogspannung (einfacher DAC).
+Ein langsames Multimeter zeigt oft näherungsweise diesen Mittelwert — die Physik „glättet“ das Rechteck.
 :::
 
 ## Auflösung (Resolution)
@@ -377,10 +434,20 @@ while (1) {
 ```
 
 - CPU zu 100 % im Busy Waiting — keine andere Arbeit
-- Interrupts (auch „clevere“ Timer-ISRs) erzeugen Jitter: Flanken wandern → Motor zuckt, LED blitzt
+- Jeder Interrupt zerstört das Timing
 
 ::: notes
-Bit-Banging bindet die CPU und leidet unter Prioritätskonflikten. Für präzise Regelung ist das problematisch — deshalb Hardware-PWM.
+Bit-Banging ist in Embedded-Systemen meist ungeeignet: die CPU ist gebunden und kann Sensorik/Netzwerk nicht zuverlässig bedienen.
+:::
+
+## Timing-Problem: Jitter
+
+- Auch mit Timer-ISRs statt `delay()`: andere Interrupts (z. B. UART) verzögern Toggles
+- Jitter: unbestimmte Verschiebung der Flanken
+- Folge: Duty Cycle schwankt → Motor zuckt, LED blitzt
+
+::: notes
+Software-PWM leidet unter Prioritätskonflikten. Für Motorlager und präzise Regelung ist Jitter problematisch.
 :::
 
 ## Hardware-PWM rettet den Tag
@@ -394,16 +461,26 @@ Bit-Banging bindet die CPU und leidet unter Prioritätskonflikten. Für präzise
 Der GPT toggelt in Silizium — ohne Taktzyklen der RISC-V-Pipeline für jedes Flip.
 :::
 
-## Praxis: RGB-LEDs und Wahrnehmung
+## Praxis: RGB-LEDs
 
-- RGB-LED: drei Dioden / drei PWM-Kanäle
+- RGB-LED: drei Dioden (Rot, Grün, Blau)
+- Je Farbe ein PWM-Kanal
 - Beispiel: R 100 %, G 50 %, B 0 % → wahrgenommenes Orange
-- Auge oft näherungsweise logarithmisch: 50 % Duty Cycle wirkt nicht „halb so hell“
-- Gegenmaßnahme: Gamma-Korrektur (Potenz/LUT) für natürliches Fading
 - Laborziel (geplant): Farbverläufe über Duty Cycles
 
 ::: notes
-Klassischer Labor-Use-Case: drei Kanäle mischen RGB. Lineares Hochdimmen wirkt subjektiv am Anfang schnell hell — deshalb oft exponentielle Duty-Cycle-Kurven.
+Klassischer Labor-Use-Case: drei Kanäle, Mischen beliebiger RGB-Farben über Tastverhältnisse.
+:::
+
+## Nichtlinearität des Auges
+
+- Duty Cycle 50 % wirkt oft nicht „halb so hell“
+- Helligkeitsempfindung näherungsweise logarithmisch
+- Bei 50 % PWM oft schon subjektiv sehr hell
+- Gegenmaßnahme: Gamma-Korrektur (Potenz/LUT), damit lineares Fading natürlich wirkt
+
+::: notes
+Im Labor: lineares Hochdimmen wirkt am Anfang schnell hell, danach kaum noch Zuwachs — deshalb oft exponentielle Duty-Cycle-Kurven.
 :::
 
 ## Fragen? — PWM-Grundlagen
@@ -443,7 +520,6 @@ CCR verkleinern → kürzere HIGH-Phase → dunklere LED / weniger Leistung.
 - Up-Counting (Sägezahn) + Vergleich mit CCR → Edge-Aligned PWM
 - Beispiel: `ARR = 1000`, `CCR = 250` → ca. 25 % Duty Cycle (Modell: Periode $0\ldots999$)
 - Pin HIGH von 0 bis unter CCR, danach LOW bis ARR, dann Reset
-- Center-Aligned (Dreieckszähler): Pulse symmetrisch zur Mitte — eher Antriebstechnik; für LEDs reicht Edge-Aligned
 
 ::: notes
 Flankenausgerichtet: ein Sägezahn-Durchlauf, eine klare HIGH-Phase am Anfang der Periode. Ob $ARR$ oder $ARR+1$ die Periodenlänge ist, steht im Datenblatt.
@@ -528,15 +604,51 @@ flowchart LR
 Ein GPT speist mehrere Komparatoren: vier PWM-Signale zum „Preis“ eines Timer-Moduls — Frequenz gemeinsam, Duty Cycles unabhängig.
 :::
 
-## Anwendungen: Servo und Motor
+## Center-Aligned PWM
 
-- Servo (RC): PWM oft als Datenprotokoll (typ. 50 Hz); Pulsbreite $\approx 1{,}0$–$2{,}0\,\mathrm{ms}$ steuert den Winkel; Leistung separat
-- DC-Motor: nie direkt an GPIO — Motortreiber / H-Brücke dazwischen
-- SoC: schwaches PWM-Kommando; H-Brücke schaltet externe Versorgung im gleichen Takt
-- Optional: PWM + RC-Tiefpass $\approx$ einfacher DAC für echte Gleichspannung
+- Dreieckszähler: Komparator schaltet beim Hoch- und Herunterzählen
+- PWM-Pulse symmetrisch zur Periodenmitte
+- Nutzen: Wechselrichter / Motorantrieb — oft weniger störende Harmonische
+- Für LEDs reicht meist Edge-Aligned
 
 ::: notes
-LED-Dimmen: Energieanteil. Servo: Impulsbreite als Information. Motor: MCU steuert den Treiber, nicht den Hochstrom.
+Ausblick Antriebstechnik: zentrierte Pulse können Netzstörungen und Verluste reduzieren. Für Dimmen von LEDs ist Edge-Aligned typisch ausreichend.
+:::
+
+## Glättung von PWM-Signalen
+
+- Manche Lasten brauchen echte Gleichspannung (z. B. Audio)
+- RC-Glied (Widerstand + Kondensator) als Tiefpass am PWM-Pin
+- Hohe Frequenzanteile (Kanten) werden gedämpft → Mittelwert bleibt
+- Ergebnis: steuerbare Analogspannung — PWM als einfacher DAC
+
+::: notes
+Ohne integrierten DAC: PWM + RC-Filter ergibt eine variable Gleichspannung für Zeigerinstrumente oder einfache Analogpfade.
+:::
+
+## Anwendung: Servomotoren
+
+- Hier ist PWM oft Datenprotokoll, nicht reine Leistungsübertragung
+- Typisch: 50 Hz (Periode 20 ms)
+- Pulsbreite steuert den Winkel:
+  - $1{,}0\,\mathrm{ms}$ → eine Endlage
+  - $1{,}5\,\mathrm{ms}$ → Mitte
+  - $2{,}0\,\mathrm{ms}$ → andere Endlage
+- Motorleistung kommt über separate Versorgung
+
+::: notes
+LED-Dimmen: Energieanteil. RC-Servo: Impulsbreite als Information. Die interne Elektronik des Servos setzt den Winkel um.
+:::
+
+## Anwendung: DC-Motoren und H-Brücke
+
+- Motor nie direkt an GPIO (Strombegrenzung, Chip-Schutz)
+- Motortreiber / H-Brücke dazwischen
+- SoC: schwaches PWM-Kommando (z. B. $3{,}3\,\mathrm{V}$)
+- H-Brücke: schaltet externe Versorgung (z. B. 12 V) im PWM-Takt
+
+::: notes
+MCU = Gehirn, Treiber = Muskel. Der Chip steuert Transistoren/H-Brücke; der Hochstrom fließt nicht durch den GPIO.
 :::
 
 ## Zusammenfassung: Hardware-PWM
@@ -737,7 +849,7 @@ Geplantes Szenario:
 Details folgen im Übungsblatt. Ziel: PWM-Fading und Watchdog-Reset im Simulator nachvollziehen.
 :::
 
-## Timer in C: MMIO und Prozent → CCR
+## MMIO-Register für den Timer
 
 Beispielhafte Adressen (fiktiv — immer Datenblatt prüfen):
 
@@ -750,17 +862,33 @@ Beispielhafte Adressen (fiktiv — immer Datenblatt prüfen):
 void init_pwm(void) {
     TIMER_PSC = 99;
     TIMER_ARR = 1000;
-    TIMER_CCR1 = 0;
-}
-
-void set_led_brightness(uint8_t percent) {
-    if (percent > 100) percent = 100;
-    TIMER_CCR1 = (percent * TIMER_ARR) / 100;
+    TIMER_CCR1 = 0;   /* 0 % */
 }
 ```
 
+- PSC: Takt drosseln
+- ARR: Periode / Frequenz
+- CCR1: Duty Cycle Kanal 1
+
 ::: notes
-Hardware-nahe C-Programmierung: Register aus dem Datenblatt beschreiben. Die Hilfsfunktion ist eine kleine HAL — Prozent statt Rohwerten in der Main-Logik.
+Hardware-nahe C-Programmierung: Werte aus dem Datenblatt in MMIO-Register schreiben.
+:::
+
+## Hilfsfunktion: Prozent → CCR
+
+```c
+void set_led_brightness(uint8_t percent) {
+    if (percent > 100) percent = 100;
+    uint32_t ccr = (percent * TIMER_ARR) / 100;
+    TIMER_CCR1 = ccr;
+}
+```
+
+- Menschen: Prozent; Hardware: 0 … ARR
+- Kleine Abstraktion erleichtert die Main-Logik
+
+::: notes
+Typische HAL-Schicht: `set_led_brightness(50)` statt roher Registerarithmetik in jedem Aufrufer.
 :::
 
 ## Fading in der Main-Schleife
