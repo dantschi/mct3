@@ -1,34 +1,38 @@
 # Mikrocomputertechnik 3 (MCT3)
 
-Herzlich willkommen zur Vorlesung **Mikrocomputertechnik 3 (MCT3)** an der Dualen Hochschule Baden-Württemberg Stuttgart.
+Herzlich willkommen zur Vorlesung **Mikrocomputertechnik 3 (MCT3)** an der Dualen Hochschule Baden-Württemberg Stuttgart, Studiengang Elektro- und Informationstechnik.
 
-Das Modul vertieft digitale Rechnerarchitektur und die Hardware/Software-Schnittstelle am Beispiel der **RISC-V**-Architektur — von Speicherkonzepten und Organisation bis zu Entwurf und Verständnis moderner Mikrocomputer.
+**Dozent:** Prof. Dr.-Ing. Daniel Klünder  
+**Kurswebsite:** [dantschi.github.io/mct3](https://dantschi.github.io/mct3/)  
+**Repository:** [github.com/dantschi/mct3](https://github.com/dantschi/mct3)
 
-## Materialien
+Das Modul vertieft digitale Rechnerarchitektur und die Hardware/Software-Schnittstelle am Beispiel der **RISC-V**-Architektur. Aufbauend auf MCT1 zoomen wir vom isolierten CPU-Kern hinaus zum **System-on-Chip (SoC)**: Speicherphysik und -hierarchie, Interrupts und Timer, Aktorik, serielle Busse, DMA, moderne CPU-Features, Edge-AI-Beschleuniger und Multicore — bis hin zu hardwarenaher C-Programmierung am Gesamtsystem.
 
-| Format | Link |
-|--------|------|
-| Folien (Reveal.js) | [01 · Speicherphysik & RAM-Typen](vorlesungen/01_speicherphysik.html) · [02 · Speicherhierarchie & Caches](vorlesungen/02_speicherhierarchie.html) · [03 · Interrupts & Timer](vorlesungen/03_interrupts_timer.html) · [04 · Aktorik & Sicherheit](vorlesungen/04_aktorik_sicherheit.html) · [05 · Serielle Bussysteme](vorlesungen/05_serielle_bussysteme.html) · [06 · Hardware-Beschleunigung (DMA)](vorlesungen/06_hardware_beschleunigung_dma.html) · [07 · Moderne CPU-Architekturen](vorlesungen/07_moderne_cpu_architekturen.html) · [08 · KI-Beschleuniger & Edge AI](vorlesungen/08_ki_beschleuniger_edge_ai.html) · [09 · Paralleles Rechnen & Multicore](vorlesungen/09_paralleles_rechnen_multicore.html) |
-| PDF-Handout (Skript) | [01 · Speicherphysik](vorlesungen/01_speicherphysik-handout.pdf) · [02 · Caches](vorlesungen/02_speicherhierarchie-handout.pdf) · [03 · Interrupts](vorlesungen/03_interrupts_timer-handout.pdf) · [04 · Aktorik](vorlesungen/04_aktorik_sicherheit-handout.pdf) · [05 · Busse](vorlesungen/05_serielle_bussysteme-handout.pdf) · [06 · DMA](vorlesungen/06_hardware_beschleunigung_dma-handout.pdf) · [07 · CPU-Architekturen](vorlesungen/07_moderne_cpu_architekturen-handout.pdf) · [08 · Edge AI](vorlesungen/08_ki_beschleuniger_edge_ai-handout.pdf) · [09 · Multicore](vorlesungen/09_paralleles_rechnen_multicore-handout.pdf) |
+## Kursübersicht
 
-Das PDF-Handout enthält die Folien inklusive Dozentennotizen.
+Der rote Faden der Veranstaltung:
 
-### Übungsblätter
+> Speicherzelle → Caches → Interrupts → Aktorik → Busse → DMA → OoO/Branch → Edge AI → Multicore
 
-Zu den Vorlesungen 1–6 liegen PDF-Übungsblätter und zugehörige Musterlösungen vor (Build über GitHub Actions bei jedem Publish).
+Pro Einheit: Folien (Reveal.js), Handout-PDF sowie — soweit vorhanden — Übungsblatt (Studierende / Musterlösung). Links verweisen auf die Kurswebsite.
 
-| Nr. | Thema | Übungsblatt | Musterlösung |
-|-----|-------|-------------|--------------|
-| 01 | Speicherphysik und Speicher-Mapping | [PDF](labs/lab_01_speicherphysik.pdf) | [PDF](labs/lab_01_speicherphysik-musterloesung.pdf) |
-| 02 | Speicherhierarchie und Caches | [PDF](labs/lab_02_speicherhierarchie.pdf) | [PDF](labs/lab_02_speicherhierarchie-musterloesung.pdf) |
-| 03 | Advanced Interrupts & Timer | [PDF](labs/lab_03_interrupts_timer.pdf) | [PDF](labs/lab_03_interrupts_timer-musterloesung.pdf) |
-| 04 | Aktorik & Sicherheit | [PDF](labs/lab_04_aktorik_sicherheit.pdf) | [PDF](labs/lab_04_aktorik_sicherheit-musterloesung.pdf) |
-| 05 | Serielle Bussysteme | [PDF](labs/lab_05_serielle_bussysteme.pdf) | [PDF](labs/lab_05_serielle_bussysteme-musterloesung.pdf) |
-| 06 | Hardware-Beschleunigung (DMA) | [PDF](labs/lab_06_hardware_beschleunigung_dma.pdf) | [PDF](labs/lab_06_hardware_beschleunigung_dma-musterloesung.pdf) |
+| Einheit | Thema | Schwerpunkt | Folien | Handout | Übungsblatt | Musterlösung |
+|---------|-------|-------------|--------|---------|-------------|--------------|
+| 1 | Speicherphysik & RAM-Typen | SRAM/DRAM, Flash/XIP, Memory Map, Linker | [HTML](vorlesungen/01_speicherphysik.html) | [PDF](vorlesungen/01_speicherphysik-handout.pdf) | [PDF](labs/lab_01_speicherphysik.pdf) | [PDF](labs/lab_01_speicherphysik-musterloesung.pdf) |
+| 2 | Speicherhierarchie & Caches | Lokalität, AMAT, Mapping, cache-freundlicher C-Code | [HTML](vorlesungen/02_speicherhierarchie.html) | [PDF](vorlesungen/02_speicherhierarchie-handout.pdf) | [PDF](labs/lab_02_speicherhierarchie.pdf) | [PDF](labs/lab_02_speicherhierarchie-musterloesung.pdf) |
+| 3 | Interrupts & Timer | Direct/Vectored, CLINT/PLIC, Nested Interrupts, System-Tick | [HTML](vorlesungen/03_interrupts_timer.html) | [PDF](vorlesungen/03_interrupts_timer-handout.pdf) | [PDF](labs/lab_03_interrupts_timer.pdf) | [PDF](labs/lab_03_interrupts_timer-musterloesung.pdf) |
+| 4 | Aktorik & Sicherheit | Hardware-Timer, PWM, Bit-Banging vs. Hardware, Watchdog | [HTML](vorlesungen/04_aktorik_sicherheit.html) | [PDF](vorlesungen/04_aktorik_sicherheit-handout.pdf) | [PDF](labs/lab_04_aktorik_sicherheit.pdf) | [PDF](labs/lab_04_aktorik_sicherheit-musterloesung.pdf) |
+| 5 | Serielle Bussysteme | UART/SPI/I2C, Open-Drain, differentielle Übertragung, EMI | [HTML](vorlesungen/05_serielle_bussysteme.html) | [PDF](vorlesungen/05_serielle_bussysteme-handout.pdf) | [PDF](labs/lab_05_serielle_bussysteme.pdf) | [PDF](labs/lab_05_serielle_bussysteme-musterloesung.pdf) |
+| 6 | Hardware-Beschleunigung (DMA) | Interrupt Storm, Bus-Mastering, Cache-Kohärenz, Ringpuffer | [HTML](vorlesungen/06_hardware_beschleunigung_dma.html) | [PDF](vorlesungen/06_hardware_beschleunigung_dma-handout.pdf) | [PDF](labs/lab_06_hardware_beschleunigung_dma.pdf) | [PDF](labs/lab_06_hardware_beschleunigung_dma-musterloesung.pdf) |
+| 7 | Moderne CPU-Architekturen | ILP-Limits, Out-of-Order, Branch Prediction, Spectre-Idee | [HTML](vorlesungen/07_moderne_cpu_architekturen.html) | [PDF](vorlesungen/07_moderne_cpu_architekturen-handout.pdf) | — | — |
+| 8 | KI-Beschleuniger & Edge AI | Memory Wall, Systolic Arrays, RVV, TensorFlow Lite Micro | [HTML](vorlesungen/08_ki_beschleuniger_edge_ai.html) | [PDF](vorlesungen/08_ki_beschleuniger_edge_ai-handout.pdf) | — | — |
+| 9 | Paralleles Rechnen & Multicore | SMP, MESI, Atomics, Wrap-Up / Klausurvorbereitung | [HTML](vorlesungen/09_paralleles_rechnen_multicore.html) | [PDF](vorlesungen/09_paralleles_rechnen_multicore-handout.pdf) | — | — |
+
+**Hinweise:** Folien im Browser öffnen (Speaker View: Taste `S`). Handout-PDF = Folieninhalt mit Skriptnotizen. Quelltexte unter `vorlesungen/` und `labs/`. Übungsblätter und Musterlösungen werden bei jedem Publish über GitHub Actions als PDF gebaut.
 
 ## Literatur
 
-Die zentrale Referenz dieses Moduls ist:
+Zentrale Referenz dieses Moduls:
 
 > **Sarah L. Harris, David Money Harris**  
 > *Digital Design and Computer Architecture — RISC-V Edition*  
@@ -42,14 +46,16 @@ Zur Vertiefung empfohlen:
 > *Computer Organization and Design: The Hardware/Software Interface — RISC-V Edition*  
 > Morgan Kaufmann
 
-## Tools & Ressourcen
+## Tools und Ressourcen
 
 | Tool | Einsatz | Link |
 |------|---------|------|
-| **RISC-V GCC** | C-Toolchain: Übersetzung von Bare-Metal-C nach RISC-V-Maschinencode | [GCC](https://gcc.gnu.org/) |
-| **Renode** | SoC-Simulator (CPU, Busse, Speicher, Peripherie) für Labor und Treiberentwicklung | [Renode](https://renode.io/) |
+| **RISC-V GCC** | Bare-Metal-C nach RISC-V-Maschinencode (Cross-Toolchain) | [gcc.gnu.org](https://gcc.gnu.org/) |
+| **Renode** | SoC-Simulator (CPU, Busse, Speicher, Peripherie) für Labor und Treiber | [renode.io](https://renode.io/) |
+| **Compiler Explorer** | C live als RISC-V-Assembler betrachten (Optimierung, Scheduling) | [godbolt.org](https://godbolt.org/) |
+| **Ripes** | Visueller RISC-V-Simulator (u. a. Data-Cache-Ansicht) | [github.com/mortbopet/Ripes](https://github.com/mortbopet/Ripes) |
 
-## OER & Lizenz
+## OER und Lizenz
 
 Dieses Vorlesungsmaterial ist eine **Open Educational Resource (OER)**. Die Vorlesungsinhalte – Texte, Code und Diagramme – stehen unter der Lizenz **[Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)**.
 
