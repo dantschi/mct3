@@ -1,0 +1,847 @@
+---
+title: "04 · Aktorik & Sicherheit"
+subtitle: "Mikrocomputertechnik 3 · Von Hardware-Countern, PWM-Signalen und dem rettenden Watchdog"
+author: "Prof. Dr.-Ing. Daniel Klünder"
+lang: de
+# Vortrag:  quarto preview vorlesungen/04_aktorik_sicherheit.qmd
+#           (Notizen nur mit Taste S)
+# Handout:  quarto render vorlesungen/04_aktorik_sicherheit.qmd --profile handout --to pdf
+#           → _handout/vorlesungen/04_aktorik_sicherheit.pdf
+format: revealjs
+---
+
+## Willkommen zu Block 4!
+
+- Willkommen zur vierten Vorlesung in Mikrocomputertechnik 3
+- Rückblick: In Block 3 hat der CLINT dem SoC einen Herzschlag (System-Tick) gegeben
+- Bisher: CPU reagiert auf Ereignisse (Interrupts) und verarbeitet Daten
+- Heute: das System wird aktiv — physikalische Welt steuern (Aktorik)
+- Sicherheitsnetz: Wer passt auf die CPU auf, wenn Software hängt?
+
+::: notes
+Herzlich willkommen zurück! In Block 3 haben wir die Zeit gebändigt: System-Tick, CLINT und PLIC. Ein Mikrocontroller, der nur in sich hineinhorcht, reicht aber nicht. Heute steuern wir Ausgänge — Motoren, LEDs — und klären, wie Hardware bei Software-Abstürzen eingreift (Watchdog).
+:::
+
+## Einordnung im Semester
+
+```{mermaid}
+%%| fig-width: 4.2
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[Block 3: Interrupts] -->|CPU reagiert| B[Block 4: Aktorik]
+  B -->|CPU steuert| C[LEDs und Motoren]
+  D[Watchdog] -.->|Hardware schützt| B
+  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Block 4 verbindet Ereignissteuerung mit Ausgabe und Ausfallsicherheit.
+:::
+
+## Anknüpfung: CLINT, Tick und volatile
+
+Kurz-Recap aus Block 3 (Vertiefung im Übungsblatt):
+
+- System-Tick: CLINT-Timer periodisch (typisch 1 ms)
+- Foreground-ISR und Background-`main()` teilen die CPU-Zeit
+- Geteilte Variablen: `volatile` gegen Compiler-Optimierung
+- PLIC: Prioritäten und Ordnung bei externen Ereignissen
+- Dieser Takt ist Grundlage für die Signalerzeugung heute
+
+```c
+__attribute__((interrupt))
+void timer_isr(void) {
+    uptime_ms++;
+    write_mtimecmp(read_mtime() + TICKS_PER_MS);
+}
+```
+
+::: notes
+Das Muster „Timer misst Zeit, Hauptschleife arbeitet“ ist die Blaupause vieler Embedded-Systeme. Heute nutzen wir präzise Zeitbasis und Peripherie-Timer, um Ausgangspins rhythmisch zu schalten — ohne die CPU zu blockieren.
+:::
+
+## Von der Zeitmessung zur Weltsteuerung
+
+- EVA-Prinzip: Eingabe, Verarbeitung, Ausgabe
+- Bisheriger Fokus: RAM (Verarbeitung) und Interrupts (Eingabe)
+- Fehlender Teil: Eingriff in die physikalische Welt
+- Aktorik: Steuern mechanischer/physikalischer Bauteile (Motoren, Heizungen, Leuchtmittel)
+- Ziel: Größen wie Geschwindigkeit oder Helligkeit stufenlos regeln
+
+```{mermaid}
+%%| fig-width: 3.6
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  E[Sensor] --> V[SoC]
+  V --> A[Aktorik]
+  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Bei Robotern, 3D-Druckern oder Smart-Home muss der SoC Leistung stufenlos regulieren. Genau hier stoßen wir auf eine harte Grenze digitaler Pins.
+:::
+
+## Das Problem der digitalen Welt
+
+- Die CPU lebt in einer binären Welt
+- GPIO-Pin: typisch nur HIGH (z. B. $3{,}3\,\mathrm{V}$) oder LOW ($0\,\mathrm{V}$)
+- Dilemma: halbe Helligkeit / halbe Kraft bräuchte Zwischenwerte (z. B. $1{,}65\,\mathrm{V}$)
+- Viele MCU-Pins haben keinen stufenlosen Analogausgang (DAC)
+- Lösungsidee: Trägheit der realen Welt ausnutzen
+
+::: notes
+Fundamentales Problem digitaler Aktorik: An oder Aus — kein Zwischenwert am Pin. Wir müssen mit Ein/Aus einen Mittelwert simulieren.
+:::
+
+## Das Problem der Software-Fehler
+
+- Zuverlässigkeit: Was, wenn der Code in `while (1);` hängt?
+- Folgen: System reagiert nicht; Aktoren können unkontrolliert weiterlaufen
+- In sicherheitskritischen Domänen (Medizin, Avionik, Industrie) inakzeptabel
+- Bedarf: Hardware, die die CPU überwacht und im Notfall resetten kann
+
+```{mermaid}
+%%| fig-width: 3.6
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TD
+  A[Normaler Betrieb] --> B{Software-Bug?}
+  B -->|ja| C[Freeze / Endlosschleife]
+  C --> D[Hardware muss eingreifen]
+  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Wenn Software tot ist, kann sie keinen Not-Aus auslösen. Der Watchdog ist das zweite große Thema des Blocks — nach der Aktorik.
+:::
+
+## Agenda für den heutigen Tag
+
+1. Hardware-Counter und Timer-Architektur (warum der CLINT hier nicht reicht)
+2. Pulsweitenmodulation (PWM) — Illusion analoger Signale
+3. PWM-Erzeugung in Hardware (Compare-Register)
+4. System-Sicherheit und Watchdog Timer (WDT)
+5. Brückenschlag zum Labor (z. B. Renode und RGB-LEDs)
+
+::: notes
+Zuerst Aktorik und Timer-Hardware, dann PWM, danach Watchdog gegen unkontrollierte Aktoren bei Software-Absturz.
+:::
+
+## Lernziele Block 4
+
+- Aufbau eines General Purpose Timers (GPT) inkl. Prescaler erklären
+- Mathematik der PWM verstehen (Frequenz, Duty Cycle)
+- Begründen, warum Software-PWM (Bit-Banging) die CPU belastet und Timing gefährdet
+- Watchdog Timer (WDT) korrekt konfigurieren und „füttern“
+- Typische Anfängerfehler beim WDT vermeiden
+
+::: notes
+Am Ende können Sie Leistungselektronik stufenlos ansteuern, ohne die CPU zu blockieren, und die Idee ausfallsicherer Überwachung mit dem Watchdog einordnen.
+:::
+
+## Die Leitfrage des Tages
+
+- SoC-Pin: oft maximal $3{,}3\,\mathrm{V}$ (100 %) oder $0\,\mathrm{V}$ (0 %)
+- Ziel: Motor mit ca. 50 % Leistung ($\approx 1{,}65\,\mathrm{V}$ effektiv)
+- Ohne externe Bauteile wie digitale Potentiometer
+- Wie dimmt man auf 50 %, wenn der Pin nur „Vollgas“ oder „Aus“ kennt?
+
+```{mermaid}
+%%| fig-width: 3.4
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  H[3.3 V HIGH] -->|Trick?| M[Motor bei 50 %]
+  L[0 V LOW] -->|Trick?| M
+  style M fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Wie erzeugen wir „Grau“, wenn wir nur Schwarz und Weiß haben? Die Antwort liegt in schneller Umschaltung — und in Hardware, die das ohne CPU-Last erledigt.
+:::
+
+## CLINT vs. Peripherie-Timer
+
+- Warum nicht einfach `mtime` aus Block 3 für Aktorik?
+- CLINT: 64-Bit-System-Timer — läuft durch, darf nicht „wild“ zurückgesetzt werden (OS-Zeitbasis)
+- Aktorik braucht Timer, die periodisch bei 0 neu starten und mit Ausgangspins verbunden sind
+- Lösung: General Purpose Timers (GPT) in der Peripherie — oft viele pro SoC
+
+::: notes
+Die System-Uhr bleibt unangetastet. Für Signale konfigurieren, stoppen und resetten wir GPTs, ohne die OS-Zeit zu verlieren.
+:::
+
+## Der General Purpose Timer (GPT)
+
+- Flexibles Zählwerk in Hardware, unabhängig vom RISC-V-Kern
+- Aufgaben: externe Ereignisse zählen, Zeit stoppen, Pulsmuster auf Pins ausgeben
+- Heute: programmierbarer Signalgenerator — nicht „System-Uhr“
+- Konfiguration über Memory-Mapped Register (MMIO)
+
+::: notes
+In Datenblättern oft TIM1, TIM2, … — eigene kleine Zähl-Subsysteme mit reicher Konfiguration.
+:::
+
+## Anatomie eines Hardware-Counters
+
+Drei Kernbausteine: Clock → Prescaler → Counter
+
+- Clock Source: oft Systemtakt (z. B. $100\,\mathrm{MHz}$)
+- Prescaler (PSC): Vorteiler, drosselt den Takt
+- Counter-Register (CNT): Zählwert (typisch 16- oder 32-Bit)
+
+```{mermaid}
+%%| fig-width: 3.6
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[System Clock] -->|Takt| B[Prescaler]
+  B -->|verlangsamt| C[CNT]
+  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Ohne Prescaler würde ein 16-Bit-Zähler bei 100 MHz sehr schnell überlaufen — der PSC ist das Getriebe.
+:::
+
+## Der Prescaler (Vorteiler)
+
+- Problem: $100\,\mathrm{MHz}$ = $10^{8}$ Ticks/s; 16-Bit-Max $\approx 65\,535$ → Überlauf in unter 1 ms
+- Lösung: Prescaler lässt nur jeden $n$-ten Takt durch
+- Typisch: Registerwert $PSC$, Teilung durch $PSC + 1$ (weil 0 mitzählt)
+- Beispiel: $PSC = 99$ → Teiler 100 → langsameres Zählen, längere Messfenster
+
+::: notes
+$PSC = 0$ heißt nicht „Stopp“, sondern Teiler 1 (volle Geschwindigkeit). Die „+1“ in der Formel ist laborrelevant.
+:::
+
+## Mathematik: Zählfrequenz
+
+$$
+f_{\mathrm{cnt}} = \frac{f_{\mathrm{clock}}}{PSC + 1}
+$$
+
+Beispiel: $f_{\mathrm{clock}} = 100\,\mathrm{MHz}$, $PSC = 9999$
+
+$$
+f_{\mathrm{cnt}} = \frac{10^{8}}{10^{4}} = 10\,\mathrm{kHz}
+$$
+
+→ Counter erhöht sich $10\,000$-mal pro Sekunde (alle $0{,}1\,\mathrm{ms}$).
+
+::: notes
+Im Labor müssen Sie $f_{\mathrm{cnt}}$ aus Datenblatt-Takt und Prescaler berechnen können — inkl. der +1.
+:::
+
+## Das Auto-Reload Register (ARR)
+
+- Wo endet das Zählen? → Auto-Reload / Period Register (ARR)
+- Absolute Obergrenze des Zählers
+- Erreicht `CNT` den ARR-Wert: Hardware setzt typisch auf 0 zurück
+- Dieser Rücksetzzyklus definiert die Periode des Timers
+- Achtung Datenblatt: Periode oft $ARR$ oder $ARR + 1$ Ticks
+
+::: notes
+ARR ist das Limit. Ob die Periode $ARR$ oder $ARR+1$ Zählschritte hat, steht im Datenblatt (Hersteller unterscheiden sich) — vor Duty-Cycle-Rechnungen immer nachschlagen.
+:::
+
+## Zähl-Modi im Überblick
+
+- Up-Counting (Standard): 0 → ARR → Reset → Sägezahn; Basis für Edge-Aligned PWM
+- Down-Counting: ARR → 0 → neu laden; oft bei Timeouts
+- Center-Aligned: 0 → ARR → zurück nach 0 (Dreieck); relevant für Motor-/Wechselrichter-PWM
+
+::: notes
+Für LEDs und einfache Aktorik reicht Up-Counting. Center-Aligned (symmetrische Pulse) ist vor allem in der Antriebstechnik nützlich.
+:::
+
+## Fragen? — Counter und GPT
+
+- Rolle von Prescaler (PSC) und Auto-Reload (ARR) klar?
+- Zählfrequenz $f_{\mathrm{cnt}}$ berechnen können?
+- Warum Datenblatt zu $ARR$ vs. $ARR+1$ prüfen?
+
+::: notes
+PSC drosselt, ARR begrenzt. Als Nächstes: daraus eine „analoge“ Welt — PWM.
+:::
+
+## Die analoge Illusion
+
+- Zurück zur Leitfrage: 50 % Motorleistung mit binärem Pin?
+- Trick: Pin sehr schnell ein- und ausschalten
+- Beispiel: 1 kHz, je Hälfte der Periode HIGH/LOW
+- Motor und Auge sind zu träge, um dem Stottern zu folgen
+- Effekt: Integration/Mittelung → wahrgenommene 50 % Leistung
+
+::: notes
+Wenn Licht sehr schnell blinkt, mittelt das Auge die Helligkeit. Motoren mitteln über Masse und Induktivität ähnlich.
+:::
+
+## Was ist PWM?
+
+- Pulsweitenmodulation (PWM, Pulse Width Modulation)
+- Wichtige Schnittstelle: digitale Steuerung ↔ Leistungselektronik
+- Grundfrequenz bleibt konstant; die Pulsweite (HIGH-Anteil) wird moduliert
+- Breiter Puls → viel Energie; schmaler Puls → wenig Energie
+
+::: notes
+PWM steuert Lüfter, dimmbare LEDs und Motoren: Raster bleibt, nur die HIGH-Dauer ändert sich.
+:::
+
+## Periode und Frequenz
+
+- Periode $T$: Dauer eines Zyklus (HIGH + LOW)
+- Frequenz $f = 1/T$
+- Zu niedrige $f$ (z. B. 10 Hz): sichtbares Flackern, ruckelige Motoren
+- Richtwerte (Faustregeln): LEDs oft $\gtrsim 200\,\mathrm{Hz}$; Motoren oft 10–20 kHz (weniger hörbares Fiepen)
+
+| Abschnitt | Bedeutung |
+|-----------|-----------|
+| HIGH | Energie ein |
+| LOW | Energie aus |
+| $T$ | ein voller Zyklus |
+
+::: notes
+Die Frequenz ist das Raster. Für LEDs gegen Flackern, für Motoren oft höher gegen hörbare Töne.
+:::
+
+## Der Duty Cycle (Tastverhältnis)
+
+- Wichtigste PWM-Größe: Anteil der HIGH-Zeit an der Periode
+
+$$
+\mathrm{Duty\ Cycle} = \frac{t_{\mathrm{HIGH}}}{T}
+$$
+
+- Prozentsatz der Energie, die wir einbringen
+- Periode/Frequenz konstant; wir ändern den Duty Cycle
+
+::: notes
+Im Code regeln Sie typischerweise den Duty Cycle (Dimmer, Sollgeschwindigkeit) — nicht die Grundfrequenz.
+:::
+
+## Duty Cycle in Prozent
+
+Bei konstanter Frequenz:
+
+| Duty Cycle | Wirkung (qualitativ) |
+|------------|----------------------|
+| 10 % | kurze Pulse; schwach |
+| 50 % | halbe Kraft |
+| 90 % | fast dauerhaft HIGH |
+
+Die Periode bleibt gleich — nur die fallende Flanke wandert.
+
+::: notes
+Modulation der Pulsweite bei festem Raster: so steuern Sie die abgegebene Energie.
+:::
+
+## Effektivspannung berechnen
+
+Näherung für den zeitlichen Mittelwert (idealer Mittelwert über die Periode):
+
+$$
+V_{\mathrm{eff}} \approx V_{\mathrm{Pin}} \times \mathrm{Duty\ Cycle}
+$$
+
+Beispiel: $V_{\mathrm{Pin}} = 3{,}3\,\mathrm{V}$, Duty Cycle $= 25\,\%$ $= 0{,}25$
+
+$$
+V_{\mathrm{eff}} \approx 3{,}3\,\mathrm{V} \times 0{,}25 = 0{,}825\,\mathrm{V}
+$$
+
+Bei induktiven Lasten (Motoren) ist das Verhalten komplexer — die Formel bleibt die Einstiegsnäherung.
+
+::: notes
+Ein langsames Multimeter zeigt oft näherungsweise diesen Mittelwert. Optional: PWM + RC-Tiefpass glättet zu einer echten Analogspannung (einfacher DAC).
+:::
+
+## Auflösung (Resolution)
+
+- Feinheit des Dimmens, oft in Bit; gebunden an Counter/ARR
+- 8 Bit: 256 Stufen $\Rightarrow$ Schritt $\approx 100\%/256 \approx 0{,}39\%$
+- 16 Bit: $65\,536$ Stufen — sehr feines Fading
+- Zu grobe Stufen: sichtbarer Treppeneffekt bei LEDs
+
+::: notes
+ARR und Counterbreite begrenzen die nutzbare Auflösung. Für sanftes LED-Fading oft 12–16 Bit wünschenswert.
+:::
+
+## Warum nicht Software? (Bit-Banging)
+
+```c
+/* Software-PWM — blockiert die CPU */
+while (1) {
+    set_pin_high();
+    delay_us(50);   /* 50 % HIGH */
+    set_pin_low();
+    delay_us(50);
+}
+```
+
+- CPU zu 100 % im Busy Waiting — keine andere Arbeit
+- Interrupts (auch „clevere“ Timer-ISRs) erzeugen Jitter: Flanken wandern → Motor zuckt, LED blitzt
+
+::: notes
+Bit-Banging bindet die CPU und leidet unter Prioritätskonflikten. Für präzise Regelung ist das problematisch — deshalb Hardware-PWM.
+:::
+
+## Hardware-PWM rettet den Tag
+
+- Philosophie: konfigurieren und vergessen
+- GPT ist oft direkt mit dem Pin verdrahtet (Alternate Function / Pin-Mux)
+- CPU setzt Frequenz und Duty Cycle einmal — dann weiterrechnen oder schlafen
+- Hardware erzeugt das Rechteck autark und jitterarm
+
+::: notes
+Der GPT toggelt in Silizium — ohne Taktzyklen der RISC-V-Pipeline für jedes Flip.
+:::
+
+## Praxis: RGB-LEDs und Wahrnehmung
+
+- RGB-LED: drei Dioden / drei PWM-Kanäle
+- Beispiel: R 100 %, G 50 %, B 0 % → wahrgenommenes Orange
+- Auge oft näherungsweise logarithmisch: 50 % Duty Cycle wirkt nicht „halb so hell“
+- Gegenmaßnahme: Gamma-Korrektur (Potenz/LUT) für natürliches Fading
+- Laborziel (geplant): Farbverläufe über Duty Cycles
+
+::: notes
+Klassischer Labor-Use-Case: drei Kanäle mischen RGB. Lineares Hochdimmen wirkt subjektiv am Anfang schnell hell — deshalb oft exponentielle Duty-Cycle-Kurven.
+:::
+
+## Fragen? — PWM-Grundlagen
+
+- Periode $T$ und Duty Cycle klar?
+- Warum ist Bit-Banging riskant für Stabilität und Timing?
+- $V_{\mathrm{eff}}$ nachvollziehbar?
+
+::: notes
+Als Nächstes: Counter + Compare-Register — wie die Hardware das Signal erzeugt.
+:::
+
+## Counter trifft Compare-Register
+
+- Bekannt: `CNT` zählt, `ARR` begrenzt die Periode
+- Neu: Capture/Compare Register (`CCR`) — Schwelle für den Duty Cycle
+- Merksatz:
+  - `ARR` → Frequenz / Periode
+  - `CCR` → Duty Cycle
+
+::: notes
+In C programmieren Sie typischerweise ARR (Raster) und CCR (Schieberegler für die Pulsweite).
+:::
+
+## Der Komparator im Timer
+
+- Hardware vergleicht fortlaufend `CNT` und `CCR`
+- Typische Logik (vereinfacht): solange `CNT < CCR` → Pin HIGH, sonst LOW
+- Läuft automatisch — ohne Software-Latenz pro Takt
+
+::: notes
+CCR verkleinern → kürzere HIGH-Phase → dunklere LED / weniger Leistung.
+:::
+
+## Edge-Aligned PWM
+
+- Up-Counting (Sägezahn) + Vergleich mit CCR → Edge-Aligned PWM
+- Beispiel: `ARR = 1000`, `CCR = 250` → ca. 25 % Duty Cycle (Modell: Periode $0\ldots999$)
+- Pin HIGH von 0 bis unter CCR, danach LOW bis ARR, dann Reset
+- Center-Aligned (Dreieckszähler): Pulse symmetrisch zur Mitte — eher Antriebstechnik; für LEDs reicht Edge-Aligned
+
+::: notes
+Flankenausgerichtet: ein Sägezahn-Durchlauf, eine klare HIGH-Phase am Anfang der Periode. Ob $ARR$ oder $ARR+1$ die Periodenlänge ist, steht im Datenblatt.
+:::
+
+## Schritt 1: Start — Pin HIGH
+
+- Start: `CNT = 0`
+- Vergleich: $0 < 250$ (`CNT < CCR`) → ja → Pin HIGH ($3{,}3\,\mathrm{V}$)
+- Timer zählt weiter; die CPU kann andere Aufgaben erledigen
+- LED leuchtet in der HIGH-Phase
+
+| CNT | CCR | Pin |
+|-----|-----|-----|
+| 0 … 249 | 250 | HIGH |
+| $\ge$ 250 | 250 | LOW (nächster Schritt) |
+
+::: notes
+Zyklusbeginn: Counter unter CCR → Hardware hält den Pin HIGH. Die CPU ist nicht am Toggeln beteiligt.
+:::
+
+## Schritt 2: Counter erreicht CCR (Match)
+
+- Counter erreicht exakt `CCR = 250`
+- Vergleich: $250 < 250$? → nein → Compare Match
+- Hardware zieht den Pin sofort auf LOW ($0\,\mathrm{V}$)
+- Pin bleibt LOW, während `CNT` weiter bis ARR steigt (251 … 999)
+- LED in dieser Phase aus
+
+| Phase | Bedingung | Pin |
+|-------|-----------|-----|
+| HIGH | `CNT < CCR` | HIGH |
+| Match | `CNT >= CCR` | LOW |
+
+::: notes
+Ab dem Schwellenwert liefert die Hardware keine Energie mehr bis zum Periodenende. Bei ARR $= 1000$ und CCR $= 250$ sind das in unserem Modell 25 % HIGH (Zählung $0\ldots999$). Prüfen Sie im Datenblatt, ob die Periode $ARR$ oder $ARR+1$ beträgt.
+:::
+
+## Schritt 3: Counter erreicht ARR (Neustart)
+
+- `CNT` erreicht `ARR = 1000`
+- Auto-Reload: Hardware setzt `CNT` auf 0
+- Vergleich erneut: $0 < 250$ → ja → Pin wieder HIGH
+- Ergebnis: Rechteck mit 25 % Duty Cycle — ohne laufende CPU-Arbeit
+
+::: notes
+Der Kreis schließt sich: ARR startet den Zyklus neu. Bei z. B. 10 kHz Periodenrate dimmt die Hardware flackerfrei, während die CPU schlafen oder rechnen kann.
+:::
+
+## Die Polarität (Polarity)
+
+- Bisher Active-High: `CNT < CCR` → Pin HIGH
+- Alternative: Active-Low — Logik invertiert
+- Wichtig bei invertierter Beschaltung (z. B. Common-Anode-LEDs, manche Treiber)
+- Typisch: Polarity-Bit im Timer-Konfigurationsregister
+
+::: notes
+Laborfalle: Duty Cycle erhöhen und die LED wird dunkler → oft Active-Low. Polarity-Bit setzen, statt die Software-Logik zu verdrehen.
+:::
+
+## Mehrere Kanäle an einem Timer
+
+- Ein Timer: ein Counter und ein ARR → gemeinsame Frequenz
+- Oft 4 Compare-Register (CCR1–CCR4) → bis zu 4 Pins
+- Unterschiedliche Duty Cycles möglich, gleiche Grundfrequenz
+- Ideal für RGB: ein Rhythmus, drei Helligkeiten
+
+```{mermaid}
+%%| fig-width: 4.0
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  CNT[Counter und ARR] --> C1[CCR1]
+  CNT --> C2[CCR2]
+  CNT --> C3[CCR3]
+  C1 --> R[LED Rot]
+  C2 --> G[LED Grün]
+  C3 --> B[LED Blau]
+  style CNT fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Ein GPT speist mehrere Komparatoren: vier PWM-Signale zum „Preis“ eines Timer-Moduls — Frequenz gemeinsam, Duty Cycles unabhängig.
+:::
+
+## Anwendungen: Servo und Motor
+
+- Servo (RC): PWM oft als Datenprotokoll (typ. 50 Hz); Pulsbreite $\approx 1{,}0$–$2{,}0\,\mathrm{ms}$ steuert den Winkel; Leistung separat
+- DC-Motor: nie direkt an GPIO — Motortreiber / H-Brücke dazwischen
+- SoC: schwaches PWM-Kommando; H-Brücke schaltet externe Versorgung im gleichen Takt
+- Optional: PWM + RC-Tiefpass $\approx$ einfacher DAC für echte Gleichspannung
+
+::: notes
+LED-Dimmen: Energieanteil. Servo: Impulsbreite als Information. Motor: MCU steuert den Treiber, nicht den Hochstrom.
+:::
+
+## Zusammenfassung: Hardware-PWM
+
+- GPT erzeugt Signale autark (kein Bit-Banging)
+- Frequenz: Prescaler (PSC) und Auto-Reload (ARR)
+- Duty Cycle: Compare-Register (CCR)
+- Active-High (typisch): `CNT < CCR` → Pin HIGH
+- LEDs direkt (strombegrenzt); Motoren über Treiber/H-Brücke — jitterarm
+
+::: notes
+Damit endet der Aktorik-Teil: wenige Register setzen, Hardware erledigt das Rechteck. Als Nächstes: Was, wenn Software einfriert und der Aktor auf hoher Leistung stehen bleibt?
+:::
+
+## Fragen? — Hardware-PWM
+
+- Zusammenspiel von Counter, ARR und CCR?
+- Warum gleiche Frequenz, aber unterschiedliche Duty Cycles auf einem Timer?
+- PWM zum Dimmen vs. PWM als Servo-Protokoll?
+
+::: notes
+Als Nächstes: Software-Abstürze in kritischen Systemen und der Watchdog.
+:::
+
+## Szenario: System ohne Reset-Zugang
+
+- Beispiel: Gerät ohne physischen Zugang (Satellit, Implantat, Feldgerät)
+- Software hängt in einer Endlosschleife (Freeze)
+- Kommunikation und Steuerung fallen aus
+- Niemand kann den Reset-Knopf drücken
+- Folge: Mission / Funktion dauerhaft verloren — ohne Selbstheilung
+
+::: notes
+Auf dem Schreibtisch reicht der Reset-Taster. In autonomen oder unzugänglichen Systemen muss Hardware von Software-Ausfällen ausgehen und selbst eingreifen können.
+:::
+
+## Warum stürzt Software ab?
+
+- Endlosschleifen (z. B. Timeout vergessen: `while (sensor_busy);`)
+- Deadlocks (Multicore, später Block 9)
+- Stack Overflow (z. B. zu tiefes Nesting)
+- Soft-Errors: Bit-Flips (z. B. Strahlung) → Program Counter / Zustand zerstört
+
+::: notes
+Selbst gut getesteter Code kann scheitern. Wir brauchen eine Hardware-Lebensversicherung unabhängig von der CPU-Logik.
+:::
+
+## Leitfrage 2: Wer resettet die tote CPU?
+
+- OS/C-Code abgestürzt — CPU reagiert nicht mehr
+- Wie resettet man, wenn das „Gehirn“ den Reset nicht mehr auslösen kann?
+- Antwort: Software nicht vertrauen — unabhängige, einfache Hardware
+
+```{mermaid}
+%%| fig-width: 3.6
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TD
+  CPU[CPU abgestürzt] -->|keine Reaktion| S[System eingefroren]
+  W{Wer drückt Reset?} -.-> S
+  style W fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Ein totes Gehirn startet sich nicht selbst. Es braucht eine externe Instanz — den Watchdog.
+:::
+
+## Der Watchdog Timer (WDT)
+
+- WDT: einfaches Hardware-Modul, getrennt von der ALU
+- Ultimatum: z. B. „Reset in 5 s, wenn kein Lebenszeichen“
+- Gesunde Software setzt den Zähler periodisch zurück
+- Bei Ausfall: Timeout → Hardware zieht die Reset-Leitung
+
+::: notes
+Der Watchdog ist eine Zeitbombe, die Software regelmäßig entschärfen muss. Sonst erzwingt er einen System-Reset.
+:::
+
+## Architektur des WDT
+
+- Oft Down-Counter
+- Beim Start: Timeout-Wert laden (z. B. äquivalent zu 5 s) und starten
+- Zählt rückwärts; bei vielen SoCs nach Aktivierung nicht mehr abschaltbar
+- Einfachheit ist Sicherheitsfeature
+
+::: notes
+Wenige Features, harte Semantik: einmal scharf, oft nicht per Software zu stoppen — auch gegen Missbrauch nach Kompromittierung.
+:::
+
+## Der Biss des Hundes
+
+- Counter erreicht 0
+- Kein „freundlicher“ Interrupt (CPU könnte taub sein)
+- Direkter Eingriff in Reset-/Power-Management
+- Chip wie nach Hardware-Reset: CPU, Zustand, Peripherie neu
+- Boot ab Reset-Vektor / Flash-Startadresse
+
+::: notes
+Der WDT löst einen harten Reset aus — die Freeze-Schleife ist weg, das System startet sauber neu.
+:::
+
+## Den Hund streicheln (Feed)
+
+- Gesunde Software muss den WDT periodisch zurücksetzen
+- „Petting / kicking the dog“: magischen Wert ins Feed-Register schreiben
+- Counter springt auf den Startwert zurück
+
+```c
+void wdt_feed(void) {
+    *(volatile uint32_t *)WDT_FEED_REG = 0xAA55;
+}
+```
+
+::: notes
+Regelmäßiges Schreiben ins Feed-Register ist das Lebenszeichen: „Ich lebe noch.“
+:::
+
+## Wo streichelt man den Hund?
+
+- Falsch: Füttern nur in der SysTick-ISR
+  - `main` kann tot sein, Interrupts laufen weiter → kein Reset
+- Richtig: in der untersten `while (1)`-Ebene der Geschäftslogik
+
+```c
+int main(void) {
+    init_wdt();  /* z. B. 5 s Timeout */
+    while (1) {
+        lese_sensoren();
+        berechne_werte();
+        wdt_feed();  /* nur wenn wir hier ankommen */
+    }
+}
+```
+
+::: notes
+Klassischer Fehler: Feed in der 1-ms-ISR. Die Hauptschleife hängt, der Tick füttert weiter — der Watchdog „merkt“ den Freeze nicht.
+:::
+
+## Unabhängige Taktquelle (LSI)
+
+- Was, wenn der Hauptquarz ausfällt?
+- Gemeinsamer Takt: CPU und WDT würden gemeinsam einfrieren
+- Echter WDT: eigener Low-Speed-Oszillator (LSI, oft $\approx 32\,\mathrm{kHz}$)
+- Isolation: Überwachung unabhängig vom CPU-Takt
+
+::: notes
+Sicherheit braucht Isolation. Stirbt der Systemtakt, muss der WDT weiterzählen und resetten können.
+:::
+
+## Window Watchdog (WWDG)
+
+- Normaler WDT: erkennt zu langsames Füttern (Timeout)
+- Problem: fehlerhafter Code füttert zu oft / zu früh
+- Window Watchdog: Füttern nur in einem Zeitfenster erlaubt
+- Zu früh oder zu spät → Reset
+
+| Zeitpunkt | Bewertung |
+|-----------|-----------|
+| vor Fenster | Reset (zu früh) |
+| im Fenster | OK |
+| nach Timeout | Reset (zu spät) |
+
+::: notes
+Für kritische Systeme: das Fenster beweist, dass die Software im erwarteten Takt läuft — nicht nur „irgendwie noch füttert“.
+:::
+
+## Zusammenfassung Watchdog
+
+- WDT: Netz bei Freeze, Deadlocks, entgleistem Ablauf
+- Autarker Down-Counter → harter System-Reset bei 0
+- Software setzt periodisch zurück (Feed)
+- Feed in der Main-Loop, nicht in der Timer-ISR
+- Window Watchdog: auch zu schnelles Abarbeiten erkennen
+
+::: notes
+Mit korrekt platziertem Feed überlebt das System viele Software-Ausfälle durch Neustart. Im Labor (geplant) lässt sich der Freeze bewusst provozieren.
+:::
+
+## Fragen? — Watchdog
+
+- Warum eigener Takt (nicht CPU-Takt)?
+- Warum ist Feed in der Timer-ISR ein Designfehler?
+- Welches Problem löst der Window Watchdog zusätzlich?
+
+::: notes
+Als Nächstes: PWM und Watchdog zusammen — Ausblick auf das Labor in Renode.
+:::
+
+## Ausblick Labor: smarte Lampe
+
+Geplantes Szenario:
+
+- Timer als PWM-Generator; virtuelle RGB-LEDs in Renode
+- Fading in der Main-Schleife
+- Watchdog aktivieren
+- Virtueller Taster → künstliche `while (1);` (Freeze provozieren)
+
+::: notes
+Details folgen im Übungsblatt. Ziel: PWM-Fading und Watchdog-Reset im Simulator nachvollziehen.
+:::
+
+## Timer in C: MMIO und Prozent → CCR
+
+Beispielhafte Adressen (fiktiv — immer Datenblatt prüfen):
+
+```c
+#define TIMER_BASE 0x40000000
+#define TIMER_PSC  (*(volatile uint32_t *)(TIMER_BASE + 0x00))
+#define TIMER_ARR  (*(volatile uint32_t *)(TIMER_BASE + 0x04))
+#define TIMER_CCR1 (*(volatile uint32_t *)(TIMER_BASE + 0x0C))
+
+void init_pwm(void) {
+    TIMER_PSC = 99;
+    TIMER_ARR = 1000;
+    TIMER_CCR1 = 0;
+}
+
+void set_led_brightness(uint8_t percent) {
+    if (percent > 100) percent = 100;
+    TIMER_CCR1 = (percent * TIMER_ARR) / 100;
+}
+```
+
+::: notes
+Hardware-nahe C-Programmierung: Register aus dem Datenblatt beschreiben. Die Hilfsfunktion ist eine kleine HAL — Prozent statt Rohwerten in der Main-Logik.
+:::
+
+## Fading in der Main-Schleife
+
+```c
+int main(void) {
+    init_pwm();
+    int brightness = 0;
+    while (1) {
+        set_led_brightness(brightness);
+        brightness = (brightness + 1) % 101;
+        delay_ms(10);   /* oder SysTick aus Block 3 */
+        wdt_feed();
+    }
+}
+```
+
+- Sanftes Hochdimmen; Feed beweist lebendige Hauptschleife
+
+::: notes
+Sauberer: Wartezeiten über SysTick statt busy `delay`. Wichtig bleibt: Feed nur hier, nicht in der ISR.
+:::
+
+## Den Crash provozieren
+
+- Watchdog-Timeout z. B. 2 s
+- Button → künstlicher Deadlock ohne Feed
+
+```c
+if (button_pressed()) {
+    printf("Freeze — warte auf WDT...\n");
+    while (1) {
+        /* kein wdt_feed() */
+    }
+}
+```
+
+::: notes
+PWM-Hardware kann die LED-Helligkeit halten, während `main` hängt. Nach Timeout: harter Reset durch den WDT.
+:::
+
+## Reset-Ursache lesen
+
+- Nach Reboot: warum neu gestartet?
+- Reset-Reason-Register (Power-/Reset-Block)
+- Beim Boot zuerst auswerten
+
+```c
+void check_reset_reason(void) {
+    uint32_t reason = *(volatile uint32_t *)RESET_REASON_REG;
+    if (reason & WDT_RESET_FLAG) {
+        printf("WDT-Reset nach Freeze\n");
+        /* optional: loggen / sicherer Modus */
+    }
+}
+```
+
+::: notes
+Professionelle Systeme unterscheiden Power-On, Pin-Reset und WDT-Reset — und reagieren darauf (Log, Warnung, degradierter Betrieb).
+:::
+
+## Best Practices: WDT-Intervall
+
+- Zu kurz: Fehlalarme bei kurzer CPU-Last (z. B. schwere Berechnung)
+- Zu lang: sichtbarer Freeze; Aktoren wirken zu lange unkontrolliert
+- Praxis oft: etwa $0{,}5$–$3\,\mathrm{s}$, abhängig von Mechanik und Risiko
+
+::: notes
+Das Intervall ist eine Designentscheidung: sicherheitskritische Aktoren brauchen kürzere Timeouts als unkritische Anzeigen.
+:::
+
+## Zusammenfassung Block 4
+
+- Aktorik über PWM: Illusion steuerbarer Mittelwerte
+- GPT: ARR (Frequenz), CCR (Duty Cycle) — autark im Hintergrund
+- Kein Bit-Banging: weniger CPU-Last und Jitter
+- WDT: harter Reset bei Software-Freeze
+- Feed nur in der Main-Loop, nie allein in der Timer-ISR
+
+Vielen Dank — wir sehen uns im Labor.
+
+::: notes
+Block 4 schließt EVA und funktionale Grundsicherheit. Im Renode-Labor setzen Sie PWM und Watchdog praktisch um.
+:::
