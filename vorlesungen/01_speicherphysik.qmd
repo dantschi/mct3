@@ -1,5 +1,5 @@
 ---
-title: "01 · Speicherphysik & RAM-Typen"
+title: "01 · Speicherphysik (Teil 1: Non-Volatile)"
 subtitle: "Mikrocomputertechnik 3 · DHBW Stuttgart"
 author: "Prof. Dr.-Ing. Daniel Klünder"
 # Vortrag:  quarto preview vorlesungen/01_speicherphysik.qmd
@@ -41,26 +41,13 @@ Herzlich willkommen zu Mikrocomputertechnik 3! Es freut mich sehr, Sie nach MCT1
 - Pipelining: mehrere Befehle gleichzeitig auf dem Fließband
 - Memory-Mapped I/O: Geräte tarnen sich als Adressen im Arbeitsspeicher
 
-:::: {.columns}
-
-::: {.column width="48%"}
-
-```asm
-# MCT1 Refresher
-la s1, 0xF0000000
-lw t0, 0(s1)
+```riscv
+# MCT1 Refresher: Basisadresse und I/O-Register
+la   s1, 0xF0000000
+lw   t0, 0(s1)
 andi t1, t0, 1
-beq t1, zero, Wait
-
+beq  t1, zero, Wait
 ```
-
-:::
-
-::: {.column width="48%"}
-Wenn alles über Speicheradressen läuft, müssen wir verstehen, wie Speicher physikalisch aufgebaut ist.
-:::
-
-::::
 
 ::: notes
 Erinnern wir uns kurz an unser Handwerkszeug aus MCT1. Wir kennen die Architektur, wir wissen, was ein Load- und ein Store-Befehl auf dem Silizium auslösen und wie Pipelining den Durchsatz maximiert. Am Ende von MCT1 haben wir bereits gesehen, dass LEDs und Schalter über Memory-Mapped I/O angesteuert werden können. Genau an dieser Stelle setzen wir an: Wenn alles über Speicheradressen läuft, müssen wir verstehen, wie diese Speicher physikalisch aufgebaut sind.
@@ -69,13 +56,18 @@ Erinnern wir uns kurz an unser Handwerkszeug aus MCT1. Wir kennen die Architektu
 ## Der Paradigmenwechsel: Core vs. SoC
 
 - Der Core (CPU): reines Rechenwerk (ALU, Register, Pipeline)
-- Früher: CPU, RAM und I/O-Controller als getrennte Bausteine auf der Platine
-- System-on-Chip (SoC): alle Komponenten auf einem Silizium-Die
-- Vorteile: geringerer Stromverbrauch, geringere Kosten, weniger Platz
-- Herausforderung: der interne Systembus muss den Datenhunger der CPU stillen
+- Früher: CPU, RAM und I/O als getrennte Bausteine auf der Platine
+- Heute: System-on-Chip — alles auf einem Silizium-Die
+- Vorteile: weniger Strom, Kosten und Platz; Herausforderung: Systembus
+
+::: notes
+Der Begriff Mikroprozessor ist heute eigentlich fast überholt; wir sprechen meistens von Mikrocontrollern oder System-on-Chips. Warum? Weil es aus physikalischen und finanziellen Gründen viel sinnvoller ist, den Arbeitsspeicher, den Festspeicher und die Peripherie-Controller direkt mit der CPU auf dasselbe Stück Silizium zu drucken. Das spart Latenz und Energie, da keine Signale über kupferne Leiterbahnen einer Platine geschickt werden müssen.
+:::
+
+## SoC: Komponenten am Systembus
 
 ```{mermaid}
-%%| fig-width: 4.8
+%%| fig-width: 4.2
 %%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
 flowchart TB
   subgraph SoC["System-on-Chip"]
@@ -94,11 +86,10 @@ flowchart TB
     UART --- Bus
   end
   style Bus fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-
 ```
 
 ::: notes
-Der Begriff Mikroprozessor ist heute eigentlich fast überholt; wir sprechen meistens von Mikrocontrollern oder System-on-Chips. Warum? Weil es aus physikalischen und finanziellen Gründen viel sinnvoller ist, den Arbeitsspeicher, den Festspeicher und die Peripherie-Controller direkt mit der CPU auf dasselbe Stück Silizium zu drucken. Das spart Latenz und Energie, da keine Signale über kupferne Leiterbahnen einer Platine geschickt werden müssen.
+Im SoC hängen CPU, Cache, Flash, RAM und Peripherie am gemeinsamen Systembus. Der Bus muss den Datenhunger der CPU stillen — ohne ihn bleibt selbst der schnellste Kern untätig.
 :::
 
 ## Unsere Werkzeuge in MCT3
@@ -272,8 +263,10 @@ In der Harvard-Architektur entzerren wir den Verkehr. Wir haben zwei Busse. Gena
 | früh       | $1\times$  | $1\times$  |
 | später     | $16\times$ | $\approx 3\times$ |
 
+*Schematisch — Trendillustration, keine Messdaten.*
+
 ::: notes
-Das ist eines der wichtigsten Diagramme der Rechnerarchitektur. Jahrelang haben wir CPUs höher getaktet. Aber der Arbeitsspeicher, der auf einer anderen Platine liegt, wird physikalisch nicht im selben Maß schneller. Die Folge: Die CPU verhungert am Datenbus. Wenn eine CPU bei 4 GHz arbeitet und der RAM 100 Nanosekunden für eine Antwort braucht, vergehen 400 Taktzyklen, in denen die CPU einfach nichts tun kann!
+Die Tabelle ist bewusst schematisch — sie illustriert den Trend, keine konkreten Messreihen. Jahrelang haben wir CPUs höher getaktet. Aber der Arbeitsspeicher, der auf einer anderen Platine liegt, wird physikalisch nicht im selben Maß schneller. Die Folge: Die CPU verhungert am Datenbus. Wenn eine CPU bei 4 GHz arbeitet und der RAM 100 Nanosekunden für eine Antwort braucht, vergehen 400 Taktzyklen, in denen die CPU einfach nichts tun kann!
 :::
 
 ## Das magische Speicher-Dreieck
@@ -597,10 +590,10 @@ Wir brauchen Speicher, der:
 Antwort: volatiler Speicher (RAM).\
 Zwei Technologien: **SRAM** und **DRAM**.
 
-*(Übergang in den zweiten Teil der Vorlesung)*
+*(Fortsetzung in Termin 2: RAM-Typen, Spezialspeicher, Linker)*
 
 ::: notes
-Für Variablen, Zwischenergebnisse der ALU und den Stack brauchen wir ein perfektes Kurzzeitgedächtnis. Das bringt uns zum zweiten großen Kapitel des heutigen Tages: dem volatilen Arbeitsspeicher. Wir werden sehen, wie sich Ingenieure geniale Schaltungen überlegt haben, um Bits rasend schnell zu speichern.
+Für Variablen, Zwischenergebnisse der ALU und den Stack brauchen wir ein perfektes Kurzzeitgedächtnis. Das bringt uns zum volatilen Arbeitsspeicher — den zweiten großen Block. SRAM und DRAM behandeln wir in Termin 2.
 :::
 
 ## Fragen?
@@ -610,18 +603,18 @@ Für Variablen, Zwischenergebnisse der ALU und den Stack brauchen wir ein perfek
 - Wear Leveling?
 
 ::: notes
-Bevor wir in die Transistorebene des SRAMs eintauchen, machen wir eine kurze Pause für Fragen. Ist das Konzept klar, warum wir auf einem Mikrocontroller nicht einfach NAND-Flash verwenden können, um Code auszuführen?
+Bevor wir in Termin 2 in die Transistorebene von SRAM und DRAM eintauchen: Ist das Konzept klar, warum wir auf einem Mikrocontroller nicht einfach NAND-Flash verwenden können, um Code auszuführen?
 :::
 
-## Kurze Pause
+## Kurze Pause — Fortsetzung in Termin 2
 
-10 Minuten Pause.\
-Gleich geht es weiter mit:
+10 Minuten Pause bzw. Ende von Termin 1.\
+In Termin 2 geht es weiter mit:
 
 - SRAM (6-Transistor-Zelle)
 - DRAM (1-Transistor-Zelle und Refresh)
 - Spezialspeicher (FIFOs und Dual-Ported RAM)
 
 ::: notes
-Atmen Sie kurz durch, holen Sie sich einen Kaffee. In zehn Minuten geht es weiter mit der Physik des Arbeitsspeichers.
+Atmen Sie kurz durch. Termin 1 schließt hier mit dem non-volatilen Speicher. In Termin 2 folgt die Physik des Arbeitsspeichers — SRAM, DRAM und Spezialspeicher im SoC.
 :::

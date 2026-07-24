@@ -8,8 +8,8 @@ Das Modul vertieft digitale Rechnerarchitektur und die Hardware/Software-Schnitt
 
 | Format | Link |
 |--------|------|
-| Folien (Reveal.js) | [01 · Speicherphysik](vorlesungen/01_speicherphysik.html) |
-| PDF-Handout (Skript) | [01 · Speicherphysik (PDF)](vorlesungen/01_speicherphysik-handout.pdf) |
+| Folien (Reveal.js) | [01 · Speicherphysik (Teil 1)](vorlesungen/01_speicherphysik.html) · [02 · Speicherhierarchie & Caches](vorlesungen/02_speicherhierarchie.html) |
+| PDF-Handout (Skript) | [01 · Speicherphysik Teil 1 (PDF)](vorlesungen/01_speicherphysik-handout.pdf) · [02 · Caches (PDF)](vorlesungen/02_speicherhierarchie-handout.pdf) |
 | Übungsblatt | [Beispielblatt (PDF)](labs/lab_01_beispiel.pdf) |
 | Musterlösung | [Beispielblatt Musterlösung (PDF)](labs/lab_01_beispiel-musterloesung.pdf) |
 
