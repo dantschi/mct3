@@ -8,8 +8,8 @@ Das Modul vertieft digitale Rechnerarchitektur und die Hardware/Software-Schnitt
 
 | Format | Link |
 |--------|------|
-| Folien (Reveal.js) | [01 · Speicherphysik & RAM-Typen](vorlesungen/01_speicherphysik.html) · [02 · Speicherhierarchie & Caches](vorlesungen/02_speicherhierarchie.html) |
-| PDF-Handout (Skript) | [01 · Speicherphysik (PDF)](vorlesungen/01_speicherphysik-handout.pdf) · [02 · Caches (PDF)](vorlesungen/02_speicherhierarchie-handout.pdf) |
+| Folien (Reveal.js) | [01 · Speicherphysik & RAM-Typen](vorlesungen/01_speicherphysik.html) · [02 · Speicherhierarchie & Caches](vorlesungen/02_speicherhierarchie.html) · [03 · Interrupts & Timer](vorlesungen/03_interrupts_timer.html) |
+| PDF-Handout (Skript) | [01 · Speicherphysik (PDF)](vorlesungen/01_speicherphysik-handout.pdf) · [02 · Caches (PDF)](vorlesungen/02_speicherhierarchie-handout.pdf) · [03 · Interrupts (PDF)](vorlesungen/03_interrupts_timer-handout.pdf) |
 | Übungsblatt | [Beispielblatt (PDF)](labs/lab_01_beispiel.pdf) |
 | Musterlösung | [Beispielblatt Musterlösung (PDF)](labs/lab_01_beispiel-musterloesung.pdf) |
 
