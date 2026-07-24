@@ -14,7 +14,7 @@ Der rote Faden der Veranstaltung:
 
 > Speicherzelle → Caches → Interrupts → Aktorik → Busse → DMA → OoO/Branch → Edge AI → Multicore
 
-Pro Einheit: Folien (Reveal.js), Handout-PDF sowie — soweit vorhanden — Übungsblatt (Studierende / Musterlösung). Links verweisen auf die Kurswebsite.
+Pro Einheit: Folien (Reveal.js), Handout-PDF sowie Übungsblatt (Studierende / Musterlösung). Links verweisen auf die Kurswebsite.
 
 | Einheit | Thema | Schwerpunkt | Folien | Handout | Übungsblatt | Musterlösung |
 |---------|-------|-------------|--------|---------|-------------|--------------|
@@ -24,9 +24,9 @@ Pro Einheit: Folien (Reveal.js), Handout-PDF sowie — soweit vorhanden — Übu
 | 4 | Aktorik & Sicherheit | Hardware-Timer, PWM, Bit-Banging vs. Hardware, Watchdog | [HTML](vorlesungen/04_aktorik_sicherheit.html) | [PDF](vorlesungen/04_aktorik_sicherheit-handout.pdf) | [PDF](labs/lab_04_aktorik_sicherheit.pdf) | [PDF](labs/lab_04_aktorik_sicherheit-musterloesung.pdf) |
 | 5 | Serielle Bussysteme | UART/SPI/I2C, Open-Drain, differentielle Übertragung, EMI | [HTML](vorlesungen/05_serielle_bussysteme.html) | [PDF](vorlesungen/05_serielle_bussysteme-handout.pdf) | [PDF](labs/lab_05_serielle_bussysteme.pdf) | [PDF](labs/lab_05_serielle_bussysteme-musterloesung.pdf) |
 | 6 | Hardware-Beschleunigung (DMA) | Interrupt Storm, Bus-Mastering, Cache-Kohärenz, Ringpuffer | [HTML](vorlesungen/06_hardware_beschleunigung_dma.html) | [PDF](vorlesungen/06_hardware_beschleunigung_dma-handout.pdf) | [PDF](labs/lab_06_hardware_beschleunigung_dma.pdf) | [PDF](labs/lab_06_hardware_beschleunigung_dma-musterloesung.pdf) |
-| 7 | Moderne CPU-Architekturen | ILP-Limits, Out-of-Order, Branch Prediction, Spectre-Idee | [HTML](vorlesungen/07_moderne_cpu_architekturen.html) | [PDF](vorlesungen/07_moderne_cpu_architekturen-handout.pdf) | — | — |
-| 8 | KI-Beschleuniger & Edge AI | Memory Wall, Systolic Arrays, RVV, TensorFlow Lite Micro | [HTML](vorlesungen/08_ki_beschleuniger_edge_ai.html) | [PDF](vorlesungen/08_ki_beschleuniger_edge_ai-handout.pdf) | — | — |
-| 9 | Paralleles Rechnen & Multicore | SMP, MESI, Atomics, Wrap-Up / Klausurvorbereitung | [HTML](vorlesungen/09_paralleles_rechnen_multicore.html) | [PDF](vorlesungen/09_paralleles_rechnen_multicore-handout.pdf) | — | — |
+| 7 | Moderne CPU-Architekturen | ILP-Limits, Out-of-Order, Branch Prediction, Spectre-Idee | [HTML](vorlesungen/07_moderne_cpu_architekturen.html) | [PDF](vorlesungen/07_moderne_cpu_architekturen-handout.pdf) | [PDF](labs/lab_07_moderne_cpu_architekturen.pdf) | [PDF](labs/lab_07_moderne_cpu_architekturen-musterloesung.pdf) |
+| 8 | KI-Beschleuniger & Edge AI | Memory Wall, Systolic Arrays, RVV, TensorFlow Lite Micro | [HTML](vorlesungen/08_ki_beschleuniger_edge_ai.html) | [PDF](vorlesungen/08_ki_beschleuniger_edge_ai-handout.pdf) | [PDF](labs/lab_08_ki_beschleuniger_edge_ai.pdf) | [PDF](labs/lab_08_ki_beschleuniger_edge_ai-musterloesung.pdf) |
+| 9 | Paralleles Rechnen & Multicore | SMP, MESI, Atomics, Wrap-Up / Klausurvorbereitung | [HTML](vorlesungen/09_paralleles_rechnen_multicore.html) | [PDF](vorlesungen/09_paralleles_rechnen_multicore-handout.pdf) | [PDF](labs/lab_09_paralleles_rechnen_multicore.pdf) | [PDF](labs/lab_09_paralleles_rechnen_multicore-musterloesung.pdf) |
 
 **Hinweise:** Folien im Browser öffnen (Speaker View: Taste `S`). Handout-PDF = Folieninhalt mit Skriptnotizen. Quelltexte unter `vorlesungen/` und `labs/`. Übungsblätter und Musterlösungen werden bei jedem Publish über GitHub Actions als PDF gebaut.
 
