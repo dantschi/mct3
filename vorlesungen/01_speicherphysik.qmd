@@ -1,0 +1,627 @@
+---
+title: "01 · Speicherphysik & RAM-Typen"
+subtitle: "Mikrocomputertechnik 3 · DHBW Stuttgart"
+author: "Prof. Dr.-Ing. Daniel Klünder"
+# Vortrag:  quarto preview vorlesungen/01_speicherphysik.qmd
+#           (Notizen nur mit Taste S)
+# Handout:  quarto render vorlesungen/01_speicherphysik.qmd --profile handout --to pdf
+#           → _handout/vorlesungen/01_speicherphysik.pdf
+format: revealjs
+---
+
+## Willkommen zu Mikrocomputertechnik 3!
+
+- Der Kreis schließt sich: dritter und finaler Teil der Mikrocomputertechnik-Reihe
+- Rückblick MCT1: Prozessor auf Gatter-Ebene aus Nullen und Einsen aufgebaut
+- Nächster Schritt: von der isolierten CPU zum Gesamtsystem
+- System-on-Chip (SoC): CPU, Speicher, Busse und Peripherie im Zusammenspiel
+- Hardware trifft Software: von nacktem Assembler zur hardwarenahen C-Programmierung
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+graph LR
+  A[MCT1: CPU Core] --> B[MCT3: System-on-Chip]
+  B --> C[Speicher]
+  B --> D[Bussysteme]
+  B --> E[Peripherie und I/O]
+  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+
+```
+
+::: notes
+Herzlich willkommen zu Mikrocomputertechnik 3! Es freut mich sehr, Sie nach MCT1 wiederzusehen. Sie haben bereits ein enormes Verständnis dafür entwickelt, wie ein Prozessor intern tickt — von der ALU bis zum Pipelining. Jetzt zoomen wir heraus. Ein Prozessor allein kann nichts bewirken, wenn er keine Daten speichern oder mit der Außenwelt kommunizieren kann. In diesem Semester bauen wir gedanklich ein komplettes System-on-Chip (SoC) um unseren RISC-V-Kern herum. Wir werden C-Code schreiben, der direkt mit der Hardware spricht.
+:::
+
+## Rückblick: Was wir aus MCT1 wissen
+
+- Die RISC-V ISA: eleganter, modularer Befehlssatz (RV32I)
+- Die Register-Werkbank: 32 Architektur-Register als schneller, aber winziger Arbeitsbereich
+- Der Datenpfad: Fetch, Decode, Execute, Memory und Write-Back
+- Pipelining: mehrere Befehle gleichzeitig auf dem Fließband
+- Memory-Mapped I/O: Geräte tarnen sich als Adressen im Arbeitsspeicher
+
+:::: {.columns}
+
+::: {.column width="48%"}
+
+```asm
+# MCT1 Refresher
+la s1, 0xF0000000
+lw t0, 0(s1)
+andi t1, t0, 1
+beq t1, zero, Wait
+
+```
+
+:::
+
+::: {.column width="48%"}
+Wenn alles über Speicheradressen läuft, müssen wir verstehen, wie Speicher physikalisch aufgebaut ist.
+:::
+
+::::
+
+::: notes
+Erinnern wir uns kurz an unser Handwerkszeug aus MCT1. Wir kennen die Architektur, wir wissen, was ein Load- und ein Store-Befehl auf dem Silizium auslösen und wie Pipelining den Durchsatz maximiert. Am Ende von MCT1 haben wir bereits gesehen, dass LEDs und Schalter über Memory-Mapped I/O angesteuert werden können. Genau an dieser Stelle setzen wir an: Wenn alles über Speicheradressen läuft, müssen wir verstehen, wie diese Speicher physikalisch aufgebaut sind.
+:::
+
+## Der Paradigmenwechsel: Core vs. SoC
+
+- Der Core (CPU): reines Rechenwerk (ALU, Register, Pipeline)
+- Früher: CPU, RAM und I/O-Controller als getrennte Bausteine auf der Platine
+- System-on-Chip (SoC): alle Komponenten auf einem Silizium-Die
+- Vorteile: geringerer Stromverbrauch, geringere Kosten, weniger Platz
+- Herausforderung: der interne Systembus muss den Datenhunger der CPU stillen
+
+```{mermaid}
+%%| fig-width: 4.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TB
+  subgraph SoC["System-on-Chip"]
+    CPU[CPU]
+    Cache[Cache]
+    Flash[Flash]
+    RAM[RAM]
+    Timer[Timer]
+    UART[UART]
+    Bus[Systembus]
+    CPU --- Bus
+    Cache --- Bus
+    Flash --- Bus
+    RAM --- Bus
+    Timer --- Bus
+    UART --- Bus
+  end
+  style Bus fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+
+```
+
+::: notes
+Der Begriff Mikroprozessor ist heute eigentlich fast überholt; wir sprechen meistens von Mikrocontrollern oder System-on-Chips. Warum? Weil es aus physikalischen und finanziellen Gründen viel sinnvoller ist, den Arbeitsspeicher, den Festspeicher und die Peripherie-Controller direkt mit der CPU auf dasselbe Stück Silizium zu drucken. Das spart Latenz und Energie, da keine Signale über kupferne Leiterbahnen einer Platine geschickt werden müssen.
+:::
+
+## Unsere Werkzeuge in MCT3
+
+- Hochsprache statt Assembler: Programmierung in C (Embedded Systems)
+- Toolchain: RISC-V GCC übersetzt C in Maschinencode
+- Simulator: von Venus zu Renode
+- Fokus: Hardware-Treiber statt Sortier-Algorithmen
+- Bare-Metal: direkt auf der Hardware, ohne Betriebssystem
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[main.c] -->|RISC-V GCC| B[firmware.elf]
+  B -->|Laden| C[Renode]
+  C --> D[Virtueller SoC]
+  style C fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+
+```
+
+::: notes
+Da wir nun komplexe Systeme bauen, reicht uns nackter Assembler nicht mehr — die Produktivität wäre zu gering. Wir nutzen C. C ist der Industrie-Standard für hardwarenahe Programmierung, da es uns erlaubt, Adressen als Pointer direkt anzufassen, während uns der Compiler die mühsame Register-Zuweisung abnimmt. Als Laborumgebung nutzen wir Renode, einen professionellen Open-Source-Simulator, der komplette SoCs simulieren kann.
+:::
+
+## Was ist Renode?
+
+- Industrie-Standard: u. a. bei Google, Intel und Microchip zur Chip-Simulation
+- Vollständige SoC-Simulation: CPU, Busse, Timer und RAM
+- Professionelles Kommandozeilen-Tool (ohne grafisches Breadboard)
+- Virtuelle I/O: Sensoren per Skript an I2C- oder SPI-Bus
+- Skript-gesteuert: SoCs über Textdateien (`.resc` / `.repl`)
+
+```text
+# Beispielhaftes Renode Setup-Skript
+machine LoadPlatformDescription @platforms/cpus/riscv32.repl
+sysbus LoadELF @firmware.elf
+start
+
+```
+
+::: notes
+Renode ist ein fantastisches Werkzeug. Anstatt zu warten, bis eine Chipfabrik das neue Silizium ausliefert, können Software-Ingenieure in Renode bereits den Code für den neuen Chip schreiben. Renode simuliert das exakte Timing und die Memory Map des Chips. Sie werden im Labor lernen, wie man C-Code lokal kompiliert und das fertige Binary direkt in diese simulierte Hardware lädt.
+:::
+
+## Modul-Übersicht: Unser Fahrplan
+
+- Block 1 & 2: Speicherphysik, RAM-Typen, Caches und die Memory Wall
+- Block 3 & 4: Advanced Interrupts, Hardware-Timer, PWM und Watchdogs
+- Block 5 & 6: Serielle Busse (UART, I2C, SPI) und DMA
+- Block 7 & 8: Out-of-Order Execution und Edge-AI (KI-Beschleuniger)
+- Block 9: Multicore und Abschluss-Labor
+
+```{mermaid}
+%%| fig-width: 4.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TD
+  A[Speicher und Caches] --> B[Timer und Peripherie]
+  B --> C[Busse und DMA]
+  C --> D[OoO und Edge-AI]
+  D --> E[Multicore und Abschluss]
+  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+
+```
+
+::: notes
+Unser Semester ist logisch gegliedert. Wir starten ganz innen im Chip bei den Speichern und Caches. Dann arbeiten wir uns langsam nach außen: über die System-Timer hin zu den externen Bussen, mit denen wir Sensoren auslesen. In der letzten Phase des Semesters widmen wir uns den hochmodernen Konzepten: Out-of-Order CPUs und maschinelles Lernen direkt auf dem Mikrocontroller (Edge AI).
+:::
+
+## Prüfungsleistung und Laborbetrieb
+
+- Theorie und Praxis: je Einheit 2 Stunden Theorie und 2 Stunden Labor
+- Labor als Schlüssel: C-Treiber für das Verständnis der SoC-Architektur
+- Prüfungsform: schriftliche Klausur am Semesterende (ca. 90 Minuten)
+- Klausurinhalte: C-Code, Pointer-Arithmetik, Architektur, Cache-Berechnungen
+- Fokus auf Problemlösung, nicht auf Auswendiglernen von Datenblättern
+
+::: notes
+Wie in MCT1 gilt auch hier: Die Vorlesung gibt Ihnen die Konzepte, aber das echte Verständnis kommt im Labor. Wer die Laborblätter selbstständig in Renode löst, hat bereits 80 % der Klausurvorbereitung erledigt. In der Klausur werden wir keine Registeradressen eines bestimmten Chips abfragen, sondern Konzepte: Wie richten Sie einen DMA-Transfer ein? Warum tritt ein Cache-Miss auf?
+:::
+
+## Agenda für den heutigen Tag
+
+1. Systemarchitektur (Von-Neumann vs. Harvard) und Memory Wall
+2. Speicher-Klassifikationen (volatil, non-volatil, Random Access)
+3. Festwertspeicher (ROM, EPROM, Flash) — Architektur und Nutzung
+4. Volatiler Speicher (SRAM vs. DRAM) — Transistoren vs. Kondensatoren
+5. Spezialspeicher im SoC (DPRAM, FIFOs) und Brückenschlag zum Labor
+
+::: notes
+Unser heutiges Ziel ist es, das Konzept „Arbeitsspeicher“, das wir in MCT1 als magische Blackbox betrachtet haben, physikalisch zu öffnen. Wir klären heute ein für alle Mal den Unterschied zwischen dem Speicher, auf dem unser Code liegt, und dem Speicher, in dem unsere Variablen leben.
+:::
+
+## Die Leitfrage des Tages
+
+- Die CPU ist schnell: Milliarden Berechnungen pro Sekunde
+- Datenhunger: jede Berechnung braucht Befehle und Daten
+- Masse: moderne Programme bestehen aus Milliarden von Bits
+- Flip-Flop-Problem: Milliarden D-Flip-Flops sind zu groß, teuer und stromhungrig
+- Leitfrage: Wie speichert Silizium Milliarden Bits dicht und effizient?
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TD
+  A[1 Bit speichern] --> B[D-Flip-Flop: 20+ Transistoren]
+  B --> C[1 Gigabyte = 8 Mrd. Bits]
+  C --> D[160 Mrd. Transistoren?]
+  D --> E[Lösung: neue Speicherkonzepte]
+  style E fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+
+```
+
+::: notes
+Das D-Flip-Flop aus MCT1 ist großartig, um 32 Register zu bauen. Aber wenn wir ein Gigabyte Speicher bauen wollen und für jedes Bit 20 Transistoren brauchen, würde unser Chip so groß wie ein Fußballfeld werden und sofort verglühen. Wir brauchen grundlegend andere physikalische Konzepte, um Daten dicht und effizient zu speichern. Das ist die Essenz der heutigen Vorlesung.
+:::
+
+## Systemarchitektur: Von-Neumann
+
+- Klassisches Modell nach John von Neumann (1945)
+- Gemeinsamer Speicher: Befehle und Daten im selben Arbeitsspeicher
+- Gemeinsamer Bus für Adressen und Daten zwischen CPU und RAM
+- Von-Neumann-Flaschenhals: kein paralleles Laden von Befehl und Variable
+- Folge: Structural Hazards auf dem Fließband
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  CPU[CPU] <-->|Ein Bus für Code und Daten| RAM[RAM]
+  style RAM fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+
+```
+
+::: notes
+Starten wir mit der Systemarchitektur. Die Von-Neumann-Architektur ist das Konzept, das fast alle modernen Desktop-PCs nutzen. Alles liegt im selben RAM. Der große Nachteil: Wenn der Datenpfad aus MCT1 einen Load-Befehl ausführt, muss er Daten aus dem RAM holen. Wenn er gleichzeitig den nächsten Befehl fetchen möchte, knallt es auf dem Bus. Dieser Stau ist der berühmte Von-Neumann-Flaschenhals.
+:::
+
+## Systemarchitektur: Harvard
+
+- Harvard-Architektur trennt die Speicherräume strikt
+- Getrennte Speicher für Befehle (Code) und Daten
+- Getrennte Bus-Systeme zur CPU
+- Vorteil: Fetch und Memory im selben Taktzyklus möglich
+- Modified Harvard: extern Von-Neumann, intern getrennte L1-Caches
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  IM[Code Memory] <-->|Instruction Bus| CPU[CPU]
+  CPU <-->|Data Bus| DM[Data Memory]
+  style CPU fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+
+```
+
+::: notes
+In der Harvard-Architektur entzerren wir den Verkehr. Wir haben zwei Busse. Genau dieses Modell haben wir in MCT1 für unseren 5-Stufen-Prozessor genutzt: einen Instruction Memory und einen Data Memory. In echten SoCs findet man heute oft das „Modified Harvard“-Design: Der Hauptspeicher draußen ist ein großer Block (Von-Neumann), aber direkt am Prozessorkern gibt es getrennte L1-Instruction- und L1-Data-Caches, die wie eine Harvard-Architektur wirken.
+:::
+
+## Die Memory Wall
+
+- Moores Gesetz: Transistoren kleiner, CPUs schneller
+- Ungleichgewicht: RAM-Geschwindigkeit hielt nicht mit
+- Memory Wall: wachsende Lücke zwischen CPU- und RAM-Speed
+- Warte-Problem: oft mehr Stalls als echte Rechenzeit
+- Lösung: hierarchischer Aufbau in mehreren Speicherschichten
+
+| Generation | CPU relativ | RAM relativ |
+|------------|-------------|-------------|
+| früh       | $1\times$  | $1\times$  |
+| später     | $16\times$ | $\approx 3\times$ |
+
+::: notes
+Das ist eines der wichtigsten Diagramme der Rechnerarchitektur. Jahrelang haben wir CPUs höher getaktet. Aber der Arbeitsspeicher, der auf einer anderen Platine liegt, wird physikalisch nicht im selben Maß schneller. Die Folge: Die CPU verhungert am Datenbus. Wenn eine CPU bei 4 GHz arbeitet und der RAM 100 Nanosekunden für eine Antwort braucht, vergehen 400 Taktzyklen, in denen die CPU einfach nichts tun kann!
+:::
+
+## Das magische Speicher-Dreieck
+
+Drei Ziele, die sich gegenseitig ausschließen:
+
+1. Geschwindigkeit — wie schnell lesen/schreiben?
+2. Kapazität — wie viele Gigabyte auf dem Chip?
+3. Kosten — wie teuer ist ein Bit in der Herstellung?
+
+Eiserne Regel: immer nur zwei Ziele gleichzeitig optimierbar.\
+Beispiel: schnell und groß ist extrem teuer (SRAM); groß und billig ist langsam (Massenspeicher).
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TD
+  A[Geschwindigkeit] --- B[Kapazität]
+  B --- C[Geringe Kosten]
+  C --- A
+  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+
+```
+
+::: notes
+Dies ist das magische Dreieck der Speicherarchitektur. Wenn jemand zu Ihnen kommt und einen Speicher fordert, der rasend schnell ist, Terabytes an Daten fasst und nur 5 Euro kostet, müssen Sie ihn enttäuschen. Die Physik lässt das nicht zu. Deshalb bestehen Computer nicht aus einem einzigen Speichertyp, sondern aus einer Mischung verschiedener Technologien.
+:::
+
+## Klassifikation 1: Volatil vs. Non-Volatil
+
+**Volatiler Speicher (flüchtig)**
+
+- Verliert Daten sofort ohne Betriebsspannung
+- Beispiele: SRAM, DRAM, CPU-Register
+- Vorteil: meist schnell und beliebig oft beschreibbar
+
+**Non-volatiler Speicher (nicht-flüchtig)**
+
+- Behält Daten Jahre ohne Strom
+- Beispiele: Flash, SD-Karten, ROM
+- Nachteil: oft langsamer beim Schreiben, physischer Verschleiß
+
+::: notes
+Die grundlegendste Unterscheidung von Speichern ist die Frage nach dem Stromausfall. Volatile Speicher sind das Kurzzeitgedächtnis des Computers. Ziehen Sie den Stecker, ist alles weg. Non-Volatile Speicher sind das Langzeitgedächtnis. Für ein funktionierendes System (wie unseren SoC) brauchen wir zwingend beides: einen Festspeicher für Firmware bzw. Boot-Code und einen Arbeitsspeicher für die laufenden Berechnungen.
+:::
+
+## Klassifikation 2: Random Access vs. sequenziell
+
+**Random Access (wahlfreier Zugriff)**
+
+- Jede Adresse in derselben Zeit direkt auslesbar
+- Latenz unabhängig vom Ort (Beispiel: RAM)
+
+**Sequenzieller Zugriff**
+
+- Daten nur der Reihe nach (wie eine Kassette)
+- Ende erreicht man erst nach dem Durchlaufen des Vorderns
+
+Architektur-Bedeutung: CPUs führen Code nur aus Random-Access-Speichern direkt aus.
+
+::: notes
+Der Begriff „RAM“ (Random Access Memory) wird oft synonym für Arbeitsspeicher genutzt, aber eigentlich beschreibt er eine Zugriffsmethode. „Wahlfrei“ bedeutet, die Latenz ist unabhängig vom Ort der Daten. Wenn Sie ein Magnetband haben, dauert es Minuten, um an das Ende des Bandes zu spulen. Eine CPU braucht aber für jeden Befehl im Speicher sofortigen Zugriff, daher muss Code zwingend in einem Random-Access-Speicher liegen.
+:::
+
+## Die Speicherhierarchie-Pyramide
+
+Um die Memory Wall zu überwinden, stapeln Architekten Speicher übereinander:
+
+- Spitze: CPU-Register (klein, teuer, blitzschnell)
+- Ebene 2: Caches L1/L2/L3 (SRAM — Megabytes, sehr schnell)
+- Ebene 3: Main Memory (DRAM — Gigabytes, moderat)
+- Basis: Massenspeicher (Flash/SSD — Terabytes, langsam, billig, non-volatil)
+
+Prinzip: Daten wandern je nach Nutzungshäufigkeit in der Pyramide.
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TD
+  A["CPU Register < 1 ns"] --> B["L1/L2 Cache ~2-10 ns"]
+  B --> C["Main Memory DRAM ~100 ns"]
+  C --> D["Flash / SSD ~100000 ns"]
+  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+
+```
+
+::: notes
+Da wir das magische Dreieck nicht brechen können, bauen wir eine Pyramide. Oben haben wir extrem teuren, rasend schnellen Speicher, aber eben nur sehr wenig davon. Unten haben wir den billigen, riesigen Speicher. Die Kunst der Computerarchitektur — und das werden wir in Block 2 ausführlich beleuchten — liegt darin, die Daten, die die CPU in den nächsten Millisekunden braucht, unbemerkt in der Pyramide nach oben zu schieben.
+:::
+
+## Fokus heute: Wir öffnen die Chips
+
+- Heute: Physik statt Betriebssystem
+- Wir öffnen die Boxen der Speicherhierarchie
+- Wie funktioniert Festwertspeicher (ROM/Flash)?
+- Warum nutzen SRAM und DRAM andere physikalische Konzepte?
+- Was bedeutet das für uns als C-Programmierer am SoC?
+
+::: notes
+Nachdem wir nun die Motivation und die Einordnung im System haben, greifen wir uns heute zwei fundamentale Speicherarten heraus: den Festspeicher, auf dem unsere Firmware liegt, und den volatilen Arbeitsspeicher. Wir werden sehen, dass beide extrem unterschiedliche Kompromisse beim Design eingehen mussten.
+:::
+
+## Festwertspeicher (Non-Volatile)
+
+- Start unten in der Pyramide: Speicher, der Stromausfall überlebt
+- Überbegriff: ROM (Read-Only Memory)
+- Historisch wirklich nur lesbar
+- Evolution: Firmware nachträglich updatebar machen
+- Weg: Mask-ROM $\rightarrow$ PROM $\rightarrow$ EPROM $\rightarrow$ EEPROM $\rightarrow$ Flash
+
+::: notes
+Beginnen wir mit dem Langzeitgedächtnis. Jeder Computer muss beim Einschalten wissen, was er tun soll. Er braucht Boot-Code. Dieser Code muss zwingend auf einem nicht-flüchtigen Speicher liegen. Die Geschichte dieses Speichers ist eine faszinierende Reise davon, wie Hardware immer flexibler und softwareähnlicher wurde.
+:::
+
+## Mask-ROM
+
+- Nullen und Einsen bei der Herstellung physisch verdrahtet (Fotolithografie-Masken)
+- Vorteil: extrem billig in der Massenproduktion
+- Nachteil: Bug $\Rightarrow$ alle Chips unbrauchbar
+- Früher: Game-Cartridges, Spieluhren
+- Heute: kaum noch für Anwendercode; ggf. unveränderliche Boot-Loader
+
+::: notes
+Der Mask-ROM ist Hard-Coded im wahrsten Sinne des Wortes. Eine Eins ist eine physische Kupferverbindung, eine Null ist eine durchtrennte Leitung. Wenn Sie als Programmierer einen Fehler gemacht haben, mussten Sie den Halbleiter-Hersteller anrufen, eine neue Belichtungsmaske für 100.000 Dollar bestellen und alle produzierten Chips entsorgen. Die Industrie verlangte dringend nach einer besseren Lösung.
+:::
+
+## PROM (Programmable ROM)
+
+- Chip verlässt das Werk leer (alles Einsen) und wird beim Kunden beschrieben
+- Jede Zelle besitzt eine mikroskopische Sicherung (Fuse)
+- Hohe Spannung „brennt“ die Sicherung durch: $1 \rightarrow 0$
+- OTP (One-Time Programmable): einmal durchgebrannt, nie reparierbar
+- Gut für kleine Serien; Firmware-Updates weiterhin unmöglich
+
+::: notes
+Das PROM war der erste Schritt zur Flexibilität. Man kauft leere Chips und brennt sein Programm mit einem speziellen Programmiergerät hinein. Das passiert wörtlich: Man jagt eine hohe Spannung durch den Chip und brennt winzige Sicherungen durch. Das ist großartig für Kleinserien, aber „One-Time Programmable“ heißt: Bei einem Bug müssen Sie zwar nicht die Maske ändern, aber den Chip müssen Sie trotzdem auslöten und wegwerfen.
+:::
+
+## EPROM (Erasable PROM)
+
+- Speicher, der gelöscht und neu beschrieben werden kann
+- Quarzglas-Fenster auf der Chip-Oberseite
+- UV-Licht (ca. 20–30 Minuten) löscht den gesamten Chip
+- Nachteil: immer ganzer Chip, langsam, Ausbau nötig
+- Fenster nach dem Brennen abdecken, sonst löscht Sonnenlicht den Code
+
+::: notes
+Wenn Sie heute alte Arcade-Automaten oder Synthesizer aus den 80er Jahren aufschrauben, sehen Sie diese wunderschönen Keramikchips mit einem runden Glasfenster in der Mitte. Das ist ein EPROM. Die Idee war revolutionär: Man konnte den Chip unter eine UV-Lampe legen, ihn komplett löschen und neu beschreiben. Es dauerte eine halbe Stunde, aber es sparte enorm viel Geld bei der Entwicklung.
+:::
+
+## EEPROM (Electrically Erasable PROM)
+
+- Löschen per elektrischem Signal statt UV-Licht
+- In-System Programming: kein Auslöten nötig
+- Byte-Ebene: einzelne Bytes gezielt löschen und neu beschreiben
+- Kehrseite: große Zellen, geringe Dichte, hohe Kosten pro Megabyte
+- Heute: kleine Konfigurationsdaten (MAC-Adresse, Kalibrierung)
+
+::: notes
+Das UV-Licht war unpraktisch. Das EEPROM löste dieses Problem, indem man durch geschicktes Anlegen von hohen elektrischen Spannungen die Elektronen wieder aus der Speicherzelle herausziehen konnte. Das Geniale: Man konnte gezielt ein einzelnes Byte löschen, während der Rest des Chips unangetastet blieb. Der Nachteil war jedoch die enorme Größe der einzelnen Zelle, weshalb EEPROMs niemals Gigabyte-Größen erreichten.
+:::
+
+## Flash-Speicher: Die Revolution der Blöcke
+
+- Geburt des Flash (Toshiba, 1984): Kompromiss aus EPROM und EEPROM
+- Löschen nicht byteweise, sondern blockweise „blitzartig“
+- Architektur-Trick: Wegfall der byteweisen Löschlogik $\Rightarrow$ kleinere Zellen
+- Resultat: hohe Speicherdichte zu niedrigen Preisen
+- Dominante Technologie für Firmware und Massenspeicher (SSD, USB, Smartphones)
+
+::: notes
+In den 80er Jahren suchte die Industrie nach einem Weg, die Vorteile von EEPROMs (elektrisches Löschen) mit einer hohen Speicherdichte zu vereinen. Der Ingenieur Fujio Masuoka bei Toshiba erfand den Flash-Speicher. Sein Trick: Er warf die komplexe Verschaltung weg, die nötig war, um jedes Byte einzeln zu löschen. Flash kann nur blockweise gelöscht werden. Das sparte so viel Platz auf dem Silizium, dass Flash die Welt eroberte.
+:::
+
+## Das Floating-Gate (logische Sicht)
+
+- Flash speichert Bits ohne Strom über Floating-Gate-Transistoren
+- Zwei Gates: Control-Gate und isoliertes Floating-Gate
+- Floating-Gate vollständig in Siliziumdioxid eingeschlossen
+- Hohe Spannung ($\approx +20\,\mathrm{V}$): Elektronen tunneln ins Floating-Gate
+- Ohne Spannung: Elektronen gefangen — gespeichertes Bit (oft Jahre haltbar)
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TD
+  A[Control Gate] -->|Hohe Spannung| B[Floating Gate]
+  B -->|Elektronen gefangen = Bit 0| C[Substrat / Kanal]
+  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+
+```
+
+::: notes
+Wir lassen die Quantenphysik außen vor und betrachten es logisch: Ein normaler Transistor schaltet Strom. Beim Flash bauen wir eine kleine, isolierte Insel in den Transistor ein — das Floating-Gate. Wenn wir sehr viel Spannung anlegen, tunneln Elektronen durch die Isolationsschicht auf diese Insel. Wenn wir den Strom abschalten, können sie nicht mehr zurück. Sie sind gefangen. Diese gefangene Ladung verändert das Schaltverhalten des Transistors. Die CPU misst diesen Transistor und weiß: Hier ist eine Null gespeichert.
+:::
+
+## NAND vs. NOR Flash
+
+Flash spaltet sich in zwei Architekturen — je nach Verdrahtung der Floating-Gate-Zellen:
+
+| | NOR | NAND |
+|---|---|---|
+| Verdrahtung | parallel | seriell (Kette) |
+| Zugriff | Byte/Wort (Random Access) | Seiten (Pages) |
+| Typischer Einsatz | Mikrocontroller | SSD, Smartphones |
+
+::: notes
+Flash ist nicht gleich Flash. Je nachdem, wie Sie diese isolierten Transistoren auf dem Silizium anordnen, erhalten Sie völlig unterschiedliche Eigenschaften. NOR-Flash verdrahtet die Zellen parallel, was viel Platz kostet, aber extrem schnellen und direkten Zugriff erlaubt. NAND-Flash schaltet sie in Serie, was Platz spart, den Zugriff aber sehr starr und blockbasiert macht.
+:::
+
+## NOR-Flash & Execute-In-Place (XIP)
+
+- Random Access: direkte Adressierung, z. B. `0x08000004`
+- XIP: CPU holt Befehle direkt aus dem NOR-Flash (ohne RAM-Kopie)
+- Fetch-Stage der RISC-V-Pipeline liest Code aus dem Flash
+- Nachteil: teurer, geringe Kapazität (oft 1–16 MB auf dem SoC)
+- In MCT3: `.text`-Section landet im NOR-Flash des Controllers
+
+::: notes
+NOR-Flash verhält sich beim Lesen genau wie das SRAM aus unserer Architektur-Vorlesung. Das ist essenziell für kleine Embedded-Systeme! Die CPU schickt eine Adresse, der NOR-Flash antwortet sofort mit dem Assembler-Befehl. Das nennt man Execute-In-Place (XIP). Das Programm läuft direkt aus dem Flash. Das spart immens viel teuren Arbeitsspeicher, da der Code nicht erst kopiert werden muss.
+:::
+
+## C-Code und der Flash-Speicher {.scrollable}
+
+- `const` zwingt den Compiler zu ROM/Flash (Section `.rodata`), nicht RAM
+- C-Pointer können direkt auf Flash-Adressen zeigen
+- Lesen erlaubt: `int wert = *flash_ptr;` (schnell, XIP)
+- Schreiben verboten: `*flash_ptr = 42;` → Hard Fault (kein einfacher Store)
+
+```c
+// Pointer auf internen NOR-Flash
+const uint32_t *firmware_version =
+    (const uint32_t *)0x08000000;
+
+// Lesen klappt sofort (Random Access)
+uint32_t ver = *firmware_version;
+
+```
+
+::: notes
+Hier schlagen wir die Brücke zur C-Programmierung. Wenn Sie große Tabellen, Bilder oder Fonts in Ihrem Programm haben, setzen Sie das Keyword const davor. Der Linker legt diese Daten in den Flash. Da NOR-Flash Random-Access bietet, können Sie per Pointer darauf zugreifen, als wäre es normaler RAM. Aber wehe, Sie versuchen per Software einen Wert dorthin zu speichern — das wird von der Hardware blockiert, da Flash-Speicher einen aufwendigen Erase-Write-Zyklus benötigt.
+:::
+
+## NAND-Flash (Massenspeicher)
+
+- Höchste Dichte durch serielle Verkettung der Zellen
+- Kein Random Access: immer ganze Page (z. B. 4096 Bytes) lesen
+- Kein XIP: CPU führt Code nicht direkt aus NAND aus
+- Boot: Code zuerst von NAND nach DDR-RAM kopieren
+- Einsatz: SSDs, SD-Karten, USB-Sticks (Terabyte-Bereich)
+
+::: notes
+NAND-Flash hat die Datenspeicherung revolutioniert. Es ist der Grund, warum wir Terabytes in unseren Laptops haben. Aber die CPU hasst NAND-Flash. Wenn der Program Counter einen Befehl holen will, kann der NAND-Flash nicht antworten, sondern liefert nur einen riesigen Datenblock zurück. Deshalb muss beim Start Ihres Laptops das Betriebssystem erst langwierig von der SSD in den Arbeitsspeicher (RAM) kopiert werden.
+:::
+
+## Die Flash-Krankheit: Wear and Tear
+
+- Geheimnis: Flash verschleißt bei jedem Schreibvorgang
+- Hohe Spannung beim Tunneln beschädigt die Oxid-Isolation
+- Limit: ca. $10\,000$ bis $100\,000$ Erase/Write-Zyklen
+- Danach: Zelle hält Ladung nicht mehr (physisch defekt)
+- Gefahr: ständiges Schreiben in denselben Sektor zerstört den Chip
+
+::: notes
+Hier müssen Sie als Systemarchitekt extrem aufpassen. Wenn Sie RAM beschreiben, können Sie das unendlich oft tun. Wenn Sie Daten in einen Flash-Speicher schreiben, beschädigen Sie ihn auf mikroskopischer Ebene. Die Glasisolierung bekommt Risse, durch die die gefangenen Elektronen wieder entkommen. Nach 100.000 Schreibvorgängen ist der Sektor tot.
+:::
+
+## Die Rettung: Wear Leveling (FTL)
+
+- Wear Leveling: Verschleißausgleich über wechselnde physische Blöcke
+- Logischer Sektor → jedes Mal anderer physischer Flash-Block
+- Flash Translation Layer (FTL) übersetzt logisch $\leftrightarrow$ physisch
+- SD-Karte/SSD: eigener Controller; Bare-Metal: Software muss Wear Leveling leisten
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  OS[OS: Schreibe Sektor 0] --> FTL[Flash Translation Layer]
+  FTL --> B1[Physisch Block 12]
+  FTL -.->|danach| B2[Physisch Block 88]
+  style FTL fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+
+```
+
+::: notes
+Damit Ihre teure SSD nicht nach einem Jahr defekt ist, trickst der Controller. Wenn das Betriebssystem sagt „Schreibe Sektor 0“, schreibt die SSD es in Wirklichkeit in Block 12. Beim nächsten Mal in Block 88. Ein interner Algorithmus (Wear Leveling) verteilt die Schreibzugriffe gleichmäßig über alle Millionen Zellen des Chips, damit alle gleichzeitig altern. Wenn Sie in MCT3 auf einem nackten RISC-V SoC Daten in den Flash schreiben wollen, haben Sie diese Luxus-Schicht nicht. Sie müssen das selbst programmieren!
+:::
+
+## Memory Map: Wo liegt der Flash im SoC?
+
+- In der 32-Bit Memory Map ist ein Block für Flash reserviert
+- Typisches Beispiel: `0x0800 0000` bis `0x080F FFFF` (1 MB NOR-Flash)
+- Linker legt Maschinen-Code (`.text`) auf diese Startadresse
+- Nach Reset: PC springt hartverdrahtet auf `0x0800 0000`
+- Boot per Execute-in-Place aus dem NOR-Flash
+
+::: notes
+Lassen Sie uns den Bogen zurück zu MCT1 schlagen. Der Prozessor legt eine 32-Bit Adresse auf den Bus. Der Adress-Decoder sieht, dass die Adresse mit 0x08 beginnt, weckt den NOR-Flash auf und leitet den Befehl an die CPU. Das ist der Moment, in dem der Mikrocontroller bootet. Alles passiert transparent.
+:::
+
+## Zusammenfassung: Non-Volatile Memory
+
+- Festwertspeicher überlebt Stromausfall und hält Firmware/Boot-Code
+- Evolution: Mask-ROM bis blockbasiertes Flash
+- NOR-Flash: parallel, XIP, Standard in Mikrocontrollern
+- NAND-Flash: seriell, dicht, Massenspeicher; braucht RAM zum Ausführen
+- Flash verschleißt (Oxid-Schäden) und braucht Wear Leveling
+
+::: notes
+Damit haben wir die Basis unserer Speicherpyramide durchleuchtet. Wir wissen nun, wo unser Code liegt, wenn der Strom ausgeschaltet ist, und warum der Prozessor ihn direkt ausführen kann. Aber der Flash-Speicher hat ein Problem: Er ist viel zu langsam für die Arbeitsvariablen unserer Software und er verschleißt, wenn wir ihn ständig mit neuen Werten beschreiben würden.
+:::
+
+## Der Bedarf an Arbeitsspeicher
+
+Wir brauchen Speicher, der:
+
+- im Takt der CPU (Nanosekunden) liest und schreibt
+- unendlich oft beschreibbar ist, ohne zu verschleißen
+
+Antwort: volatiler Speicher (RAM).\
+Zwei Technologien: **SRAM** und **DRAM**.
+
+*(Übergang in den zweiten Teil der Vorlesung)*
+
+::: notes
+Für Variablen, Zwischenergebnisse der ALU und den Stack brauchen wir ein perfektes Kurzzeitgedächtnis. Das bringt uns zum zweiten großen Kapitel des heutigen Tages: dem volatilen Arbeitsspeicher. Wir werden sehen, wie sich Ingenieure geniale Schaltungen überlegt haben, um Bits rasend schnell zu speichern.
+:::
+
+## Fragen?
+
+- Flash-Architektur?
+- Execute-in-Place (XIP)?
+- Wear Leveling?
+
+::: notes
+Bevor wir in die Transistorebene des SRAMs eintauchen, machen wir eine kurze Pause für Fragen. Ist das Konzept klar, warum wir auf einem Mikrocontroller nicht einfach NAND-Flash verwenden können, um Code auszuführen?
+:::
+
+## Kurze Pause
+
+10 Minuten Pause.\
+Gleich geht es weiter mit:
+
+- SRAM (6-Transistor-Zelle)
+- DRAM (1-Transistor-Zelle und Refresh)
+- Spezialspeicher (FIFOs und Dual-Ported RAM)
+
+::: notes
+Atmen Sie kurz durch, holen Sie sich einen Kaffee. In zehn Minuten geht es weiter mit der Physik des Arbeitsspeichers.
+:::
