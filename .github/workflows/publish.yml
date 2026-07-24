@@ -1,21 +1,27 @@
-name: Publish Quarto Website
+name: Build Quarto Website
+
+# Repo ist vorerst privat — kein GitHub Pages / kein gh-pages-Branch.
+# Nach Öffnung der Vorlesung: Publish-Schritt wieder aktivieren
+# (quarto-dev/quarto-actions/publish@v2, target: gh-pages) und
+# einmalig lokal `quarto publish gh-pages` ausführen.
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-deploy:
+  build:
     runs-on: ubuntu-latest
     # Früher abbrechen statt bis 6h zu hängen
     timeout-minutes: 45
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -30,7 +36,7 @@ jobs:
       - name: Render website
         uses: quarto-dev/quarto-actions/render@v2
 
-      # --- PDF-Handout (kann an Mermaid/Chrome scheitern; Website trotzdem publishen) ---
+      # --- PDF-Handout (kann an Mermaid/Chrome scheitern; Website-Build bleibt unabhängig) ---
       - name: Install Chrome Headless Shell (Mermaid → PNG)
         timeout-minutes: 10
         run: quarto install chrome-headless-shell --no-prompt
@@ -74,7 +80,7 @@ jobs:
             exit 1
           fi
 
-      # Erfolgreiche PDFs anhängen, auch wenn einzelne Handouts fehlgeschlagen sind
+      # Erfolgreiche PDFs an die Site-Ausgabe anhängen (für Artifact / spätere Pages)
       - name: Attach handout PDFs to website
         if: always() && !cancelled()
         run: |
@@ -148,21 +154,23 @@ jobs:
             exit 1
           fi
 
-      - name: List published lab PDFs
+      - name: List lab PDFs
         if: always() && !cancelled()
         run: |
           mkdir -p _site/labs
           ls -la _site/labs/ || echo "Keine Labor-PDFs vorhanden."
 
-      - name: Publish to GitHub Pages
-        uses: quarto-dev/quarto-actions/publish@v2
+      # Kein Publish auf gh-pages — Build-Artefakt zum Download bereithalten
+      - name: Upload site artifact
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@v4
         with:
-          target: gh-pages
-          render: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: mct3-site
+          path: _site/
+          if-no-files-found: warn
+          retention-days: 14
 
-      # Fehlendes PDF ist nur eine Warnung — Website-Build und Publish bleiben grün.
+      # Fehlendes PDF ist nur eine Warnung — Website-Build bleibt grün.
       - name: Warn if handout PDF did not build
         if: steps.handout.outcome != 'success'
         run: |

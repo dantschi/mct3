@@ -8,8 +8,8 @@ Das Modul vertieft digitale Rechnerarchitektur und die Hardware/Software-Schnitt
 
 | Format | Link |
 |--------|------|
-| Folien (Reveal.js) | [01 · Speicherphysik & RAM-Typen](vorlesungen/01_speicherphysik.html) · [02 · Speicherhierarchie & Caches](vorlesungen/02_speicherhierarchie.html) · [03 · Interrupts & Timer](vorlesungen/03_interrupts_timer.html) · [04 · Aktorik & Sicherheit](vorlesungen/04_aktorik_sicherheit.html) · [05 · Serielle Bussysteme](vorlesungen/05_serielle_bussysteme.html) |
-| PDF-Handout (Skript) | [01 · Speicherphysik (PDF)](vorlesungen/01_speicherphysik-handout.pdf) · [02 · Caches (PDF)](vorlesungen/02_speicherhierarchie-handout.pdf) · [03 · Interrupts (PDF)](vorlesungen/03_interrupts_timer-handout.pdf) · [04 · Aktorik (PDF)](vorlesungen/04_aktorik_sicherheit-handout.pdf) · [05 · Busse (PDF)](vorlesungen/05_serielle_bussysteme-handout.pdf) |
+| Folien (Reveal.js) | [01 · Speicherphysik & RAM-Typen](vorlesungen/01_speicherphysik.html) · [02 · Speicherhierarchie & Caches](vorlesungen/02_speicherhierarchie.html) · [03 · Interrupts & Timer](vorlesungen/03_interrupts_timer.html) · [04 · Aktorik & Sicherheit](vorlesungen/04_aktorik_sicherheit.html) · [05 · Serielle Bussysteme](vorlesungen/05_serielle_bussysteme.html) · [06 · Hardware-Beschleunigung (DMA)](vorlesungen/06_hardware_beschleunigung_dma.html) |
+| PDF-Handout (Skript) | [01 · Speicherphysik (PDF)](vorlesungen/01_speicherphysik-handout.pdf) · [02 · Caches (PDF)](vorlesungen/02_speicherhierarchie-handout.pdf) · [03 · Interrupts (PDF)](vorlesungen/03_interrupts_timer-handout.pdf) · [04 · Aktorik (PDF)](vorlesungen/04_aktorik_sicherheit-handout.pdf) · [05 · Busse (PDF)](vorlesungen/05_serielle_bussysteme-handout.pdf) · [06 · DMA (PDF)](vorlesungen/06_hardware_beschleunigung_dma-handout.pdf) |
 | Übungsblatt | [Beispielblatt (PDF)](labs/lab_01_beispiel.pdf) |
 | Musterlösung | [Beispielblatt Musterlösung (PDF)](labs/lab_01_beispiel-musterloesung.pdf) |
 

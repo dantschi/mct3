@@ -1,0 +1,1052 @@
+---
+title: "06 · Hardware-Beschleunigung (DMA)"
+subtitle: "Mikrocomputertechnik 3 · Direct Memory Access — die CPU vom Daten-Schaufeln befreien"
+author: "Prof. Dr.-Ing. Daniel Klünder"
+lang: de
+# Vortrag:  quarto preview vorlesungen/06_hardware_beschleunigung_dma.qmd
+#           (Notizen nur mit Taste S)
+# Handout:  quarto render vorlesungen/06_hardware_beschleunigung_dma.qmd --profile handout --to pdf
+#           → _handout/vorlesungen/06_hardware_beschleunigung_dma.pdf
+format: revealjs
+---
+## Willkommen zu Block 6!
+
+- Willkommen zur sechsten Vorlesung in Mikrocomputertechnik 3
+- Bisher: Denken (Speicher/Caches), Reagieren (Interrupts), Handeln (PWM), Sprechen (Busse)
+- Heute: Effizienz — den größten Stau im Datenpfad auflösen
+- Ziel: stupide Fleißarbeit von der CPU auf Hardware-Assistenten verlagern
+
+::: notes
+Herzlich willkommen zurück! Sensoren und Aktoren beherrschen Sie bereits. Bisher erledigt die CPU jeden Schritt selbst. Heute lernen wir zu delegieren: Die CPU wird Manager, Subsysteme erledigen das Daten-Schaufeln.
+:::
+
+## Einordnung im Semester
+
+```{mermaid}
+%%| fig-width: 4.2
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[Bisher: CPU macht alles] -->|Flaschenhals| B[CPU überlastet]
+  C[Heute: Arbeitsteilung] -->|CPU rechnet| D[DMA schaufelt]
+  style C fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Von „alles selbst“ zu Parallelität: CPU rechnet, DMA bewegt Daten.
+:::
+
+## Anknüpfung: I2C-Labor
+
+Kurz-Recap aus Block 5 (Vertiefung im Übungsblatt):
+
+- IMU per I2C: Start, Adresse, R/W, ACK/NACK, Stop
+- High/Low-Byte per Shift zu 16-Bit-Werten
+- CPU wartete oft auf die I2C-Hardware (`wait_for_ack` / Polling)
+
+```c
+uint8_t read_sensor_x(void) {
+    i2c_send_start();
+    /* … */
+    return i2c_read_byte();  /* CPU wartet hier oft */
+}
+```
+
+::: notes
+Für seltene Sensorwerte ist Polling akzeptabel. Bei großen, kontinuierlichen Datenmengen wird Wartezeit zum Problem.
+:::
+
+## Schnelle Schnittstellen, langsames Füttern
+
+- Big 3 beherrscht: UART, SPI, I2C
+- Externe Geräte anschließbar
+- SPI für Displays/Flash oft mit SCK im Zehner-MHz-Bereich
+- Folge: die Schnittstelle kann Megabytes/s transportieren — wenn Software nachkommt
+
+::: notes
+Schnelle Peripherie nützt wenig, wenn der Pfad RAM → Controller der Engpass ist.
+:::
+
+## Das Problem: Datenmenge
+
+- Temperaturfühler: wenige Bytes/s — unkritisch
+- Audio: z. B. $\approx 44\,100$ Samples/s, kontinuierlich, jitterarm
+- TFT $320\times 240$, 16 Bit, 60 FPS:
+
+$$
+320 \times 240 \times 2 \times 60 = 9\,216\,000\ \mathrm{Bytes/s}
+$$
+
+- CPU müsste millionenfach RAM lesen und SPI-Register füllen
+
+::: notes
+Bei Grafik/Audio bindet Software-Kopieren die CPU stark — selbst bei schneller Peripherie.
+:::
+
+## Refresher: Wie die CPU kopiert
+
+- MCT1: Speicherzugriff über Load/Store
+- `lw`: RAM → Register; `sw`: Register → MMIO (z. B. SPI-TX)
+- Kein „direkt von RAM nach SPI“ in einem Befehl
+
+```asm
+loop:
+    lw   t0, 0(s1)     /* RAM lesen */
+    sw   t0, 0(s2)     /* Peripherie schreiben */
+    addi s1, s1, 4
+    bne  s1, s3, loop
+```
+
+::: notes
+Jedes Byte wandert durch Register/ALU-Pfad — viele Takte nur für 1:1-Kopieren.
+:::
+
+## Agenda
+
+1. CPU-Flaschenhals: Polling und Interrupt-Stürme
+2. DMA: Bypass der CPU und Bus-Mastering
+3. Kanäle und Konfiguration (Source, Destination, Increment)
+4. Burst, Ringpuffer, Double Buffering
+5. Labor-Ausblick (Renode)
+
+::: notes
+Zuerst zeigen wir, warum Software scheitert — dann der Hardware-Rettungsanker DMA.
+:::
+
+## Lernziele Block 6
+
+- Begründen, warum Polling und häufige ISRs den Prozessor auslasten
+- Bus-Mastering und Arbitration im SoC erklären
+- DMA-Kanal: Source, Destination, Increment Mode
+- Cache-Kohärenz bei DMA einordnen
+- Ringpuffer und Double Buffering (Ping-Pong) für Streams erklären
+
+::: notes
+Am Ende: große Transfers nicht mehr per `for`-Schleife über den Bus — sondern per DMA.
+:::
+
+## Die Leitfrage des Tages
+
+- 1 MB Array im SRAM (z. B. Bild) → SPI → Display
+- Parallel: CPU führt schwere Berechnung aus (z. B. Edge-AI)
+- Wie fließen die Bytes RAM → Peripherie, ohne die CPU-Rechnung zu stoppen?
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  RAM[(SRAM)] -.->|Tunnel?| SPI[SPI]
+  CPU[CPU] -->|weiterrechnen| KI[Berechnung]
+  style SPI fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Ziel: Parallelität — CPU rechnet, Datenfluss läuft daneben. Spoiler: DMA.
+:::
+
+## Fragen? — Motivation
+
+- Limitierung durch `lw`/`sw` klar?
+- Warum kann SPI „schneller“ sein als Software nachfüttert?
+
+::: notes
+Als Nächstes: klassische Software-Lösungen und warum sie bei 1 MB scheitern.
+:::
+
+## Methode 1: Polling
+
+```c
+void send_bild_polling(uint8_t *bild, uint32_t length) {
+    for (uint32_t i = 0; i < length; i++) {
+        while ((SPI_STATUS_REG & TX_EMPTY_FLAG) == 0) { }
+        SPI_DATA_REG = bild[i];
+    }
+}
+```
+
+- Warten, bis TX leer — dann nächstes Byte
+- Funktioniert korrekt — blockiert die CPU
+
+::: notes
+Klassischer Anfänger-Code: zuverlässig, aber die CPU dreht in der Warteschleife.
+:::
+
+## Die Polling-Falle
+
+- Beispiel: SPI mit $10\,\mathrm{MHz}$-SCK → grob $\approx 0{,}8\,\mu\mathrm{s}$ pro Byte (8 Bit + Overhead je nach Mode)
+- $10^{6}$ Bytes $\Rightarrow$ Größenordnung $\approx 0{,}8\,\mathrm{s}$ Transferzeit
+- CPU-Last in der `while`-Schleife: praktisch 100 % Wartezeit
+- Keine parallele Nutzarbeit in dieser Zeit
+
+::: notes
+Sekundenbruchteile sind für GHz-CPUs Ewigkeiten — Milliarden verschwendeter Takte als „Postbote“.
+:::
+
+## Methode 2: Interrupt-Versand
+
+- SPI löst bei TX-leer Interrupt aus (über PLIC)
+- ISR schreibt ein Byte; CPU rechnet dazwischen weiter
+
+```c
+void spi_tx_empty_isr(void) {
+    if (bytes_sent < 1000000) {
+        SPI_DATA_REG = bild_array[bytes_sent++];
+    }
+}
+```
+
+::: notes
+Interrupts entlasten gegenüber Polling — bei Mikrosekunden-Raten droht trotzdem Kollaps.
+:::
+
+## Interrupt-Overhead
+
+Pro Interrupt typisch:
+
+- Pipeline leeren, `mepc`/`mcause` setzen
+- Register retten (Stack)
+- Nutzarbeit: ein Byte kopieren
+- Register wiederherstellen, `mret`
+
+Oft Dutzende Takte Overhead für wenige Nutz-Takte.
+
+::: notes
+Erinnerung Block 3: Kontextwechsel ist teuer — besonders bei einem Byte Nutzlast.
+:::
+
+## Interrupt Storm
+
+- SPI meldet „leer“ im Sub-µs- bis µs-Takt
+- Millionen ISRs/s möglich
+- CPU: Zeit geht in Push/Pop statt Nutzarbeit
+
+| Phase | Was passiert |
+|-------|----------------|
+| kurz | KI/Main |
+| lang | ISR-Overhead |
+| kurz | KI/Main |
+| lang | ISR-Overhead |
+
+::: notes
+Interrupts passen zu seltenen Ereignissen (Taste, Tick) — nicht zu Dauerfeuer im Mikrosekunden-Takt.
+:::
+
+## CPU als Postbote
+
+- Polling und ISR: jedes Byte durch CPU-Register
+- Pfad: RAM → Bus → (Cache) → Register → Bus → SPI
+- ALU/Pipeline involviert, obwohl nur 1:1 kopiert wird
+
+::: notes
+Hochkomplexe Rechenwerke als Spediteur missbrauchen — architektonisch unnötig.
+:::
+
+## Bus-Engstelle beim Software-Kopieren
+
+- Auch mit getrennten L1-I/D-Caches teilen sich CPU und Peripherie oft den Systembus zum Hauptspeicher
+- Intensives `lw`/`sw`-Kopieren belegt diesen Pfad
+- Instruction-Fetch und Nutzarbeit konkurrieren → Pipeline stottert
+
+::: notes
+Klassisch als Von-Neumann-Flaschenhals diskutiert; bei modernen SoCs oft die gemeinsame Memory-Interconnect. Software-Kopieren belegt denselben teuren Pfad.
+:::
+
+## Lösung: Hardware-Assistent
+
+- CPU = Manager (rechnen, entscheiden)
+- Auftrag: Quelle, Ziel, Länge — dann weiterarbeiten
+- Assistent schaufelt und meldet „fertig“
+- Name: Direct Memory Access (DMA) / DMAC
+
+::: notes
+Einmal konfigurieren, Hintergrundtransfer, Interrupt erst am Ende (oder bei Meilensteinen).
+:::
+
+## Fragen? — Flaschenhals
+
+- Warum Interrupt-Sturm bei schnellem SPI?
+- Warum verschwenden `lw`/`sw`-Schleifen ALU/Bus?
+- „Postboten“-Problem klar?
+
+::: notes
+Als Nächstes: Was DMA ist und wie Bus-Mastering funktioniert.
+:::
+
+## Was ist DMA?
+
+- DMA: Direct Memory Access — direkter Speicherzugriff
+- Peripherie (SPI, UART, ADC, …) liest/schreibt RAM ohne CPU-Kopierschleife
+- Steuerung: DMA-Controller (DMAC) als dediziertes Subsystem
+
+::: notes
+Geräte umgehen die CPU und greifen — über den DMAC — direkt auf den Speicher zu.
+:::
+
+## Bypass der CPU
+
+- Ohne DMA: RAM → CPU → UART/SPI
+- Mit DMA: RAM ↔ DMAC ↔ Peripherie
+- Datenpfad an der CPU vorbei; CPU-Auslastung für den Transfer nahe 0 %
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TD
+  RAM[(SRAM)] <--> DMAC[DMA-Controller]
+  DMAC <--> SPI[SPI]
+  CPU[CPU] -.->|Auftrag| DMAC
+  style DMAC fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+CPU erteilt den Auftrag und rechnet weiter; der Tunnel RAM–Peripherie läuft autonom.
+:::
+
+## Der DMA-Controller (DMAC)
+
+- Eigenes Silizium-Modul auf dem SoC
+- Keine allgemeine ALU — spezialisiert auf Adressen und Transfers
+- Merkt sich u. a. Quelle, Ziel, Restlänge
+- Oft mehrere Controller/Kanäle (DMA1, DMA2, …)
+
+::: notes
+„Dumm, aber schnell“: lesen, schreiben, Zeiger erhöhen, $N$-mal — besser als jede Software-Schleife.
+:::
+
+## Kampf um den Bus
+
+- Oft ein gemeinsamer Pfad zum RAM
+- Früher: CPU alleiniger Nutzer
+- DMA will denselben Bus — Konfliktregelung nötig
+
+::: notes
+Zwei Master am gleichen Medium brauchen Arbitration.
+:::
+
+## Bus-Mastering
+
+- Bus-Master: darf selbst Transaktionen starten
+- CPU: Bus-Master
+- DMAC: ebenfalls Bus-Master
+- UART/SPI-Datenregister typisch: Slave (passiv)
+
+::: notes
+Die CPU verliert das Monopol; der DMAC darf eigenständig Speicherzugriffe auslösen.
+:::
+
+## Bus-Arbitration
+
+- Bus-Matrix / Arbiter steuert den Zugang
+- Gleichzeitiger Zugriff CPU und DMA → Priorität entscheidet
+- Oft DMA bevorzugt (Echtzeit: Audio, Display)
+- Verlierer: kurze Stall-Zyklen
+
+```{mermaid}
+%%| fig-width: 3.6
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  CPU[CPU] --> A{Arbiter}
+  DMA[DMA] --> A
+  A --> RAM[(SRAM)]
+  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Echtzeit-Streams vertragen Stalls schlecht; die CPU verkraftet kurze Wartezeiten besser.
+:::
+
+## Cycle Stealing
+
+- DMA „klaut“ gelegentlich Bus-Zyklen
+- Kein ISR-Overhead pro Byte → Störung oft gering
+- Mit L1-Cache rechnet die CPU oft ohne Dauerzugriff auf den Hauptspeicherbus
+
+::: notes
+Gegenüber Software-Kopieren vernachlässigbar — besonders bei guter Cache-Lokalität der CPU-Arbeit.
+:::
+
+## Transparent vs. Blocking
+
+- Transparent: DMA nutzt Bus, wenn die CPU ihn ohnehin nicht braucht
+- Blocking / Burst: DMA belegt den Bus länger — CPU stottert kurz
+- Immer noch weit günstiger als C-Kopierschleifen
+
+::: notes
+Selbst harte Bursts sind Fliegengewicht gegen millionenfaches `lw`/`sw`.
+:::
+
+## Hardware-Handshake
+
+- DMA darf Peripherie nicht überfluten
+- Synchronisation über dedizierte Signale im SoC (ohne CPU)
+
+::: notes
+Wie Staffelübergabe: erst anfordern, dann liefern.
+:::
+
+## Request / Acknowledge (Handshake)
+
+- Request (klassisch oft DREQ): Peripherie „Register leer / bereit“
+- DMAC: Transfer RAM ↔ Peripherie
+- Acknowledge (klassisch oft DACK): „geliefert“
+- Signale und Namen sind herstellerspezifisch — das Prinzip bleibt gleich
+
+```{mermaid}
+%%| fig-width: 3.6
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  SPI -->|DREQ| DMAC
+  DMAC -->|Daten| SPI
+  DMAC -->|DACK| SPI
+  style DMAC fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Klassische Bezeichnungen DREQ/DACK; am Chip oft andere Signalnamen. Prinzip: Peripherie fordert an, DMA liefert.
+:::
+
+## Richtung: Memory → Peripheral
+
+- SRAM → UART / SPI / I2C / DAC
+- Quelle: Array (Adresse steigt); Ziel: festes Datenregister
+- Typisch: Audio-Out, Display-Refresh
+
+::: notes
+Klassischer Sender: C-Puffer hinaus in die Welt.
+:::
+
+## Richtung: Peripheral → Memory
+
+- UART / SPI / ADC → SRAM
+- z. B. ADC sampelt Mikrofon mit hoher Rate → DREQ → DMA füllt Puffer
+- CPU wertet später aus (Spracherkennung etc.)
+
+::: notes
+Sensorik ohne Interrupt-Sturm: DMA füllt den Puffer geräuschlos.
+:::
+
+## Richtung: Memory → Memory
+
+- SRAM-Array A → Array B
+- Ersetzt/beschleunigt `memcpy`-artige Kopien
+- Oft ohne externes DREQ — so schnell der Bus erlaubt
+
+::: notes
+Auch reine Software-Pufferumzüge profitieren vom DMAC.
+:::
+
+## DMA-Interrupts
+
+- Anbindung an PLIC / Interrupt-System
+- Typisch: Transfer Complete (TC), Half Transfer (HT), Transfer Error (TE)
+- Ein Interrupt nach $N$ Bytes statt $N$ Interrupts
+
+::: notes
+HT ist Basis für Ping-Pong: eine Hälfte füllen/lesen, während die andere transferiert.
+:::
+
+## Fragen? — DMA-Grundlagen
+
+- Was bedeutet Bus-Mastering?
+- Wie schlichtet der Arbiter (Cycle Stealing)?
+- Rolle des Hardware-Handshakes (Request/Acknowledge)?
+
+::: notes
+Als Nächstes: Kanäle konfigurieren — Source, Destination, Increment, Cache.
+:::
+
+## DMA-Kanäle (Channels / Streams)
+
+- Viele Peripherien wollen parallel Daten bewegen (UART, SPI, I2C, …)
+- Ein DMAC hat daher mehrere Kanäle (z. B. Channel 0–7)
+- Jeder Kanal: eigene Quelle, Ziel, Länge, Priorität
+- Interner DMA-Arbiter: bei gleichzeitigen DREQs entscheidet die Kanalpriorität
+
+```{mermaid}
+%%| fig-width: 4.0
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  SPI -->|DREQ| CH1[Kanal 1]
+  UART -->|DREQ| CH2[Kanal 2]
+  I2C -->|DREQ| CH3[Kanal 3]
+  CH1 --> A{DMA-Arbiter}
+  CH2 --> A
+  CH3 --> A
+  A --> Bus[Systembus]
+  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Mehrere Förderbänder parallel: Audio auf Kanal 1, Logs auf Kanal 2 — der DMA-interne Schiedsrichter regelt Konflikte, ohne die CPU.
+:::
+
+## Multiplexing der Kanäle (DMAMUX)
+
+- Oft mehr Peripherien als DMA-Kanäle
+- Lösung: Multiplexer-Matrix (häufig DMAMUX) vor dem DMAC
+- Software verbindet z. B. `UART_TX`-Request mit Kanal 3
+- Doppelbelegung desselben Kanals → undokumentiertes / fehlerhaftes Verhalten
+- Referenzhandbuch: Request-Tabellen sind Pflichtlektüre
+
+::: notes
+Erster Programmierschritt: Request-Leitung der richtigen Peripherie auf den richtigen Kanal legen.
+:::
+
+## MMIO-Register eines Kanals
+
+- Steuerung über Memory-Mapped Register
+- In C oft als `struct` abgebildet
+- Vier Kernfragen: Woher? Wohin? Wie viel? Welche Breite / Modi?
+
+```c
+typedef struct {
+    volatile uint32_t SRC_ADDR;  /* Quelle */
+    volatile uint32_t DST_ADDR;  /* Ziel */
+    volatile uint32_t COUNT;     /* Anzahl Transfers */
+    volatile uint32_t CONTROL;   /* Breite, Inkrement, Enable, … */
+} DMA_Channel_TypeDef;
+
+/* Adresse fiktiv — im Labor: Datenblatt / Renode-Modell */
+#define DMA_CH1 ((DMA_Channel_TypeDef *)0x40020000u)
+```
+
+::: notes
+Layout und Bitfelder sind herstellerspezifisch — die vier Parameter finden Sie überall wieder.
+:::
+
+## Parameter 1: Source Address (SRC)
+
+- Physikalische Startadresse der Quelle in `SRC_ADDR`
+- Senden: oft Adresse eines Arrays im SRAM
+- DMA liest von dort (ggf. mit Auto-Inkrement)
+
+```c
+uint8_t bild_array[1000];
+DMA_CH1->SRC_ADDR = (uint32_t)&bild_array[0];
+```
+
+::: notes
+Lade-Ort: Read-Zugriff auf dem Systembus in den internen DMA-Pfad.
+:::
+
+## Parameter 2: Destination Address (DST)
+
+- Zieladresse in `DST_ADDR`
+- Senden über SPI/UART: Adresse des Datenregisters (z. B. TX_DATA)
+- DMA schreibt blind auf diese Adresse
+
+```c
+#define SPI_TX_DATA_REG 0x4003000Cu  /* fiktiv */
+
+DMA_CH1->DST_ADDR = SPI_TX_DATA_REG;
+```
+
+::: notes
+Ablade-Ort: nach dem Lesen folgt der Write auf die Peripherie — der Controller startet den seriellen Versand.
+:::
+
+## Parameter 3: Transfer Count
+
+- `COUNT`: Anzahl der Transfers (oft 16 Bit, z. B. bis $65\,535$)
+- Nach erfolgreichem Transfer: Hardware dekrementiert automatisch
+- Bei `COUNT = 0`: Kanal stoppt, typisch Transfer-Complete-Interrupt
+
+```{mermaid}
+%%| fig-width: 3.6
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[COUNT = 1000] --> B[Transfer]
+  B --> C[COUNT = 999]
+  C --> D[COUNT = 0]
+  D -->|STOP| E[IRQ an CPU]
+  style E fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Ohne Zähler würde der DMA endlos weiterlaufen. Null bedeutet: Auftrag erledigt, CPU benachrichtigen.
+:::
+
+## Parameter 4: Data Width
+
+- Pro Transfer: 8, 16 oder 32 Bit — gesetzt im `CONTROL`-Register
+- Quelle und Ziel müssen passen (z. B. 8-Bit-Sensorregister ≠ 32-Bit-Write)
+
+| C-Typ | DMA-Breite | Transfers für 32 Bit Nutzdaten |
+|-------|------------|--------------------------------|
+| `uint8_t` | Byte (8) | 4 |
+| `uint16_t` | Halfword (16) | 2 |
+| `uint32_t` | Word (32) | 1 (oft maximal effizient) |
+
+::: notes
+Passende Breite spart Bus-Zyklen: 16-Bit-Sensor → Halfword-DMA, nicht byteweise.
+:::
+
+## Address Increment Mode
+
+- Arrays: Pointer muss wandern — sonst 1000× dieselbe Adresse
+- INC: nach jedem Transfer $+$ Data-Width auf SRC und/oder DST
+- Hardware-Äquivalent zu `pointer++`
+- Quelle und Ziel getrennt schaltbar
+
+```c
+/* Konzept — in Hardware als Auto-Inkrement */
+*DST_ADDR = *SRC_ADDR;
+SRC_ADDR += width;  /* wenn Memory-Increment aktiv */
+```
+
+::: notes
+Damit wird die klassische Kopierschleife in Silizium nachgebaut.
+:::
+
+## Memory → Peripheral: Pointer
+
+- Source Increment: **an** (Array durchlaufen)
+- Destination Increment: **aus** (festes TX-Register)
+- Ziel inkrementieren → Schreiben neben das Register → oft Bus Fault
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[SRAM++] -->|INC an| B[UART_TX fest]
+  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Klassischer Fehler: Peripherie-Adresse mitwandern lassen. Der Briefschlitz bleibt starr.
+:::
+
+## Peripheral → Memory: Pointer
+
+- Source Increment: **aus** (festes ADC-/RX-Register)
+- Destination Increment: **an** (Werte im Array ablegen)
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  B[ADC_DATA fest] -->|INC an| A[SRAM++]
+  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Sensor immer aus demselben Fach; Ablage im RAM der Reihe nach.
+:::
+
+## Memory Alignment
+
+- Word-Transfers (32 Bit): Startadressen typisch 4-Byte-aligned
+- Unaligned (z. B. `0x20000001`) → oft Bus Error / Transfer Error
+- In C Alignment erzwingen:
+
+```c
+__attribute__((aligned(4))) uint8_t dma_buffer[1000];
+```
+
+::: notes
+Unaligned Word-Zugriffe wären teuer oder verboten — DMA-Puffer sauber ausrichten.
+:::
+
+## Cache-Kohärenz und DMA
+
+- Relevant, sobald ein Data-Cache (Write-Back) vorhanden ist — viele einfache MCUs haben keinen
+- Erinnerung Block 2: L1-D-Cache puffert RAM-Inhalte
+- DMA sieht den CPU-D-Cache typischerweise **nicht** — Zugriff auf den physischen Speicher
+- CPU und DMA können unterschiedliche Sicht auf dieselben Adressen haben
+
+```{mermaid}
+%%| fig-width: 3.8
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart TD
+  CPU[CPU] <--> Cache[L1 Cache]
+  Cache -.->|Write-Back verzögert| RAM[(SRAM)]
+  DMAC[DMA] <-->|liest/schreibt RAM| RAM
+  style Cache fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Klassische Falle: CPU ändert Array nur im Cache; DMA verschickt veraltete RAM-Bytes.
+:::
+
+## Stale Data (beide Richtungen)
+
+- Senden (CPU → DMA): frische Daten nur im Cache → DMA sendet alte RAM-Inhalte
+- Empfangen (DMA → CPU): frische Daten im RAM → CPU trifft veralteten Cache-Hit
+- Lösung: Software-Cache-Wartung oder uncached Regionen
+
+::: notes
+Beide Seiten können sich „belügen“, wenn Kohärenz nicht hergestellt wird.
+:::
+
+## Cache Clean / Invalidate
+
+- Clean (Flush): vor DMA-Sendestart schmutzige Lines des Puffers in den RAM schreiben
+- Invalidate: vor CPU-Lesen empfangener DMA-Daten Lines verwerfen → nächster Read geht zum RAM
+- API ist plattformabhängig (ARM: Cache-Maintenance; RISC-V: je nach Implementierung / Fence)
+
+```c
+bild_berechnen();
+/* Konzept: Cache-Bereich des Arrays in den RAM schreiben */
+cache_clean((uintptr_t)bild_array, sizeof(bild_array));
+dma_start();
+```
+
+::: notes
+Wenige Takte Overhead — dafür korrekte Sichtbarkeit zwischen CPU und DMA.
+:::
+
+## Uncached DMA-Zonen
+
+- Alternative: Speicherregion ohne Caching (oft per MPU / PMP)
+- CPU greift dort immer direkt auf RAM zu
+- Kohärenz hardwareseitig einfacher; Zugriff etwas langsamer
+- Linker platziert DMA-Puffer gezielt
+
+```text
+MEMORY {
+  RAM_CACHED   : ORIGIN = 0x20000000, LENGTH = 246K
+  RAM_UNCACHED : ORIGIN = 0x2003E800, LENGTH = 10K  /* DMA-Puffer */
+}
+```
+
+::: notes
+Professioneller Ansatz in OS/RTOS: DMA-Buffer in uncached Segment, kein manuelles Flushen vergessen.
+:::
+
+## Fragen? — Kanalkonfiguration
+
+- Welche vier Parameter braucht ein DMA-Kanal?
+- Warum Destination-Increment bei UART-TX aus?
+- Cache-Kohärenz: Problem und Rolle von Clean/Invalidate?
+
+::: notes
+Als Nächstes: Burst vs. Single, Ringpuffer und Ping-Pong für endlose Streams.
+:::
+
+## Single-Transfer vs. Burst
+
+- Single: ein DREQ → typisch ein Read + ein Write; Bus danach wieder frei
+- Burst: nach einem Request ein Block (z. B. 16 Words) am Stück
+- Burst: höherer Durchsatz, kurz härtere Busbelegung für die CPU
+
+::: notes
+Single ist höflich; Burst maximiert Bandbreite, blockiert den Bus länger.
+:::
+
+## Warum Burst-Transfers?
+
+- On-Chip-SRAM: Burst spart vor allem wiederholte Bus-Arbitration
+- Externes DRAM (Block 1): Zeile öffnen kostet; offene Zeile → schnelle Column-Zugriffe
+- Burst: einmal „aufmachen“, viele Words hintereinander — besonders bei DRAM deutlich effizienter
+
+| Modus | Typischer Nachteil Single | Vorteil Burst |
+|-------|---------------------------|---------------|
+| On-Chip-SRAM | 16× Arbitration | 1× Arbitration, hoher Durchsatz |
+| DRAM | zusätzlich oft 16× Row-Aktivierung | 1× öffnen, 16× lesen |
+
+::: notes
+SRAM-MCU: Burst = weniger Bus-Schiedsverfahren. DRAM-SoC: zusätzlich die Zeilenlogik aus Block 1.
+:::
+
+## FIFOs im DMAC
+
+- Problem: Burst holt schnell aus dem RAM; SPI/UART sind langsamer
+- Viele DMACs: interner FIFO als Zwischenpuffer
+- Burst → FIFO füllen → Bus freigeben → Peripherie per DREQ aus dem FIFO füttern
+
+```{mermaid}
+%%| fig-width: 3.6
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  RAM[(SRAM)] -->|Burst| FIFO[DMA-FIFO]
+  FIFO -->|DREQ-getaktet| SPI[SPI]
+  style FIFO fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Entkopplung: schneller Speicherzugriff und langsamer I/O-Takt getrennt.
+:::
+
+## Problem endloser Streams
+
+- Audio-DAC: z. B. $\approx 44\,100$ Samples/s, lange Dauer
+- RAM fasst nicht die ganze Datei
+- Kleiner Puffer: `COUNT = 0` → Sound bricht ab
+- Ständiges Stoppen/Neustarten in Software → Glitches
+
+::: notes
+Feste Blöcke reichen für Streams nicht — der DMA muss „im Kreis“ weiterlaufen können.
+:::
+
+## Circular Mode (Ringpuffer)
+
+- Array fester Größe als Ring (z. B. 4 KiB)
+- Bei `COUNT = 0`: Pointer und Zähler werden in Hardware neu geladen (Wrap)
+- DMA rotiert, bis Software den Kanal stoppt
+
+::: notes
+Industriestandard für Audio, Video, Netzwerk: Speicher als Endlosschleife.
+:::
+
+## Ringpuffer: Software-Pflicht
+
+- DMA-Lesezeiger läuft im Kreis
+- CPU muss den gerade verlassenen Bereich nachfüllen (z. B. aus Flash/Netz)
+- Zu langsam → alte Daten → Stottern (Buffer Underrun)
+
+```{mermaid}
+%%| fig-width: 3.4
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  CPU[CPU schreibt] --> R((Ringpuffer))
+  R --> DMA[DMA liest]
+  DMA -->|Wrap| R
+  style R fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+```
+
+::: notes
+Katz-und-Maus: DMA frisst, Software füllt — wo steht der DMA gerade?
+:::
+
+## Double Buffering (Ping-Pong)
+
+- Ring in zwei Hälften A und B
+- DMA liest A → CPU füllt parallel B (und umgekehrt)
+- Kein Konflikt: getrennte Bereiche
+
+::: notes
+Zwei Eimer: einer wird geleert, der andere gefüllt — stabile Multimedia-Wiedergabe.
+:::
+
+## Ping-Pong: Interrupt-Logik
+
+- Mitte erreicht → Signal: Hälfte A fertig → CPU füllt A nach
+- Ende erreicht → Signal: Hälfte B fertig → Wrap, CPU füllt B nach
+- Endlos mit klarer Phasengrenze
+
+::: notes
+Zwei Ereignisse reichen: Halb und Voll (Complete) im Circular Mode.
+:::
+
+## Half-Transfer-Interrupt (HT)
+
+- Bei vielen Controllern: HT bei exakt 50 % von `COUNT` → erste Hälfte nachfüllen
+- TC (`COUNT = 0`): zweite Hälfte nachfüllen (bei Circular: Wrap)
+- Ein Array + zwei Flags in der ISR (Namen/Bits herstellerspezifisch)
+
+```c
+void dma_isr(void) {
+    if (STATUS_REG & HALF_TRANSFER_FLAG)
+        fill_first_half();
+    if (STATUS_REG & TRANSFER_COMPLETE_FLAG)
+        fill_second_half();
+}
+```
+
+::: notes
+HT + TC = Double Buffering ohne zwei separate Hardware-Kanäle.
+:::
+
+## Ausblick: DMA2D (2D-Kopie)
+
+- High-End-SoCs: 2D-DMA / Grafik-Accelerator (z. B. Chrom-ART)
+- Versteht Rechtecke ($X$/$Y$), nicht nur lineare Bytes
+- Zeilenoffsets am Ende jeder Zeile — Ausschnitte aus Framebuffer-Layouts
+
+::: notes
+Für GUIs: Button aus Hintergrundbild kopieren, ohne CPU-Pixelschleifen.
+:::
+
+## Scatter-Gather (verkettete Listen)
+
+- Viele kleine Puffer im RAM verstreut
+- Neu-Konfigurieren nach jedem Puffer kostet CPU/IRQs
+- Scatter-Gather: Deskriptor-Liste (SRC, DST, COUNT, Next) im RAM
+- DMA lädt den nächsten Auftrag selbst nach
+
+::: notes
+Königsklasse: CPU schreibt die Auftragskette; DMA arbeitet sie autonom ab.
+:::
+
+## Grenzen von DMA
+
+- Verschiebt Bytes — keine allgemeine Logik
+- Kein `if` auf Nutzdaten, keine Berechnung pro Byte
+- Kein Protokollverständnis (z. B. I2C-ACK): nur Reaktion auf DREQ/Handshake
+- Für Entscheidungen bleibt die CPU zuständig
+
+::: notes
+Assistent ohne Gehirn: transportiert zuverlässig; bewertet und filtert nicht.
+:::
+
+## Fragen? — Streams und Burst
+
+- Warum Burst (SRAM: Arbitration; DRAM: zusätzlich Row-Hits) effizienter ist?
+- Was leistet Circular Mode?
+- Ping-Pong mit Half-Transfer: Ablauf?
+
+::: notes
+Theorie Streams abgeschlossen. Als Nächstes: Labor-Ausblick — Polling vs. DMA messbar machen.
+:::
+
+## Ausblick Labor: DMA in Renode
+
+Geplantes Szenario (Details im Übungsblatt):
+
+- Langer String (z. B. HTML-Header) über UART
+- Runde 1: Polling — CPU blockiert sichtbar
+- Runde 2: DMA-Kanal — CPU rechnet/blinkt weiter, Text läuft im Hintergrund
+
+::: notes
+Dieselben Dämonen wie in der Theorie: erst blockierend, dann asynchron entlastet.
+:::
+
+## Messung 1: Polling (blockierend)
+
+- LED als Heartbeat der `main`-Schleife
+- Klassische UART-Sendeschleife:
+
+```c
+void send_uart_polling(const char *text, uint32_t len) {
+    for (uint32_t i = 0; i < len; i++) {
+        while (!(UART_STATUS_REG & TX_EMPTY)) { }
+        UART_TX_REG = text[i];
+    }
+}
+```
+
+::: notes
+Vergleichswert: die C-Schleife, die wir theoretisch als Engpass begründet haben.
+:::
+
+## Erwartung: Timer-/LED-Beweis
+
+- Während langer Polling-Ausgabe: Text im UART-Monitor
+- LED steht (nahezu) still — Heartbeat pausiert
+- Interpretation: Polling blockiert Multitasking in der Hauptschleife
+
+::: notes
+Laboridee: Solange gesendet wird, kommt die `main`-Schleife nicht zum Blinken.
+:::
+
+## Messung 2: Umstieg auf DMA
+
+- Polling-Schleife ersetzen durch MMIO-Konfiguration des DMAC
+- Generisches Rezept in vier Schritten (herstellerübergreifend)
+
+::: notes
+Registerlayout im Labor aus Datenblatt / Renode-Modell — Bits hier didaktisch.
+:::
+
+## Schritt 1: UART für DMA scharfschalten
+
+- Standard: UART erwartet CPU-Writes
+- Enable-Bit für DMA-Request (DREQ), wenn TX-Register Platz hat
+
+```c
+#define UART_CR3     (*(volatile uint32_t *)(UART_BASE + 0x08u))
+#define UART_DMA_EN  (1u << 7)  /* Bitlage fiktiv */
+
+UART_CR3 |= UART_DMA_EN;
+```
+
+::: notes
+Ohne Request vom UART startet der DMA nicht — Peripherie muss „rufen“ dürfen.
+:::
+
+## Schritt 2: Kanal konfigurieren
+
+- SRC = String im SRAM, DST = UART-TX-Register (fest)
+- COUNT = Länge; Memory-Increment an, Peripherie-Increment aus
+
+```c
+DMA_CH1->SRC_ADDR = (uint32_t)html_string;
+DMA_CH1->DST_ADDR = (uint32_t)&UART_TX_REG;
+DMA_CH1->COUNT    = string_laenge;
+DMA_CH1->CONTROL |= (DMA_MINC_EN | DMA_DIR_M2P);
+```
+
+::: notes
+Exakt die Parameter aus dem Theorieteil — Array wandert, TX-Adresse bleibt starr.
+:::
+
+## Schritt 3: Interrupts aktivieren
+
+- Transfer-Complete-Enable im DMA
+- PLIC (bzw. Interrupt-Controller) für den Kanal freischalten
+
+```c
+DMA_CH1->CONTROL |= DMA_TCIE_EN;
+enable_interrupt(DMA_CH1_IRQn);  /* Pseudocode */
+```
+
+::: notes
+Ein IRQ am Ende statt eines IRQs pro Byte — Abschluss und ggf. nächster Auftrag.
+:::
+
+## Schritt 4: Enable (Startschuss)
+
+- ENABLE-Bit setzen → Transfer startet hardwareseitig
+- C-Funktion kehrt sofort zurück — CPU ist frei
+
+```c
+void start_dma_transfer(void) {
+    DMA_CH1->CONTROL |= DMA_ENABLE_BIT;
+    /* main() läuft sofort weiter */
+}
+```
+
+::: notes
+Ein Bit, und der Hintergrundtransfer läuft — Triumph der Delegation.
+:::
+
+## Erwartung mit DMA
+
+- Text erscheint weiter im Monitor
+- LED blinkt ungestört (Heartbeat bleibt)
+- CPU kann parallel rechnen; DMA nutzt Cycle Stealing
+
+::: notes
+Zielbild im Simulator: System „lebt“, während Bytes asynchron ausgehen.
+:::
+
+## Interrupt-Handling am Ende
+
+- `COUNT = 0` → Transfer Complete
+- In der ISR Status quittieren (Flag clear), sonst erneutes Feuern
+
+```c
+void dma_channel1_isr(void) {
+    if (DMA_STATUS_REG & TRANSFER_COMPLETE) {
+        DMA_CLEAR_REG = CLEAR_TRANSFER_COMPLETE;
+        /* optional: nächsten Transfer starten */
+    }
+}
+```
+
+::: notes
+Wie beim SysTick: Grund lesen, Flag löschen, zurück — Mission erfüllt.
+:::
+
+## Zusammenfassung Block 6
+
+- Polling blockiert; Interrupt-Stürme kosten Overhead
+- DMA: spezialisierter Coprozessor für Speichertransfers
+- DMAC als Bus-Master, Cycle Stealing mit dem Arbiter
+- Kanal: SRC, DST, COUNT, Breite, Increment
+- Cache-Kohärenz: Clean/Invalidate oder uncached Regionen
+- Circular Mode, HT/TC → Ringpuffer und Ping-Pong
+
+::: notes
+CPU bleibt Gehirn; DMA ist der Muskel für Massenbewegungen.
+:::
+
+## Ausblick und Abschluss
+
+- Übungsblatt: Polling vs. DMA in Renode nachvollziehen
+- Nächster Block: moderne CPU-Beschleunigung (u. a. Out-of-Order)
+
+Vielen Dank — viel Erfolg im Labor.
+
+::: notes
+Wenn Terminal flüssig schreibt und die LED weiterblinkt, ist die Architektur verstanden. Bis zum nächsten Block!
+:::
