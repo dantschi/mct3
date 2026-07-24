@@ -1,0 +1,296 @@
+---
+title: "Probeklausur: Mikrocomputertechnik 3"
+subtitle: "Wrap-Up & Prüfungsvorbereitung · MCT3"
+---
+
+::: {.content-visible when-profile="solution"}
+> **Musterlösung**
+:::
+
+**Hinweise zur Bearbeitung**
+
+- **Dauer:** 90 Minuten  
+- **Erlaubte Hilfsmittel:** Nicht-programmierbarer Taschenrechner  
+- **Maximal erreichbare Punktzahl:** 100 Punkte  
+
+---
+
+## Aufgabe 1: Speicherhierarchie und Caches (25 Punkte)
+
+### 1.1 AMAT-Berechnung (10 Punkte)
+
+Ein SoC verfügt über einen L1-Cache und langsamen DRAM.
+
+- Hit Time L1: $2$ Taktzyklen  
+- Miss Penalty (DRAM): $150$ Taktzyklen  
+- Hit Rate: $96\,\%$  
+
+Berechnen Sie die Average Memory Access Time (AMAT) in Taktzyklen. Formel und Rechenweg angeben.
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 1.1**
+
+$$
+\mathrm{AMAT} = HitTime + (MissRate \times MissPenalty)
+$$
+
+$MissRate = 1 - 0{,}96 = 0{,}04$
+
+$$
+\mathrm{AMAT} = 2 + (0{,}04 \times 150) = 2 + 6 = 8\ \mathrm{Taktzyklen}
+$$
+:::
+
+### 1.2 Cache-Mapping (8 Punkte)
+
+Erklären Sie *Thrashing* bei einem Direct-Mapped-Cache. Wie löst ein 4-Way Set-Associative Cache das Problem hardwareseitig?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 1.2**
+
+**Thrashing:** Beim Direct Mapped hat jeder RAM-Block genau einen festen Cache-Platz (Index). Wechseln zwei Adressen mit demselben Index ab, verdrängen sie sich ständig → Miss Rate nahe $100\,\%$, obwohl der Rest des Caches leer sein kann.
+
+**4-Way:** Derselbe Index führt auf ein *Set* mit 4 Ways. Beide Blöcke können im Set nebeneinander liegen, ohne sich zu verdrängen.
+:::
+
+### 1.3 Hardwarenahes C und Lokalität (7 Punkte)
+
+```c
+for (int col = 0; col < 1000; col++) {
+    for (int row = 0; row < 1000; row++) {
+        bild[row][col] = 255 - bild[row][col];
+    }
+}
+```
+
+Warum ist die Performance mit Caches schlecht? Wie muss der Code umgeschrieben werden?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 1.3**
+
+C speichert 2D-Arrays *Row-Major*. Der Code läuft *Column-Major* → große Sprünge, Cache-Lines werden ungenutzt verdrängt (viele Misses).
+
+Lösung: Schleifen tauschen — äußere `row`, innere `col` (sequenzieller Zugriff, hohe räumliche Lokalität).
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 2: Interrupts, Timer und Aktorik (25 Punkte)
+
+### 2.1 Interrupt-Controller (8 Punkte)
+
+Nennen Sie für CLINT und PLIC je ein typisches Einsatzbeispiel und begründen Sie kurz die hardwareseitige Trennung.
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 2.1**
+
+- **CLINT:** lokaler Timer (`mtime`/`mtimecmp`), Software-/IPI — kernnah, geringe Latenz für OS-kritische Events.  
+- **PLIC:** externe Peripherie (UART, I2C, GPIO, …) — bündelt, priorisiert und routet viele Quellen.
+
+Trennung: kritische lokale Events ohne Warteschlange hinter hunderten Peripherie-IRQs.
+:::
+
+### 2.2 Hardware-Timer und PWM (10 Punkte)
+
+Systemtakt $50\,\mathrm{MHz}$, `PSC = 49`, `ARR = 10\,000`.
+
+1. Berechnen Sie die PWM-Frequenz in Hz (vereinfachtes Modell $f_{\mathrm{pwm}} = f_{\mathrm{cnt}}/\mathrm{ARR}$).  
+2. Welchen `CCR`-Wert brauchen Sie für $60\,\%$ Duty Cycle?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 2.2**
+
+1. $$
+f_{\mathrm{cnt}} = \frac{50\,\mathrm{MHz}}{\mathrm{PSC}+1} = \frac{50\times 10^{6}}{50} = 1\,\mathrm{MHz}
+$$
+$$
+f_{\mathrm{pwm}} = \frac{f_{\mathrm{cnt}}}{\mathrm{ARR}} = \frac{10^{6}}{10\,000} = 100\,\mathrm{Hz}
+$$
+
+2. $\mathrm{CCR} = 10\,000 \times 0{,}60 = 6000$
+:::
+
+### 2.3 Nested Interrupts (7 Punkte)
+
+Was ist das *Clobbering* von `mepc` bei Nested Interrupts? Welche Maßnahme ist nötig, bevor `MIE` in der ISR wieder auf 1 gesetzt wird?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 2.3**
+
+Tritt ein höherpriorer Interrupt in der ISR auf, überschreibt die Hardware `mepc` mit dem PC der ISR — die Rücksprungadresse zum Main-Programm geht verloren (*Clobbering*).
+
+Vor erneutem `MIE=1` müssen `mepc` (und typisch `mstatus`) auf dem Stack gesichert werden.
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 3: Architektur und DMA (25 Punkte)
+
+### 3.1 Direct Memory Access (10 Punkte)
+
+DMA überträgt $10\,000$ Bytes aus einem SRAM-Array an UART-TX.
+
+1. Inkrement-Modi für `SRC_ADDR` und `DST_ADDR` (An/Aus)? Begründung.  
+2. Hauptvorteil gegenüber interrupt-basiertem Senden (Interrupt Storm)?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 3.1**
+
+1. **SRC:** Inkrement an (Array durchlaufen). **DST:** Inkrement aus (immer dasselbe TX-Register; sonst Bus Fault / falsche Adressen).  
+2. Kein ISR-Overhead pro Byte — DMA als Bus-Master kopiert SRAM → UART, CPU-Last nahe $0\,\%$.
+:::
+
+### 3.2 Cache-Kohärenz bei DMA (7 Punkte)
+
+L1-D-Cache mit Write-Back: Warum kann DMA *Stale Data* senden? Software-Abhilfe?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 3.2**
+
+CPU schreibt nur in den Cache; RAM bleibt veraltet. DMA liest den RAM und sendet alte Bytes.
+
+Abhilfe: vor DMA-Start *Cache Clean/Flush* des Puffers — oder Puffer in *uncached* Region (MPU/PMP/Linker).
+:::
+
+### 3.3 Moderne CPU-Architekturen (8 Punkte)
+
+```riscv
+1: add t0, t1, t2
+2: sub t0, t4, t5
+```
+
+RAW oder WAR/WAW? Wie löst Register Renaming das Problem?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 3.3**
+
+**WAW** (beide schreiben `t0`; Befehl 2 braucht das Ergebnis von 1 nicht).
+
+Renaming: Schreibziel von 1 → physisches Register z. B. `P10`, von 2 → `P11`. Ziele getrennt → beide parallel ausführbar.
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 4: Multicore, Busse und KI (25 Punkte)
+
+### 4.1 MESI-Protokoll (8 Punkte)
+
+Beide Kerne haben Variable `x` in **S**. Core 1 führt `x = 42;` aus. Welche Bus-Nachricht? Zustände danach in Core 0 und Core 1?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 4.1**
+
+Core 1 sendet **Invalidate**-Broadcast. Core 0 → **I**, Core 1 nach dem Write → **M**.
+:::
+
+### 4.2 Hardware-Atomics (7 Punkte)
+
+Warum führt `while(lock == 1); lock = 1;` zu einer Race Condition? Welche zwei RISC-V-A-Extension-Befehle lösen das?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 4.2**
+
+Lesen und Schreiben sind getrennte Befehle: beide Kerne können „frei“ sehen und den Lock setzen → kritischer Bereich doppelt betreten.
+
+Lösung: `lr.w` (Load-Reserved) und `sc.w` (Store-Conditional).
+:::
+
+### 4.3 Serielle Busse (5 Punkte)
+
+Warum ist I2C gegen Kurzschlüsse resilienter als SPI Push-Pull, wenn zwei Geräte gleichzeitig treiben — und welcher Geschwindigkeitsnachteil folgt daraus?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 4.3**
+
+I2C: Open-Drain — nur aktiv LOW oder hochohmig; HIGH über Pull-ups. Konflikt LOW/„HIGH“ → Strom über Pull-up nach GND, kein Push-Pull-Kurzschluss.
+
+Nachteil: langsame Rising Edges → typisch deutlich niedriger als SPI (z. B. $100$–$400\,\mathrm{kHz}$ vs. MHz).
+:::
+
+### 4.4 KI-Hardware (5 Punkte)
+
+Warum ist ein Systolic Array (NPU) für neuronale Netze energieeffizienter als eine hochgetaktete General-Purpose-CPU?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 4.4**
+
+Milliarden identischer MACs. Die CPU leidet unter Memory Wall und Instruction-Decode-Overhead. Systolic Arrays reichen Daten in Hardware von Zelle zu Zelle weiter (Wiederverwendung) → weniger RAM-Zugriffe und weniger Front-End-Energie → höhere Effizienz (TOPS/Watt).
+:::

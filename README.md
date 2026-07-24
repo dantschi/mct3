@@ -30,6 +30,12 @@ Pro Einheit: Folien (Reveal.js), Handout-PDF sowie Übungsblatt (Studierende / M
 
 **Hinweise:** Folien im Browser öffnen (Speaker View: Taste `S`). Handout-PDF = Folieninhalt mit Skriptnotizen. Quelltexte unter `vorlesungen/` und `labs/`. Übungsblätter und Musterlösungen werden bei jedem Publish über GitHub Actions als PDF gebaut.
 
+## Probeklausur
+
+| Dokument | Studierende | Musterlösung |
+|----------|-------------|--------------|
+| Probeklausur (90 Min., 100 Punkte) | [PDF](labs/probeklausur.pdf) | [PDF](labs/probeklausur-musterloesung.pdf) |
+
 ## Literatur
 
 Zentrale Referenz dieses Moduls:
