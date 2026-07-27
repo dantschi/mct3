@@ -35,7 +35,7 @@ Caches und DMA haben externe Engpässe entschärft. Zurück zum Prozessorkern: W
 Kurz-Recap aus Block 6 (Vertiefung im Übungsblatt):
 
 - DMA kopiert Arrays autonom; Polling blockiert die CPU stark
-- Mit DMA bleibt die Hauptschleife (z. B. LED) oft reagierfähig
+- Mit DMA bleibt die Hauptschleife (z. B. LED) oft reaktionsfähig
 - Bus-Mastering und Cycle Stealing: DMA teilt sich den Bus mit der CPU
 - Folge: weniger ALU-Zeit für stupides Kopieren — mehr Zeit für echte Berechnung
 
@@ -97,7 +97,7 @@ Drei Hebel: weniger Befehle, kürzerer Takt, bessere Architektur (kleineres CPI)
 ## Limit der skalaren Pipeline
 
 - Ideal ohne Stalls/Hazards/Misses: $\mathrm{IPC} = 1$, $\mathrm{CPI} = 1$
-- Eine skalare Ein-Issue-Pipeline: physikalisch kein $\mathrm{CPI} < 1$
+- Eine skalare Ein-Issue-Pipeline: strukturell kein $\mathrm{CPI} < 1$
 - Ein Pfad → Befehle im Gänsemarsch
 - Realität oft schlechter ($\mathrm{CPI} > 1$) durch Bubbles und Hazards
 
@@ -187,7 +187,7 @@ add t0, t1, t2   # schreibt t0
 sub t3, t0, t4   # liest t0 — muss warten
 ```
 
-- Keine Parallelität dieser beiden im selben EX-Schritt — ILP hier = 0
+- Keine Parallelität dieser beiden im selben EX-Schritt — ILP dieses Paares = 1 (rein sequentiell)
 
 ::: notes
 Bekannt aus MCT1: echte Datenabhängigkeit — Hardware kann Mathematik nicht „wegoptimieren“.
@@ -428,7 +428,7 @@ Wer Daten hat, rechnet; wer auf Memory wartet, bleibt in der Queue.
 ## Problem: Interrupts im Chaos
 
 - Frühe Befehle noch nicht fertig, spätere schon executed
-- Interrupt / Exception: maschinenlesbarer Zustand muss konsistent sein
+- Interrupt / Exception: architektonisch sichtbarer Zustand muss konsistent sein
 - Ohne Schutz: RAM/Register könnten „Zukunft“ schon enthalten — inkonsistent für OS
 
 ::: notes
@@ -526,10 +526,22 @@ Die Pipeline braucht jeden Takt neuen Nachschub — an der Weggabelung fehlt das
 - Warten auf die ALU: wenige Bubbles — bei 5 Stufen oft erträglich
 - Moderne High-Performance-Kerne: deutlich tiefere Pipelines (Größenordnung: viele Stufen), u. a. für hohe Taktraten
 - Falscher Weg → Flush vieler spekulativer Instruktionen
-- Miss-Prediction Penalty: oft im Bereich vieler Takte — teuer für IPC
+- Misprediction Penalty: oft im Bereich vieler Takte — teuer für IPC
 
 ::: notes
 Tiefe Pipelines erhöhen die Branch Penalty: falsch geraten heißt viele Arbeitseinheiten verwerfen.
+:::
+
+## Misprediction: Zahlenbeispiel
+
+- $20\,\%$ der Befehle sind Branches
+- Misprediction-Rate $10\,\%$, Penalty $15$ Takte
+- Basis-CPI $= 1$ (ideale Pipeline ohne andere Stalls)
+- CPI-Aufschlag: $0{,}20 \times 0{,}10 \times 15 = 0{,}30$
+- Effektives CPI $\approx 1{,}30$ → ca. $23\,\%$ langsamer als ideal
+
+::: notes
+Klausurtypisch: Branch-Anteil $\times$ Fehlrate $\times$ Penalty aufs CPI aufschlagen. $1{,}30/1 = 1{,}30$ Takte pro Befehl $\Rightarrow$ Durchsatz $1/1{,}30 \approx 0{,}77$ — rund $23\,\%$ langsamer.
 :::
 
 ## Branch Prediction
@@ -537,7 +549,7 @@ Tiefe Pipelines erhöhen die Branch Penalty: falsch geraten heißt viele Arbeits
 - Nicht warten — spekulativ den wahrscheinlichen Weg füllen
 - Vorhersage typisch schon beim Fetch
 - Treffer: praktisch keine Branch-Latenz
-- Fehlprognose: Flush / Miss-Prediction Penalty
+- Fehlprognose: Flush / Misprediction Penalty
 - Ziel: hohe Accuracy (in der Praxis oft deutlich über 90 %)
 
 ::: notes
@@ -605,9 +617,12 @@ Taken: $+1$ (Sättigung bei $11$); Not Taken: $-1$ (Sättigung bei $00$).
 %%| fig-width: 4.2
 %%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
 flowchart LR
-  S00["00 Strong NT"] --- S01["01 Weak NT"]
-  S01 --- S10["10 Weak T"]
-  S10 --- S11["11 Strong T"]
+  S00["00 Strong NT"] -->|Taken| S01["01 Weak NT"]
+  S01 -->|Taken| S10["10 Weak T"]
+  S10 -->|Taken| S11["11 Strong T"]
+  S11 -->|Not-Taken| S10
+  S10 -->|Not-Taken| S01
+  S01 -->|Not-Taken| S00
   style S11 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
 ```
 
@@ -688,7 +703,7 @@ Zenit der Performance: rechnen auf Pfaden, die logisch noch unsicher sind.
 Während der Branch noch „unterwegs“ ist, läuft der vorhergesagte Pfad schon.
 :::
 
-## Rollback bei Miss-Prediction
+## Rollback bei Misprediction
 
 - Falscher Pfad: spekulative Loads/Rechnungen verwerfen
 - ROB hält Ergebnisse zurück — kein vorzeitiges Commit in Architekturzustand
@@ -787,7 +802,7 @@ Kontrolle gegen Branches — Flash/I-Cache zahlen den Preis.
 ## Tool: Compiler Explorer (Godbolt)
 
 - Web-Tool: C links, Assembler rechts (live)
-- Farbzuordnung C-Zeile ↔ Instruktionen
+- Farbzuordnung C-Zeile → Instruktionen
 - Ideal, um `-O1` vs. `-O3` und RISC-V-Output zu vergleichen
 
 ::: notes

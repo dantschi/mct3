@@ -127,7 +127,7 @@ Bei hohen Frequenzen wirken parallele Bahnen problematisch (Störung, Laufzeitun
 
 ## Das Schieberegister
 
-- Wandlung: parallele CPU-Daten ↔ serieller Bitstrom
+- Wandlung: parallele CPU-Daten → serieller Bitstrom
 - Kern: Schieberegister (Kette von D-Flip-Flops, MCT1)
 - CPU schreibt parallel; Kommunikations-Hardware schiebt Bit für Bit auf die Leitung
 - Empfänger schiebt Bits wieder zu einem Wort zusammen
@@ -226,6 +226,18 @@ Industrie-Standards für On-Board-Kommunikation:
 Alle drei finden Sie in typischen MCU-Datenblättern. Heute: wann welches Protokoll — Start mit UART.
 :::
 
+## Lernziele Block 5
+
+- UART, SPI und I2C nach Pins, Takt und Topologie einordnen
+- UART-Frame (Start/Stop/Parity) und Baudrate erklären
+- SPI-Modi (CPOL/CPHA) und Chip-Select begründen
+- I2C-Transaktion inkl. ACK/NACK und Repeated Start nachvollziehen
+- Single-Ended vs. differenziell und EMI-Grundlagen einordnen
+
+::: notes
+Harris & Harris sowie Datenblatt-Kapitel zu Serial I/O — Protokollwahl ist Systemdesign.
+:::
+
 ## Was ist UART?
 
 - UART: Universal Asynchronous Receiver-Transmitter
@@ -242,7 +254,7 @@ Mindestens ein UART-Controller ist in MCUs üblich. Terminal-Ausgabe läuft typi
 
 - Typisch genau zwei Teilnehmer
 - TX (Transmit) und RX (Receive)
-- Kreuzverkabelung: TX₁ → RX₂, TX₂ → RX₁
+- Kreuzverkabelung: TX1 → RX2, TX2 → RX1
 - Gemeinsames GND zwingend
 - Full-Duplex auf zwei Datenleitungen
 
@@ -404,7 +416,7 @@ Wenn Framing und Baudrate klar sind, führen wir den Takt explizit ein: SPI.
 
 - SPI: Serial Peripheral Interface (u. a. Motorola, 1980er)
 - Synchron: eigene Taktleitung — kein Baudraten-Drift wie bei UART
-- Full-Duplex, oft sehr hohe SCK-Taktraten (zehnere MHz möglich; Bitrate $\approx$ SCK bei 1 Bit/Takt)
+- Full-Duplex, oft sehr hohe SCK-Taktraten (einige zehn MHz möglich; Bitrate $\approx$ SCK bei 1 Bit/Takt)
 - Wenig Framing-Overhead: Bits folgen dem Takt
 
 ::: notes
@@ -584,7 +596,7 @@ SPI = Bandbreiten-Monster. Für viele kleine Sensoren kommt I2C.
 | Einsatz | Display, SD, Flash |
 
 ::: notes
-Als Nächstes: zwei Leitungen, Takt behalten, viele Adressen — I2C (Fortsetzung).
+Als Nächstes: zwei Leitungen, Takt behalten, viele Adressen — I2C.
 :::
 
 ## Fragen? — SPI
@@ -606,7 +618,7 @@ Wenn Master, Takt und CS klar sind, folgt das Multi-Drop-Protokoll I2C.
 - Viele Bausteine an exakt zwei Signalen (+ GND)
 
 ::: notes
-Auf Drohnen- oder Smartphone-Boards hängen Gyroskop, Barometer, Lade-IC und oft Touch oft am I2C — weil zwei Pins viele Geräte adressieren.
+Auf Drohnen- oder Smartphone-Boards hängen Gyroskop, Barometer, Lade-IC und oft Touch am I2C — weil zwei Pins viele Geräte adressieren.
 :::
 
 ## Ein echter Bus
@@ -776,7 +788,7 @@ Unblutige Kollisionsauflösung: Verlierer wechselt auf Empfang; Gewinner merkt o
 ## Nachteile von I2C
 
 - Open-Drain + Pull-up: langsamere Flanken als Push-Pull
-- Typisch Standard/Fast Mode: $100\,\mathrm{kHz}$ / $400\,\mathrm{kHz}$ (vs. SPI: SCK oft zehnere MHz)
+- Typisch Standard/Fast Mode: $100\,\mathrm{kHz}$ / $400\,\mathrm{kHz}$ (vs. SPI: SCK oft einige zehn MHz)
 - Buskapazität begrenzt Teilnehmerzahl und Kabellänge
 
 ::: notes
@@ -861,7 +873,7 @@ Deshalb Ethernet und viele Feldbusse: Twisted Pair. Störungen heben sich in der
 ## RS-485
 
 - Physikalische Schicht für lange Strecken (oft mit UART-Logik)
-- Transceiver: Single-Ended TX/RX ↔ differenziell A/B
+- Transceiver: Single-Ended TX/RX → differenziell A/B
 - Reichweiten im dreistelligen Meterbereich möglich
 - Häufig mit Protokollen wie Modbus
 
@@ -941,7 +953,7 @@ Wie ein internes Regal: Adresse des Chips und Adresse des Fachs (Register).
 Beispielhafte Adressen und Bits (fiktiv — immer Datenblatt prüfen):
 
 ```c
-#define I2C_BASE 0x40010000
+#define I2C_BASE 0x40010000u
 #define I2C_CR1  (*(volatile uint32_t *)(I2C_BASE + 0x00))
 
 void i2c_init(void) {

@@ -11,6 +11,8 @@ subtitle: "Mikrocomputertechnik 3 (MCT3)"
 
 Sie vertiefen Vorlesung 7: Datenabhängigkeiten und Superskalarität, Register Renaming / ROB, Branch Prediction und Spekulation (inkl. Spectre) sowie Compiler-Optimierungen in Godbolt (`-O1` vs. `-O3`).
 
+**Bearbeitungszeit:** ca. 45–60 Min. | **Orientierungspunkte:** Aufgabe 1: 8 P, Aufgabe 2: 12 P, Aufgabe 3: 4 P (Gesamt: 24 P)
+
 ## Teil 1: Theorie — Von In-Order zu Out-of-Order
 
 ### Aufgabe 1.1: Datenabhängigkeiten und Superskalarität
@@ -40,7 +42,7 @@ Gegeben:
 
 1. **RAW** zwischen Befehl 1 (`lw t0, …`) und Befehl 2 (`add t1, t0, …`): Befehl 2 braucht den Wert in `t0`. Die Abhängigkeit ist real; ohne Ergebnis von 1 ist 2 nicht korrekt ausführbar.
 
-2. **WAR** zwischen 2 und 3: Befehl 3 ist mathematisch unabhängig von 2, überschreibt aber dasselbe Architektur-Register `t0`. Würde 3 vor 2 fertig, läse 2 den *neuen* Wert von `t0` statt den von `lw` — falsches Additions-Ergebnis.
+2. **WAR** zwischen 2 und 3: Befehl 3 ist mathematisch unabhängig von 2, überschreibt aber dasselbe Architektur-Register `t0`. Würde Befehl 3 *schreiben*, bevor Befehl 2 den alten Wert aus `t0` *gelesen* hat, läse 2 den *neuen* Wert von `t0` statt den von `lw` — falsches Additions-Ergebnis. Die Schreib-/Lese-Reihenfolge auf dem Architektur-Register muss also gewahrt bleiben (oder per Renaming entkoppelt werden).
 :::
 
 {{< pagebreak >}}
@@ -74,7 +76,7 @@ Out-of-Order-(OoO-)CPUs lösen falsche Abhängigkeiten und führen Befehle async
 
 Moderne Prozessoren haben oft Pipelines mit weit über 15 Stufen.
 
-1. Erklären Sie das *Control-Hazard*-Problem bei Sprüngen (`beq`). Warum führen Fehlprognosen bei tiefen Pipelines zu massiven Leistungseinbrüchen (*Miss-Prediction Penalty*)?
+1. Erklären Sie das *Control-Hazard*-Problem bei Sprüngen (`beq`). Warum führen Fehlprognosen bei tiefen Pipelines zu massiven Leistungseinbrüchen (*Misprediction Penalty*)?
 
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
@@ -85,7 +87,7 @@ Moderne Prozessoren haben oft Pipelines mit weit über 15 Stufen.
 ::: {.content-visible when-profile="solution"}
 **Musterlösung Aufgabe 2.1**
 
-Bei `beq` weiß die Fetch-Stufe noch nicht, ob der Sprung genommen wird — die ALU entscheidet erst später. Die Pipeline muss aber jeden Takt füttern und spekuliert. Bei z. B. 15 Stufen können viele spekulative Befehle im Fließband liegen. Bei Fehlprognose: Flush → *Miss-Prediction Penalty* (viele verlorene Takte, IPC-Einbruch).
+Bei `beq` weiß die Fetch-Stufe noch nicht, ob der Sprung genommen wird — die ALU entscheidet erst später. Die Pipeline muss aber jeden Takt füttern und spekuliert. Bei z. B. 15 Stufen können viele spekulative Befehle im Fließband liegen. Bei Fehlprognose: Flush → *Misprediction Penalty* (viele verlorene Takte, IPC-Einbruch).
 :::
 
 ### Aufgabe 2.2: Branch History und Spekulation
@@ -107,9 +109,38 @@ Bei `beq` weiß die Fetch-Stufe noch nicht, ob der Sprung genommen wird — die 
 2. Der Predictor wählt einen Pfad; die CPU wartet nicht passiv, sondern schiebt die vorhergesagten Instruktionen durch Renaming in die Execution Units und rechnet/lädt „auf Verdacht“. Bestätigt sich die Vorhersage, ist die Arbeit schon getan (höherer IPC).
 :::
 
+### Aufgabe 2.2b: 2-Bit-Prädiktor — Zustandstabelle
+
+Ein 2-Bit saturierender Zähler startet im Zustand `11` (*Strongly Taken*). Kodierung: `00` Strongly NT, `01` Weakly NT, `10` Weakly T, `11` Strongly T. Vorhersage: Zustände `1x` → Taken, `0x` → Not Taken.
+
+Gegeben die tatsächliche Sprungsequenz: **T, T, NT, NT, T**.
+
+1. Füllen Sie eine Zustandstabelle: für jeden Schritt Startzustand, Vorhersage, tatsächliches Ergebnis, Treffer/Miss, Folgezustand.
+2. Wie viele Treffer (korrekte Vorhersagen) ergeben sich insgesamt?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung Aufgabe 2.2b**
+
+| Schritt | Start | Vorhersage | Ist | Treffer? | Folge |
+|--------:|:-----:|:----------:|:---:|:------:|:-----:|
+| 1 | `11` | T | T | ja | `11` |
+| 2 | `11` | T | T | ja | `11` |
+| 3 | `11` | T | NT | nein | `10` |
+| 4 | `10` | T | NT | nein | `01` |
+| 5 | `01` | NT | T | nein | `10` |
+
+**Treffer:** 2 von 5 (Schritte 1 und 2).
+:::
+
 ### Aufgabe 2.3: Seitenkanalangriffe (Spectre)
 
-1. Bei Miss-Prediction macht der ROB einen *Rollback* (Squash). Welcher Zustand wird dabei typisch *nicht* gelöscht und öffnet die Tür für Spectre?
+1. Bei Misprediction macht der ROB einen *Rollback* (Squash). Welcher Zustand wird dabei typisch *nicht* gelöscht und öffnet die Tür für Spectre?
 2. Wie nutzt ein Angreifer Timing als Orakel, um eigentlich unerreichbare Daten zu rekonstruieren?
 
 ::: {.content-hidden when-profile="solution"}

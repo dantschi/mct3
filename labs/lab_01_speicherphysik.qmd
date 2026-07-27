@@ -11,6 +11,8 @@ subtitle: "Mikrocomputertechnik 3 (MCT3)"
 
 Sie vertiefen die Speicherphysik aus Vorlesung 1 (Von-Neumann/Harvard, SRAM/DRAM, Flash/XIP) und üben den Brückenschlag zur Embedded-C-Praxis (Linker-Sections, Pointer auf die Memory Map).
 
+**Bearbeitungszeit:** ca. 45–60 Min. | **Orientierungspunkte:** Aufgabe 1: 12 P, Aufgabe 2: 10 P (Gesamt: 22 P)
+
 ## Teil 1: Theorie — Speicherphysik
 
 ### Aufgabe 1.1: Systemarchitekturen und Flaschenhälse
@@ -79,6 +81,8 @@ Für Firmware in Embedded Systems wird häufig Flash-Speicher verwendet.
 
 ## Teil 2: Praxis — Speicher-Mapping und C-Pointer
 
+{{< pagebreak >}}
+
 ### Aufgabe 2.1: Memory Map und Linker-Skript
 
 In einem Embedded System müssen Software und Hardware über das Speicher-Mapping verbunden werden.
@@ -129,4 +133,31 @@ uint32_t ver = *firmware_word;
 Ein direkter Schreibversuch (z. B. nach Cast auf nicht-`const`) scheitert typischerweise an der **Flash-Hardware**: Zellen lassen sich nicht wie SRAM byteweise per Store beschreiben. Zuerst sind blockweise Löschzyklen (Erase) mit speziellen Programmiersequenzen nötig. Die Speicher-Hardware blockiert den normalen CPU-Store — je nach Architektur als Bus-/Access-Fault bzw. Hard Fault.
 
 Hinweis: Bereits `const` verhindert den Schreibversuch zur Compile-Zeit; der Hard-Fault-Aspekt betrifft den Fall eines erzwungenen Stores auf die Flash-Region.
+:::
+
+### Aufgabe 2.3: Adressraum und Endadresse
+
+Ein Mikrocontroller mappt $1\,\mathrm{MiB}$ NOR-Flash ab der Basisadresse `0x08000000`.
+
+1. Berechnen Sie die erste Adresse *nach* dem Flash-Bereich (Exclusive-Endadresse). Geben Sie den Rechenweg an.
+2. Liegt die Adresse `0x080FFFFF` noch im Flash? Begründen Sie kurz.
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung Aufgabe 2.3**
+
+1. $1\,\mathrm{MiB} = 2^{20}\,\mathrm{Byte} = 1\,048\,576\,\mathrm{Byte} = \mathtt{0x100000}$ Byte.
+
+$$
+\mathrm{Endadresse}_{\mathrm{exklusiv}} = \mathtt{0x08000000} + \mathtt{0x100000} = \mathtt{0x08100000}
+$$
+
+Gültiger Adressbereich: $\mathtt{0x08000000}$ … $\mathtt{0x080FFFFF}$ (inklusive).
+
+2. Ja — `0x080FFFFF` ist die letzte gültige Byte-Adresse im Flash ($1\,\mathrm{MiB}-1$ Offset).
 :::

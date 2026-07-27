@@ -624,13 +624,13 @@ Schematisch: Zähler gegen Zielwert — bei Erreichen Interrupt.
 ```c
 void timer_isr(void) {
     uint64_t now = read_mtime();
-    write_mtimecmp(now + INTERVAL);  /* quittieren / neu scharf schalten */
+    write_mtimecmp(now + INTERVAL);  /* neu scharf schalten */
     /* eigentliche Arbeit ... */
 }
 ```
 
 ::: notes
-Häufiger Anfängerfehler: LED toggeln und zurückkehren, ohne mtimecmp zu aktualisieren — dann feuert der Alarm sofort wieder.
+Häufiger Anfängerfehler: LED toggeln und zurückkehren, ohne mtimecmp zu aktualisieren — dann feuert der Alarm sofort wieder. Besser `mtimecmp += INTERVAL` statt `now + INTERVAL`, um Drift durch ISR-Latenz zu vermeiden.
 :::
 
 ## Konzept: Der System-Tick
@@ -726,11 +726,22 @@ CSRs steuern den Kern von innen; der CLINT liegt außerhalb auf dem Bus — wie 
 #define CLINT_MTIMECMP 0x02004000
 #define CLINT_MTIME    0x0200BFF8
 
+/* RV32: mtime atomar hi/lo lesen (kein 64-Bit-Load!) */
+static uint64_t read_mtime(void) {
+    volatile uint32_t *mt = (volatile uint32_t *)CLINT_MTIME;
+    uint32_t hi, lo;
+    do {
+        hi = mt[1];
+        lo = mt[0];
+    } while (hi != mt[1]);
+    return ((uint64_t)hi << 32) | lo;
+}
+
 void init_systick(void) {
-    uint64_t now = *(volatile uint64_t *)CLINT_MTIME;
+    uint64_t now = read_mtime();
     *(volatile uint64_t *)CLINT_MTIMECMP = now + TICKS_PER_MS;
-    set_csr(mie, (1U << 7));       /* MTIE: Timer-Quelle in mie */
-    set_csr(mstatus, MSTATUS_MIE); /* globale Freigabe */
+    set_csr(mie, (1u << 7));       /* MTIE */
+    set_csr(mstatus, MSTATUS_MIE); /* MIE global */
 }
 ```
 
@@ -965,14 +976,22 @@ Bei verschachtelten Traps überschreibt die Hardware das einzige `mepc`. Ohne vo
 ## Nesting korrekt: zuerst Stack, dann `MIE`
 
 ```asm
+addi sp, sp, -8     /* Platz fuer mepc + mstatus */
 csrr t0, mepc
 sw   t0, 0(sp)      /* mepc retten */
 csrr t1, mstatus
 sw   t1, 4(sp)      /* mstatus retten */
 /* erst jetzt: MIE = 1 und unterbrechbare Arbeit */
+/* ... innere Arbeit ... */
+lw   t1, 4(sp)      /* mstatus zurueck */
+csrw mstatus, t1
+lw   t0, 0(sp)      /* mepc zurueck */
+csrw mepc, t0
+addi sp, sp, 8
+mret
 ```
 
-- Reihenfolge: CSRs auf den Stack → dann `MIE` setzen
+- Reihenfolge: Stack-Platz → CSRs sichern → dann `MIE` setzen
 - Nach dem inneren Interrupt: Werte zurückschreiben, dann `mret`
 - `MIE=1` ohne Stack-Rettung ist unsicher
 
@@ -1044,15 +1063,15 @@ Erinnerung MCT1: Calling Conventions. Eine ISR ist kein normales Unterprogramm �
 
 ## Background Task und Foreground ISR
 
-- Foreground: kurze ISR inkrementiert `uptime` (nur lesen/schreiben der Zeitbasis)
+- Foreground: kurze ISR inkrementiert `system_uptime_ms` (nur lesen/schreiben der Zeitbasis)
 - Background: `main` vergleicht gegen einen Merker — ohne die ISR-Zählung zu nullen
 
 ```c
-volatile uint32_t uptime;
+volatile uint32_t system_uptime_ms;
 uint32_t last_toggle = 0;
 
 while (1) {
-    uint32_t now = uptime;
+    uint32_t now = system_uptime_ms;
     if (now - last_toggle >= 1000) {
         toggle_led();
         last_toggle = now;
@@ -1061,7 +1080,7 @@ while (1) {
 ```
 
 ::: notes
-Kein blockierendes `delay()`: die CPU bleibt in der Main-Schleife nutzbar. Die ISR liefert nur die Uhr; `main` speichert den letzten Aktionszeitpunkt separat — so entsteht keine Race durch `uptime = 0`.
+Kein blockierendes `delay()`: die CPU bleibt in der Main-Schleife nutzbar. Die ISR liefert nur die Uhr; `main` speichert den letzten Aktionszeitpunkt separat — so entsteht keine Race durch `system_uptime_ms = 0`.
 :::
 
 ## Geteilte Variablen

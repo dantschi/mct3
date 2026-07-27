@@ -148,7 +148,7 @@ Am Ende können Sie Leistungselektronik stufenlos ansteuern, ohne die CPU zu blo
 ## Die Leitfrage des Tages
 
 - SoC-Pin: oft maximal $3{,}3\,\mathrm{V}$ (100 %) oder $0\,\mathrm{V}$ (0 %)
-- Ziel: Motor mit ca. 50 % Leistung ($\approx 1{,}65\,\mathrm{V}$ effektiv)
+- Ziel: Motor mit ca. 50 % Leistung ($\approx 1{,}65\,\mathrm{V}$ Mittelwert)
 - Ohne externe Bauteile wie digitale Potentiometer
 - Wie dimmt man auf 50 %, wenn der Pin nur „Vollgas“ oder „Aus“ kennt?
 
@@ -334,7 +334,7 @@ Wenn Licht sehr schnell blinkt, mittelt das Auge die Helligkeit. Motoren mitteln
 ## Was ist PWM?
 
 - Pulsweitenmodulation (PWM, Pulse Width Modulation)
-- Wichtige Schnittstelle: digitale Steuerung ↔ Leistungselektronik
+- Wichtige Schnittstelle: digitale Steuerung und Leistungselektronik
 - Grundfrequenz bleibt konstant; die Pulsweite (HIGH-Anteil) wird moduliert
 - Breiter Puls → viel Energie; schmaler Puls → wenig Energie
 
@@ -390,24 +390,24 @@ Die Periode bleibt gleich — nur die fallende Flanke wandert.
 Modulation der Pulsweite bei festem Raster: so steuern Sie die abgegebene Energie.
 :::
 
-## Effektivspannung berechnen
+## Mittlere Spannung berechnen
 
-Näherung für den zeitlichen Mittelwert (idealer Mittelwert über die Periode):
+Zeitlicher Mittelwert über die Periode (nicht der Effektivwert/RMS):
 
 $$
-V_{\mathrm{eff}} \approx V_{\mathrm{Pin}} \times \mathrm{Duty\ Cycle}
+\bar{V} = V_{\mathrm{Pin}} \times \mathrm{Duty\ Cycle}
 $$
 
 Beispiel: $V_{\mathrm{Pin}} = 3{,}3\,\mathrm{V}$, Duty Cycle $= 25\,\%$ $= 0{,}25$
 
 $$
-V_{\mathrm{eff}} \approx 3{,}3\,\mathrm{V} \times 0{,}25 = 0{,}825\,\mathrm{V}
+\bar{V} = 3{,}3\,\mathrm{V} \times 0{,}25 = 0{,}825\,\mathrm{V}
 $$
 
-Bei induktiven Lasten (Motoren) ist das Verhalten komplexer — die Formel bleibt die Einstiegsnäherung.
+Zum Vergleich RMS eines Rechtecksignals: $V_{\mathrm{RMS}} = V_{\mathrm{Pin}} \cdot \sqrt{D}$ — bei 25 % also $\approx 1{,}65\,\mathrm{V}$. Bei ohmscher Last skaliert die *Leistung* mit $D$; der Mittelwert bleibt die Einstiegsnäherung für die „Scheinspannung“.
 
 ::: notes
-Ein langsames Multimeter zeigt oft näherungsweise diesen Mittelwert — die Physik „glättet“ das Rechteck.
+Ein langsames Multimeter zeigt oft näherungsweise den Mittelwert — die Physik „glättet“ das Rechteck. Effektivwert (RMS) und Mittelwert sind verschieden; bei ohmscher Last passt „50 % Duty → 50 % Leistung“ zum Mittelwert-Pfad über $P \propto D$.
 :::
 
 ## Auflösung (Resolution)
@@ -518,11 +518,11 @@ CCR verkleinern → kürzere HIGH-Phase → dunklere LED / weniger Leistung.
 ## Edge-Aligned PWM
 
 - Up-Counting (Sägezahn) + Vergleich mit CCR → Edge-Aligned PWM
-- Beispiel: `ARR = 1000`, `CCR = 250` → ca. 25 % Duty Cycle (Modell: Periode $0\ldots999$)
+- Beispiel: `ARR = 999`, `CCR = 250` → exakt 25 % Duty Cycle (Periode $0\ldots999$ = 1000 Takte)
 - Pin HIGH von 0 bis unter CCR, danach LOW bis ARR, dann Reset
 
 ::: notes
-Flankenausgerichtet: ein Sägezahn-Durchlauf, eine klare HIGH-Phase am Anfang der Periode. Ob $ARR$ oder $ARR+1$ die Periodenlänge ist, steht im Datenblatt.
+Flankenausgerichtet: ein Sägezahn-Durchlauf, eine klare HIGH-Phase am Anfang der Periode. Mit $ARR = 999$ und Zählung $0\ldots999$ ist die Periodenlänge exakt 1000 — analog zur „PSC+1"-Falle beim Prescaler. Ob Ihr Chip $ARR$ oder $ARR+1$ als Periodenlänge zählt, steht im Datenblatt.
 :::
 
 ## Schritt 1: Start — Pin HIGH
@@ -546,7 +546,7 @@ Zyklusbeginn: Counter unter CCR → Hardware hält den Pin HIGH. Die CPU ist nic
 - Counter erreicht exakt `CCR = 250`
 - Vergleich: $250 < 250$? → nein → Compare Match
 - Hardware zieht den Pin sofort auf LOW ($0\,\mathrm{V}$)
-- Pin bleibt LOW, während `CNT` weiter bis ARR steigt (251 … 999)
+- Pin bleibt LOW, während `CNT` weiter bis ARR steigt (250 … 999)
 - LED in dieser Phase aus
 
 | Phase | Bedingung | Pin |
@@ -555,12 +555,12 @@ Zyklusbeginn: Counter unter CCR → Hardware hält den Pin HIGH. Die CPU ist nic
 | Match | `CNT >= CCR` | LOW |
 
 ::: notes
-Ab dem Schwellenwert liefert die Hardware keine Energie mehr bis zum Periodenende. Bei ARR $= 1000$ und CCR $= 250$ sind das in unserem Modell 25 % HIGH (Zählung $0\ldots999$). Prüfen Sie im Datenblatt, ob die Periode $ARR$ oder $ARR+1$ beträgt.
+Ab dem Schwellenwert liefert die Hardware keine Energie mehr bis zum Periodenende. Bei ARR $= 999$ und CCR $= 250$ sind das exakt 250 HIGH- und 750 LOW-Takte = 25 %. Prüfen Sie im Datenblatt, ob die Periode $ARR$ oder $ARR+1$ beträgt.
 :::
 
 ## Schritt 3: Counter erreicht ARR (Neustart)
 
-- `CNT` erreicht `ARR = 1000`
+- `CNT` erreicht `ARR = 999`
 - Auto-Reload: Hardware setzt `CNT` auf 0
 - Vergleich erneut: $0 < 250$ → ja → Pin wieder HIGH
 - Ergebnis: Rechteck mit 25 % Duty Cycle — ohne laufende CPU-Arbeit

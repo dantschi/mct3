@@ -11,6 +11,8 @@ subtitle: "Mikrocomputertechnik 3 (MCT3)"
 
 Sie vertiefen Vorlesung 6: Direct Memory Access (Interrupt Storm, Bus-Mastering/Cycle Stealing, Cache-Kohärenz, Ringpuffer/Double Buffering) sowie den Vergleich Polling vs. DMA-UART in C.
 
+**Bearbeitungszeit:** ca. 45–60 Min. | **Orientierungspunkte:** Aufgabe 1: 14 P, Aufgabe 2: 10 P (Gesamt: 24 P)
+
 ## Teil 1: Theorie — Direct Memory Access (DMA)
 
 ### Aufgabe 1.1: Der CPU-Flaschenhals
@@ -31,7 +33,7 @@ Große Datenmengen (z. B. ein $1\,\mathrm{MB}$-Bild) über schnelle SPI an ein D
 
 1. Ein schnelles SPI-Modul meldet im Sub-Mikrosekunden-Takt (z. B. alle $0{,}8\,\mu\mathrm{s}$), dass das Senderegister leer ist. Interrupt-basiert wird die CPU millionenfach pro Sekunde unterbrochen. Kontextwechsel (Pipeline flush, Register sichern/wiederherstellen) kostet Dutzende bis Hunderte Takte *pro Byte* — die CPU ertrinkt in ISR-Overhead (*Interrupt Storm*) und kommt kaum noch zum Rechnen.
 
-2. Bei `lw`/`sw` wandert jedes Byte physisch durch Register-File/ALU der CPU. Der DMAC transportiert autonom SRAM ↔ Peripherie und führt den Datenstrom an der CPU vorbei (*Bypass*). Die CPU-Last für den Transfer sinkt von nahe 100 % Richtung nahe 0 %.
+2. Bei `lw`/`sw` wandert jedes Byte physisch durch Register-File/ALU der CPU. Der DMAC transportiert autonom SRAM → Peripherie und führt den Datenstrom an der CPU vorbei (*Bypass*). Die CPU-Last für den Transfer sinkt von nahe 100 % Richtung nahe 0 %.
 :::
 
 ### Aufgabe 1.2: Bus-Mastering und Arbitration
@@ -101,6 +103,36 @@ Für endlose Streams (z. B. Audio mit $44\,100$ Samples/s) reichen lineare Einma
 2. Der Ring wird logisch in zwei Hälften geteilt. Während der DMA eine Hälfte ausspielt (z. B. an einen DAC), füllt die CPU die andere. HT feuert in der Puffermitte, TC am Ende (bei Circular oft am Wrap) — Ping-Pong für glitchfreien Dauerstrom.
 :::
 
+### Aufgabe 1.5: DMA-Durchsatz und CPU-Entlastung
+
+Ein SPI-Controller arbeitet mit $10\,\mathrm{MHz}$ Bitrate und überträgt $1\,\mathrm{MiB}$ Bilddaten an ein Display. Vereinfachung: 1 Bit pro Takt, kein Protokoll-Overhead.
+
+1. Wie lange dauert der Transfer (in Sekunden)?
+2. Bei Polling blockiert die CPU während des gesamten Transfers (*Busy-Waiting*). Wie lange ist die CPU damit blockiert?
+3. Mit DMA übernimmt der DMAC den Transfer. Was gilt näherungsweise für die CPU-Last *während* des Transfers — und wofür braucht die CPU dennoch Zyklen?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung Aufgabe 1.5**
+
+1. Bitrate $10\,\mathrm{Mbit/s}$, Datenmenge $1\,\mathrm{MiB} = 8\,\mathrm{Mbit}$:
+
+$$
+t = \frac{8\times 10^{6}\,\mathrm{bit}}{10\times 10^{6}\,\mathrm{bit/s}} = 0{,}8\,\mathrm{s}
+$$
+
+(Mit $1\,\mathrm{MB} = 10^{6}\,\mathrm{Byte}$ analog: $t = 0{,}8\,\mathrm{s}$.)
+
+2. Polling: die CPU ist die gesamten $0{,}8\,\mathrm{s}$ blockiert (nahe $100\,\%$ Last für den Transfer).
+
+3. Mit DMA: CPU-Last für den Datentransfer selbst $\approx 0$. Die CPU braucht nur kurze Setup-Zyklen (Register konfigurieren, ggf. Cache Clean, Kanal starten) und optional eine Transfer-Complete-ISR am Ende.
+:::
+
 {{< pagebreak >}}
 
 ## Teil 2: Praxis — DMA-Konfiguration und Polling-Vergleich
@@ -116,7 +148,6 @@ Für endlose Streams (z. B. Audio mit $44\,100$ Samples/s) reichen lineare Einma
 
 Die Funktion blockiert, bis das UART-TX-Register jeweils bereit ist (`UART_TX_EMPTY`).
 
-::: {.content-hidden when-profile="solution"}
 ```c
 #include <stdint.h>
 
@@ -136,6 +167,7 @@ void send_uart_polling(const char *text, uint32_t len) {
 }
 ```
 
+::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
 *(Notieren Sie Ihre Lösung hier.)*
@@ -167,7 +199,6 @@ void send_uart_polling(const char *text, uint32_t len) {
 
 Das UART muss Hardware-Requests (DREQ) ausgeben, sobald das Senderegister leer ist.
 
-::: {.content-hidden when-profile="solution"}
 ```c
 #define UART_CR3  (*(volatile uint32_t *)(UART_BASE + 0x08u))
 #define UART_DMAR (1u << 7) /* DMA Request Enable */
@@ -177,6 +208,7 @@ void uart_enable_dma_req(void) {
 }
 ```
 
+::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
 *(Notieren Sie Ihre Lösung hier.)*
@@ -201,8 +233,12 @@ void uart_enable_dma_req(void) {
 
 Quelle: String-Array; Ziel: UART-TX. Quelladresse inkrementieren, Zieladresse fest (Memory-to-Peripheral).
 
-::: {.content-hidden when-profile="solution"}
 ```c
+#include <stdint.h>
+
+#define UART_BASE   0x40010000u
+#define UART_TX_REG (*(volatile uint32_t *)(UART_BASE + 0x04u))
+
 typedef struct {
     volatile uint32_t SRC_ADDR;
     volatile uint32_t DST_ADDR;
@@ -232,6 +268,7 @@ void start_uart_dma_transfer(const char *text, uint32_t len) {
 }
 ```
 
+::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
 *(Notieren Sie Ihre Lösung hier.)*
@@ -241,6 +278,11 @@ void start_uart_dma_transfer(const char *text, uint32_t len) {
 **Musterlösung Aufgabe 2.3**
 
 ```c
+#include <stdint.h>
+
+#define UART_BASE   0x40010000u
+#define UART_TX_REG (*(volatile uint32_t *)(UART_BASE + 0x04u))
+
 typedef struct {
     volatile uint32_t SRC_ADDR;
     volatile uint32_t DST_ADDR;

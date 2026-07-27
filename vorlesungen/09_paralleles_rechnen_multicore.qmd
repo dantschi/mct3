@@ -15,10 +15,28 @@ format: revealjs
 - Neunte und letzte Vorlesung in Mikrocomputertechnik 3
 - Weg: Speicherzelle → Caches → DMA → Busse → OoO → Edge AI
 - Heute: Multi-Core — Thread-Level Parallelism auf dem SoC
-- Praxis: kompakte Theorie, danach Raum für Wrap-Up und Klausurvorbereitung
+- Praxis: Theorie zu MESI/Atomics, danach Wrap-Up und Klausurvorbereitung
 
 ::: notes
 Letzter Baustein: zweiter (und weiterer) Prozessorkern — und wie Software damit sicher umgeht.
+:::
+
+## Agenda und Lernziele
+
+1. Cache-Kohärenz und MESI (Bus Snooping)
+2. Race Conditions und Hardware-Atomics (LR/SC, AMO)
+3. Amdahls Gesetz und Semester-Rückblick / Klausurfokus
+
+Lernziele:
+
+- Kohärenzproblem und MESI-Zustände erklären
+- Race Conditions auf Assembler-Ebene begründen
+- Software-Locks vs. Hardware-Atomics unterscheiden
+- Speedup-Grenzen mit Amdahl abschätzen
+- Systemwissen der Blöcke 1–8 für die Klausur strukturieren
+
+::: notes
+Zwei Probleme: Hardware-Kohärenz der Caches; Software-Atomizität bei Shared-Updates.
 :::
 
 ## Anknüpfung: Edge-AI-Labor
@@ -88,23 +106,6 @@ flowchart TD
 Private L1 für Tempo — darunter treffen sich die Kerne. Dort lauert die Kohärenzfrage.
 :::
 
-## Agenda und Lernziele
-
-1. Cache-Kohärenz und MESI (Bus Snooping)
-2. Race Conditions und Hardware-Atomics (LR/SC, AMO)
-3. Semester-Rückblick und Klausurfokus
-
-Lernziele:
-
-- Kohärenzproblem und MESI-Zustände erklären
-- Race Conditions auf Assembler-Ebene begründen
-- Software-Locks vs. Hardware-Atomics unterscheiden
-- Systemwissen der Blöcke 1–8 für die Klausur strukturieren
-
-::: notes
-Zwei Probleme: Hardware-Kohärenz der Caches; Software-Atomizität bei Shared-Updates.
-:::
-
 ## Die Leitfrage des Tages
 
 - Write-Back (Block 2): Writes oft nur im privaten L1 — RAM kann veraltet sein
@@ -155,6 +156,27 @@ Idee bleibt: Caches koordinieren die „Wahrheit“ einer Adresse — Implementi
 
 ::: notes
 Konzept der vier Buchstaben zählt — nicht jede Transitionstabelle auswendig.
+:::
+
+## MESI: Zustandsübersicht
+
+```{mermaid}
+%%| fig-width: 4.2
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+stateDiagram-v2
+  [*] --> I
+  I --> E: Read Miss (allein)
+  I --> S: Read Miss (geteilt)
+  E --> S: Fremd-Read
+  E --> M: lokaler Write
+  S --> M: Write + Invalidate
+  S --> I: Invalidate empfangen
+  M --> S: Fremd-Read (Intervention)
+  M --> I: Fremd-Write / Flush
+```
+
+::: notes
+Die Pfeile sind die klausurrelevanten Übergänge. Merken Sie sich besonders: Write auf Shared braucht Invalidate; Read-Miss auf Modified liefert der Owner.
 :::
 
 ## Zustand M (Modified)
@@ -230,6 +252,24 @@ Geteilte Ressource nie heimlich ändern.
 Konsistenz: erzwungenes Verwerfen, dann Nachladen der Wahrheit.
 :::
 
+## MESI-Beispiel: Zustandsfolge
+
+Zwei Kerne, Variable `x`, Start beide Invalid:
+
+| Schritt | Aktion | Core 0 | Core 1 |
+|---------|--------|--------|--------|
+| 1 | Core 0 liest `x` | E | I |
+| 2 | Core 1 liest `x` | S | S |
+| 3 | Core 0 schreibt `x=5` | M | I |
+| 4 | Core 1 liest `x` | S | S |
+
+- Schritt 3: Invalidate-Broadcast, dann lokal M
+- Schritt 4: Owner-Supply (Intervention) oder Memory-Pfad → beide S
+
+::: notes
+Typische Klausurfrage: Tabelle ausfüllen. Üben Sie die Sequenz Read-Miss → Shared → Write → Invalidate → erneutes Lesen.
+:::
+
 ## Overhead von MESI
 
 - Preis: Kohärenz-Traffic (Invalidate, Snoop)
@@ -264,8 +304,8 @@ Als Nächstes: Race Conditions — MESI lügt nicht, versteht aber kein `i++`.
 ## Software: gemeinsamer Zähler
 
 - MESI: Caches *kohärent* (pro Adresse)
-- Semantik von `zähler++` (RMW) ist MESI egal
-- Beide Kerne: `zähler++` auf globalem `int` — Erwartung: $+2$
+- Semantik von `zaehler++` (RMW) ist MESI egal
+- Beide Kerne: `zaehler++` auf globalem `int` — Erwartung: $+2$
 
 ::: notes
 Einfachste Aufgabe — parallel gefährlich.
@@ -303,16 +343,17 @@ Wettlauf: beide rechnen auf demselben Startwert.
 ## Naive Software-Locks
 
 ```c
+/* ohne volatile: Compiler darf den Spin-Loop wegoptimieren */
 while (lock == 1) { }
 lock = 1;
-zähler++;
+zaehler++;
 lock = 0;
 ```
 
 Idee: Mutual Exclusion — aber Check und Set sind getrennt.
 
 ::: notes
-Schloss-Metapher stimmt logisch — atomar nicht.
+Schloss-Metapher stimmt logisch — atomar nicht. `volatile` verhindert Compiler-Optimierung des Spins, macht Check+Set aber nicht atomar.
 :::
 
 ## Warum Software-Locks scheitern
@@ -360,10 +401,31 @@ Erfolgspfad: wie RMW, Monitor still.
 - Beide: `lr.w` nahezu gleichzeitig
 - Core 0: `sc.w` ok
 - Core 1: `sc.w` scheitert (Reservation gebrochen / Kohärenz)
-- Software von Core 1 retried die Schleife
+- Software von Core 1 wiederholt die Schleife
 
 ::: notes
 Zweiter Kern prallt ab — Zustand bleibt konsistent.
+:::
+
+## LR/SC: Spinlock in Assembler
+
+```asm
+acquire:
+  lr.w   t0, (a0)      /* Lock-Adresse in a0 */
+  bnez   t0, acquire   /* belegt? erneut versuchen */
+  li     t1, 1
+  sc.w   t2, t1, (a0)  /* t2=0 bei Erfolg */
+  bnez   t2, acquire   /* Reservation gebrochen → Retry */
+  /* kritischer Abschnitt */
+release:
+  sw     zero, 0(a0)   /* Lock freigeben */
+```
+
+- `sc.w` liefert Status in `t2`: 0 = Erfolg, sonst Fehlschlag
+- Typisches Muster für Mutex/Spinlock auf RISC-V ohne AMO
+
+::: notes
+Genau diese Retry-Schleife erwartet die Klausur: LR, Test, SC, bei Fehler zurück. Release oft als einfacher Store (ggf. mit `fence`).
 :::
 
 ## AMO-Befehle
@@ -381,10 +443,10 @@ Ein Befehl statt explizitem LR/SC-Loop für einfache Ops.
 ```c
 #include <stdatomic.h>
 
-_Atomic int zähler = 0;
+_Atomic int zaehler = 0;
 
 void isr_oder_core1(void) {
-    atomic_fetch_add(&zähler, 1);
+    atomic_fetch_add(&zaehler, 1);
 }
 ```
 
@@ -406,12 +468,38 @@ Atomics schützen Daten, nicht vor schlechter Lock-Ordnung.
 
 ## Fragen? — Race Conditions
 
-- Race bei `zähler++`?
-- Warum reicht normales `int lock`?
+- Race bei `zaehler++`?
+- Warum reicht normales `int lock` nicht?
 - Wie sichert LR/SC den Zugriff?
 
 ::: notes
-Kohärenz = Wahrheit; Atomics = unteilbare Updates. Als Nächstes: Semesterfazit.
+Kohärenz = Wahrheit; Atomics = unteilbare Updates. Als Nächstes: Amdahl und Semesterfazit.
+:::
+
+## Amdahls Gesetz
+
+- Nicht alles ist parallelisierbar: serieller Anteil $s$, paralleler Anteil $p = 1 - s$
+- Speedup bei $N$ Kernen:
+
+$$
+S(N) = \frac{1}{s + \frac{p}{N}}
+$$
+
+- Grenze für $N \to \infty$: $S_{\max} = 1/s$
+
+::: notes
+Mehr Kerne helfen nur dem parallelen Anteil. 10 % seriell → maximal 10× Speedup — egal wie viele Kerne.
+:::
+
+## Amdahl: Zahlenbeispiel
+
+- Programm: 80 % parallel, 20 % seriell ($s = 0{,}2$)
+- 4 Kerne: $S(4) = 1 / (0{,}2 + 0{,}8/4) = 1 / 0{,}4 = 2{,}5$
+- 100 Kerne: $S(100) \approx 1 / (0{,}2 + 0{,}008) \approx 4{,}8$
+- Trotz 100 Kernen weit unter 5× — der serielle Rest dominiert
+
+::: notes
+Klausurtypisch: Einsetzen und interpretieren. Optimierung des seriellen Pfads lohnt oft mehr als „noch ein Kern“.
 :::
 
 ## Unser fertiges SoC (Rückblick)
@@ -515,6 +603,18 @@ Konzepte und Prinziprechnungen — keine Datenblatt-Trivia.
 
 ::: notes
 Nutzen Sie die Gelegenheit vor der Klausurphase.
+:::
+
+## Zusammenfassung Block 9
+
+- SMP: private L1, gemeinsamer Speicher → Kohärenz nötig
+- MESI: M/E/S/I; Write auf Shared → Invalidate
+- Race: `i++` ist RMW — MESI reicht nicht; Atomics (LR/SC, AMO)
+- Amdahl: serieller Anteil begrenzt den Multicore-Speedup
+- Klausur: AMAT, Mapping, IRQ/Timer, PWM, DMA, OoO-Idee, MESI
+
+::: notes
+Kohärenz hält Caches ehrlich; Atomics halten Updates unteilbar; Amdahl hält Erwartungen realistisch.
 :::
 
 ## Abschluss und Ausblick

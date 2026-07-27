@@ -54,7 +54,7 @@ Neuronale Netze: lange, vorhersagbare Schleifen — ideal für DLP, teuer für O
 ## Grenze der General-Purpose-CPU
 
 - ILP: wenige Issues parallel — skaliert nicht beliebig mit mehr ALUs
-- Mehr Breite → exponentiell teureres Renaming/ROB/Decode
+- Mehr Breite → überproportional (nahezu quadratisch) teureres Renaming/ROB/Decode
 - Große Chipfläche oft für Caches und Kontrolllogik, nicht nur für Arithmetik
 - Für reine Massen-Mathematik oft ineffizient
 
@@ -202,11 +202,22 @@ add t3, t3, t2   # a += w*x
 Ohne Wiederverwendung der Daten verhungert die ALU am Bus.
 :::
 
+## Arithmetic Intensity: Zahlenbeispiel
+
+- $\mathrm{AI} = \mathrm{Ops}/\mathrm{Bytes}$
+- Naive MAC-Schleife: $2$ Ops (Mul+Add), lädt $2\times$ Float32 $= 8$ Byte → $\mathrm{AI} = 0{,}25$ Ops/Byte
+- Systolic Array / Weight-Stationary: Gewichte bleiben in der Zelle → deutlich höhere AI
+- Roofline-Idee: niedrige AI → Memory-bound; hohe AI → Compute-bound
+
+::: notes
+Faustformel der Memory Wall: unter $\approx 1$ Ops/Byte oft speichergebunden. Wiederverwendung (Stationary Weights) hebt die AI — erst dann lohnen hohe TOPS.
+:::
+
 ## Datenproblem: Gewichte
 
 - Modelle wie ResNet-50: Millionen Parameter — Megabyte-Bereich
 - L1 oft nur Dutzende KiB → Matrizen passen nicht
-- Cache Thrashing: fast jeder Zugriff geht Richtung DRAM/Flash
+- Capacity Misses: fast jeder Zugriff geht Richtung DRAM/Flash
 
 ::: notes
 Block-2-Caches helfen bei Lokalität — bei einmaligem Durchlauf riesiger Matrizen kaum.
@@ -458,7 +469,7 @@ Anders als AVX: Code nicht an feste Bitbreite ketten.
 - Schleife läuft in Hardware-Schritten durch das Array
 
 ```asm
-# Pseudocode / Konzept — Details im RVV-Spec
+# Pseudocode / Konzept — Details in der RVV-Spezifikation
 loop:
     vsetvli t0, a0, e32   # wie viele e32-Elemente?
     vle32.v v1, (a1)
@@ -529,7 +540,7 @@ Mittelweg: C/OS auf der CPU, heiße Mathe auf Vektorunits.
 ## Grenzen von Vektoren
 
 - Registerfile bleibt: lesen/schreiben kostet Energie und limitiert Skalierung
-- Sehr große Modelle: Pfad ALU ↔ Register wird Engpass
+- Sehr große Modelle: Pfad ALU → Register wird Engpass
 - Nächste Stufe: Daten fließen ohne ständiges Zurückschreiben — Systolic Arrays
 
 ::: notes
@@ -788,8 +799,9 @@ Pipeline: Sensor → TFLM → Klasse — Busse + Edge AI zusammen.
 ## Modell als C-Array
 
 ```c
-/* Intelligenz als .rodata im Flash — aligned für DMA/Interpreter */
-const unsigned char step_model_tflite[] __attribute__((aligned(4))) = {
+/* Intelligenz als .rodata im Flash */
+const unsigned char step_model_tflite[]
+    __attribute__((aligned(4))) = {
     0x1c, 0x00, 0x00, 0x00, 0x54, 0x46, 0x4c, 0x33,
     /* … weitere Bytes … */
 };
@@ -805,8 +817,10 @@ Kein Python-Paket — Execute-in-Place aus Flash möglich.
 const int kTensorArenaSize = 10 * 1024;
 uint8_t tensor_arena[kTensorArenaSize];
 
+/* ältere TFLM-API; aktuelle Versionen ohne ErrorReporter */
 tflite::MicroInterpreter interpreter(
-    model, resolver, tensor_arena, kTensorArenaSize, error_reporter);
+    model, resolver, tensor_arena,
+    kTensorArenaSize, error_reporter);
 interpreter.AllocateTensors();
 ```
 
@@ -821,6 +835,7 @@ Sicherheit durch feste Grenzen statt stiller Stack-Korruption.
 
 ```cpp
 while (1) {
+    /* hier vereinfachend Float-Modell; quantisiert: data.int8 */
     for (int i = 0; i < 128; i++)
         input->data.f[i] = read_i2c_sensor();
     interpreter.Invoke();

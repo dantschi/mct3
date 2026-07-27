@@ -1,5 +1,5 @@
 ---
-title: "Übungsblatt 3: Advanced Interrupts & Timer"
+title: "Übungsblatt 3: Fortgeschrittene Interrupts und Timer"
 subtitle: "Mikrocomputertechnik 3 (MCT3)"
 ---
 
@@ -10,6 +10,8 @@ subtitle: "Mikrocomputertechnik 3 (MCT3)"
 ## Zielsetzung
 
 Sie vertiefen Vorlesung 3: Direct vs. Vectored Mode (`mtvec`), CLINT/PLIC, Nested Interrupts/`mepc`-Clobbering sowie die Programmierung eines periodischen System-Ticks über `mtime`/`mtimecmp`.
+
+**Bearbeitungszeit:** ca. 45–60 Min. | **Orientierungspunkte:** Aufgabe 1: 12 P, Aufgabe 2: 10 P (Gesamt: 22 P)
 
 ## Teil 1: Theorie — Interrupt-Architektur auf SoCs
 
@@ -88,11 +90,13 @@ Beim Trap-Eintritt setzt die Hardware typisch `MIE` in `mstatus` auf 0 — weite
 
 ## Teil 2: Praxis — System-Ticks programmieren
 
-Spezifikation (didaktisches Beispiel, Adressen fiktiv/herstellerähnlich):
+Spezifikation (didaktisches Beispiel, Adressen entsprechen dem verbreiteten SiFive-CLINT-Layout):
 
 - CLINT-Oszillator: $10\,\mathrm{MHz}$ ($10\,000\,000\,\mathrm{Hz}$)
 - `mtime` an `0x0200BFF8` (64 Bit)
 - `mtimecmp` an `0x02004000` (64 Bit)
+
+{{< pagebreak >}}
 
 ### Aufgabe 2.1: Mathematik des Timers
 
@@ -114,6 +118,8 @@ $$
 pro Millisekunde.
 :::
 
+{{< pagebreak >}}
+
 ### Aufgabe 2.2: Initialisierung in C
 
 Vervollständigen Sie das Snippet, sodass der erste Alarm in $1\,\mathrm{ms}$ ausgelöst wird.
@@ -133,7 +139,7 @@ void init_systick(void) {
     /* TODO */
 
     /* 3. Freigabe (Pseudo-Code) */
-    /* set_csr(mie, (1U << 7)); */ /* MTIE */
+    /* set_csr(mie, (1u << 7)); */ /* MTIE */
     /* set_csr(mstatus, 8); */     /* MIE */
 }
 ```
@@ -158,7 +164,7 @@ void init_systick(void) {
     uint64_t now = *(volatile uint64_t *)CLINT_MTIME;
     *(volatile uint64_t *)CLINT_MTIMECMP = now + TICKS_PER_MS;
 
-    /* set_csr(mie, (1U << 7)); */
+    /* set_csr(mie, (1u << 7)); */
     /* set_csr(mstatus, 8); */
 }
 ```

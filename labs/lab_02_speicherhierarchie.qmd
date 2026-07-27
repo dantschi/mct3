@@ -11,6 +11,8 @@ subtitle: "Mikrocomputertechnik 3 (MCT3)"
 
 Sie vertiefen Vorlesung 2: Lokalitätsprinzip, AMAT, Cache-Mapping (Direct Mapped / Set-Associative), Schreibstrategien und cache-freundlichen C-Code (Row-Major vs. Column-Major).
 
+**Bearbeitungszeit:** ca. 45–60 Min. | **Orientierungspunkte:** Aufgabe 1: 14 P, Aufgabe 2: 8 P (Gesamt: 22 P)
+
 ## Teil 1: Theorie — Speicherhierarchie und Caches
 
 ### Aufgabe 1.1: Das Lokalitätsprinzip
@@ -60,16 +62,16 @@ Ein Prozessor habe:
 Formel (ein Cache-Level, Miss geht zum Hauptspeicher):
 
 $$
-\mathrm{AMAT} = T_{\mathrm{Hit}} + (M_{\mathrm{miss}} \times T_{\mathrm{Miss}})
+\mathrm{AMAT} = \text{Hit Time} + (\text{Miss Rate} \times \text{Miss Penalty})
 $$
 
-1. Miss-Rate = 1 - 0,95 = 0,05
+1. Miss Rate $= 1 - 0{,}95 = 0{,}05$
 
 $$
 \mathrm{AMAT} = 1 + (0{,}05 \times 100) = 1 + 5 = 6\ \mathrm{Takte}
 $$
 
-2. Bei Hit Rate $50\,\%$: Miss-Rate = 0,5
+2. Bei Hit Rate $50\,\%$: Miss Rate $= 0{,}5$
 
 $$
 \mathrm{AMAT} = 1 + (0{,}5 \times 100) = 1 + 50 = 51\ \mathrm{Takte}
@@ -183,5 +185,5 @@ for (int col = 0; col < 1000; col++) {
 ::: {.content-visible when-profile="solution"}
 **Musterlösung Aufgabe 2.2**
 
-Erwartung: Variante A zeigt deutlich höhere Hit-Rate als Variante B. Die absolute Rate hängt von Line-Größe, Cache-Kapazität und Associativity ab — entscheidend ist der relative Unterschied und die Begründung über Row-Major-Lokalität. Details und Messprotokoll folgen im Übungsbetrieb / Renode- bzw. Ripes-Setup der Veranstaltung.
+Erwartung: Variante A ist deutlich schneller und zeigt eine höhere Hit-Rate als Variante B — wegen der räumlichen Lokalität im Row-Major-Layout. Die absolute Rate hängt von Line-Größe, Cache-Kapazität und Associativity ab; entscheidend ist der relative Unterschied.
 :::

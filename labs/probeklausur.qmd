@@ -7,17 +7,53 @@ subtitle: "Wrap-Up & Prüfungsvorbereitung · MCT3"
 > **Musterlösung**
 :::
 
+**Deckblatt**
+
+| | |
+|--|--|
+| Name | \underline{\hspace{8cm}} |
+| Matrikelnummer | \underline{\hspace{8cm}} |
+| Kurs / Studiengruppe | \underline{\hspace{8cm}} |
+
 **Hinweise zur Bearbeitung**
 
 - **Dauer:** 90 Minuten  
-- **Erlaubte Hilfsmittel:** Nicht-programmierbarer Taschenrechner  
+- **Erlaubte Hilfsmittel:** Nicht-programmierbarer Taschenrechner (keine Skripte, kein Smartphone)  
 - **Maximal erreichbare Punktzahl:** 100 Punkte  
+
+**Punkteübersicht**
+
+| Aufgabe | Thema | Punkte |
+|---------|-------|--------|
+| 1 | Speicherphysik, Hierarchie und Caches | 20 |
+| 2 | Interrupts, Timer, PWM | 25 |
+| 3 | DMA, CPU-Architekturen, Branch Prediction | 30 |
+| 4 | Multicore, Busse und Edge AI | 25 |
+| | **Summe** | **100** |
 
 ---
 
-## Aufgabe 1: Speicherhierarchie und Caches (25 Punkte)
+## Aufgabe 1: Speicherphysik, Hierarchie und Caches (20 Punkte)
 
-### 1.1 AMAT-Berechnung (10 Punkte)
+### 1.1 SRAM vs. DRAM (5 Punkte)
+
+Nennen Sie je zwei charakteristische Unterschiede zwischen SRAM und DRAM (Zellaufbau, Refresh, Dichte/Flüchtigkeit).
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+\vspace{2.5cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 1.1**
+
+- **Zellaufbau:** SRAM typisch 6T-Flip-Flop; DRAM 1T1C (Transistor + Kondensator).  
+- **Refresh:** DRAM braucht periodischen Refresh (Ladung sickert ab); SRAM hält den Zustand, solange Versorgungsspannung anliegt.  
+- **Dichte/Kosten:** DRAM dichter/günstiger pro Bit; SRAM schneller, aber flächenintensiver. Beide volatil.
+:::
+
+### 1.2 AMAT-Berechnung (6 Punkte)
 
 Ein SoC verfügt über einen L1-Cache und langsamen DRAM.
 
@@ -30,42 +66,42 @@ Berechnen Sie die Average Memory Access Time (AMAT) in Taktzyklen. Formel und Re
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
-*(Notieren Sie Ihre Lösung hier.)*
+\vspace{2.5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung 1.1**
+**Musterlösung 1.2**
 
 $$
-\mathrm{AMAT} = HitTime + (MissRate \times MissPenalty)
+\mathrm{AMAT} = \text{Hit Time} + (\text{Miss Rate} \times \text{Miss Penalty})
 $$
 
-$MissRate = 1 - 0{,}96 = 0{,}04$
+$\text{Miss Rate} = 1 - 0{,}96 = 0{,}04$
 
 $$
 \mathrm{AMAT} = 2 + (0{,}04 \times 150) = 2 + 6 = 8\ \mathrm{Taktzyklen}
 $$
 :::
 
-### 1.2 Cache-Mapping (8 Punkte)
+### 1.3 Cache-Mapping (4 Punkte)
 
 Erklären Sie *Thrashing* bei einem Direct-Mapped-Cache. Wie löst ein 4-Way Set-Associative Cache das Problem hardwareseitig?
 
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
-*(Notieren Sie Ihre Lösung hier.)*
+\vspace{2.5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung 1.2**
+**Musterlösung 1.3**
 
 **Thrashing:** Beim Direct Mapped hat jeder RAM-Block genau einen festen Cache-Platz (Index). Wechseln zwei Adressen mit demselben Index ab, verdrängen sie sich ständig → Miss Rate nahe $100\,\%$, obwohl der Rest des Caches leer sein kann.
 
 **4-Way:** Derselbe Index führt auf ein *Set* mit 4 Ways. Beide Blöcke können im Set nebeneinander liegen, ohne sich zu verdrängen.
 :::
 
-### 1.3 Hardwarenahes C und Lokalität (7 Punkte)
+### 1.4 Hardwarenahes C und Lokalität (5 Punkte)
 
 ```c
 for (int col = 0; col < 1000; col++) {
@@ -80,11 +116,11 @@ Warum ist die Performance mit Caches schlecht? Wie muss der Code umgeschrieben w
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
-*(Notieren Sie Ihre Lösung hier.)*
+\vspace{2.5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung 1.3**
+**Musterlösung 1.4**
 
 C speichert 2D-Arrays *Row-Major*. Der Code läuft *Column-Major* → große Sprünge, Cache-Lines werden ungenutzt verdrängt (viele Misses).
 
@@ -102,7 +138,7 @@ Nennen Sie für CLINT und PLIC je ein typisches Einsatzbeispiel und begründen S
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
-*(Notieren Sie Ihre Lösung hier.)*
+\vspace{2.5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -116,7 +152,7 @@ Trennung: kritische lokale Events ohne Warteschlange hinter hunderten Peripherie
 
 ### 2.2 Hardware-Timer und PWM (10 Punkte)
 
-Systemtakt $50\,\mathrm{MHz}$, `PSC = 49`, `ARR = 10\,000`.
+Systemtakt $50\,\mathrm{MHz}$, `PSC = 49`, `ARR = 10000`.
 
 1. Berechnen Sie die PWM-Frequenz in Hz (vereinfachtes Modell $f_{\mathrm{pwm}} = f_{\mathrm{cnt}}/\mathrm{ARR}$).  
 2. Welchen `CCR`-Wert brauchen Sie für $60\,\%$ Duty Cycle?
@@ -124,7 +160,7 @@ Systemtakt $50\,\mathrm{MHz}$, `PSC = 49`, `ARR = 10\,000`.
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
-*(Notieren Sie Ihre Lösung hier.)*
+\vspace{2.5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -134,37 +170,37 @@ Systemtakt $50\,\mathrm{MHz}$, `PSC = 49`, `ARR = 10\,000`.
 f_{\mathrm{cnt}} = \frac{50\,\mathrm{MHz}}{\mathrm{PSC}+1} = \frac{50\times 10^{6}}{50} = 1\,\mathrm{MHz}
 $$
 $$
-f_{\mathrm{pwm}} = \frac{f_{\mathrm{cnt}}}{\mathrm{ARR}} = \frac{10^{6}}{10\,000} = 100\,\mathrm{Hz}
+f_{\mathrm{pwm}} = \frac{f_{\mathrm{cnt}}}{\mathrm{ARR}} = \frac{10^{6}}{10000} = 100\,\mathrm{Hz}
 $$
 
-2. $\mathrm{CCR} = 10\,000 \times 0{,}60 = 6000$
+2. $\mathrm{CCR} = 10000 \times 0{,}60 = 6000$
 :::
 
 ### 2.3 Nested Interrupts (7 Punkte)
 
-Was ist das *Clobbering* von `mepc` bei Nested Interrupts? Welche Maßnahme ist nötig, bevor `MIE` in der ISR wieder auf 1 gesetzt wird?
+Was ist das *Clobbering* von `mepc`, wenn in einer ISR (nach erneut gesetztem `MIE=1`) ein weiterer Interrupt eintrifft? Welche Maßnahme ist nötig, bevor `MIE` in der ISR wieder auf 1 gesetzt wird?
 
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
-*(Notieren Sie Ihre Lösung hier.)*
+\vspace{2.5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
 **Musterlösung 2.3**
 
-Tritt ein höherpriorer Interrupt in der ISR auf, überschreibt die Hardware `mepc` mit dem PC der ISR — die Rücksprungadresse zum Main-Programm geht verloren (*Clobbering*).
+Trifft nach `MIE=1` ein weiterer Interrupt in der ISR ein, überschreibt die Hardware `mepc` mit dem PC *innerhalb* der äußeren ISR — die ursprüngliche Rücksprungadresse zum Main-Programm geht verloren (*Clobbering*).
 
 Vor erneutem `MIE=1` müssen `mepc` (und typisch `mstatus`) auf dem Stack gesichert werden.
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 3: Architektur und DMA (25 Punkte)
+## Aufgabe 3: DMA, CPU-Architekturen und Branch Prediction (30 Punkte)
 
-### 3.1 Direct Memory Access (10 Punkte)
+### 3.1 Direct Memory Access (8 Punkte)
 
-DMA überträgt $10\,000$ Bytes aus einem SRAM-Array an UART-TX.
+DMA überträgt $10000$ Bytes aus einem SRAM-Array an UART-TX.
 
 1. Inkrement-Modi für `SRC_ADDR` und `DST_ADDR` (An/Aus)? Begründung.  
 2. Hauptvorteil gegenüber interrupt-basiertem Senden (Interrupt Storm)?
@@ -172,7 +208,7 @@ DMA überträgt $10\,000$ Bytes aus einem SRAM-Array an UART-TX.
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
-*(Notieren Sie Ihre Lösung hier.)*
+\vspace{2.5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -182,14 +218,14 @@ DMA überträgt $10\,000$ Bytes aus einem SRAM-Array an UART-TX.
 2. Kein ISR-Overhead pro Byte — DMA als Bus-Master kopiert SRAM → UART, CPU-Last nahe $0\,\%$.
 :::
 
-### 3.2 Cache-Kohärenz bei DMA (7 Punkte)
+### 3.2 Cache-Kohärenz bei DMA (5 Punkte)
 
 L1-D-Cache mit Write-Back: Warum kann DMA *Stale Data* senden? Software-Abhilfe?
 
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
-*(Notieren Sie Ihre Lösung hier.)*
+\vspace{2.0cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -200,7 +236,7 @@ CPU schreibt nur in den Cache; RAM bleibt veraltet. DMA liest den RAM und sendet
 Abhilfe: vor DMA-Start *Cache Clean/Flush* des Puffers — oder Puffer in *uncached* Region (MPU/PMP/Linker).
 :::
 
-### 3.3 Moderne CPU-Architekturen (8 Punkte)
+### 3.3 Moderne CPU-Architekturen (7 Punkte)
 
 ```riscv
 1: add t0, t1, t2
@@ -212,7 +248,7 @@ RAW oder WAR/WAW? Wie löst Register Renaming das Problem?
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
-*(Notieren Sie Ihre Lösung hier.)*
+\vspace{2.5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -223,18 +259,47 @@ RAW oder WAR/WAW? Wie löst Register Renaming das Problem?
 Renaming: Schreibziel von 1 → physisches Register z. B. `P10`, von 2 → `P11`. Ziele getrennt → beide parallel ausführbar.
 :::
 
+### 3.4 2-Bit-Branch-Predictor (10 Punkte)
+
+Ein 2-Bit saturierender Zähler startet in `11` (*Strongly Taken*). Kodierung: `00` Strongly NT, `01` Weakly NT, `10` Weakly T, `11` Strongly T. Vorhersage: `1x` → Taken, `0x` → Not Taken.
+
+Sequenz der tatsächlichen Sprünge: **T, T, NT, NT, T**.
+
+1. Geben Sie für jeden Schritt Startzustand, Vorhersage, Ist-Ergebnis und Folgezustand an.  
+2. Wie viele Treffer?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+\vspace{3.5cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 3.4**
+
+| Schritt | Start | Vorhersage | Ist | Folge |
+|--------:|:-----:|:----------:|:---:|:-----:|
+| 1 | `11` | T | T | `11` |
+| 2 | `11` | T | T | `11` |
+| 3 | `11` | T | NT | `10` |
+| 4 | `10` | T | NT | `01` |
+| 5 | `01` | NT | T | `10` |
+
+**Treffer:** 2 von 5 (Schritte 1 und 2).
+:::
+
 {{< pagebreak >}}
 
-## Aufgabe 4: Multicore, Busse und KI (25 Punkte)
+## Aufgabe 4: Multicore, Busse und Edge AI (25 Punkte)
 
-### 4.1 MESI-Protokoll (8 Punkte)
+### 4.1 MESI-Protokoll (6 Punkte)
 
 Beide Kerne haben Variable `x` in **S**. Core 1 führt `x = 42;` aus. Welche Bus-Nachricht? Zustände danach in Core 0 und Core 1?
 
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
-*(Notieren Sie Ihre Lösung hier.)*
+\vspace{2.0cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -243,14 +308,14 @@ Beide Kerne haben Variable `x` in **S**. Core 1 führt `x = 42;` aus. Welche Bus
 Core 1 sendet **Invalidate**-Broadcast. Core 0 → **I**, Core 1 nach dem Write → **M**.
 :::
 
-### 4.2 Hardware-Atomics (7 Punkte)
+### 4.2 Hardware-Atomics (5 Punkte)
 
 Warum führt `while(lock == 1); lock = 1;` zu einer Race Condition? Welche zwei RISC-V-A-Extension-Befehle lösen das?
 
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
-*(Notieren Sie Ihre Lösung hier.)*
+\vspace{2.0cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -261,14 +326,14 @@ Lesen und Schreiben sind getrennte Befehle: beide Kerne können „frei“ sehen
 Lösung: `lr.w` (Load-Reserved) und `sc.w` (Store-Conditional).
 :::
 
-### 4.3 Serielle Busse (5 Punkte)
+### 4.3 Serielle Busse (4 Punkte)
 
 Warum ist I2C gegen Kurzschlüsse resilienter als SPI Push-Pull, wenn zwei Geräte gleichzeitig treiben — und welcher Geschwindigkeitsnachteil folgt daraus?
 
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
-*(Notieren Sie Ihre Lösung hier.)*
+\vspace{2.0cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -279,18 +344,39 @@ I2C: Open-Drain — nur aktiv LOW oder hochohmig; HIGH über Pull-ups. Konflikt 
 Nachteil: langsame Rising Edges → typisch deutlich niedriger als SPI (z. B. $100$–$400\,\mathrm{kHz}$ vs. MHz).
 :::
 
-### 4.4 KI-Hardware (5 Punkte)
+### 4.4 KI-Hardware / Systolic Array (5 Punkte)
 
 Warum ist ein Systolic Array (NPU) für neuronale Netze energieeffizienter als eine hochgetaktete General-Purpose-CPU?
 
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
-*(Notieren Sie Ihre Lösung hier.)*
+\vspace{2.0cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
 **Musterlösung 4.4**
 
 Milliarden identischer MACs. Die CPU leidet unter Memory Wall und Instruction-Decode-Overhead. Systolic Arrays reichen Daten in Hardware von Zelle zu Zelle weiter (Wiederverwendung) → weniger RAM-Zugriffe und weniger Front-End-Energie → höhere Effizienz (TOPS/Watt).
+:::
+
+### 4.5 Quantisierung und Memory Wall (5 Punkte)
+
+Ein Modell habe $250\,000$ Gewichte.
+
+1. Vergleichen Sie den Speicherbedarf in Float32 vs. Int8.  
+2. Warum mildert Int8-Quantisierung die *Memory Wall* auf MCUs?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+\vspace{2.5cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 4.5**
+
+1. Float32: $250\,000 \times 4\,\mathrm{B} = 1\,\mathrm{MB}$. Int8: $250\,000 \times 1\,\mathrm{B} = 250\,\mathrm{KB}$ (Faktor $4$ kleiner).
+
+2. Weniger Bytes → weniger DRAM-/Flash-Bandbreite und kürzere Ladezeiten; Integer-MACs oft günstiger als Float ohne FPU. Die ALU wartet weniger auf Speicher → Memory Wall wird entschärft.
 :::

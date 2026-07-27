@@ -7,6 +7,7 @@ author: "Prof. Dr.-Ing. Daniel Klünder"
 # Handout:  quarto render vorlesungen/02_speicherhierarchie.qmd --profile handout --to pdf
 #           → _handout/vorlesungen/02_speicherhierarchie.pdf
 format: revealjs
+lang: de
 ---
 
 ## Willkommen zu Block 2!
@@ -508,7 +509,7 @@ Ein Cache-Eintrag enthält drei Felder:
 
 | Valid | Tag | Daten |
 |-------|-----|-------|
-| 1 Bit | z. B. 18 Bit | z. B. 64 Bytes |
+| 1 Bit | z. B. 17 Bit | z. B. 64 Bytes |
 
 ::: notes
 Im SRAM des Caches speichern wir nicht nur die Daten. Wir müssen die Daten markieren. Stellen Sie sich vor, Sie legen Aktenordner aus dem Keller auf den Schreibtisch. Wenn auf dem Ordner nicht steht, wo er herkommt, wissen Sie später nicht, wem die Daten gehören. Dieses Etikett ist das Tag. Und das Valid-Bit brauchen wir, weil der Cache beim Einschalten des PCs voller Strom-Rauschen und Müll ist. Das Valid-Bit sagt: Diese Daten sind frisch und echt.
@@ -725,12 +726,12 @@ Hier scheitert der Direct Mapped Cache brutal. Wenn zwei Variablen, die Sie im C
 Thrashing *kann* auftreten, wenn zwei heiß genutzte Arrays denselben Cache-Index treffen (abhängig von Alignment, Array-Größe und Cache-Organisation):
 
 ```c
-// Kollision möglich, wenn A[i] und B[i] denselben Index abbilden
+// Kollision möglich bei gleichem Cache-Index
 int A[1000];
 int B[1000];
 
 for (int i = 0; i < 1000; i++) {
-    // im Konfliktfall: gegenseitiges Verdrängen → hohe Miss Rate
+    // Konflikt: gegenseitiges Verdrängen
     A[i] = A[i] + B[i];
 }
 ```
@@ -965,11 +966,11 @@ Solange nur ein CPU-Kern mit „seinen“ Daten arbeitet, bleibt das oft unsicht
 
 - Write-Through (Durchschreiben)
 - Jeder Schreibvorgang geht synchron in L1 und Main Memory
-- Cache und RAM bleiben konsistent
-- Kein anderer Core liest veraltete Daten
+- RAM bleibt aktuell (gegenüber dem schreibenden Kern)
+- Achtung Multicore: ein anderer Kern kann trotzdem eine veraltete L1-Kopie halten — volle Kohärenz braucht Invalidierung/Snooping (Block 9)
 
 ::: notes
-Die sicherste Methode ist das Durchschreiben. Jeder Store-Befehl geht nicht nur in den Cache, sondern wird sofort an den langsamen RAM durchgereicht. Das ist vorteilhaft für die Konsistenz: Es gibt keine Diskrepanzen zwischen den Ebenen.
+Eine einfache Methode für die RAM-Konsistenz ist das Durchschreiben. Jeder Store-Befehl geht nicht nur in den Cache, sondern wird sofort an den langsamen RAM durchgereicht. Vorteil: keine Diskrepanz zwischen Cache und RAM beim schreibenden Kern — volle Multicore-Kohärenz braucht trotzdem Invalidierung/Snooping.
 :::
 
 ## Write-Through: Datenfluss
@@ -1065,7 +1066,7 @@ Das ist der Moment der Wahrheit. Erst wenn ein Block aus Platzmangel aus dem Cac
 | Merkmal | Write-Through | Write-Back |
 |---------|---------------|------------|
 | RAM-Update | sofort | erst bei Eviction |
-| Kohärenz | immer | RAM oft veraltet |
+| RAM aktuell | ja | oft veraltet (Dirty) |
 | Performance | schlecht (ohne Buffer) | hervorragend |
 | Bus-Last | hoch | gering |
 | Hardware | gering | Dirty-Bits nötig |

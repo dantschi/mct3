@@ -9,7 +9,9 @@ subtitle: "Mikrocomputertechnik 3 (MCT3)"
 
 ## Zielsetzung
 
-Sie vertiefen Vorlesung 4: Hardware-Timer für PWM (PSC, ARR, CCR), Duty Cycle und Effektivspannung, Software- vs. Hardware-PWM sowie Watchdog-/Window-Watchdog-Sicherheit — inklusive kurzer C-Praxis.
+Sie vertiefen Vorlesung 4: Hardware-Timer für PWM (PSC, ARR, CCR), Duty Cycle und mittlere Spannung, Software- vs. Hardware-PWM sowie Watchdog-/Window-Watchdog-Sicherheit — inklusive kurzer C-Praxis.
+
+**Bearbeitungszeit:** ca. 45–60 Min. | **Orientierungspunkte:** Aufgabe 1: 14 P, Aufgabe 2: 8 P (Gesamt: 22 P)
 
 ## Teil 1: Theorie — Hardware-Counter, PWM und Watchdog
 
@@ -40,7 +42,7 @@ Ein SoC läuft mit $f_{\mathrm{clock}} = 100\,\mathrm{MHz}$. Timer: `PSC = 99`, 
 
 1. Berechnen Sie die Zählfrequenz $f_{\mathrm{cnt}}$. Formel angeben.
 2. Bestimmen Sie den Duty Cycle in Prozent (vereinfachtes Modell $\mathrm{CCR}/\mathrm{ARR}$).
-3. Nähern Sie die Effektivspannung $V_{\mathrm{eff}}$ am Pin (Vorlesungsmodell: Mittelwert $\approx V_{\mathrm{Pin}} \times$ Duty Cycle).
+3. Nähern Sie die mittlere Spannung $V_{\mathrm{mittel}}$ am Pin (Vorlesungsmodell: Mittelwert $\approx V_{\mathrm{Pin}} \times$ Duty Cycle).
 
 ::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
@@ -63,11 +65,11 @@ $$
 $$
 
 3. $$
-V_{\mathrm{eff}} \approx V_{\mathrm{Pin}} \times \mathrm{Duty\ Cycle}
+V_{\mathrm{mittel}} \approx V_{\mathrm{Pin}} \times \mathrm{Duty\ Cycle}
 \approx 3{,}3\,\mathrm{V} \times 0{,}25 = 0{,}825\,\mathrm{V}
 $$
 
-(Hinweis: Manche Timer zählen $ARR+1$ Schritte pro Periode — dann Duty ggf. $\mathrm{CCR}/(\mathrm{ARR}+1)$. Immer Datenblatt prüfen. Die Vorlesungsgröße $V_{\mathrm{eff}}$ meint hier den zeitlichen Mittelwert, nicht den RMS-Wert $\propto\sqrt{\mathrm{Duty}}$.)
+(Hinweis: Manche Timer zählen $ARR+1$ Schritte pro Periode — dann Duty ggf. $\mathrm{CCR}/(\mathrm{ARR}+1)$. Immer Datenblatt prüfen. Die Vorlesungsgröße $V_{\mathrm{mittel}}$ meint hier den zeitlichen Mittelwert, nicht den RMS-Wert $\propto\sqrt{\mathrm{Duty}}$.)
 :::
 
 ### Aufgabe 1.3: Software-PWM vs. Hardware-PWM
@@ -106,9 +108,9 @@ Nachteile gegenüber Hardware-PWM:
 ::: {.content-visible when-profile="solution"}
 **Musterlösung Aufgabe 1.4**
 
-1. Der Watchdog Timer (WDT) ist ein von der ALU/Anwendungslogik getrennter Hardware-Zähler (meist Down-Counter). Erreicht er 0 (Timeout), greift er in das Power-/Reset-Management ein und löst typisch einen harten System-Reset aus — das System bootet neu.
+1. Der Watchdog Timer (WDT) ist ein vom Programmfluss/CPU-Kern unabhängiger Hardware-Zähler (meist Down-Counter). Erreicht er 0 (Timeout), greift er in das Power-/Reset-Management ein und löst typisch einen harten System-Reset aus — das System bootet neu.
 
-2. Füttert man den WDT in einer periodischen Timer-ISR (z. B. SysTick), kann die Hauptschleife in einem Deadlock stecken, während die ISR weiterläuft und den Hund unbemerkt füttert — der Freeze bleibt unerkannt. `wdt_feed()` gehört daher in die unterste Ebene der `while(1)`-Geschäftslogik (Main-Loop), als Beweis dass die Anwendungslogik noch fortschreitet.
+2. Füttert man den WDT in einer periodischen Timer-ISR (z. B. SysTick), kann die Hauptschleife in einem Deadlock stecken, während die ISR weiterläuft und den Hund unbemerkt füttert — der Freeze bleibt unerkannt. `wdt_feed()` gehört daher in die unterste Ebene der `while(1)`-Geschäftslogik (Main-Loop), als Beweis, dass die Anwendungslogik noch fortschreitet.
 
 3. Ein Window Watchdog (WWDG) erkennt zusätzlich zu spätes Timeout *und* zu frühes/zu häufiges Füttern (z. B. fehlerhafte Endlosschleife mit `wdt_feed()`): Feeds sind nur in einem strikten Zeitfenster erlaubt.
 :::
@@ -123,7 +125,6 @@ Adressen sind didaktisch/fiktiv.
 
 `TIMER_ARR = 1000`. Helligkeit als Prozent `0`…`100`.
 
-::: {.content-hidden when-profile="solution"}
 ```c
 #include <stdint.h>
 
@@ -143,6 +144,7 @@ void set_led_brightness(uint8_t percent) {
 }
 ```
 
+::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
 *(Notieren Sie Ihre Lösung hier.)*
@@ -174,7 +176,6 @@ void set_led_brightness(uint8_t percent) {
 
 Simulieren Sie einen Deadlock per Tastendruck. Nach WDT-Reset soll die Ursache auf der Konsole erscheinen. Füttern Sie den WDT an der architektonisch richtigen Stelle.
 
-::: {.content-hidden when-profile="solution"}
 ```c
 #include <stdio.h>
 #include <stdint.h>
@@ -203,6 +204,7 @@ int main(void) {
 }
 ```
 
+::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
 *(Notieren Sie Ihre Lösung hier.)*

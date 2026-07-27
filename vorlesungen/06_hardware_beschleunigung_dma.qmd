@@ -9,6 +9,7 @@ lang: de
 #           → _handout/vorlesungen/06_hardware_beschleunigung_dma.pdf
 format: revealjs
 ---
+
 ## Willkommen zu Block 6!
 
 - Willkommen zur sechsten Vorlesung in Mikrocomputertechnik 3
@@ -187,6 +188,8 @@ Sekundenbruchteile sind für GHz-CPUs Ewigkeiten — Milliarden verschwendeter T
 - ISR schreibt ein Byte; CPU rechnet dazwischen weiter
 
 ```c
+volatile uint32_t bytes_sent;
+
 void spi_tx_empty_isr(void) {
     if (bytes_sent < 1000000) {
         SPI_DATA_REG = bild_array[bytes_sent++];
@@ -284,7 +287,7 @@ Geräte umgehen die CPU und greifen — über den DMAC — direkt auf den Speich
 ## Bypass der CPU
 
 - Ohne DMA: RAM → CPU → UART/SPI
-- Mit DMA: RAM ↔ DMAC ↔ Peripherie
+- Mit DMA: RAM → DMAC → Peripherie
 - Datenpfad an der CPU vorbei; CPU-Auslastung für den Transfer nahe 0 %
 
 ```{mermaid}
@@ -386,7 +389,7 @@ Wie Staffelübergabe: erst anfordern, dann liefern.
 ## Request / Acknowledge (Handshake)
 
 - Request (klassisch oft DREQ): Peripherie „Register leer / bereit“
-- DMAC: Transfer RAM ↔ Peripherie
+- DMAC: Transfer RAM → Peripherie
 - Acknowledge (klassisch oft DACK): „geliefert“
 - Signale und Namen sind herstellerspezifisch — das Prinzip bleibt gleich
 
@@ -501,11 +504,11 @@ Erster Programmierschritt: Request-Leitung der richtigen Peripherie auf den rich
 typedef struct {
     volatile uint32_t SRC_ADDR;  /* Quelle */
     volatile uint32_t DST_ADDR;  /* Ziel */
-    volatile uint32_t COUNT;     /* Anzahl Transfers */
-    volatile uint32_t CONTROL;   /* Breite, Inkrement, Enable, … */
+    volatile uint32_t COUNT;     /* Anzahl */
+    volatile uint32_t CONTROL;   /* Breite, Enable, … */
 } DMA_Channel_TypeDef;
 
-/* Adresse fiktiv — im Labor: Datenblatt / Renode-Modell */
+/* fiktiv — Labor: Datenblatt / Renode */
 #define DMA_CH1 ((DMA_Channel_TypeDef *)0x40020000u)
 ```
 
@@ -681,11 +684,11 @@ Beide Seiten können sich „belügen“, wenn Kohärenz nicht hergestellt wird.
 
 - Clean (Flush): vor DMA-Sendestart schmutzige Lines des Puffers in den RAM schreiben
 - Invalidate: vor CPU-Lesen empfangener DMA-Daten Lines verwerfen → nächster Read geht zum RAM
-- API ist plattformabhängig (ARM: Cache-Maintenance; RISC-V: je nach Implementierung / Fence)
+- API ist plattformabhängig (ARM: Cache-Maintenance; RISC-V: Fence ordnet Zugriffe; für Cache-Kohärenz ggf. Zicbom — `cbo.clean`/`cbo.inval`)
 
 ```c
 bild_berechnen();
-/* Konzept: Cache-Bereich des Arrays in den RAM schreiben */
+/* Konzept: Cache-Bereich in den RAM schreiben */
 cache_clean((uintptr_t)bild_array, sizeof(bild_array));
 dma_start();
 ```
@@ -704,7 +707,7 @@ Wenige Takte Overhead — dafür korrekte Sichtbarkeit zwischen CPU und DMA.
 ```text
 MEMORY {
   RAM_CACHED   : ORIGIN = 0x20000000, LENGTH = 246K
-  RAM_UNCACHED : ORIGIN = 0x2003E800, LENGTH = 10K  /* DMA-Puffer */
+  RAM_UNCACHED : ORIGIN = 0x2003D800, LENGTH = 10K  /* DMA */
 }
 ```
 
@@ -880,7 +883,7 @@ Assistent ohne Gehirn: transportiert zuverlässig; bewertet und filtert nicht.
 
 ## Fragen? — Streams und Burst
 
-- Warum Burst (SRAM: Arbitration; DRAM: zusätzlich Row-Hits) effizienter ist?
+- Warum ist Burst (SRAM: Arbitration; DRAM: zusätzlich Row-Hits) effizienter?
 - Was leistet Circular Mode?
 - Ping-Pong mit Half-Transfer: Ablauf?
 

@@ -11,6 +11,8 @@ subtitle: "Mikrocomputertechnik 3 (MCT3)"
 
 Sie vertiefen Vorlesung 8: Memory Wall bei neuronalen Netzen, Data-Level Parallelism / RVV, Systolic Arrays (NPUs) sowie Edge-AI-Praxis mit TensorFlow Lite Micro (Quantisierung, Arena, Inferenz).
 
+**Bearbeitungszeit:** ca. 45–60 Min. | **Orientierungspunkte:** Aufgabe 1: 12 P, Aufgabe 2: 12 P (Gesamt: 24 P)
+
 ## Teil 1: Theorie — Von der CPU zum KI-Beschleuniger
 
 ### Aufgabe 1.1: Die Memory Wall bei neuronalen Netzen
@@ -99,13 +101,36 @@ Neuronale Netze bestehen hardwareseitig primär aus großen Matrizen. Die grundl
 2. Keyword `const` → typisch `.rodata`; das Linker-Skript mappt Read-Only-Daten in den NOR-Flash (XIP/ROM), ohne das Array beim Start in den SRAM zu kopieren.
 :::
 
+### Aufgabe 2.1b: Modellgröße Float32 vs. Int8
+
+Ein kleines Netz habe $250\,000$ Gewichte (Biases vernachlässigt).
+
+1. Berechnen Sie den Speicherbedarf der Gewichte in Float32 (4 Byte/Gewicht) und in Int8 (1 Byte/Gewicht).
+2. Um welchen Faktor schrumpft der Gewichtsspeicher durch Int8-Quantisierung?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung Aufgabe 2.1b**
+
+1. Float32: $250\,000 \times 4\,\mathrm{B} = 1\,000\,000\,\mathrm{B} = 1\,\mathrm{MB}$.  
+   Int8: $250\,000 \times 1\,\mathrm{B} = 250\,000\,\mathrm{B} = 250\,\mathrm{KB}$.
+
+2. Faktor $4$ (Float32 ist viermal so groß) bzw. Int8 benötigt $1/4$ des Float32-Speichers.
+:::
+
 {{< pagebreak >}}
 
 ### Aufgabe 2.2: TFLM-Inferenzzyklus (C++)
 
 Vervollständigen Sie das Snippet. Hilfsobjekte `resolver`, `error_reporter`, `input`, `output` und `read_i2c_sensor()` seien gegeben.
 
-::: {.content-hidden when-profile="solution"}
+Hinweis: Das Snippet nutzt Float-Tensoren (`data.f`). Bei einem Int8-quantisierten Modell greifen Sie typisch auf `data.int8` zu und skalieren mit den Quantisierungsparametern (`scale`, `zero_point`) — hier didaktisch als Float belassen.
+
 ```cpp
 #include "tensorflow/lite/micro/all_ops_resolver.h"
 #include "tensorflow/lite/micro/micro_interpreter.h"
@@ -115,8 +140,10 @@ Vervollständigen Sie das Snippet. Hilfsobjekte `resolver`, `error_reporter`, `i
 /* TODO */
 
 void setup_and_run_ai() {
+    const tflite::Model *model = tflite::GetModel(step_model_tflite);
+
     tflite::MicroInterpreter interpreter(
-        step_model_tflite, resolver, tensor_arena, 10 * 1024, error_reporter);
+        model, resolver, tensor_arena, 10 * 1024, error_reporter);
 
     /* 2. Arena vorbereiten */
     /* TODO: interpreter.... */
@@ -135,6 +162,7 @@ void setup_and_run_ai() {
 }
 ```
 
+::: {.content-hidden when-profile="solution"}
 ### Ihre Lösung {.unnumbered}
 
 *(Notieren Sie Ihre Lösung hier.)*
@@ -151,9 +179,10 @@ const int kTensorArenaSize = 10 * 1024;
 uint8_t tensor_arena[kTensorArenaSize];
 
 void setup_and_run_ai() {
+    const tflite::Model *model = tflite::GetModel(step_model_tflite);
+
     tflite::MicroInterpreter interpreter(
-        step_model_tflite, resolver, tensor_arena, kTensorArenaSize,
-        error_reporter);
+        model, resolver, tensor_arena, kTensorArenaSize, error_reporter);
 
     interpreter.AllocateTensors();
 
@@ -170,7 +199,7 @@ void setup_and_run_ai() {
 }
 ```
 
-(Hinweis: In realem TFLM-Code holt man `input`/`output` typisch über `interpreter.input(0)` / `output(0)` nach `AllocateTensors()` — hier didaktisch vereinfacht.)
+(Hinweis: In realem TFLM-Code holt man `input`/`output` typisch über `interpreter.input(0)` / `output(0)` nach `AllocateTensors()` — hier didaktisch vereinfacht. Bei Int8-Modellen: `data.int8` statt `data.f`, plus De-/Quantisierung.)
 :::
 
 ### Aufgabe 2.3: System-Auswirkungen in Renode

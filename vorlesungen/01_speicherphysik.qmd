@@ -7,6 +7,7 @@ author: "Prof. Dr.-Ing. Daniel Klünder"
 # Handout:  quarto render vorlesungen/01_speicherphysik.qmd --profile handout --to pdf
 #           → _handout/vorlesungen/01_speicherphysik.pdf
 format: revealjs
+lang: de
 ---
 
 ## Willkommen zu Mikrocomputertechnik 3!
@@ -43,7 +44,7 @@ Herzlich willkommen zu Mikrocomputertechnik 3! Es freut mich sehr, Sie nach MCT1
 
 ```riscv
 # MCT1 Refresher: Basisadresse und I/O-Register
-la   s1, 0xF0000000
+li   s1, 0xF0000000
 lw   t0, 0(s1)
 andi t1, t0, 1
 beq  t1, zero, Wait
@@ -181,6 +182,18 @@ Wie in MCT1 gilt auch hier: Die Vorlesung gibt Ihnen die Konzepte, aber das echt
 
 ::: notes
 Unser heutiges Ziel ist es, das Konzept „Arbeitsspeicher“, das wir in MCT1 als magische Blackbox betrachtet haben, physikalisch zu öffnen. Wir klären heute ein für alle Mal den Unterschied zwischen dem Speicher, auf dem unser Code liegt, und dem Speicher, in dem unsere Variablen leben.
+:::
+
+## Lernziele Block 1
+
+- Memory Wall und Speicherhierarchie-Idee motivieren
+- Volatil vs. non-volatil sowie Random Access vs. sequentiell einordnen
+- NOR-Flash/XIP vs. NAND und Wear Leveling erklären
+- SRAM (6T) vs. DRAM (1T1C, Refresh) unterscheiden
+- Memory Map und Linker-Sections (`.text`, `.data`, `.bss`) zuordnen
+
+::: notes
+Harris & Harris, *Digital Design and Computer Architecture — RISC-V Edition*, Kap. Memory Systems — Terminologie und Aufbau.
 :::
 
 ## Die Leitfrage des Tages
@@ -323,7 +336,7 @@ Die grundlegendste Unterscheidung von Speichern ist die Frage nach dem Stromausf
 **Sequenzieller Zugriff**
 
 - Daten nur der Reihe nach (wie eine Kassette)
-- Ende erreicht man erst nach dem Durchlaufen des Vorderns
+- Ende erreicht man erst nach dem Durchlaufen der davorliegenden Daten
 
 Architektur-Bedeutung: CPUs führen Code nur aus Random-Access-Speichern direkt aus.
 
@@ -489,12 +502,12 @@ Flash ist nicht gleich Flash. Je nachdem, wie Sie diese isolierten Transistoren 
 NOR-Flash verhält sich beim Lesen genau wie das SRAM aus unserer Architektur-Vorlesung. Das ist essenziell für kleine Embedded-Systeme! Die CPU schickt eine Adresse, der NOR-Flash antwortet sofort mit dem Assembler-Befehl. Das nennt man Execute-In-Place (XIP). Das Programm läuft direkt aus dem Flash. Das spart immens viel teuren Arbeitsspeicher, da der Code nicht erst kopiert werden muss.
 :::
 
-## C-Code und der Flash-Speicher {.scrollable}
+## C-Code und der Flash-Speicher
 
 - `const` zwingt den Compiler zu ROM/Flash (Section `.rodata`), nicht RAM
 - C-Pointer können direkt auf Flash-Adressen zeigen
 - Lesen erlaubt: `int wert = *flash_ptr;` (schnell, XIP)
-- Schreiben verboten: `*flash_ptr = 42;` → Hard Fault (kein einfacher Store)
+- Schreiben verboten: `*flash_ptr = 42;` → Store/AMO Access Fault (`mcause` 7; kein einfacher Store)
 
 ```c
 // Pointer auf internen NOR-Flash
@@ -526,7 +539,7 @@ NAND-Flash hat die Datenspeicherung revolutioniert. Es ist der Grund, warum wir 
 
 - Geheimnis: Flash verschleißt bei jedem Schreibvorgang
 - Hohe Spannung beim Tunneln beschädigt die Oxid-Isolation
-- Limit: ca. $10\,000$ bis $100\,000$ Erase/Write-Zyklen
+- Limit: ca. $10\,000$ bis $100\,000$ Erase/Write-Zyklen — je nach Zelltyp (NOR/SLC höher, TLC/QLC oft nur $\sim 1000$–$10000$)
 - Danach: Zelle hält Ladung nicht mehr (physisch defekt)
 - Gefahr: ständiges Schreiben in denselben Sektor zerstört den Chip
 
@@ -559,13 +572,14 @@ Damit Ihre teure SSD nicht nach einem Jahr defekt ist, trickst der Controller. W
 ## Memory Map: Wo liegt der Flash im SoC?
 
 - In der 32-Bit Memory Map ist ein Block für Flash reserviert
-- Typisches Beispiel: `0x0800 0000` bis `0x080F FFFF` (1 MB NOR-Flash)
-- Linker legt Maschinen-Code (`.text`) auf diese Startadresse
-- Nach Reset: PC springt hartverdrahtet auf `0x0800 0000`
+- Beispiel (STM32-artig): `0x0800 0000` bis `0x080F FFFF` (1 MB NOR-Flash)
+- RISC-V/SiFive oft anders: Boot-ROM bei `0x0000_1000`, QSPI-Flash ab `0x2000_0000`
+- Linker legt Maschinen-Code (`.text`) auf die Plattform-Startadresse
+- Nach Reset: PC springt hartverdrahtet auf den Reset-Vektor (plattformspezifisch)
 - Boot per Execute-in-Place aus dem NOR-Flash
 
 ::: notes
-Lassen Sie uns den Bogen zurück zu MCT1 schlagen. Der Prozessor legt eine 32-Bit Adresse auf den Bus. Der Adress-Decoder sieht, dass die Adresse mit 0x08 beginnt, weckt den NOR-Flash auf und leitet den Befehl an die CPU. Das ist der Moment, in dem der Mikrocontroller bootet. Alles passiert transparent.
+Lassen Sie uns den Bogen zurück zu MCT1 schlagen. Der Prozessor legt eine 32-Bit Adresse auf den Bus. Der Adress-Decoder erkennt den Flash-Bereich, weckt den NOR-Flash auf und leitet den Befehl an die CPU. Die konkreten Basisadressen sind plattformspezifisch — STM32 nutzt oft `0x0800_0000`, SiFive/Renode-RISC-V andere Maps. Das Prinzip bleibt: Boot per XIP aus NOR-Flash.
 :::
 
 ## Zusammenfassung: Non-Volatile Memory
@@ -927,7 +941,7 @@ Wordline öffnet den Transistor; der Kondensator speichert die Ladung gegen Mass
 
 - Geladen (hohe Spannung) $\rightarrow$ logische 1
 - Entladen ($\approx 0\,\mathrm{V}$) $\rightarrow$ logische 0
-- Kapazitäten im Femtofarad-Bereich — wenige Tausend Elektronen
+- Kapazitäten im Femtofarad-Bereich — einige zehntausend bis hunderttausend Elektronen
 - 3D-Fertigung: Trench-/Stack-Kondensatoren für Dichte
 
 ::: notes
@@ -938,7 +952,7 @@ Um Kapazität bei kleinem Fußabdruck zu gewinnen, werden Kondensatoren als Grä
 
 - Isolation ist nie perfekt — Ladung sickert ab
 - Spannung einer „1“ sinkt kontinuierlich
-- Nach ca. $64\,\mathrm{ms}$ oft kritisch für die Sensorik
+- Nach ca. $64\,\mathrm{ms}$ oft kritisch für die Sense Amplifiers / Leseverstärker
 - Ohne Pflege löscht sich DRAM selbst
 
 ::: notes
