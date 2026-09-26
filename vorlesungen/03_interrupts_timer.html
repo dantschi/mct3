@@ -1,0 +1,2795 @@
+<!DOCTYPE html>
+<html lang="de"><head>
+<link href="../assets/dhbw_logo.svg" rel="icon" type="image/svg+xml">
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-html/tabby.min.js"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/light-border.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.10.18">
+
+  <meta name="author" content="Prof.&nbsp;Dr.-Ing. Daniel Klünder">
+  <title>Mikrocomputertechnik 3 – 03 · Interrupts &amp; Timer</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href="../site_libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href="../site_libs/revealjs/dist/reveal.css">
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+      vertical-align: middle;
+    }
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      { color: #003b4f; background-color: #f1f3f5; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #003b4f; } /* Normal */
+    code span.al { color: #ad0000; } /* Alert */
+    code span.an { color: #5e5e5e; } /* Annotation */
+    code span.at { color: #657422; } /* Attribute */
+    code span.bn { color: #ad0000; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #003b4f; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #20794d; } /* Char */
+    code span.cn { color: #8f5902; } /* Constant */
+    code span.co { color: #5e5e5e; } /* Comment */
+    code span.cv { color: #5e5e5e; font-style: italic; } /* CommentVar */
+    code span.do { color: #5e5e5e; font-style: italic; } /* Documentation */
+    code span.dt { color: #ad0000; } /* DataType */
+    code span.dv { color: #ad0000; } /* DecVal */
+    code span.er { color: #ad0000; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #ad0000; } /* Float */
+    code span.fu { color: #4758ab; } /* Function */
+    code span.im { color: #00769e; } /* Import */
+    code span.in { color: #5e5e5e; } /* Information */
+    code span.kw { color: #003b4f; font-weight: bold; } /* Keyword */
+    code span.op { color: #5e5e5e; } /* Operator */
+    code span.ot { color: #003b4f; } /* Other */
+    code span.pp { color: #ad0000; } /* Preprocessor */
+    code span.sc { color: #5e5e5e; } /* SpecialChar */
+    code span.ss { color: #20794d; } /* SpecialString */
+    code span.st { color: #20794d; } /* String */
+    code span.va { color: #111111; } /* Variable */
+    code span.vs { color: #20794d; } /* VerbatimString */
+    code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="../site_libs/revealjs/dist/theme/quarto-f355cf95444bdbe7a358cd689c441e6f.css">
+  <link href="../site_libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href="../site_libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href="../site_libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href="../site_libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+  <script src="../site_libs/quarto-diagram/mermaid.min.js"></script>
+  <script src="../site_libs/quarto-diagram/mermaid-init.js"></script>
+  <link href="../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+</head>
+<body class="quarto-light">
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide" class="quarto-title-block center">
+  <h1 class="title">03 · Interrupts &amp; Timer</h1>
+  <p class="subtitle">Mikrocomputertechnik 3 · Vom Hardware-Tick zur Ereignissteuerung</p>
+
+<div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+Prof.&nbsp;Dr.-Ing. Daniel Klünder
+</div>
+</div>
+</div>
+
+</section>
+<section id="willkommen-zu-block-3" class="slide level2">
+<h2>Willkommen zu Block 3!</h2>
+<ul>
+<li>Willkommen zur dritten Vorlesung in Mikrocomputertechnik 3</li>
+<li>Rückblick Block 1 und 2: Speicherphysik und Caches</li>
+<li>Bisher: Daten möglichst schnell zur CPU bringen</li>
+<li>Heute: Zeit und asynchrone Ereignisse</li>
+<li>Praxis-Fundament: System-Timer als Basis jedes Betriebssystems</li>
+</ul>
+<aside class="notes">
+<p>Herzlich willkommen zurück! In den letzten beiden Einheiten haben wir das Speicher-Dilemma gelöst. Sie wissen nun, wie Code und Variablen physikalisch abgelegt und durch Caches beschleunigt werden. Aber ein System-on-Chip muss mehr können, als nur schnell Daten zu verarbeiten. Er muss auf die reale Welt reagieren. Heute lernen wir, wie ein SoC komplexe Ereignisse verwaltet und wie wir der CPU ein Gefühl für die Zeit beibringen.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="einordnung-im-semester" class="slide level2">
+<h2>Einordnung im Semester</h2>
+<div class="cell" data-reveal="true" data-fig-width="4.2" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[Block 1 und 2: Speicher] --&gt; B[Block 3: Zeit und Ereignisse]
+  B --&gt; C[Block 4: Aktorik]
+  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Block 3 knüpft an Speicher und Caches an und öffnet das Thema Echtzeit: Timer, Interrupts und Ereignissteuerung.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="anknüpfung-cache-und-lokalität" class="slide level2">
+<h2>Anknüpfung: Cache und Lokalität</h2>
+<p>Kurz-Recap aus Block 2 (Labor folgt mit dem Übungsblatt):</p>
+<ul>
+<li>Spaltenweiser Zugriff kann den Cache durch schlechte Lokalität belasten</li>
+<li>Zeilenweiser Zugriff maximiert räumliche Lokalität und Hit Rate</li>
+<li>Software und Hardware sind untrennbar verbunden</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb1-1"><a aria-label="1"></a><span class="co">// Cache-freundliches Muster aus Block 2</span></span>
+<span id="cb1-2"><a aria-label="2"></a><span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> row <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> row <span class="op">&lt;</span> <span class="dv">1000</span><span class="op">;</span> row<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb1-3"><a aria-label="3"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> col <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> col <span class="op">&lt;</span> <span class="dv">1000</span><span class="op">;</span> col<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb1-4"><a aria-label="4"></a>        bild<span class="op">[</span>row<span class="op">][</span>col<span class="op">]</span> <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb1-5"><a aria-label="5"></a>    <span class="op">}</span></span>
+<span id="cb1-6"><a aria-label="6"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<aside class="notes">
+<p>In Block 2 haben wir gesehen, dass die Struktur Ihres C-Codes die Hit Rate massiv beeinflusst. Das Cache-Labor (z. B. mit Ripes) vertieft das messbar — sobald das Übungsblatt vorliegt. Behalten Sie die Denkweise: Wir programmieren mit der Hardware, nicht gegen sie.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="von-daten-zu-ereignissen" class="slide level2">
+<h2>Von Daten zu Ereignissen</h2>
+<ul>
+<li>Eine CPU bei 3 GHz ist extrem schnell</li>
+<li>Die Außenwelt (Taster, Sensoren) ist vergleichsweise langsam</li>
+<li>Warten in einer Schleife verschwendet Energie</li>
+<li>Ziel: nützliche Arbeit, während auf Peripherie gewartet wird</li>
+<li>Ausweg: asynchrone, ereignisgesteuerte Systeme</li>
+</ul>
+<aside class="notes">
+<p>Was nützt die schnellste Pipeline, wenn das Programm in einer Schleife auf einen Tastendruck wartet? Die CPU soll rechnen und nur reagieren, wenn wirklich etwas passiert.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="cpu-zeit-sinnvoll-nutzen" class="slide level2">
+<h2>CPU-Zeit sinnvoll nutzen</h2>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Phase</th>
+<th>Inhalt (schematisch)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Main</td>
+<td>nützliche Arbeit</td>
+</tr>
+<tr class="even">
+<td>ISR</td>
+<td>kurzes Event-Handling</td>
+</tr>
+<tr class="odd">
+<td>Main</td>
+<td>weiterrechnen</td>
+</tr>
+</tbody>
+</table>
+<p><em>Interrupt unterbricht nur kurz — kein Dauer-Polling.</em></p>
+<aside class="notes">
+<p>Statt Busy-Waiting: Die CPU arbeitet im Main-Loop und wechselt nur bei Ereignissen kurz in die Interrupt Service Routine (ISR).</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="refresher-mct1-polling-vs.-interrupts" class="slide level2">
+<h2>Refresher MCT1: Polling vs.&nbsp;Interrupts</h2>
+<ul>
+<li>Polling (Busy Waiting): ständiges Abfragen — hohe Last, kein sinnvolles Multitasking</li>
+<li>Interrupt: „Türklingel-Prinzip“</li>
+<li>Hardware signalisiert Ereignis → CPU unterbricht die laufende Arbeit</li>
+<li>Danach Rückkehr in den unterbrochenen Kontext</li>
+</ul>
+<aside class="notes">
+<p>Polling ist „Sind wir schon da?“ — stromhungrig und starr. Interrupts lassen die CPU rechnen, bis die Hardware klingelt.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="polling-vs.-interrupt-schema" class="slide level2">
+<h2>Polling vs.&nbsp;Interrupt — Schema</h2>
+<div class="cell" data-reveal="true" data-fig-width="4" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[Main Loop] --&gt;|Interrupt| B[ISR]
+  B --&gt;|Return| A
+  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Schematisch: Das Main-Programm läuft weiter, bis ein Interrupt die ISR anstößt; danach Rückkehr.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="refresher-mct1-das-csr-system" class="slide level2">
+<h2>Refresher MCT1: Das CSR-System</h2>
+<ul>
+<li>Control and Status Registers: spezielle Maschinenregister</li>
+<li><code>mstatus</code>: globaler Interrupt-Schalter (u. a. MIE)</li>
+<li><code>mcause</code>: Grund der Unterbrechung (Interrupt/Exception-Code)</li>
+<li><code>mepc</code>: Rücksprungadresse des unterbrochenen Programms</li>
+<li><code>mret</code>: Rückkehr anhand von <code>mepc</code></li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource riscv number-lines code-with-copy"><code class="sourceCode"><span id="cb2-1"><a aria-label="1"></a># Typische Aktion in einer ISR (Kontext lesen)</span>
+<span id="cb2-2"><a aria-label="2"></a>csrr t0, mcause    # Warum wurde ich geweckt?</span>
+<span id="cb2-3"><a aria-label="3"></a>csrr t1, mepc      # Wo muss ich später wieder hin?</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<aside class="notes">
+<p>Ohne CSRs könnte die Hardware den Interrupt-Kontext nicht verwalten. Bei einem Trap schreibt die Hardware den Grund nach mcause und merkt sich in mepc den Fortsetzungspunkt.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="der-rudimentäre-mct1-trap-handler" class="slide level2">
+<h2>Der rudimentäre MCT1-Trap-Handler</h2>
+<ul>
+<li>In MCT1 oft ein einziger Einsprung über <code>mtvec</code></li>
+<li>Alle Quellen landen an derselben Adresse</li>
+<li>Software muss per <code>mcause</code> verzweigen (<code>if</code>/<code>else</code>)</li>
+<li>Für wenige Quellen akzeptabel — für echte SoCs zu starr und langsam</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb3-1"><a aria-label="1"></a><span class="co">// Logischer Ablauf des einfachen Handlers</span></span>
+<span id="cb3-2"><a aria-label="2"></a><span class="dt">void</span> trap_handler<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb3-3"><a aria-label="3"></a>    <span class="dt">int</span> cause <span class="op">=</span> read_csr<span class="op">(</span>mcause<span class="op">);</span></span>
+<span id="cb3-4"><a aria-label="4"></a>    <span class="cf">if</span> <span class="op">(</span>cause <span class="op">==</span> BUTTON<span class="op">)</span> handle_button<span class="op">();</span></span>
+<span id="cb3-5"><a aria-label="5"></a>    <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>cause <span class="op">==</span> TIMER<span class="op">)</span> handle_timer<span class="op">();</span></span>
+<span id="cb3-6"><a aria-label="6"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<aside class="notes">
+<p>Ein gemeinsamer Trap-Handler reicht für Übungen mit wenigen Quellen. Bei dutzenden Peripherien wird die Software-Suche zum Flaschenhals.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="agenda-für-den-heutigen-tag" class="slide level2">
+<h2>Agenda für den heutigen Tag</h2>
+<ol type="1">
+<li>Grenzen des einfachen Traps</li>
+<li>Vektorisierte Interrupts (Vectored Mode)</li>
+<li>RISC-V CLINT — lokale Timer und Software-Interrupts</li>
+<li>RISC-V PLIC — Dirigent für externe Peripherie</li>
+<li>Nested Interrupts</li>
+<li>Brückenschlag zum Labor (System-Ticks, z. B. in Renode)</li>
+</ol>
+<aside class="notes">
+<p>Heute rüsten wir auf: direkter Sprung zur passenden ISR, Hardware-Timer und ein Controller für viele externe Quellen.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="lernziele-block-3" class="slide level2">
+<h2>Lernziele Block 3</h2>
+<ul>
+<li>Erklären, warum lineare <code>if</code>/<code>else</code>-Ketten in ISRs für SoCs ungeeignet sind</li>
+<li>Vektor-Tabelle und Vectored Mode in RISC-V verstehen</li>
+<li>CLINT (lokal) und PLIC (global) unterscheiden</li>
+<li>Mathematik hinter dem 64-Bit-System-Timer (<code>mtime</code>) beherrschen</li>
+<li>Gefahren und Lösungen bei Nested Interrupts kennen</li>
+</ul>
+<aside class="notes">
+<p>Am Ende verstehen Sie, wie moderne Chips Ereignisse verarbeiten — und Sie beherrschen den Hardware-Timer als Herzstück für Scheduler und Zeitmessung.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="die-leitfrage-des-tages" class="slide level2">
+<h2>Die Leitfrage des Tages</h2>
+<ul>
+<li>Moderne MCUs: dutzende Peripheriegeräte können Interrupts auslösen</li>
+<li>Theoretisch sogar im selben Taktzyklus</li>
+<li>Wer darf zuerst? Was passiert mit den anderen?</li>
+<li>Leitfrage: Wie managt die CPU viele Alarme ohne Suchaufwand und ohne den Wichtigen zu verpassen?</li>
+<li>Antwort: spezialisierte Interrupt-Controller-Hardware</li>
+</ul>
+<aside class="notes">
+<p>Viele Ereignisse gleichzeitig — wie Feueralarm, Telefon und Klingel auf einmal. Die CPU braucht ein intelligentes Verteilzentrum vor dem Kern.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="viele-quellen-ein-problem" class="slide level2">
+<h2>Viele Quellen — ein Problem</h2>
+<div class="cell" data-reveal="true" data-fig-width="4" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[Timer] --&gt; CPU[CPU]
+  B[UART Rx] --&gt; CPU
+  C[Not-Aus] --&gt; CPU
+  D[Sensoren] --&gt; CPU
+  style C fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Schematisch: Viele Quellen drängen zur CPU. Ohne Priorisierung und schnelle Identifikation entsteht Chaos — besonders bei kritischen Signalen wie Not-Aus.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="das-skalierungsproblem" class="slide level2">
+<h2>Das Skalierungsproblem</h2>
+<ul>
+<li>MCT1: wenige Quellen (z. B. Taster, ein Timer)</li>
+<li>Echte SoCs: dutzende Interrupt-Quellen</li>
+<li>RISC-V-Kern: nur wenige feste Interrupt-Leitungen (u. a. Timer, Software, External)</li>
+<li>Folge: viele Geräte teilen sich typischerweise den External-Interrupt-Pfad</li>
+</ul>
+<aside class="notes">
+<p>Der Kern bleibt schlank: nicht hundert Pins, sondern wenige standardisierte Interrupt-Eingänge. Externe Geräte müssen gebündelt werden.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="der-software-flaschenhals" class="slide level2">
+<h2>Der Software-Flaschenhals</h2>
+<ul>
+<li>Alle teilen sich „External“ → <code>mcause</code> sagt oft nur die Kategorie</li>
+<li>Software muss Quellen abfragen: „Warst du das?“</li>
+<li>Lange <code>if</code>/<code>else</code>-Ketten kosten viele Takte</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb4-1"><a aria-label="1"></a><span class="co">// Problematisch für Echtzeit</span></span>
+<span id="cb4-2"><a aria-label="2"></a><span class="dt">void</span> isr<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-3"><a aria-label="3"></a>    <span class="cf">if</span> <span class="op">(</span>check<span class="op">(</span>SPI<span class="op">))</span> handle_spi<span class="op">();</span></span>
+<span id="cb4-4"><a aria-label="4"></a>    <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>check<span class="op">(</span>I2C<span class="op">))</span> handle_i2c<span class="op">();</span></span>
+<span id="cb4-5"><a aria-label="5"></a>    <span class="co">/* ... viele weitere Abfragen ... */</span></span>
+<span id="cb4-6"><a aria-label="6"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<aside class="notes">
+<p>Bei gebündelten Quellen reicht „Externes Ereignis“ nicht aus. Sequenzielle Software-Suche skaliert schlecht.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="latenz-explosion" class="slide level2">
+<h2>Latenz-Explosion</h2>
+<ul>
+<li>Latenz: Zeit vom Signal bis zur nützlichen ISR</li>
+<li>Best Case: Quelle steht oben in der Kette</li>
+<li>Worst Case: viele falsche Abfragen zuvor</li>
+<li>Komplexität <span class="math inline">\(\mathcal{O}(n)\)</span> — inakzeptabel für harte Echtzeit (z. B. ABS)</li>
+</ul>
+<aside class="notes">
+<p>Schwankende Reaktionszeiten sind in Embedded-Echtzeitsystemen problematisch. Wir brauchen möglichst deterministische Latenzen.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="das-prioritäten-problem" class="slide level2">
+<h2>Das Prioritäten-Problem</h2>
+<ul>
+<li>Gleichzeitige Events: wer gewinnt?</li>
+<li>Reine Software-Kette: Priorität oft „wer steht oben im Code“</li>
+<li>Schwer zur Laufzeit flexibel umzupriorisieren</li>
+<li>Wunsch: Hardware entscheidet den Gewinner automatisch</li>
+</ul>
+<aside class="notes">
+<p>Statische Code-Reihenfolge ist starr. Kritische Alarme müssen unabhängig von der Schreibreihenfolge im C-Code gewinnen können.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="die-risc-v-architektur-lösung" class="slide level2">
+<h2>Die RISC-V-Architektur-Lösung</h2>
+<ul>
+<li>Arbeitsteilung: CPU rechnet, Controller managen Alarme</li>
+<li>Externe Module sammeln, priorisieren und melden den Gewinner</li>
+<li>Direkter Sprung zur passenden Software-Routine</li>
+<li>Trennung: lokale vs.&nbsp;globale Ereignisse</li>
+</ul>
+<aside class="notes">
+<p>Statt den Flaschenhals in C zu programmieren, übernimmt dedizierte Hardware das Sortieren und Weiterreichen.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="interrupt-controller-vor-der-cpu" class="slide level2">
+<h2>Interrupt-Controller vor der CPU</h2>
+<div class="cell" data-reveal="true" data-fig-width="4.2" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[Sensoren] --&gt;|Sammeln und Sortieren| B[Interrupt-Controller]
+  B --&gt;|Wichtigster gewinnt| CPU[CPU]
+  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Schematisch: Der Controller filtert und priorisiert; die CPU sieht den ausgewählten Alarm.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="lokale-vs.-globale-interrupts" class="slide level2">
+<h2>Lokale vs.&nbsp;globale Interrupts</h2>
+<p>Lokale Interrupts (core-nah):</p>
+<ul>
+<li>Beispiele: System-Timer, Software-Interrupts</li>
+<li>Eigene Leitungen in den RISC-V-Kern</li>
+<li>Sehr geringe Latenz</li>
+</ul>
+<p>Globale Interrupts (Peripherie):</p>
+<ul>
+<li>UART, SPI, Taster, …</li>
+<li>Über den External-Interrupt-Pfad gebündelt</li>
+</ul>
+<aside class="notes">
+<p>Lokale Ereignisse gehören eng zur CPU (z. B. OS-Tick). Globale kommen von der Plattform-Peripherie.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="die-zwei-giganten-clint-und-plic" class="slide level2">
+<h2>Die zwei Giganten: CLINT und PLIC</h2>
+<ul>
+<li>CLINT (Core Local Interruptor): lokale Timer- und Software-Interrupts</li>
+<li>PLIC (Platform-Level Interrupt Controller): Dirigent für externe Geräte</li>
+<li>PLIC → External Interrupt an die CPU</li>
+</ul>
+<aside class="notes">
+<p>CLINT und PLIC strukturieren das SoC-Design: Zeit lokal, Peripherie global.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="clint-und-plic-schema" class="slide level2">
+<h2>CLINT und PLIC — Schema</h2>
+<div class="cell" data-reveal="true" data-fig-width="4.2" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  T[Timer] --&gt; CLINT
+  SW[Software] --&gt; CLINT
+  CLINT --&gt;|lokal| CPU[CPU]
+  U[UART] --&gt; PLIC
+  S[SPI] --&gt; PLIC
+  PLIC --&gt;|External| CPU
+  style CLINT fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+  style PLIC fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Architektur für den Rest der Vorlesung: CLINT für Zeit, PLIC für die Plattform. Zuerst lösen wir das Suchproblem per Vectored Mode.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="fragen-motivation" class="slide level2">
+<h2>Fragen? — Motivation</h2>
+<ul>
+<li>Skalierungsproblem klar?</li>
+<li>Warum sind lineare <code>if</code>/<code>else</code>-Ketten in ISRs riskant für Echtzeit?</li>
+<li>Lokal vs.&nbsp;global?</li>
+</ul>
+<aside class="notes">
+<p>Wenn die Grenzen des MCT1-Handlers klar sind, folgt die Lösung: Vektor-Tabellen.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="das-register-mtvec-im-detail" class="slide level2">
+<h2>Das Register <code>mtvec</code> im Detail</h2>
+<ul>
+<li><code>mtvec</code>: Basisadresse der Trap-/Interrupt-Behandlung</li>
+<li>In MCT1 oft vereinfacht als reine Handler-Adresse gesetzt</li>
+<li>Unterste 2 Bits sind MODE — keine Adressbits</li>
+<li>Obere Bits: BASE-Adresse</li>
+</ul>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Bits 31:2</th>
+<th>Bits 1:0</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>BASE</td>
+<td>MODE</td>
+</tr>
+</tbody>
+</table>
+<aside class="notes">
+<p>mtvec ist mehr als eine Adresse: Die unteren Bits konfigurieren das Eintrittsverhalten.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="das-mode-feld-in-mtvec" class="slide level2">
+<h2>Das MODE-Feld in <code>mtvec</code></h2>
+<ul>
+<li>MODE = 0 (Direct): alle Traps zur Adresse BASE (MCT1-Verhalten)</li>
+<li>MODE = 1 (Vectored): Interrupts springen versetzt; Exceptions weiter zu BASE</li>
+<li>MODE 2 und 3: im Standard reserviert</li>
+</ul>
+<aside class="notes">
+<p>Vectored Mode lässt die Hardware den Einsprung anhand der Ursache berechnen — ohne Software-Suche.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="direct-mode-mode-0" class="slide level2">
+<h2>Direct Mode (MODE = 0)</h2>
+<ul>
+<li>Hardware setzt PC = BASE</li>
+<li>Alle Quellen landen an derselben Stelle</li>
+<li>Software liest <code>mcause</code> und verzweigt</li>
+</ul>
+<aside class="notes">
+<p>Wie eine Hotline mit Sprachmenü: erst sortieren, dann bearbeiten.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="direct-mode-schema" class="slide level2">
+<h2>Direct Mode — Schema</h2>
+<div class="cell" data-reveal="true" data-fig-width="4" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[Timer] --&gt; B["PC = BASE"]
+  C[UART] --&gt; B
+  D[Exception] --&gt; B
+  B --&gt; E[Software: if/else]
+  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Alle Pfade treffen sich in einem Trichter — einfach, aber nicht skalierbar.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="vectored-mode-mode-1" class="slide level2">
+<h2>Vectored Mode (MODE = 1)</h2>
+<ul>
+<li>Jeder Interrupt-Typ erhält einen eigenen Einsprung</li>
+<li>Hardware nutzt den Exception-Code aus <code>mcause</code></li>
+<li>Kein <code>if</code>/<code>else</code> zur Identifikation der Quelle</li>
+<li>Sprung in konstanter Zeit zur passenden Routine</li>
+</ul>
+<aside class="notes">
+<p>Direkte Durchwahl statt Hotline: Timer → Timer-ISR, UART → UART-ISR.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="vectored-mode-schema" class="slide level2">
+<h2>Vectored Mode — Schema</h2>
+<div class="cell" data-reveal="true" data-fig-width="4.2" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[Timer] --&gt;|Hardware| B["PC = BASE + Offset_Timer"]
+  C[UART] --&gt;|Hardware| D["PC = BASE + Offset_UART"]
+  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Die Hardware berechnet den Ziel-PC aus BASE und Interrupt-Code.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="wie-vectored-mode-rechnet" class="slide level2">
+<h2>Wie Vectored Mode rechnet</h2>
+<p>Bei MODE = 1 und Interrupt:</p>
+<p><span class="math display">\[
+\mathrm{PC} = \mathrm{BASE} + 4 \times \mathrm{mcause.ExceptionCode}
+\]</span></p>
+<ul>
+<li>Faktor 4: ein RV32I-Befehl belegt typischerweise 4 Bytes</li>
+<li>Beispiel: Timer-Interrupt (Code 7) → <span class="math inline">\(\mathrm{BASE} + 28\)</span></li>
+</ul>
+<aside class="notes">
+<p>Silizium multipliziert den Code mit der Befehlslänge und addiert zur Basis — deterministisch und schnell.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="die-vektor-tabelle" class="slide level2">
+<h2>Die Vektor-Tabelle</h2>
+<ul>
+<li>An BASE liegt eine Tabelle aus Sprungbefehlen (<code>j</code> / <code>jal</code>)</li>
+<li>Eintrag <span class="math inline">\(k\)</span> bei Offset <span class="math inline">\(4k\)</span></li>
+<li>Beispiel: bei Offset 28 der Sprung zur Timer-ISR</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource riscv number-lines code-with-copy"><code class="sourceCode"><span id="cb5-1"><a aria-label="1"></a>.align 4</span>
+<span id="cb5-2"><a aria-label="2"></a>vector_table_base:</span>
+<span id="cb5-3"><a aria-label="3"></a>    j isr_cause_0      # Offset 0</span>
+<span id="cb5-4"><a aria-label="4"></a>    j isr_cause_1      # Offset 4</span>
+<span id="cb5-5"><a aria-label="5"></a>    # ...</span>
+<span id="cb5-6"><a aria-label="6"></a>    j isr_timer        # Offset 28 (Code 7 * 4)</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<aside class="notes">
+<p>Die Tabelle ist die Absprungrampe: Hardware landet auf dem passenden Jump, der in Ihren C-Handler führt.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="memory-layout-einer-vektor-tabelle" class="slide level2">
+<h2>Memory Layout einer Vektor-Tabelle</h2>
+<ul>
+<li>Oft früh im Flash (nahe Boot-Code), Section z. B. <code>.vectors</code></li>
+<li>RISC-V Vectored Mode: an <code>BASE + 4k</code> liegt ein <strong>Befehl</strong> (<code>j</code>/<code>jal</code>), keine Adresse</li>
+<li>Gegensatz zu Cortex-M: dort speichert die Tabelle Funktionszeiger (Daten)</li>
+<li>In C: Sprungtabelle typisch in Assembler oder als Inline-Asm/Linker-Skript</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource riscv number-lines code-with-copy"><code class="sourceCode"><span id="cb6-1"><a aria-label="1"></a>.section .vectors, "ax"</span>
+<span id="cb6-2"><a aria-label="2"></a>.align 2</span>
+<span id="cb6-3"><a aria-label="3"></a>vector_table_base:</span>
+<span id="cb6-4"><a aria-label="4"></a>    j isr_cause_0</span>
+<span id="cb6-5"><a aria-label="5"></a>    j isr_cause_1</span>
+<span id="cb6-6"><a aria-label="6"></a>    /* ... */</span>
+<span id="cb6-7"><a aria-label="7"></a>    j isr_timer        /* Offset 28 = 7 * 4 */</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<aside class="notes">
+<p>Wichtiger Unterschied zur ARM-Welt: Die Hardware führt die Instruktion an der Vektoradresse aus. Ein Array von Funktionszeigern wäre nur Daten — die CPU würde Adressen als Maschinenbefehl interpretieren. Deshalb: Jump-Tabelle, nicht Zeiger-Tabelle.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="alignment-vorgaben" class="slide level2">
+<h2>Alignment-Vorgaben</h2>
+<ul>
+<li>Unterste 2 Bits von <code>mtvec</code> = MODE</li>
+<li>BASE muss an den unteren Bits 0 sein (sonst Mode-Kollision)</li>
+<li>Tabelle mindestens 4-Byte-aligned; je nach System strengere Grenzen</li>
+<li>In Assembler: <code>.align</code></li>
+</ul>
+<aside class="notes">
+<p>Eine ungerade BASE würde MODE-Bits verfälschen. Alignment ist Pflicht, kein Detail.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="der-performance-gewinn" class="slide level2">
+<h2>Der Performance-Gewinn</h2>
+<ul>
+<li>Ohne Vektoren: Suchlatenz <span class="math inline">\(\mathcal{O}(n)\)</span></li>
+<li>Mit Vektoren: Identifikation in Hardware, <span class="math inline">\(\mathcal{O}(1)\)</span></li>
+<li>Reaktionszeit unabhängig von der Position in einer Software-Liste</li>
+<li>Grundlage für harte Echtzeit</li>
+</ul>
+<aside class="notes">
+<p>Egal ob Quelle 1 oder 50: der Einsprung bleibt kurz und vorhersagbar.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="fragen-vectored-mode" class="slide level2">
+<h2>Fragen? — Vectored Mode</h2>
+<ul>
+<li>Direct vs.&nbsp;Vectored klar?</li>
+<li>Warum <span class="math inline">\(\times 4\)</span>?</li>
+<li>Vektor-Tabelle verstanden?</li>
+</ul>
+<aside class="notes">
+<p>Als Nächstes: die Hardware, die den Timer-Pfad speist — der CLINT.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="was-ist-der-clint" class="slide level2">
+<h2>Was ist der CLINT?</h2>
+<ul>
+<li>CLINT = Core Local Interruptor</li>
+<li>Standardisiertes Modul nahe der Pipeline</li>
+<li>Kein generischer ISA-Befehl, sondern Systembaustein</li>
+<li>Aufgabe: lokale Zeit (Timer) und Software-Interrupts</li>
+<li>Typische Codes: Machine Timer (7), Machine Software (3)</li>
+</ul>
+<aside class="notes">
+<p>Neben ALU und Register braucht das SoC Module wie den CLINT, die Zeit zählen und den Kern gezielt wecken.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="warum-local" class="slide level2">
+<h2>Warum „Local“?</h2>
+<ul>
+<li>Timer-Interrupts sind oft kritisch für OS (Scheduler, Context Switch)</li>
+<li>Sollen nicht hinter UART/SPI auf einem gemeinsamen Bus warten</li>
+<li>CLINT hat eine direkte, priorisierte Anbindung an den Kern</li>
+</ul>
+<aside class="notes">
+<p>Der System-Tick ist der Herzschlag des OS — deshalb VIP-Pfad statt Peripherie-Stau.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="clint-lokale-überholspur" class="slide level2">
+<h2>CLINT — lokale Überholspur</h2>
+<div class="cell" data-reveal="true" data-fig-width="4" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  CLINT[CLINT Timer] --&gt;|lokal| CPU[CPU]
+  PLIC[PLIC] --&gt;|External| CPU
+  style CLINT fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Schematisch: CLINT lokal, PLIC über den External-Pfad.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="das-herz-der-zeit-mtime" class="slide level2">
+<h2>Das Herz der Zeit: <code>mtime</code></h2>
+<ul>
+<li>Register <code>mtime</code> (Machine Time) im CLINT</li>
+<li>Zählt mit dem Takt eines Hardware-Oszillators</li>
+<li>Läuft, sobald der Chip mit Spannung versorgt ist</li>
+<li>Repräsentiert System-Uptime (seit Start)</li>
+</ul>
+<aside class="notes">
+<p>mtime ist die unaufhaltsame Systemuhr — Software stoppt sie typischerweise nicht.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="das-64-bit-problem-auf-rv32" class="slide level2">
+<h2>Das 64-Bit-Problem auf RV32</h2>
+<ul>
+<li>RV32: native Wortbreite 32 Bit</li>
+<li>32-Bit-Zähler bei 1 MHz: Overflow nach <span class="math inline">\(\approx 71\)</span> Minuten</li>
+<li>Deshalb: <code>mtime</code> im CLINT 64 Bit — auch auf RV32</li>
+<li>Overflow erst nach astronomisch langen Zeiten (bei üblichen Takten)</li>
+</ul>
+<aside class="notes">
+<p>Eingebettete Systeme laufen oft monatelang. Eine 32-Bit-Uhr würde Zeitmessung und Scheduler zerstören.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="bit-lesen-auf-rv32" class="slide level2">
+<h2>64-Bit lesen auf RV32</h2>
+<ul>
+<li>CLINT liefert <code>mtime</code> als <code>mtime_lo</code> / <code>mtime_hi</code></li>
+<li>Race: Overflow zwischen den beiden Reads möglich</li>
+<li>Sicheres Muster: <code>hi</code> vor und nach <code>lo</code> prüfen</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb7-1"><a aria-label="1"></a><span class="dt">uint32_t</span> hi<span class="op">,</span> lo<span class="op">;</span></span>
+<span id="cb7-2"><a aria-label="2"></a><span class="cf">do</span> <span class="op">{</span></span>
+<span id="cb7-3"><a aria-label="3"></a>    hi <span class="op">=</span> CLINT_MTIME_HI<span class="op">;</span></span>
+<span id="cb7-4"><a aria-label="4"></a>    lo <span class="op">=</span> CLINT_MTIME_LO<span class="op">;</span></span>
+<span id="cb7-5"><a aria-label="5"></a><span class="op">}</span> <span class="cf">while</span> <span class="op">(</span>hi <span class="op">!=</span> CLINT_MTIME_HI<span class="op">);</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<aside class="notes">
+<p>Klassisches Embedded-Muster gegen Tear: solange hi stabil ist, war der 64-Bit-Wert konsistent.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="der-auslöser-mtimecmp" class="slide level2">
+<h2>Der Auslöser: <code>mtimecmp</code></h2>
+<ul>
+<li><code>mtimecmp</code> (Machine Time Compare), ebenfalls 64 Bit</li>
+<li>Software schreibt einen Zukunftswert (Eieruhr)</li>
+<li>Beispiel: jetzt <span class="math inline">\(= 100\)</span>, Intervall <span class="math inline">\(50\)</span> → <code>mtimecmp = 150</code></li>
+</ul>
+<aside class="notes">
+<p>Wir lesen mtime, addieren das Intervall und programmieren den Alarm — dann weiter im Main-Loop.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="hardware-logik-im-clint" class="slide level2">
+<h2>Hardware-Logik im CLINT</h2>
+<ul>
+<li>64-Bit-Komparator: in jedem Takt <code>mtime &gt;= mtimecmp</code>?</li>
+<li>Bei wahr: lokaler Timer-Interrupt an die CPU</li>
+<li>CPU springt (im Vectored Mode) zur Timer-ISR</li>
+</ul>
+<aside class="notes">
+<p>Der Komparator arbeitet dauernd in Hardware — kein Polling in Software nötig.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="clint-komparator-schema" class="slide level2">
+<h2>CLINT-Komparator — Schema</h2>
+<div class="cell" data-reveal="true" data-fig-width="4" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  A[mtime] --&gt; C{"mtime &gt;= mtimecmp?"}
+  B[mtimecmp] --&gt; C
+  C --&gt;|ja| D[Timer-Interrupt]
+  style C fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Schematisch: Zähler gegen Zielwert — bei Erreichen Interrupt.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="quittieren-des-timer-interrupts" class="slide level2">
+<h2>Quittieren des Timer-Interrupts</h2>
+<ul>
+<li>Vergleich ist <span class="math inline">\(\ge\)</span>: Interrupt bleibt aktiv, solange <code>mtime &gt;= mtimecmp</code></li>
+<li>Ohne Update: sofort erneuter Eintritt nach <code>mret</code></li>
+<li>Pflicht in der ISR: neuen Zukunftswert nach <code>mtimecmp</code> schreiben</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb8-1"><a aria-label="1"></a><span class="dt">void</span> timer_isr<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb8-2"><a aria-label="2"></a>    <span class="dt">uint64_t</span> now <span class="op">=</span> read_mtime<span class="op">();</span></span>
+<span id="cb8-3"><a aria-label="3"></a>    write_mtimecmp<span class="op">(</span>now <span class="op">+</span> INTERVAL<span class="op">);</span>  <span class="co">/* neu scharf schalten */</span></span>
+<span id="cb8-4"><a aria-label="4"></a>    <span class="co">/* eigentliche Arbeit ... */</span></span>
+<span id="cb8-5"><a aria-label="5"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<aside class="notes">
+<p>Häufiger Anfängerfehler: LED toggeln und zurückkehren, ohne mtimecmp zu aktualisieren — dann feuert der Alarm sofort wieder. Besser <code>mtimecmp += INTERVAL</code> statt <code>now + INTERVAL</code>, um Drift durch ISR-Latenz zu vermeiden.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="konzept-der-system-tick" class="slide level2">
+<h2>Konzept: Der System-Tick</h2>
+<ul>
+<li>Wofür nutzen wir den Timer in der Praxis?</li>
+<li>System-Tick (SysTick): Herzschlag eines OS (z. B. FreeRTOS, Linux)</li>
+<li>Periodischer Alarm (typisch jede 1 ms)</li>
+<li>In der ISR: globale Zeitbasis hochzählen (z. B. <code>system_uptime_ms</code>)</li>
+<li>Scheduler: bei Tick prüfen, ob Task A pausiert und Task B läuft (preemptives Multitasking)</li>
+</ul>
+<aside class="notes">
+<p>Der CLINT-Timer ist mehr als ein Wecker: Er ist der Herzschlag des Systems. Multitasking auf einem Kern beruht darauf, dass der Hardware-Timer die CPU regelmäßig unterbricht und der Scheduler den Kontext wechselt.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="warum-oft-1-millisekunde" class="slide level2">
+<h2>Warum oft 1 Millisekunde?</h2>
+<ul>
+<li>SysTick in Embedded Systems oft 1 ms (1000 Hz)</li>
+<li>Kompromiss: Auflösung vs.&nbsp;Overhead</li>
+<li>Zu grob (z. B. 1 s): Software kann nicht fein reagieren</li>
+<li>Zu fein (z. B. 1 µs): ISR-/Kontextwechsel-Overhead dominiert</li>
+<li>1 ms: bewährter Sweetspot für Wahrnehmung und CPU-Last</li>
+</ul>
+<aside class="notes">
+<p>Jeder Interrupt kostet Pipeline- und Registeraufwand. Bei 1 µs-Ticks bleibt kaum Zeit für Nutzarbeit. Bei 1 ms hat eine CPU mit z. B. 100 MHz noch etwa <span class="math inline">\(10^{5}\)</span> Takte für echte Berechnungen — und für Menschen wirkt 1 ms noch „sofort“.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="mathematik-takte-berechnen" class="slide level2">
+<h2>Mathematik: Takte berechnen</h2>
+<ul>
+<li><code>mtime</code> zählt Oszillator-Takte, keine Sekunden</li>
+<li>Umrechnung in Software nötig</li>
+<li>Beispiel: Quarz <span class="math inline">\(10\,\mathrm{MHz}\)</span> <span class="math inline">\(\Rightarrow\)</span> <span class="math inline">\(10^{7}\)</span> Takte/s</li>
+<li>Pro ms: <span class="math inline">\(10^{7}/1000 = 10^{4}\)</span> Takte</li>
+<li>Nächster Alarm: <code>mtimecmp = mtime + 10000</code></li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb9-1"><a aria-label="1"></a><span class="pp">#define TIMER_FREQ   </span><span class="dv">10000000</span><span class="pp">  </span><span class="co">/* 10 MHz */</span></span>
+<span id="cb9-2"><a aria-label="2"></a><span class="pp">#define TICKS_PER_MS </span><span class="op">(</span><span class="pp">TIMER_FREQ </span><span class="op">/</span><span class="pp"> </span><span class="dv">1000</span><span class="op">)</span></span>
+<span id="cb9-3"><a aria-label="3"></a></span>
+<span id="cb9-4"><a aria-label="4"></a><span class="dt">void</span> timer_isr<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb9-5"><a aria-label="5"></a>    <span class="dt">uint64_t</span> now <span class="op">=</span> read_mtime<span class="op">();</span></span>
+<span id="cb9-6"><a aria-label="6"></a>    write_mtimecmp<span class="op">(</span>now <span class="op">+</span> TICKS_PER_MS<span class="op">);</span></span>
+<span id="cb9-7"><a aria-label="7"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<aside class="notes">
+<p>Im Datenblatt steht die Timer-Frequenz. Daraus berechnen Sie Ticks pro Millisekunde und programmieren <code>mtimecmp</code> entsprechend — das ist typische Labor-Mathematik.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="software-interrupts-im-clint" class="slide level2">
+<h2>Software-Interrupts im CLINT</h2>
+<ul>
+<li>Register <code>msip</code> (Machine Software Interrupt Pending)</li>
+<li>Ein Bit pro Kern: Schreiben einer 1 → Soft-Interrupt (Exception Code 3)</li>
+<li>Sinn: Arbeit aus einer hochprioren ISR in einen niedriger priorisierten Pfad auslagern (Deferred Interrupt Handling)</li>
+</ul>
+<aside class="notes">
+<p>Die CPU kann sich selbst „anklingeln“. Oft: in der schnellen ISR nur das Nötigste, Soft-Interrupt setzen, Rest später abarbeiten.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="inter-processor-interrupts-ipi" class="slide level2">
+<h2>Inter-Processor Interrupts (IPI)</h2>
+<p>Vorgriff auf Block 9 (Multicore):</p>
+<ul>
+<li>Ein CLINT, mehrere <code>msip</code>-Bits (eines pro Kern)</li>
+<li>Kern A schreibt <code>msip</code> von Kern B → asynchroner Interrupt auf B</li>
+<li>Standardweg für Inter-Processor Communication / Aufwecken</li>
+</ul>
+<div class="cell" data-reveal="true" data-fig-width="3.8" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  C0[Core 0] --&gt;|schreibt msip[1]| CLINT
+  CLINT --&gt;|Interrupt| C1[Core 1]
+  style CLINT fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Schlafende Kerne können so gezielt geweckt werden — z. B. nach Netzwerkempfang auf Kern 0 die Entschlüsselung auf Kern 1 anstoßen.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="mmio-beim-clint" class="slide level2">
+<h2>MMIO beim CLINT</h2>
+<ul>
+<li><code>mtime</code> / <code>mtimecmp</code> sind keine CSRs (<code>csrw</code>), sondern Memory-Mapped Register</li>
+<li>Zugriff über normale C-Pointer auf physische Adressen</li>
+<li>Basisadresse abhängig vom SoC (bei SiFive oft ab <code>0x02000000</code>)</li>
+</ul>
+<aside class="notes">
+<p>CSRs steuern den Kern von innen; der CLINT liegt außerhalb auf dem Bus — wie Peripherie über MMIO.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="c-beispiel-systick-initialisieren" class="slide level2">
+<h2>C-Beispiel: SysTick initialisieren</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb10-1"><a aria-label="1"></a><span class="pp">#define CLINT_MTIMECMP </span><span class="bn">0x02004000</span></span>
+<span id="cb10-2"><a aria-label="2"></a><span class="pp">#define CLINT_MTIME    </span><span class="bn">0x0200BFF8</span></span>
+<span id="cb10-3"><a aria-label="3"></a></span>
+<span id="cb10-4"><a aria-label="4"></a><span class="co">/* RV32: mtime atomar hi/lo lesen (kein 64-Bit-Load!) */</span></span>
+<span id="cb10-5"><a aria-label="5"></a><span class="dt">static</span> <span class="dt">uint64_t</span> read_mtime<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb10-6"><a aria-label="6"></a>    <span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*</span>mt <span class="op">=</span> <span class="op">(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*)</span>CLINT_MTIME<span class="op">;</span></span>
+<span id="cb10-7"><a aria-label="7"></a>    <span class="dt">uint32_t</span> hi<span class="op">,</span> lo<span class="op">;</span></span>
+<span id="cb10-8"><a aria-label="8"></a>    <span class="cf">do</span> <span class="op">{</span></span>
+<span id="cb10-9"><a aria-label="9"></a>        hi <span class="op">=</span> mt<span class="op">[</span><span class="dv">1</span><span class="op">];</span></span>
+<span id="cb10-10"><a aria-label="10"></a>        lo <span class="op">=</span> mt<span class="op">[</span><span class="dv">0</span><span class="op">];</span></span>
+<span id="cb10-11"><a aria-label="11"></a>    <span class="op">}</span> <span class="cf">while</span> <span class="op">(</span>hi <span class="op">!=</span> mt<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
+<span id="cb10-12"><a aria-label="12"></a>    <span class="cf">return</span> <span class="op">((</span><span class="dt">uint64_t</span><span class="op">)</span>hi <span class="op">&lt;&lt;</span> <span class="dv">32</span><span class="op">)</span> <span class="op">|</span> lo<span class="op">;</span></span>
+<span id="cb10-13"><a aria-label="13"></a><span class="op">}</span></span>
+<span id="cb10-14"><a aria-label="14"></a></span>
+<span id="cb10-15"><a aria-label="15"></a><span class="dt">void</span> init_systick<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb10-16"><a aria-label="16"></a>    <span class="dt">uint64_t</span> now <span class="op">=</span> read_mtime<span class="op">();</span></span>
+<span id="cb10-17"><a aria-label="17"></a>    <span class="op">*(</span><span class="dt">volatile</span> <span class="dt">uint64_t</span> <span class="op">*)</span>CLINT_MTIMECMP <span class="op">=</span> now <span class="op">+</span> TICKS_PER_MS<span class="op">;</span></span>
+<span id="cb10-18"><a aria-label="18"></a>    set_csr<span class="op">(</span>mie<span class="op">,</span> <span class="op">(</span><span class="dv">1</span><span class="bu">u</span> <span class="op">&lt;&lt;</span> <span class="dv">7</span><span class="op">));</span>       <span class="co">/* MTIE */</span></span>
+<span id="cb10-19"><a aria-label="19"></a>    set_csr<span class="op">(</span>mstatus<span class="op">,</span> MSTATUS_MIE<span class="op">);</span> <span class="co">/* MIE global */</span></span>
+<span id="cb10-20"><a aria-label="20"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li><code>MTIE</code> in <code>mie</code>: Timer-Interrupt-Quelle freigeben</li>
+<li><code>MIE</code> in <code>mstatus</code>: Interrupts global erlauben</li>
+<li>Beide Schalter nötig — sonst bleibt der Alarm stumm</li>
+</ul>
+<aside class="notes">
+<p>Rezept: Zeit lesen, Intervall addieren, Compare setzen — dann <code>MTIE</code> und <code>MIE</code>. Adressen sind beispielhaft (SiFive-üblich); immer Datenblatt prüfen.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="zusammenfassung-clint" class="slide level2">
+<h2>Zusammenfassung CLINT</h2>
+<ul>
+<li>Lokale, zeitkritische Ereignisse</li>
+<li>64-Bit-Zähler <code>mtime</code>, Compare <code>mtimecmp</code></li>
+<li>Soft-Interrupts (<code>msip</code>): Deferred Handling und IPI</li>
+<li>Konfiguration über MMIO</li>
+</ul>
+<aside class="notes">
+<p>Damit haben wir die Systemzeit. Als Nächstes: externe Peripherie über den PLIC.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="fragen-clint-und-systick" class="slide level2">
+<h2>Fragen? — CLINT und SysTick</h2>
+<ul>
+<li>Warum 64-Bit <code>mtime</code>?</li>
+<li>Race Condition beim 64-Bit-Lesen auf RV32?</li>
+<li>Warum sofort erneuter Timer-Interrupt ohne neues <code>mtimecmp</code>?</li>
+</ul>
+<aside class="notes">
+<p>Wenn Timer und Quittieren klar sind, öffnen wir die Tür zur Peripherie: PLIC.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="auftritt-plic" class="slide level2">
+<h2>Auftritt PLIC</h2>
+<ul>
+<li>PLIC = Platform-Level Interrupt Controller</li>
+<li>Dirigent für dutzende externe Geräte</li>
+<li>Sammelt Signale, priorisiert, meldet ein External Interrupt an den Kern</li>
+</ul>
+<aside class="notes">
+<p>Die Sortierlogik wandert von langen <code>if</code>/<code>else</code>-Ketten in dedizierte Hardware.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="plic-architektur" class="slide level2">
+<h2>PLIC-Architektur</h2>
+<ul>
+<li>Gateways: Anbindung der Sensoren/Peripherie</li>
+<li>Arbitration: Schiedsrichter über Prioritäten</li>
+<li>Targets: typischerweise CPU-Kerne</li>
+<li>M:N-Router (viele Quellen → wenige Kerne)</li>
+</ul>
+<aside class="notes">
+<p>Egal ob 10 oder 100 Quellen: der Kern sieht weiterhin den External-Pfad — das hält die Pipeline schlank.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="plic-schema" class="slide level2">
+<h2>PLIC — Schema</h2>
+<div class="cell" data-reveal="true" data-fig-width="4.2" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+  U[UART] --&gt;|ID 1| PLIC
+  I[I2C] --&gt;|ID 2| PLIC
+  S[SPI] --&gt;|ID 3| PLIC
+  PLIC --&gt;|Gewinner| CPU[Core: Ext. Interrupt]
+  style PLIC fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+</pre>
+</div>
+<p></p></figure><p></p>
+</div>
+</div>
+</div>
+<aside class="notes">
+<p>Schematisch: mehrere Quellen, ein External Interrupt zum Kern — Identifikation folgt per Claim.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="zuweisung-von-prioritäten-und-enables" class="slide level2">
+<h2>Zuweisung von Prioritäten und Enables</h2>
+<ul>
+<li>Jedes Gerät hat eine ID</li>
+<li>Pro Gerät: Priority-Register (MMIO); typisch <span class="math inline">\(0\)</span> = aus, größer = höher</li>
+<li>Zusätzlich: Enable-Bits pro Target — ohne Enable bleibt die Quelle stumm</li>
+<li>Prioritäten und Enables zur Laufzeit per Software änderbar</li>
+</ul>
+<aside class="notes">
+<p>Priorität allein reicht nicht: die Quelle muss für den Zielkern auch enabled sein. Beides steuern Sie über MMIO-Register im PLIC.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="priority-thresholds" class="slide level2">
+<h2>Priority Thresholds</h2>
+<ul>
+<li>Pro Target (Kern): Threshold-Register</li>
+<li>Weiterleitung nur wenn Priorität <strong>strikt größer</strong> als Threshold</li>
+<li>Beispiel: Threshold <span class="math inline">\(= 5\)</span> → Prio 3 wird blockiert, Prio 7 weckt die CPU</li>
+</ul>
+<aside class="notes">
+<p>Nützlich, wenn die CPU kritische Arbeit schützt: niedrige Alarme prallen am PLIC ab, Notfälle kommen durch.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="das-pending-array" class="slide level2">
+<h2>Das Pending-Array</h2>
+<ul>
+<li>Blockierte/wartende Quellen gehen nicht verloren</li>
+<li>Pending-Bit pro Quelle — bleibt gesetzt bis Claim</li>
+<li>Arbiter wählt parallel die höchste Priorität über dem Threshold</li>
+<li>Gewinner → External Interrupt an die CPU</li>
+</ul>
+<aside class="notes">
+<p>Klingeln wird gespeichert. Sinkt der Threshold später, kann der PLIC ausstehende Pendings nachreichen. Die Auswahl selbst läuft in Hardware-Gattern — ohne <span class="math inline">\(\mathcal{O}(n)\)</span>-Software-Suche.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="zwei-stufen-handshake" class="slide level2">
+<h2>Zwei-Stufen-Handshake</h2>
+<ul>
+<li>External Interrupt: <code>mcause</code> sagt oft nur „PLIC / External“ (Code 11)</li>
+<li>CPU kennt die Quellen-ID noch nicht</li>
+<li>Pflicht: Claim (ID lesen) und später Complete (fertig melden)</li>
+</ul>
+<aside class="notes">
+<p>Ohne Handshake weiß die Software nicht, wer gewonnen hat — und der PLIC kann den Kanal nicht korrekt freigeben.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="schritt-1-claim" class="slide level2">
+<h2>Schritt 1: Claim</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb11-1"><a aria-label="1"></a><span class="dt">void</span> external_interrupt_handler<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb11-2"><a aria-label="2"></a>    <span class="dt">uint32_t</span> id <span class="op">=</span> <span class="op">*(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*)</span>PLIC_CLAIM_REG<span class="op">;</span></span>
+<span id="cb11-3"><a aria-label="3"></a>    my_isr_functions<span class="op">[</span>id<span class="op">]();</span></span>
+<span id="cb11-4"><a aria-label="4"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li>MMIO-Read auf Claim-Register → Gewinner-ID</li>
+<li>Danach direkter Sprung (z. B. Funktionszeiger-Array)</li>
+</ul>
+<aside class="notes">
+<p>Ein Read ersetzt die lange Abfragekette: ID lesen, passende ISR aufrufen.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="atomares-lesen-und-löschen" class="slide level2">
+<h2>Atomares Lesen und Löschen</h2>
+<ul>
+<li>Claim-Read löscht atomar das zugehörige Pending-Bit</li>
+<li>In Multicore: nur ein Kern erhält die ID; andere lesen 0</li>
+<li>Verhindert doppelte Bearbeitung derselben Quelle</li>
+</ul>
+<aside class="notes">
+<p>Atomarität verhindert Race Conditions, wenn mehrere Kerne gleichzeitig claimen.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="claim-und-complete" class="slide level2">
+<h2>Claim und Complete</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb12-1"><a aria-label="1"></a><span class="dt">void</span> external_interrupt_handler<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-2"><a aria-label="2"></a>    <span class="dt">uint32_t</span> id <span class="op">=</span> <span class="op">*(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*)</span>PLIC_CLAIM_REG<span class="op">;</span></span>
+<span id="cb12-3"><a aria-label="3"></a>    my_isr_functions<span class="op">[</span>id<span class="op">]();</span>                 <span class="co">/* Treiberarbeit */</span></span>
+<span id="cb12-4"><a aria-label="4"></a>    <span class="op">*(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*)</span>PLIC_CLAIM_REG <span class="op">=</span> id<span class="op">;</span>  <span class="co">/* Complete */</span></span>
+<span id="cb12-5"><a aria-label="5"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li>Während Claimed: dieselbe Quelle blockiert; andere dürfen pending werden</li>
+<li>ID zurückschreiben → Kanal wieder freigeben</li>
+<li>Danach <code>mret</code> in den unterbrochenen Kontext</li>
+</ul>
+<aside class="notes">
+<p>Ohne Complete bleibt die Quelle oft dauerhaft blockiert. Claim und Complete teilen sich typischerweise dieselbe Registeradresse (Read vs.&nbsp;Write).</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="plic-in-software-steuern-mmio" class="slide level2">
+<h2>PLIC in Software steuern (MMIO)</h2>
+<ul>
+<li>Prioritäten, Enables, Threshold, Claim/Complete — alles MMIO</li>
+<li>Keine speziellen CSR-Befehle: Pointer in C</li>
+<li>Trigger am Gateway: Level (Leitung High) oder Edge (Flanke) — oft im Gerät konfigurierbar</li>
+</ul>
+<aside class="notes">
+<p>Wie beim CLINT: Treiber schreiben Integer-Werte auf feste Adressen. Level-Signale bleiben aktiv, bis die Ursache im Gerät gelöscht ist; Edge reagiert auf den Spannungswechsel.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="gegenüberstellung-clint-vs.-plic" class="slide level2">
+<h2>Gegenüberstellung: CLINT vs.&nbsp;PLIC</h2>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th></th>
+<th>CLINT (lokal)</th>
+<th>PLIC (global)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Zuständigkeit</td>
+<td>Timer, Soft/IPI</td>
+<td>UART, SPI, GPIO, …</td>
+</tr>
+<tr class="even">
+<td>Latenz</td>
+<td>minimal (core-nah)</td>
+<td>etwas höher (Systembus)</td>
+</tr>
+<tr class="odd">
+<td>Prioritäten</td>
+<td>fest/kritisch</td>
+<td>frei konfigurierbar</td>
+</tr>
+<tr class="even">
+<td>Handshake</td>
+<td><code>mtimecmp</code> neu setzen</td>
+<td>Claim und Complete</td>
+</tr>
+</tbody>
+</table>
+<aside class="notes">
+<p>SysTick → CLINT; viele Sensoren → PLIC. Das ist die Merksatz-Trennung für Klausur und Praxis.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="fragen-plic" class="slide level2">
+<h2>Fragen? — PLIC</h2>
+<ul>
+<li>Pending vs.&nbsp;Threshold klar?</li>
+<li>Warum Claim/Complete zwingend?</li>
+<li>Warum atomarer Claim-Read?</li>
+</ul>
+<aside class="notes">
+<p>Als Nächstes: Darf eine ISR von einer wichtigeren ISR unterbrochen werden?</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="standardverhalten-taube-cpu" class="slide level2">
+<h2>Standardverhalten: „taube“ CPU</h2>
+<ul>
+<li>Bei Trap setzt die Hardware <code>MIE</code> in <code>mstatus</code> automatisch auf 0</li>
+<li>Während der ISR: weitere Interrupts blockiert bis <code>mret</code></li>
+<li>Schützt vor Chaos — Nachteil bei langen ISRs</li>
+</ul>
+<aside class="notes">
+<p>Standard: Ohren zu, ISR ohne Störung abarbeiten. Sicher, aber in Echtzeitsystemen oft zu restriktiv.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="problem-blockierender-isrs" class="slide level2">
+<h2>Problem blockierender ISRs</h2>
+<ul>
+<li>Langsame ISR (z. B. I2C, 5 ms) bei SysTick alle 1 ms</li>
+<li>Mit <code>MIE = 0</code> verpassen wir mehrere Ticks</li>
+<li>Zeitbasis und Scheduler leiden</li>
+<li>Regel: ISRs so kurz wie möglich halten</li>
+</ul>
+<aside class="notes">
+<p>Lange ISRs blockieren den Herzschlag. Besser: Flag setzen, Arbeit in die Main-Schleife verschieben (Deferred Processing).</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="lösung-nested-interrupts" class="slide level2">
+<h2>Lösung: Nested Interrupts</h2>
+<ul>
+<li>Nesting: eine laufende ISR darf von einer höher prioren unterbrochen werden</li>
+<li>Beispielablauf: Main → I2C (niedrig) → Timer (hoch) → weiter I2C → Main</li>
+<li>PLIC kann höherpriore Quellen durchreichen — die CPU muss Nesting aber explizit erlauben (<code>MIE</code>)</li>
+<li>Mächtig für Echtzeit, softwareseitig aufwendig</li>
+</ul>
+<aside class="notes">
+<p>Die CPU stapelt Ereignisse nach Priorität. Das schützt die Zeitbasis, erfordert aber korrekte Register-Rettung — sonst geht der Rücksprung verloren.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="clobbering-von-mepc" class="slide level2">
+<h2>Clobbering von <code>mepc</code></h2>
+<ul>
+<li>Hardware hat nur <strong>ein</strong> <code>mepc</code></li>
+<li>Main → I2C: <code>mepc</code> = Rücksprung Main</li>
+<li>Nesting + Timer: Hardware überschreibt <code>mepc</code> mit I2C-PC</li>
+<li>Main-Rücksprung verloren → Absturz</li>
+</ul>
+<aside class="notes">
+<p>Bei verschachtelten Traps überschreibt die Hardware das einzige <code>mepc</code>. Ohne vorherige Sicherung in Software ist der Weg zurück in die Main-Schleife verloren.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="nesting-korrekt-zuerst-stack-dann-mie" class="slide level2">
+<h2>Nesting korrekt: zuerst Stack, dann <code>MIE</code></h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb13-1"><a aria-label="1"></a>addi <span class="kw">sp</span><span class="op">,</span> <span class="kw">sp</span><span class="op">,</span> <span class="op">-</span><span class="dv">8</span>     <span class="op">/*</span> Platz fuer mepc <span class="op">+</span> mstatus <span class="op">*/</span></span>
+<span id="cb13-2"><a aria-label="2"></a>csrr t0<span class="op">,</span> mepc</span>
+<span id="cb13-3"><a aria-label="3"></a>sw   t0<span class="op">,</span> <span class="dv">0</span><span class="op">(</span><span class="kw">sp</span><span class="op">)</span>      <span class="op">/*</span> mepc retten <span class="op">*/</span></span>
+<span id="cb13-4"><a aria-label="4"></a>csrr t1<span class="op">,</span> mstatus</span>
+<span id="cb13-5"><a aria-label="5"></a>sw   t1<span class="op">,</span> <span class="dv">4</span><span class="op">(</span><span class="kw">sp</span><span class="op">)</span>      <span class="op">/*</span> mstatus retten <span class="op">*/</span></span>
+<span id="cb13-6"><a aria-label="6"></a>/* erst jetzt<span class="op">:</span> MIE <span class="op">=</span> <span class="dv">1</span> und unterbrechbare Arbeit <span class="op">*/</span></span>
+<span id="cb13-7"><a aria-label="7"></a>/* ... innere Arbeit <span class="op">...</span> <span class="op">*/</span></span>
+<span id="cb13-8"><a aria-label="8"></a>lw   t1<span class="op">,</span> <span class="dv">4</span><span class="op">(</span><span class="kw">sp</span><span class="op">)</span>      <span class="op">/*</span> mstatus zurueck <span class="op">*/</span></span>
+<span id="cb13-9"><a aria-label="9"></a>csrw mstatus<span class="op">,</span> t1</span>
+<span id="cb13-10"><a aria-label="10"></a>lw   t0<span class="op">,</span> <span class="dv">0</span><span class="op">(</span><span class="kw">sp</span><span class="op">)</span>      <span class="op">/*</span> mepc zurueck <span class="op">*/</span></span>
+<span id="cb13-11"><a aria-label="11"></a>csrw mepc<span class="op">,</span> t0</span>
+<span id="cb13-12"><a aria-label="12"></a>addi <span class="kw">sp</span><span class="op">,</span> <span class="kw">sp</span><span class="op">,</span> <span class="dv">8</span></span>
+<span id="cb13-13"><a aria-label="13"></a>mret</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li>Reihenfolge: Stack-Platz → CSRs sichern → dann <code>MIE</code> setzen</li>
+<li>Nach dem inneren Interrupt: Werte zurückschreiben, dann <code>mret</code></li>
+<li><code>MIE=1</code> ohne Stack-Rettung ist unsicher</li>
+</ul>
+<aside class="notes">
+<p>Klassische OS-Technik: Hardware-CSRs in RAM sichern, bevor ein zweiter Trap sie überschreiben darf. Erst danach die globalen Interrupts wieder freigeben.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="gefahren-von-nested-interrupts" class="slide level2">
+<h2>Gefahren von Nested Interrupts</h2>
+<ul>
+<li>Stack Overflow bei tiefer Verschachtelung</li>
+<li>Deadlocks zwischen ISRs (Locks / geteilte Ressourcen)</li>
+<li>Praxis: Nesting nur wenn nötig; ISRs kurz halten; Arbeit deferred in <code>main</code></li>
+</ul>
+<aside class="notes">
+<p>Industrie-Empfehlung: Nested Interrupts sparsam. Flag setzen, Main erledigt die Arbeit — oft robuster und debuggbarer.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="fragen-nesting" class="slide level2">
+<h2>Fragen? — Nesting</h2>
+<ul>
+<li>Warum überschreibt Hardware <code>mepc</code> beim Nesting?</li>
+<li>Wie schützt man sich vor Clobbering?</li>
+<li>Warum Nesting möglichst vermeiden?</li>
+</ul>
+<aside class="notes">
+<p>Wenn Stack-Rettung und Clobbering klar sind, spannen wir den Bogen zum Labor.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="ausblick-labor-systick-szenario" class="slide level2">
+<h2>Ausblick Labor: SysTick-Szenario</h2>
+<p>Geplantes Laborziel:</p>
+<ul>
+<li>CLINT so konfigurieren, dass er periodisch (z. B. 1 ms) feuert</li>
+<li>In der ISR <code>system_uptime_ms</code> hochzählen</li>
+<li><code>main</code>-Schleife steuert Verhalten über diese Zeitbasis (z. B. LED-Takt)</li>
+<li>Hardwarenaher C-Code für RISC-V (Simulation in Renode)</li>
+</ul>
+<aside class="notes">
+<p>Im Labor steht der CLINT-Herzschlag im Vordergrund — nicht der volle PLIC-Treiber. Details folgen im Übungsblatt.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="renode-und-die-zeit" class="slide level2">
+<h2>Renode und die Zeit</h2>
+<ul>
+<li>Renode simuliert den CLINT-Quarz deterministisch</li>
+<li>Konfigurierte 1 ms <span class="math inline">\(\Leftrightarrow\)</span> korrekte Anzahl virtueller Takte</li>
+<li>Unabhängig von der Last des Host-PCs</li>
+<li>Verhalten wie auf dem Zielchip (bis auf Modellgenauigkeit)</li>
+</ul>
+<aside class="notes">
+<p>Deshalb Renode: virtuelle Millisekunden sind an Taktzyklen gebunden, nicht an Windows-Scheduling.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="gcc-__attribute__interrupt" class="slide level2">
+<h2>GCC: <code>__attribute__((interrupt))</code></h2>
+<ul>
+<li>ISR muss mit <code>mret</code> enden, nicht mit normalem <code>ret</code></li>
+<li>Attribut: <code>__attribute__((interrupt))</code> — GCC erzeugt Prolog/Epilog</li>
+<li>Normale ABI: Callee darf <code>t</code>-Register zerstören; eine ISR darf keine Spuren hinterlassen</li>
+<li>Mit dem Attribut: berührte Register (inkl. temporärer) werden gesichert</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb14-1"><a aria-label="1"></a>__attribute__<span class="op">((</span>interrupt<span class="op">))</span></span>
+<span id="cb14-2"><a aria-label="2"></a><span class="dt">void</span> timer_isr<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb14-3"><a aria-label="3"></a>    <span class="co">/* … */</span></span>
+<span id="cb14-4"><a aria-label="4"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<aside class="notes">
+<p>Erinnerung MCT1: Calling Conventions. Eine ISR ist kein normales Unterprogramm — der Compiler muss den Kontext schützen, damit die unterbrochene <code>main()</code> konsistent weiterläuft.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="background-task-und-foreground-isr" class="slide level2">
+<h2>Background Task und Foreground ISR</h2>
+<ul>
+<li>Foreground: kurze ISR inkrementiert <code>system_uptime_ms</code> (nur lesen/schreiben der Zeitbasis)</li>
+<li>Background: <code>main</code> vergleicht gegen einen Merker — ohne die ISR-Zählung zu nullen</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb15-1"><a aria-label="1"></a><span class="dt">volatile</span> <span class="dt">uint32_t</span> system_uptime_ms<span class="op">;</span></span>
+<span id="cb15-2"><a aria-label="2"></a><span class="dt">uint32_t</span> last_toggle <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb15-3"><a aria-label="3"></a></span>
+<span id="cb15-4"><a aria-label="4"></a><span class="cf">while</span> <span class="op">(</span><span class="dv">1</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb15-5"><a aria-label="5"></a>    <span class="dt">uint32_t</span> now <span class="op">=</span> system_uptime_ms<span class="op">;</span></span>
+<span id="cb15-6"><a aria-label="6"></a>    <span class="cf">if</span> <span class="op">(</span>now <span class="op">-</span> last_toggle <span class="op">&gt;=</span> <span class="dv">1000</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb15-7"><a aria-label="7"></a>        toggle_led<span class="op">();</span></span>
+<span id="cb15-8"><a aria-label="8"></a>        last_toggle <span class="op">=</span> now<span class="op">;</span></span>
+<span id="cb15-9"><a aria-label="9"></a>    <span class="op">}</span></span>
+<span id="cb15-10"><a aria-label="10"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<aside class="notes">
+<p>Kein blockierendes <code>delay()</code>: die CPU bleibt in der Main-Schleife nutzbar. Die ISR liefert nur die Uhr; <code>main</code> speichert den letzten Aktionszeitpunkt separat — so entsteht keine Race durch <code>system_uptime_ms = 0</code>.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="geteilte-variablen" class="slide level2">
+<h2>Geteilte Variablen</h2>
+<ul>
+<li>Compiler-Caching: <code>volatile</code> für von ISR geschriebene, in <code>main</code> gelesene Variablen</li>
+<li>Atomarität: 64-Bit auf RV32 kann „reißen“ — beim Lesen ggf. kurz Interrupts sperren</li>
+</ul>
+<aside class="notes">
+<p>Zwei Laborregeln: volatile für Shared State; bei Mehrwort-Werten kritische Abschnitte beachten.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="zusammenfassung-block-3" class="slide level2">
+<h2>Zusammenfassung Block 3</h2>
+<ul>
+<li>CLINT: Systemzeit (<code>mtime</code>) und Soft/IPI — niedrige Latenz; Freigabe über <code>MTIE</code> und <code>MIE</code></li>
+<li>PLIC: viele externe Quellen, Priorität, Enable, Claim/Complete</li>
+<li>Vectored Mode: Sprungtabelle mit Instruktionen, <span class="math inline">\(\mathcal{O}(1)\)</span>-Einsprung</li>
+<li>Nested Interrupts: mächtig, aber <code>mepc</code> vorher auf den Stack retten</li>
+<li>GCC: <code>__attribute__((interrupt))</code> für Kontext-Sicherung</li>
+</ul>
+<p>Vielen Dank — wir sehen uns im Labor.</p>
+<aside class="notes">
+<p>Damit ist das Fundament für Echtzeit und Ereignissteuerung gelegt. Nächster Schritt: den CLINT in Renode konfigurieren und darauf aufbauen (z. B. PWM).</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+
+
+</section>
+    </div>
+  <div class="quarto-auto-generated-content" style="display: none;">
+<p><img src="../assets/dhbw_logo.svg" class="slide-logo"></p>
+<div class="footer footer-default">
+
+</div>
+</div></div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src="../site_libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src="../site_libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src="../site_libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src="../site_libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src="../site_libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src="../site_libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src="../site_libs/revealjs/plugin/notes/notes.js"></script>
+  <script src="../site_libs/revealjs/plugin/search/search.js"></script>
+  <script src="../site_libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script src="../site_libs/revealjs/plugin/math/math.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': true,
+'previewLinksAuto': true,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'jumpToSlide': true,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.togglePdfExport(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleScrollView(event)\"><kbd>r</kbd> Scroll View Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'smaller': false,
+ 
+        // Display controls in the bottom right corner
+        controls: false,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: 'c/t',
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'linear',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: null,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: false,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'none',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'none',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1280,
+
+        height: 720,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 8.0e-2,
+
+        math: {
+          mathjax: 'https://cdn.jsdelivr.net/npm/mathjax@2.7.9/MathJax.js',
+          config: 'TeX-AMS_HTML-full',
+          tex2jax: {
+            inlineMath: [['\\(','\\)']],
+            displayMath: [['\\[','\\]']],
+            balanceBraces: true,
+            processEscapes: false,
+            processRefs: true,
+            processEnvironments: true,
+            preview: 'TeX',
+            skipTags: ['script','noscript','style','textarea','pre','code'],
+            ignoreClass: 'tex2jax_ignore',
+            processClass: 'tex2jax_process'
+          },
+        },
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, QuartoSupport,
+
+          RevealMath,
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    <script>
+    /**
+     * Fit Quarto/Reveal Mermaid SVGs to remaining slide space.
+     * Dimensions from getBoundingClientRect are viewport pixels; CSS sizes inside
+     * Reveal slides are unscaled — divide by Reveal.getScale().
+     */
+    (function () {
+      const BOTTOM_PAD = 36;
+      const SIDE_PAD_RATIO = 0.92;
+      const MAX_SCALE = 3.4;
+
+      function presentSlide() {
+        var present = document.querySelector("section.present");
+        if (!present) return null;
+        var nested = present.querySelector(":scope > section.present");
+        return nested || present;
+      }
+
+      function revealScale() {
+        if (window.Reveal && typeof Reveal.getScale === "function") {
+          var s = Reveal.getScale();
+          return s > 0.05 ? s : 1;
+        }
+        return 1;
+      }
+
+      function ensureWrap(svg) {
+        var parent = svg.parentElement;
+        if (!parent) return null;
+        if (parent.classList.contains("mermaid-fit")) return parent;
+        var wrap = document.createElement("div");
+        wrap.className = "mermaid-fit";
+        parent.insertBefore(wrap, svg);
+        wrap.appendChild(svg);
+        return wrap;
+      }
+
+      function contentBottomAbove(slide, wrap) {
+        var top = slide.getBoundingClientRect().top;
+        var bottom = top + 8;
+        var children = slide.children;
+        for (var i = 0; i < children.length; i++) {
+          var el = children[i];
+          if (el === wrap || el.classList.contains("mermaid-fit")) break;
+          if (el.querySelector && el.querySelector("svg.mermaid-js")) break;
+          if (el.tagName === "ASIDE") continue;
+          var r = el.getBoundingClientRect();
+          if (r.height > 1) bottom = Math.max(bottom, r.bottom);
+        }
+        return bottom;
+      }
+
+      function naturalSize(svg) {
+        if (svg.dataset.natW && svg.dataset.natH) {
+          return { w: +svg.dataset.natW, h: +svg.dataset.natH };
+        }
+        var vb = svg.viewBox && svg.viewBox.baseVal;
+        if (vb && vb.width > 0 && vb.height > 0) {
+          svg.dataset.natW = String(vb.width);
+          svg.dataset.natH = String(vb.height);
+          return { w: vb.width, h: vb.height };
+        }
+        var wAttr = parseFloat(svg.getAttribute("width"));
+        var hAttr = parseFloat(svg.getAttribute("height"));
+        if (wAttr > 0 && hAttr > 0) {
+          svg.dataset.natW = String(wAttr);
+          svg.dataset.natH = String(hAttr);
+          return { w: wAttr, h: hAttr };
+        }
+        var r = svg.getBoundingClientRect();
+        var rs = revealScale();
+        var w = r.width / rs || 320;
+        var h = r.height / rs || 120;
+        svg.dataset.natW = String(w);
+        svg.dataset.natH = String(h);
+        return { w: w, h: h };
+      }
+
+      function fitMermaids() {
+        var slide = presentSlide();
+        if (!slide) return;
+
+        var rs = revealScale();
+        var slideRect = slide.getBoundingClientRect();
+        var svgs = slide.querySelectorAll("svg.mermaid-js");
+
+        for (var i = 0; i < svgs.length; i++) {
+          var svg = svgs[i];
+          var wrap = ensureWrap(svg);
+          if (!wrap) continue;
+
+          svg.style.removeProperty("transform");
+          svg.style.removeProperty("max-width");
+          svg.style.removeProperty("zoom");
+          wrap.style.zoom = "";
+
+          var nat = naturalSize(svg);
+          var above = contentBottomAbove(slide, wrap);
+          var availW = (slideRect.width * SIDE_PAD_RATIO) / rs;
+          var availH = Math.max(72, (slideRect.bottom - above - BOTTOM_PAD) / rs);
+
+          var scale = Math.min(availW / nat.w, availH / nat.h, MAX_SCALE);
+          if (!(scale > 0)) scale = 1;
+
+          var targetW = Math.max(1, Math.round(nat.w * scale));
+          var targetH = Math.max(1, Math.round(nat.h * scale));
+
+          svg.setAttribute("width", targetW);
+          svg.setAttribute("height", targetH);
+          svg.style.width = targetW + "px";
+          svg.style.height = targetH + "px";
+          svg.style.display = "block";
+          svg.style.margin = "0.35rem auto 0";
+        }
+      }
+
+      function scheduleFit() {
+        requestAnimationFrame(function () {
+          fitMermaids();
+          setTimeout(fitMermaids, 150);
+          setTimeout(fitMermaids, 500);
+          setTimeout(fitMermaids, 1100);
+        });
+      }
+
+      window.addEventListener("load", scheduleFit);
+
+      function bindReveal() {
+        if (!window.Reveal || !Reveal.on) return false;
+        Reveal.on("ready", scheduleFit);
+        Reveal.on("slidechanged", scheduleFit);
+        if (Reveal.isReady && Reveal.isReady()) scheduleFit();
+        return true;
+      }
+
+      if (!bindReveal()) {
+        window.addEventListener("load", function () {
+          var tries = 0;
+          var id = setInterval(function () {
+            if (bindReveal() || ++tries > 50) clearInterval(id);
+          }, 100);
+        });
+      }
+
+      window.dhbwMermaidFit = fitMermaids;
+    })();
+    </script>
+    <script id="quarto-html-after-body" type="application/javascript">
+      window.document.addEventListener("DOMContentLoaded", function (event) {
+        const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+        tabsets.forEach(function(tabset) {
+          const tabby = new Tabby('#' + tabset.id);
+        });
+        const isCodeAnnotation = (el) => {
+          for (const clz of el.classList) {
+            if (clz.startsWith('code-annotation-')) {                     
+              return true;
+            }
+          }
+          return false;
+        }
+        const onCopySuccess = function(e) {
+          // button target
+          const button = e.trigger;
+          // don't keep focus
+          button.blur();
+          // flash "checked"
+          button.classList.add('code-copy-button-checked');
+          var currentTitle = button.getAttribute("title");
+          button.setAttribute("title", "Kopiert");
+          let tooltip;
+          if (window.bootstrap) {
+            button.setAttribute("data-bs-toggle", "tooltip");
+            button.setAttribute("data-bs-placement", "left");
+            button.setAttribute("data-bs-title", "Kopiert");
+            tooltip = new bootstrap.Tooltip(button, 
+              { trigger: "manual", 
+                customClass: "code-copy-button-tooltip",
+                offset: [0, -8]});
+            tooltip.show();    
+          }
+          setTimeout(function() {
+            if (tooltip) {
+              tooltip.hide();
+              button.removeAttribute("data-bs-title");
+              button.removeAttribute("data-bs-toggle");
+              button.removeAttribute("data-bs-placement");
+            }
+            button.setAttribute("title", currentTitle);
+            button.classList.remove('code-copy-button-checked');
+          }, 1000);
+          // clear code selection
+          e.clearSelection();
+        }
+        const getTextToCopy = function(trigger) {
+          const outerScaffold = trigger.parentElement.cloneNode(true);
+          const codeEl = outerScaffold.querySelector('code');
+          for (const childEl of codeEl.children) {
+            if (isCodeAnnotation(childEl)) {
+              childEl.remove();
+            }
+          }
+          return codeEl.innerText;
+        }
+        const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+          text: getTextToCopy
+        });
+        clipboard.on('success', onCopySuccess);
+        if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+          const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+            text: getTextToCopy,
+            container: window.document.getElementById('quarto-embedded-source-code-modal')
+          });
+          clipboardModal.on('success', onCopySuccess);
+        }
+          var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+          var mailtoRegex = new RegExp(/^mailto:/);
+            var filterRegex = new RegExp("https:\/\/dantschi\.github\.io\/mct3\/");
+          var isInternal = (href) => {
+              return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+          }
+          // Inspect non-navigation links and adorn them if external
+         var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+          for (var i=0; i<links.length; i++) {
+            const link = links[i];
+            if (!isInternal(link.href)) {
+              // undo the damage that might have been done by quarto-nav.js in the case of
+              // links that we want to consider external
+              if (link.dataset.originalHref !== undefined) {
+                link.href = link.dataset.originalHref;
+              }
+            }
+          }
+        function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+          const config = {
+            allowHTML: true,
+            maxWidth: 500,
+            delay: 100,
+            arrow: false,
+            appendTo: function(el) {
+                return el.closest('section.slide') || el.parentElement;
+            },
+            interactive: true,
+            interactiveBorder: 10,
+            theme: 'light-border',
+            placement: 'bottom-start',
+          };
+          if (contentFn) {
+            config.content = contentFn;
+          }
+          if (onTriggerFn) {
+            config.onTrigger = onTriggerFn;
+          }
+          if (onUntriggerFn) {
+            config.onUntrigger = onUntriggerFn;
+          }
+            config['offset'] = [0,0];
+            config['maxWidth'] = 700;
+          window.tippy(el, config); 
+        }
+        const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+        for (var i=0; i<noterefs.length; i++) {
+          const ref = noterefs[i];
+          tippyHover(ref, function() {
+            // use id or data attribute instead here
+            let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+            try { href = new URL(href).hash; } catch {}
+            const id = href.replace(/^#\/?/, "");
+            const note = window.document.getElementById(id);
+            if (note) {
+              return note.innerHTML;
+            } else {
+              return "";
+            }
+          });
+        }
+        const findCites = (el) => {
+          const parentEl = el.parentElement;
+          if (parentEl) {
+            const cites = parentEl.dataset.cites;
+            if (cites) {
+              return {
+                el,
+                cites: cites.split(' ')
+              };
+            } else {
+              return findCites(el.parentElement)
+            }
+          } else {
+            return undefined;
+          }
+        };
+        var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+        for (var i=0; i<bibliorefs.length; i++) {
+          const ref = bibliorefs[i];
+          const citeInfo = findCites(ref);
+          if (citeInfo) {
+            tippyHover(citeInfo.el, function() {
+              var popup = window.document.createElement('div');
+              citeInfo.cites.forEach(function(cite) {
+                var citeDiv = window.document.createElement('div');
+                citeDiv.classList.add('hanging-indent');
+                citeDiv.classList.add('csl-entry');
+                var biblioDiv = window.document.getElementById('ref-' + cite);
+                if (biblioDiv) {
+                  citeDiv.innerHTML = biblioDiv.innerHTML;
+                }
+                popup.appendChild(citeDiv);
+              });
+              return popup.innerHTML;
+            });
+          }
+        }
+      });
+      </script>
+    
+
+</body></html>
