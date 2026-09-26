@@ -4,6 +4,7 @@ Herzlich willkommen zur Vorlesung **Mikrocomputertechnik 3 (MCT3)** an der Duale
 
 **Dozent:** Prof. Dr.-Ing. Daniel Klünder  
 **Kurswebsite:** [dantschi.github.io/mct3](https://dantschi.github.io/mct3/)  
+*Hinweis: Quellen im Repo unter [`vorlesungen/`](vorlesungen/) und [`labs/`](labs/).*  
 **Repository:** [github.com/dantschi/mct3](https://github.com/dantschi/mct3)
 
 Das Modul vertieft digitale Rechnerarchitektur und die Hardware/Software-Schnittstelle am Beispiel der **RISC-V**-Architektur. Aufbauend auf MCT1 zoomen wir vom isolierten CPU-Kern hinaus zum **System-on-Chip (SoC)**: Speicherphysik und -hierarchie, Interrupts und Timer, Aktorik, serielle Busse, DMA, moderne CPU-Features, Edge-AI-Beschleuniger und Multicore — bis hin zu hardwarenaher C-Programmierung am Gesamtsystem.
@@ -12,29 +13,29 @@ Das Modul vertieft digitale Rechnerarchitektur und die Hardware/Software-Schnitt
 
 Der rote Faden der Veranstaltung:
 
-> Speicherzelle → Caches → Interrupts → Aktorik → Busse → DMA → OoO/Branch → Edge AI → Multicore
+**Speicherzelle → Caches → Interrupts → Aktorik → Busse → DMA → OoO/Branch → Edge AI → Multicore**
 
 Pro Einheit: Folien (Reveal.js), Handout-PDF sowie Übungsblatt (Studierende / Musterlösung). Links verweisen auf die Kurswebsite.
 
 | Einheit | Thema | Schwerpunkt | Folien | Handout | Übungsblatt | Musterlösung |
-|---------|-------|-------------|--------|---------|-------------|--------------|
-| 1 | Speicherphysik & RAM-Typen | SRAM/DRAM, Flash/XIP, Memory Map, Linker | [HTML](vorlesungen/01_speicherphysik.html) | [PDF](vorlesungen/01_speicherphysik-handout.pdf) | [PDF](labs/lab_01_speicherphysik.pdf) | [PDF](labs/lab_01_speicherphysik-musterloesung.pdf) |
-| 2 | Speicherhierarchie & Caches | Lokalität, AMAT, Mapping, cache-freundlicher C-Code | [HTML](vorlesungen/02_speicherhierarchie.html) | [PDF](vorlesungen/02_speicherhierarchie-handout.pdf) | [PDF](labs/lab_02_speicherhierarchie.pdf) | [PDF](labs/lab_02_speicherhierarchie-musterloesung.pdf) |
-| 3 | Interrupts & Timer | Direct/Vectored, CLINT/PLIC, Nested Interrupts, System-Tick | [HTML](vorlesungen/03_interrupts_timer.html) | [PDF](vorlesungen/03_interrupts_timer-handout.pdf) | [PDF](labs/lab_03_interrupts_timer.pdf) | [PDF](labs/lab_03_interrupts_timer-musterloesung.pdf) |
-| 4 | Aktorik & Sicherheit | Hardware-Timer, PWM, Bit-Banging vs. Hardware, Watchdog | [HTML](vorlesungen/04_aktorik_sicherheit.html) | [PDF](vorlesungen/04_aktorik_sicherheit-handout.pdf) | [PDF](labs/lab_04_aktorik_sicherheit.pdf) | [PDF](labs/lab_04_aktorik_sicherheit-musterloesung.pdf) |
-| 5 | Serielle Bussysteme | UART/SPI/I2C, Open-Drain, differentielle Übertragung, EMI | [HTML](vorlesungen/05_serielle_bussysteme.html) | [PDF](vorlesungen/05_serielle_bussysteme-handout.pdf) | [PDF](labs/lab_05_serielle_bussysteme.pdf) | [PDF](labs/lab_05_serielle_bussysteme-musterloesung.pdf) |
-| 6 | Hardware-Beschleunigung (DMA) | Interrupt Storm, Bus-Mastering, Cache-Kohärenz, Ringpuffer | [HTML](vorlesungen/06_hardware_beschleunigung_dma.html) | [PDF](vorlesungen/06_hardware_beschleunigung_dma-handout.pdf) | [PDF](labs/lab_06_hardware_beschleunigung_dma.pdf) | [PDF](labs/lab_06_hardware_beschleunigung_dma-musterloesung.pdf) |
-| 7 | Moderne CPU-Architekturen | ILP-Limits, Out-of-Order, Branch Prediction, Spectre-Idee | [HTML](vorlesungen/07_moderne_cpu_architekturen.html) | [PDF](vorlesungen/07_moderne_cpu_architekturen-handout.pdf) | [PDF](labs/lab_07_moderne_cpu_architekturen.pdf) | [PDF](labs/lab_07_moderne_cpu_architekturen-musterloesung.pdf) |
-| 8 | KI-Beschleuniger & Edge AI | Memory Wall, Systolic Arrays, RVV, TensorFlow Lite Micro | [HTML](vorlesungen/08_ki_beschleuniger_edge_ai.html) | [PDF](vorlesungen/08_ki_beschleuniger_edge_ai-handout.pdf) | [PDF](labs/lab_08_ki_beschleuniger_edge_ai.pdf) | [PDF](labs/lab_08_ki_beschleuniger_edge_ai-musterloesung.pdf) |
-| 9 | Paralleles Rechnen & Multicore | SMP, MESI, Atomics, Wrap-Up / Klausurvorbereitung | [HTML](vorlesungen/09_paralleles_rechnen_multicore.html) | [PDF](vorlesungen/09_paralleles_rechnen_multicore-handout.pdf) | [PDF](labs/lab_09_paralleles_rechnen_multicore.pdf) | [PDF](labs/lab_09_paralleles_rechnen_multicore-musterloesung.pdf) |
+|--------:|-------|-------------|:------:|:-------:|:-----------:|:------------:|
+| 1 | Speicherphysik & RAM-Typen | SRAM/DRAM, Flash/XIP, Memory Map, Linker | [HTML](https://dantschi.github.io/mct3/vorlesungen/01_speicherphysik.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/01_speicherphysik-handout.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_01_speicherphysik.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_01_speicherphysik-musterloesung.pdf) |
+| 2 | Speicherhierarchie & Caches | Lokalität, AMAT, Mapping, cache-freundlicher C-Code | [HTML](https://dantschi.github.io/mct3/vorlesungen/02_speicherhierarchie.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/02_speicherhierarchie-handout.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_02_speicherhierarchie.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_02_speicherhierarchie-musterloesung.pdf) |
+| 3 | Interrupts & Timer | Direct/Vectored, CLINT/PLIC, Nested Interrupts, System-Tick | [HTML](https://dantschi.github.io/mct3/vorlesungen/03_interrupts_timer.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/03_interrupts_timer-handout.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_03_interrupts_timer.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_03_interrupts_timer-musterloesung.pdf) |
+| 4 | Aktorik & Sicherheit | Hardware-Timer, PWM, Bit-Banging vs. Hardware, Watchdog | [HTML](https://dantschi.github.io/mct3/vorlesungen/04_aktorik_sicherheit.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/04_aktorik_sicherheit-handout.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_04_aktorik_sicherheit.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_04_aktorik_sicherheit-musterloesung.pdf) |
+| 5 | Serielle Bussysteme | UART/SPI/I2C, Open-Drain, differentielle Übertragung, EMI | [HTML](https://dantschi.github.io/mct3/vorlesungen/05_serielle_bussysteme.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/05_serielle_bussysteme-handout.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_05_serielle_bussysteme.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_05_serielle_bussysteme-musterloesung.pdf) |
+| 6 | Hardware-Beschleunigung (DMA) | Interrupt Storm, Bus-Mastering, Cache-Kohärenz, Ringpuffer | [HTML](https://dantschi.github.io/mct3/vorlesungen/06_hardware_beschleunigung_dma.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/06_hardware_beschleunigung_dma-handout.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_06_hardware_beschleunigung_dma.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_06_hardware_beschleunigung_dma-musterloesung.pdf) |
+| 7 | Moderne CPU-Architekturen | ILP-Limits, Out-of-Order, Branch Prediction, Spectre-Idee | [HTML](https://dantschi.github.io/mct3/vorlesungen/07_moderne_cpu_architekturen.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/07_moderne_cpu_architekturen-handout.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_07_moderne_cpu_architekturen.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_07_moderne_cpu_architekturen-musterloesung.pdf) |
+| 8 | KI-Beschleuniger & Edge AI | Memory Wall, Systolic Arrays, RVV, TensorFlow Lite Micro | [HTML](https://dantschi.github.io/mct3/vorlesungen/08_ki_beschleuniger_edge_ai.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/08_ki_beschleuniger_edge_ai-handout.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_08_ki_beschleuniger_edge_ai.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_08_ki_beschleuniger_edge_ai-musterloesung.pdf) |
+| 9 | Paralleles Rechnen & Multicore | SMP, MESI, Atomics, Wrap-Up / Klausurvorbereitung | [HTML](https://dantschi.github.io/mct3/vorlesungen/09_paralleles_rechnen_multicore.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/09_paralleles_rechnen_multicore-handout.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_09_paralleles_rechnen_multicore.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_09_paralleles_rechnen_multicore-musterloesung.pdf) |
 
-**Hinweise:** Folien im Browser öffnen (Speaker View: Taste `S`). Handout-PDF = Folieninhalt mit Skriptnotizen. Quelltexte unter `vorlesungen/` und `labs/`. Übungsblätter und Musterlösungen werden bei jedem Publish über GitHub Actions als PDF gebaut.
+**Hinweise:** Folien im Browser öffnen (Speaker View: Taste **S**). Handout-PDF = Folieninhalt mit Skriptnotizen. Quelltexte unter [`vorlesungen/`](vorlesungen/) und [`labs/`](labs/).
 
-## Probeklausur
+### Probeklausur
 
 | Dokument | Studierende | Musterlösung |
-|----------|-------------|--------------|
-| Probeklausur (90 Min., 100 Punkte) | [PDF](labs/probeklausur.pdf) | [PDF](labs/probeklausur-musterloesung.pdf) |
+|----------|:-----------:|:------------:|
+| Probeklausur (90 Min., 100 Punkte) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur.pdf) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur-musterloesung.pdf) |
 
 ## Literatur
 

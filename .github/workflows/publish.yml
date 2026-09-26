@@ -1,27 +1,21 @@
-name: Build Quarto Website
-
-# Repo ist vorerst privat — kein GitHub Pages / kein gh-pages-Branch.
-# Nach Öffnung der Vorlesung: Publish-Schritt wieder aktivieren
-# (quarto-dev/quarto-actions/publish@v2, target: gh-pages) und
-# einmalig lokal `quarto publish gh-pages` ausführen.
+name: Publish Quarto Website
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  build:
+  build-deploy:
     runs-on: ubuntu-latest
     # Früher abbrechen statt bis 6h zu hängen
     timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -36,7 +30,7 @@ jobs:
       - name: Render website
         uses: quarto-dev/quarto-actions/render@v2
 
-      # --- PDF-Handout (kann an Mermaid/Chrome scheitern; Website-Build bleibt unabhängig) ---
+      # --- PDF-Handout (kann an Mermaid/Chrome scheitern; Website trotzdem publishen) ---
       - name: Install Chrome Headless Shell (Mermaid → PNG)
         timeout-minutes: 10
         run: quarto install chrome-headless-shell --no-prompt
@@ -80,7 +74,7 @@ jobs:
             exit 1
           fi
 
-      # Erfolgreiche PDFs an die Site-Ausgabe anhängen (für Artifact / spätere Pages)
+      # Erfolgreiche PDFs anhängen, auch wenn einzelne Handouts fehlgeschlagen sind
       - name: Attach handout PDFs to website
         if: always() && !cancelled()
         run: |
@@ -97,7 +91,7 @@ jobs:
           done
           ls -la _site/vorlesungen/*-handout.pdf
 
-      # --- Übungsblätter (Studierende + Musterlösung) ---
+      # --- Labor-Übungsblätter (Studierende + Musterlösung) ---
       - name: Render lab exercise sheets (student version)
         id: labs
         timeout-minutes: 15
@@ -154,23 +148,22 @@ jobs:
             exit 1
           fi
 
-      - name: List lab PDFs
+      - name: List published lab PDFs
         if: always() && !cancelled()
         run: |
           mkdir -p _site/labs
           ls -la _site/labs/ || echo "Keine Labor-PDFs vorhanden."
 
-      # Kein Publish auf gh-pages — Build-Artefakt zum Download bereithalten
-      - name: Upload site artifact
-        if: always() && !cancelled()
-        uses: actions/upload-artifact@v4
+      # Publish to GitHub Pages
+      - name: Publish to GitHub Pages
+        uses: quarto-dev/quarto-actions/publish@v2
         with:
-          name: mct3-site
-          path: _site/
-          if-no-files-found: warn
-          retention-days: 14
+          target: gh-pages
+          render: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Fehlendes PDF ist nur eine Warnung — Website-Build bleibt grün.
+      # Fehlendes PDF ist nur eine Warnung — Website-Build und Publish bleiben grün.
       - name: Warn if handout PDF did not build
         if: steps.handout.outcome != 'success'
         run: |
