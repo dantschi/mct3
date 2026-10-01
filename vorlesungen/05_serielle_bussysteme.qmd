@@ -60,7 +60,8 @@ Behalten Sie bei: Die CPU orchestriert; Echtzeit-Pinarbeit gehört in dedizierte
 ## Die SoC-Grenze
 
 - Beispiel: digitaler Beschleunigungssensor (IMU) auf der Platine
-- Sensor speichert Neigung (X, Y, Z) intern als Zahlen (z. B. 16 Bit)
+- Der Sensor speichert Beschleunigungsrohwerte (X, Y, Z), hier als 16-Bit-Zweierkomplement
+- Neigung ist daraus nur unter Bewegungsannahmen abgeleitet, kein Registerinhalt
 - Frage: Wie kommen diese Bits in die Register/ALU unseres SoCs?
 - Chips sind durch Kupferbahnen getrennt
 - Wir brauchen ein physikalisches und zeitliches Regelwerk — ein Protokoll
@@ -70,6 +71,8 @@ Innerhalb der CPU verschieben wir Worte über breite interne Busse. Zwischen zwe
 :::
 
 ## SoC und Sensor — Schema
+
+![Drei Adressen: MMIO im SoC, I²C-Geräteadresse 0x68, Sensorregister ab 0x3B.](../assets/figures/05_serielle_bussysteme/path.png)
 
 ```{mermaid}
 %%| fig-width: 3.8
@@ -119,13 +122,17 @@ Parallel: Breite. Seriell: Sequenz auf wenigen Leitungen.
 - Kosten und Platz: wenige Pins am Gehäuse sind günstiger
 - Crosstalk: viele parallele Bahnen stören sich gegenseitig
 - Clock Skew: bei hohen Frequenzen kommen Bits nicht mehr gleichzeitig an
-- Seriell: sehr hohe Taktraten auf wenigen Leitungen möglich
+- Seriell kann hohe Symbolraten auf wenigen Leitungen erreichen
+- „Seriell ist schneller“ gilt nicht pauschal: Pins, Takt und Nutzdatenrate getrennt betrachten
+- Mehrere serielle Lanes (USB, PCIe) sind ein anderes Modell als UART/SPI/I2C
 
 ::: notes
 Bei hohen Frequenzen wirken parallele Bahnen problematisch (Störung, Laufzeitunterschiede). Seriell braucht mehr Takte, erlaubt aber oft höhere Bitraten am Ende.
 :::
 
 ## Das Schieberegister
+
+![0x53 steht als 0101 0011 und geht als UART-Folge 1 1 0 0 1 0 1 0 hinaus.](../assets/figures/05_serielle_bussysteme/shift.png)
 
 - Wandlung: parallele CPU-Daten → serieller Bitstrom
 - Kern: Schieberegister (Kette von D-Flip-Flops, MCT1)
@@ -217,10 +224,10 @@ Industrie-Standards für On-Board-Kommunikation:
 
 | | UART | SPI | I2C |
 |--|------|-----|-----|
-| Leitungen | 2 | 4+ | 2 |
+| Signale ohne GND | 2 | 4, plus weitere CS | 2 |
 | Takt | asynchron | synchron | synchron |
-| Duplex | Full | Full | Half |
-| Speed (Faust) | niedrig–mittel | hoch (SCK oft 10–50 MHz) | moderat ($100$–$400\,\mathrm{kHz}$) |
+| Duplex | Full | Full im 4-Signal-Modell | Half |
+| Grundtempo | Baud plus Framing | SCK aus dem Timingbudget | 100/400 kHz als Fokus |
 
 ::: notes
 Alle drei finden Sie in typischen MCU-Datenblättern. Heute: wann welches Protokoll — Start mit UART.
@@ -243,8 +250,9 @@ Harris & Harris sowie Datenblatt-Kapitel zu Serial I/O — Protokollwahl ist Sys
 - UART: Universal Asynchronous Receiver-Transmitter
 - Eher Schnittstelle/Direktverbindung als Multi-Drop-Bus
 - Asynchron: kein Taktkabel
-- Historisch: serielle Schnittstelle (RS-232, COM)
-- Heute oft: Debug/`printf` über USB-UART-Wandler
+- Der UART-Frame ist nicht die elektrische Schnittstelle
+- RS-232 nutzt andere Pegel; ein 0/3,3-V-Pin darf daran nicht direkt
+- Heute oft: Debug/`printf` über einen Pegelwandler oder USB-UART
 
 ::: notes
 Mindestens ein UART-Controller ist in MCUs üblich. Terminal-Ausgabe läuft typischerweise über UART-Hardware.
@@ -255,8 +263,8 @@ Mindestens ein UART-Controller ist in MCUs üblich. Terminal-Ausgabe läuft typi
 - Typisch genau zwei Teilnehmer
 - TX (Transmit) und RX (Receive)
 - Kreuzverkabelung: TX1 → RX2, TX2 → RX1
-- Gemeinsames GND zwingend
-- Full-Duplex auf zwei Datenleitungen
+- Direktes 0/3,3-V-Modell: gemeinsamer Bezug zwingend, keine galvanische Trennung
+- Full-Duplex auf zwei Datenleitungen; GND, Versorgung und RTS/CTS zählen extra
 
 ```{mermaid}
 %%| fig-width: 3.8
@@ -292,6 +300,8 @@ Sender und Empfänger müssen dieselbe Baudrate nutzen — sonst wirre Zeichen. 
 :::
 
 ## Der UART-Frame
+
+![8N1 bei 115200 Baud: etwa 8,681 µs je Bit und 86,806 µs je Frame.](../assets/figures/05_serielle_bussysteme/uart-frame.png)
 
 - Idle: Leitung typisch HIGH
 - Frame-Aufbau:
@@ -352,12 +362,15 @@ Stop-Bits sind kein Luxus: Sie begrenzen Drift-Akkumulation auf Frame-Länge und
 |------------------|--------|------|-----|
 | `1010 0001` | 3 | 1 | 0 |
 | `0000 0000` | 0 | 0 | 1 |
+| `0x53` = `0101 0011` | 4 | 0 | 1 |
 
 ::: notes
 Parity erkennt ungerade Bitfehler; doppelte Kipper können unbemerkt bleiben. Für hohe Sicherheit: stärkere Prüfsummen in Software.
 :::
 
 ## FIFOs im UART
+
+![Höchstens 11520 Byte/s. Acht freie RX-Plätze sind etwa 694 µs Spielraum.](../assets/figures/05_serielle_bussysteme/uart-fifo.png)
 
 - Bei 115200 Baud und 8N1 (10 Bit/Frame): grob alle $\approx 87\,\mu\mathrm{s}$ ein Byte
 - Interrupt pro Byte belastet die CPU stark
@@ -402,14 +415,16 @@ UART eignet sich hervorragend für Debug und einfache Module — nicht als Hochl
 Merksatz: UART = asynchron, 2 Leitungen, 2 Teilnehmer. Als Nächstes: synchron mit Taktleitung — SPI.
 :::
 
-## Fragen? — UART und Grundlagen
+## Aufgabe — UART-Frame
 
-- Warum oft seriell statt parallel extern?
-- Warum Start- und Stop-Bit?
-- Welche Rolle spielen Hardware-FIFOs?
+Dekodieren Sie das Datenbyte. Idle ist HIGH, dann folgen Start, acht Datenbits LSB first und Stop.
+
+- Sichtbare Datenbits nach dem Start: 1, 1, 0, 0, 1, 0, 1, 0
+- Welche schriftliche MSB-Darstellung hat das Byte?
+- Even Parity: welches Parity-Bit entsteht?
 
 ::: notes
-Wenn Framing und Baudrate klar sind, führen wir den Takt explizit ein: SPI.
+Lösung: die Folge ist d0 bis d7, also 0x53 = 0101 0011. Vier Einsen, Even Parity = 0. Ein einzelner Bitfehler wäre erkennbar, zwei Bitfehler nicht sicher. Framing- und Parity-Fehler sind getrennte Statusbits.
 :::
 
 ## Was ist SPI?
@@ -420,7 +435,7 @@ Wenn Framing und Baudrate klar sind, führen wir den Takt explizit ein: SPI.
 - Wenig Framing-Overhead: Bits folgen dem Takt
 
 ::: notes
-Der Master gibt den Takt vor. Empfänger folgen dem Schlag — keine vorherige Baudraten-Einigung nötig.
+Der Controller gibt den Takt vor. Die Targets folgen dem Schlag. Eine gemeinsame Taktleitung verhindert die UART-Bauddrift, nicht jede beliebig hohe Frequenz.
 :::
 
 ## Die Synchronität (SCK)
@@ -436,7 +451,7 @@ Der Master gibt den Takt vor. Empfänger folgen dem Schlag — keine vorherige B
 | Datenleitung | gültiges Bit im vereinbarten Fenster |
 
 ::: notes
-Eine gemeinsame Uhr für Master und Slave — Uhren können nicht „auseinanderlaufen“ wie bei UART.
+Eine gemeinsame Uhr für Controller und Target. Die Uhren laufen nicht wie bei UART auseinander; das Timingbudget beider Datenblätter bleibt.
 :::
 
 ## Die 4-Draht-Architektur
@@ -451,21 +466,25 @@ Klassisch 4 Signale (+ GND):
 | CS / SS | Master → Slave | Slave auswählen (meist Active-Low) |
 
 ::: notes
-Kein UART-Kreuz: MOSI an MOSI-Logik, MISO entsprechend. Neuere Namen oft SDO/SDI — Konzept gleich.
+MOSI des Controllers trifft den Dateneingang des Targets. SDO und SDI gehören immer zu einem Baustein: Controller-SDO ist Target-SDI. Gleichnamig verbinden ist keine Regel.
 :::
 
-## Master-Slave
+## Controller und Target
 
-- Master (meist die MCU): erzeugt SCK, steuert CS, startet Transfers
-- Slave: antwortet nur, wenn selektiert und getaktet
-- Single-Master: ein aktiver Taktgeber auf dem Bus
-- Slave „redet“ nicht von selbst
+Ältere Datenblätter sagen Master und Slave. Hier: Controller und Target. MOSI und MISO bleiben die Signalnamen.
+
+- Controller (meist die MCU): erzeugt SCK, steuert CS, startet Transfers
+- Target: antwortet nur, wenn selektiert und getaktet
+- Ein Controller: ein aktiver Taktgeber in diesem Grundmodell
+- Das Target sendet nicht unaufgefordert
 
 ::: notes
 Keine Buskollision durch unaufgefordertes Senden: der Master saugt/schiebt Daten aktiv.
 :::
 
 ## Full-Duplex: Ringtausch
+
+![Mode 0: 0x96 und 0x3C. Nach vier Takten 0x63 und 0xC9.](../assets/figures/05_serielle_bussysteme/spi-ring.png)
 
 - Pro Takt: Bit auf MOSI hinaus und Bit auf MISO herein
 - Nach $n$ Takten: Schieberegister getauscht
@@ -517,6 +536,8 @@ Geschwindigkeit hoch, Pinverbrauch ebenfalls — Alternative: Daisy-Chain oder a
 
 ## Daisy-Chaining
 
+![Nur geeignete Bausteine. Nach 8, 16 und 24 Takten stehen 0x33, dann 0x22, dann 0x11 vorn.](../assets/figures/05_serielle_bussysteme/spi-topo.png)
+
 - Ein CS für mehrere Schieberegister in Serie
 - MOSI → Slave1 → … → zurück MISO
 - CPU schiebt lange Bitkette; Daten wandern durch die Kette
@@ -546,6 +567,8 @@ Im Kontrast dazu später I2C mit Open-Drain und Pull-ups — robuster für Multi
 :::
 
 ## CPOL und CPHA
+
+![Vier Modi, gleiche Datenfolge. Sample und Datenwechsel sind verschiedene Flanken.](../assets/figures/05_serielle_bussysteme/spi-modes.png)
 
 - Vier SPI-Modi (0–3): Kombination aus Ruhepegel und Abtastflanke
 - CPOL: Idle LOW oder HIGH?
@@ -599,14 +622,15 @@ SPI = Bandbreiten-Monster. Für viele kleine Sensoren kommt I2C.
 Als Nächstes: zwei Leitungen, Takt behalten, viele Adressen — I2C.
 :::
 
-## Fragen? — SPI
+## Aufgabe — SPI-Flanke
 
-- Warum hilft eine Taktleitung gegenüber UART?
-- MOSI/MISO und Ringtausch klar?
-- Warum limitiert Star-Routing mit CS die Skalierbarkeit?
+Mode 0, Idle LOW. Controller sendet `0x96`, Target sendet `0x3C`, MSB first.
+
+- Welche Flanke tastet ab, welche darf das nächste Bit setzen?
+- Welcher Registerstand gilt nach vier Takten im Links-Schiebe-Modell?
 
 ::: notes
-Wenn Master, Takt und CS klar sind, folgt das Multi-Drop-Protokoll I2C.
+Lösung: Sample steigend, Wechsel fallend. Nach vier Takten 0x63 und 0xC9, nach acht Takten 0x3C und 0x96. CPHA = 0 verlangt das erste Bit schon vor der ersten Sample-Flanke.
 :::
 
 ## Was ist I2C?
@@ -678,7 +702,10 @@ Mehrere Geräte dürfen gleichzeitig LOW ziehen — Strom fließt nach Masse, oh
 
 ## Pull-Up-Widerstände
 
-- Ohne aktives HIGH: externe Pull-ups nötig (typisch wenige kΩ)
+![Lehrrechnung: 2,2 kΩ etwa 186 ns. Fast-Mode etwa 967 Ω bis 3,54 kΩ.](../assets/figures/05_serielle_bussysteme/open-drain.png)
+
+- Ohne aktives HIGH: je ein Pull-up an SDA und an SCL
+- „Wenige kΩ“ ist keine Dimensionierung: Kapazität, Rise Time und Sinkstrom begrenzen $R_P$
 - Je einer an SDA und SCL gegen $V_{IO}$ (z. B. $3{,}3\,\mathrm{V}$)
 - Alle loslassen → Pull-up zieht HIGH (logisch 1)
 - Ein Chip zieht → Leitung LOW (logisch 0)
@@ -721,10 +748,12 @@ START wirkt wie ein Gong: alle hören die Adresse; nur der Treffer bleibt aktiv.
 
 ## ACK und NACK
 
+![Write 0xD0, 0x6B, 0x00. Der letzte Read-NACK ist der normale Abschluss.](../assets/figures/05_serielle_bussysteme/i2c-byte.png)
+
 - Nach jedem Byte: 9. Takt für Quittung
 - Sender lässt SDA los (Tendenz HIGH = NACK)
 - Empfänger zieht SDA auf LOW = ACK
-- Kein ACK → Gerät fehlt / nicht bereit (Status in Hardware)
+- Address-NACK: Gerät fehlt oder hört nicht. Data-NACK: unerwartete Ablehnung. Letzter Read-NACK: normaler Abschluss durch den Controller.
 
 ::: notes
 Vorteil gegenüber SPI: die MCU erkennt fehlende Slaves auf Protokollebene.
@@ -756,6 +785,8 @@ Klare Start- und Stop-Signaturen strukturieren den Verkehr auf dem gemeinsamen M
 :::
 
 ## Clock Stretching
+
+![SCL bleibt LOW, solange das Target hält. Arbitration: 0xA0 gegen 0xD0.](../assets/figures/05_serielle_bussysteme/stretch.png)
 
 - Zu schneller Master-Takt? Slave kann SCL auf LOW halten
 - Master will HIGH, sieht aber LOW (Wired-AND) → wartet
@@ -799,25 +830,25 @@ Netzwerkfähigkeit kostet Bandbreite. Ideal für Sensoren; Displays eher SPI.
 
 | Merkmal | UART | SPI | I2C |
 |---------|------|-----|-----|
-| Leitungen | 2 | 4+ | 2 |
-| Takt | asynchron | synchron | synchron |
-| Routing | Punkt-zu-Punkt | CS / Daisy | adressierter Bus |
-| Speed | niedrig–mittel | SCK oft 10–50 MHz | $100$–$400\,\mathrm{kHz}$ |
-| Hardware | Baud, Framing, FIFO | Push-Pull | Open-Drain, Pull-ups |
-| Einsatz | Debug, Module | Display, SD, Flash | Sensornetz |
+| Signale ohne GND | TX, RX | SCK, MOSI, MISO, CS | SDA, SCL |
+| Takt | asynchron | Controller-Takt | Controller-Takt |
+| Routing | Punkt-zu-Punkt | CS oder geeignete Daisy-Chain | adressierter Bus |
+| Tempo | Baud mal Framing | Timingbudget beider Bausteine | 100/400 kHz als Fokus |
+| Treiber | Push-Pull, Pegel beachten | Push-Pull | Open-Drain, Pull-ups |
+| Einsatz | Debug, Module | Display, Flash | Sensoren auf der Platine |
 
 ::: notes
 Auswahlkriterium: Pins vs. Bandbreite vs. Topologie.
 :::
 
-## Fragen? — I2C
+## Aufgabe — Adresse, ACK und Pull-up
 
-- Warum verhindert Open-Drain Kurzschlüsse?
-- Wie adressiert I2C ohne CS?
-- Wie funktioniert ACK/NACK?
+- Geräteadresse `0x68`. Welches Byte geht bei Write, welches bei Read auf den Bus?
+- Wer zieht SDA im neunten Takt eines Writes? Wer erzeugt den NACK nach dem letzten gelesenen Byte?
+- Lehrannahme: $V_{IO}=3{,}3\,\mathrm{V}$, $C_B=100\,\mathrm{pF}$, $3\,\mathrm{mA}$ bei $0{,}4\,\mathrm{V}$, $t_r=0{,}8473\,R_P C_B$. Liegt $2{,}2\,\mathrm{k}\Omega$ im Fast-Mode-Fenster?
 
 ::: notes
-Als Nächstes: Was, wenn wir die Platine verlassen und lange Kabel in rauen Umgebungen brauchen?
+Lösung: Write 0xD0, Read 0xD1. Das Target zieht ACK, der Controller erzeugt den letzten Read-NACK. Rp,min etwa 967 Ohm, Rp,max bei 300 ns etwa 3,54 kOhm. 2,2 kOhm liegt in diesem Rechenmodell dazwischen. Zwei vorhandene 4,7 kOhm parallel sind 2,35 kOhm. Datenblattgrenzen bleiben zu prüfen.
 :::
 
 ## Grenzen von Single-Ended
@@ -842,9 +873,12 @@ Werkshallen und Motorraum sind elektromagnetisch laut — On-Board-Busse sind da
 
 ## Differentielle Übertragung
 
+![2,5 V und 0,5 V: Differenz 2 V, Common Mode 1,5 V. +0,8 V hebt nur den Common Mode.](../assets/figures/05_serielle_bussysteme/diff.png)
+
 - Signal auf zwei Leitungen: normal und invertiert
 - Empfänger misst Differenz $V_A - V_B$, nicht gegen GND
-- Absolute Masseverschiebung wird irrelevant
+- Gleiche Störung auf beiden Leitungen ändert die Differenz nicht
+- Der Common-Mode-Bereich des Empfängers bleibt endlich; große Potentialunterschiede können weiter stören oder schädigen
 
 ```{mermaid}
 %%| fig-width: 3.6
@@ -874,7 +908,7 @@ Deshalb Ethernet und viele Feldbusse: Twisted Pair. Störungen heben sich in der
 
 - Physikalische Schicht für lange Strecken (oft mit UART-Logik)
 - Transceiver: Single-Ended TX/RX → differenziell A/B
-- Reichweiten im dreistelligen Meterbereich möglich
+- Reichweite und Bitrate gelten gemeinsam; „einige hundert Meter“ ist keine beliebige Geschwindigkeit
 - Häufig mit Protokollen wie Modbus
 
 ::: notes
@@ -902,14 +936,13 @@ CAN kombiniert Bus-Ideen (wie I2C) mit differentieller Robustheit für die Fahrz
 Der Exkurs erklärt Feldverkabelung. Zurück aufs Board: I2C-Sensor ansteuern.
 :::
 
-## Fragen? — Differentiell und Feldbusse
+## Aufgabe — Burst und Common Mode
 
-- Wie funktioniert differentielle Übertragung?
-- Warum hilft Twisted Pair gegen EMI?
-- Wann RS-485/CAN statt I2C?
+- Bytes `10 00 E0 00 40 00` ab Register `0x3B`, Bereich $\pm 2\,\mathrm{g}$ mit 16384 LSB/g. Welche Werte in g entstehen?
+- $V_A=2{,}5\,\mathrm{V}$, $V_B=0{,}5\,\mathrm{V}$, danach $+0{,}8\,\mathrm{V}$ auf beiden Leitungen. Was bleibt gleich, was ändert sich?
 
 ::: notes
-Als Nächstes: Ausblick Labor — Beschleunigungssensor per I2C (Renode).
+Lösung: X = 4096 = +0,25 g, Y = -8192 = -0,5 g, Z = 16384 = +1 g. Vdiff bleibt 2 V, Vcm steigt von 1,5 V auf 2,3 V. Ob 2,3 V erlaubt ist, steht im Transceiver-Datenblatt. Vertiefung: Multi-Controller, Daisy-Chain und die elektrische Auslegung.
 :::
 
 ## Ausblick Labor: IMU per I2C
@@ -939,9 +972,10 @@ Mechanik im Chip-Maßstab liefert Zahlen; der Bus transportiert sie zur MCU.
 ## Registerkarte des Sensors
 
 - Sensor hat eigene Memory Map (Datenblatt!)
-- Beispiele (MPU6050-ähnlich):
-  - `0x6B`: Power Management
-  - `0x3B`/`0x3C`: X-Achse High/Low
+- Beispiele aus der MPU-6000/MPU-6050-Registerkarte, im Labor gegen das Datenblatt prüfen:
+  - `0x6B`: Power Management, Aufwecken ist bausteinspezifisch
+  - `0x1C`: Beschleunigungsbereich; $\pm 2\,\mathrm{g}$ entspricht im Datenblatt oft 16384 LSB/g
+  - `0x3B` bis `0x40`: X, Y, Z je High/Low, zusammenhängend lesbar
 - I2C: erst Geräteadresse, dann Registerzeiger, dann Daten
 
 ::: notes
@@ -957,8 +991,9 @@ Beispielhafte Adressen und Bits (fiktiv — immer Datenblatt prüfen):
 #define I2C_CR1  (*(volatile uint32_t *)(I2C_BASE + 0x00))
 
 void i2c_init(void) {
-    I2C_CR1 |= (1u << 0);  /* Enable — Bitlage SoC-spezifisch */
-    I2C_CR1 |= (1u << 8);  /* Master — nur schematisch! */
+    /* Davor, plattformspezifisch: Taktfreigabe, Pin-Mux, Open-Drain, Pull-up. */
+    I2C_CR1 |= (1u << 0);  /* Enable — Bitlage nur im Lehrmodell */
+    I2C_CR1 |= (1u << 8);  /* Controller-Modus — nur schematisch */
 }
 ```
 
@@ -978,12 +1013,13 @@ Wie Timer/PWM: Steuerung über MMIO. Enable-/Master-Bits hier nur zur Didaktik �
 #define I2C_CLK_DIV (*(volatile uint32_t *)(I2C_BASE + 0x10))
 
 void i2c_set_speed(void) {
-    I2C_CLK_DIV = 1000;  /* schematisch: 100 MHz / 100 kHz */
+    /* 100 MHz / 1000 = 100 kHz ist nur dieses Rechenmodell. */
+    I2C_CLK_DIV = 1000;
 }
 ```
 
 ::: notes
-Prescaler/Divider so wählen, dass SCL die Spezifikation des Sensors einhält.
+Prescaler allein ist keine universelle I2C-Formel. SCL-High, SCL-Low, Filter und die Anstiegszeit können getrennte Felder sein.
 :::
 
 ## C: Write-Transaktion
@@ -991,40 +1027,45 @@ Prescaler/Divider so wählen, dass SCL die Spezifikation des Sensors einhält.
 Ablauf: START → Adresse+W → Reg → Daten → STOP
 
 ```c
-void sensor_wakeup(void) {
+int sensor_wakeup(void) {
     i2c_send_start();
-    i2c_send_byte((0x68u << 1) | 0u);  /* Addr + Write */
-    wait_for_ack();
-    i2c_send_byte(0x6B);               /* Register */
-    wait_for_ack();
-    i2c_send_byte(0x00);               /* Wert */
-    wait_for_ack();
+    i2c_send_byte(0xD0u);          /* 0x68 << 1 | Write */
+    if (!wait_for_ack_timeout()) return -1;
+    i2c_send_byte(0x6Bu);          /* PWR_MGMT_1 */
+    if (!wait_for_ack_timeout()) return -1;
+    i2c_send_byte(0x00u);          /* Sleep aus, Lehrwert */
+    if (!wait_for_ack_timeout()) return -1;
     i2c_send_stop();
+    return 0;
 }
 ```
 
 ::: notes
-7-Bit-Adresse um 1 nach links, R/W im LSB. Konkrete API hängt vom Treiber/SoC ab.
+Ein NACK oder ein abgelaufenes Zeitlimit beendet die Funktion. `wait_for_ack()` ohne Timeout darf bei fehlendem Sensor nicht hängen bleiben. STOP nur, solange dieser Controller den Bus besitzt.
 :::
 
 ## C: Read mit Repeated Start
 
+![Sechs Bytes ab 0x3B. Das Beispiel ergibt +0,25 g, −0,5 g und +1 g.](../assets/figures/05_serielle_bussysteme/i2c-burst.png)
+
 Zuerst Registerzeiger setzen (Write), dann Repeated START und Read:
 
 ```c
-uint8_t read_sensor_x(void) {
+/* Timeout. Fehlercode bleibt getrennt von den Bytes. */
+int read_accel_xyz(uint8_t out[6]) {
     i2c_send_start();
-    i2c_send_byte((0x68u << 1) | 0u);
-    wait_for_ack();
-    i2c_send_byte(0x3B);
-    wait_for_ack();
-
-    i2c_send_start();  /* Repeated Start */
-    i2c_send_byte((0x68u << 1) | 1u);
-    wait_for_ack();
-    uint8_t data = i2c_read_byte_nack();
+    i2c_send_byte(0xD0u);          /* 0x68 << 1 | Write */
+    if (!wait_for_ack_timeout()) return -1;
+    i2c_send_byte(0x3Bu);
+    if (!wait_for_ack_timeout()) return -1;
+    i2c_send_start();              /* Repeated Start */
+    i2c_send_byte(0xD1u);          /* Read */
+    if (!wait_for_ack_timeout()) return -1;
+    for (int i = 0; i < 5; i++)
+        out[i] = i2c_read_byte_ack();
+    out[5] = i2c_read_byte_nack(); /* normaler Abschluss */
     i2c_send_stop();
-    return data;
+    return 0;
 }
 ```
 
@@ -1034,9 +1075,9 @@ Klassisches Muster: Pointer setzen, dann lesen — oft ohne STOP dazwischen (Rep
 
 ## Renode: virtueller I2C-Sensor
 
-- Geplant: Sensor als Modell in Renode (ACK/NACK, Register)
-- C-Treiber sieht dasselbe Timing-Verhalten wie auf dem Chip
-- Validierung ohne Lötarbeit
+- Ein Registermodell kann ACK und Bursts nachbilden
+- Es beweist keine realen Flanken, keine RC-Zeit und keine zyklusgenaue Controllerlatenz
+- `Sensors.MPU6050` und `FeedSample` sind hier nicht als vorhandene API geprüft
 
 ::: notes
 Simulator ersetzt die physische IMU für Treiberentwicklung — Datenblattverhalten nachbilden.
@@ -1044,14 +1085,15 @@ Simulator ersetzt die physische IMU für Treiberentwicklung — Datenblattverhal
 
 ## Platine beschreiben (`.repl`)
 
-Schematisch:
+Im Repository liegt keine `.repl`. Der folgende Typname ist ein ungeprüftes Schema, keine Renode-API dieser Lehrveranstaltung:
 
 ```text
-sensor: Sensors.MPU6050 @ i2c0 0x68
+# nicht ausgefuehrt, Typname nicht verifiziert
+# sensor: Sensors.MPU6050 @ i2c0 0x68
 ```
 
-- Sensor an I2C0, Adresse `0x68`
-- Verknüpft CPU-I2C mit dem Sensor-Modell
+- Erst die installierte Renode-Version und das echte Peripheriemodell prüfen
+- Fehlt das Modell, bleibt der Treiber ein Lehrmodell mit explizitem Registervertrag
 
 ::: notes
 Die `.repl`-Datei beschreibt die virtuelle Verdrahtung — Ihr „Lötkolben“ in Textform.
@@ -1062,14 +1104,14 @@ Die `.repl`-Datei beschreibt die virtuelle Verdrahtung — Ihr „Lötkolben“ 
 Schematisch:
 
 ```text
-machine LoadPlatformDescription @board.repl
-sysbus LoadELF @firmware.elf
-machine.sensor FeedSample 1.5 0.0 -9.8
-start
+# Schema, in dieser Version nicht ausgefuehrt
+# machine LoadPlatformDescription @board.repl
+# sysbus LoadELF @firmware.elf
+# FeedSample ist kein gepruefter Befehl mit drei Fließkomma-Argumenten
 ```
 
-- Virtuelle Beschleunigungswerte einspeisen
-- Firmware liest dieselben Registerpfade
+- Virtuelle Registertransfers können Treiberfehler zeigen
+- Sie beweisen keine Pull-up-Auslegung, keine RC-Flanke und keine Controllerlatenz
 
 ::: notes
 Laboridee: eingespeiste Vektoren müssen nach korrektem I2C-Read in Ihrer Ausgabe erscheinen.
@@ -1081,9 +1123,12 @@ Laboridee: eingespeiste Vektoren müssen nach korrektem I2C-Read in Ihrer Ausgab
 - In C zusammensetzen:
 
 ```c
-uint8_t hi = read_sensor_x_high();
-uint8_t lo = read_sensor_x_low();
-int16_t x = (int16_t)((hi << 8) | lo);
+uint8_t b[6];
+if (read_accel_xyz(b) != 0) {
+    /* Timeout, NACK oder Busfehler. 0x00 wäre ein gültiger Messwert. */
+}
+uint16_t ux = (uint16_t)(((uint16_t)b[0] << 8) | b[1]);
+int16_t x = (int16_t)ux;   /* 0x1000 -> 4096 */
 ```
 
 ::: notes
@@ -1092,9 +1137,9 @@ Häufiger Fehler: Bytes vertauscht oder Vorzeichen falsch interpretiert.
 
 ## Polling vs. Interrupt
 
-- I2C ist relativ langsam — `wait_for_ack()` ist Polling
-- Professionell oft: Transfer starten, auf I2C-IRQ (z. B. über PLIC) warten
-- Für Einstiegslabor: Polling ist didaktisch ausreichend
+- Blockierendes Polling, Zustands-Polling und IRQ/DMA sind drei Implementierungen
+- Ein I2C-IRQ ist auf RISC-V eine externe Quelle, bei einem PLIC die Claim-ID, keine eigene `mcause`-Gerätekennung
+- Jede Warteschleife braucht eine Deadline. Ein CPU-Reset setzt den extern versorgten Sensor nicht zurück
 
 ::: notes
 Erinnerung Block 3: Polling blockiert; Interrupts entlasten die CPU bei längeren Transfers.

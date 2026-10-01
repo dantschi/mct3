@@ -55,9 +55,9 @@ Single-Ended-Busse (z. B. UART/I2C auf kurzen Board-Leitungen) scheitern oft bei
 ::: {.content-visible when-profile="solution"}
 **Musterlösung Aufgabe 1.2**
 
-1. Single-Ended wertet absolute Pegel gegen GND aus. Ein Spike hebt die Datenleitung isoliert an → aus LOW wird fälschlich HIGH. Differentiell (RS-485, CAN) wird $V_A - V_B$ ausgewertet. Trifft die Störung beide Adern als Gleichtakt ($\Delta$), gilt $(V_A+\Delta)-(V_B+\Delta)=V_A-V_B$ — die Differenz bleibt erhalten.
+1. Single-Ended wertet den Pegel gegen GND aus. Eine Störung auf der Datenleitung kann LOW als HIGH erscheinen lassen. Ein differentieller Empfänger bildet $V_A-V_B$. Dieselbe Störung auf beiden Adern lässt die Differenz unverändert, verschiebt aber den Common-Mode-Pegel. Der erlaubte Common-Mode-Bereich steht im Transceiver-Datenblatt; außerhalb bleiben Fehler und Schäden möglich.
 
-2. *Twisted Pair*: Verdrillung sorgt dafür, dass beide Adern räumlich eng und abwechselnd dieselbe Feldstärke „sehen“. Nur so ist die Störung annähernd echte Gleichtaktstörung und löscht sich in der Differenzbildung aus.
+2. *Twisted Pair* nähert eine ähnliche Einkopplung an. Unsymmetrie, Leitungsführung und der reale Empfänger heben die Unterdrückung nicht vollständig auf.
 :::
 
 {{< pagebreak >}}
@@ -71,7 +71,9 @@ Single-Ended-Busse (z. B. UART/I2C auf kurzen Board-Leitungen) scheitern oft bei
 - 7-Bit-Adresse des Sensors: `0x68`
 - Power-Management-Register: Subadresse `0x6B` (Schreiben von `0` weckt den Chip)
 - X-Achse roh: `0x3B` (High-Byte), `0x3C` (Low-Byte)
-- Hilfsfunktionen: `i2c_send_start()`, `i2c_send_stop()`, `wait_for_ack()`, `i2c_send_byte(uint8_t data)`, `i2c_read_byte_nack()`
+- Hilfsfunktionen: `i2c_send_start()`, `i2c_send_stop()`, `wait_for_ack_timeout()`, `i2c_send_byte(uint8_t data)`, `i2c_read_byte_ack()`, `i2c_read_byte_nack()`
+- `wait_for_ack_timeout()` liefert falsch bei Address-NACK, unerwartetem Data-NACK oder abgelaufener Deadline. Ein fehlender Sensor darf keine Endlosschleife erzeugen.
+- Der NACK nach dem letzten gelesenen Byte ist der normale Abschluss und kein Fehler.
 
 Adressbyte: 7-Bit-Adresse um eins nach links schieben, R/W im LSB (`0` = Write, `1` = Read).
 
@@ -85,15 +87,15 @@ void sensor_wakeup(void) {
 
     /* 1. Geräteadresse im Write-Modus (R/W = 0) */
     /* TODO: i2c_send_byte(...); */
-    wait_for_ack();
+    wait_for_ack_timeout();
 
     /* 2. Register-Adresse Power-Management */
     /* TODO: i2c_send_byte(...); */
-    wait_for_ack();
+    wait_for_ack_timeout();
 
     /* 3. Datenwert zum Aufwecken */
     /* TODO: i2c_send_byte(...); */
-    wait_for_ack();
+    wait_for_ack_timeout();
 
     i2c_send_stop();
 }
@@ -114,15 +116,15 @@ void sensor_wakeup(void) {
 
     /* 7-Bit-Adresse << 1, Write-Bit = 0 */
     i2c_send_byte((0x68u << 1) | 0u);
-    wait_for_ack();
+    wait_for_ack_timeout();
 
     /* PWR_MGMT_1 */
     i2c_send_byte(0x6Bu);
-    wait_for_ack();
+    wait_for_ack_timeout();
 
     /* 0 = Sleep aus / aufwecken (vereinfachtes Modell) */
     i2c_send_byte(0x00u);
-    wait_for_ack();
+    wait_for_ack_timeout();
 
     i2c_send_stop();
 }
@@ -131,9 +133,9 @@ void sensor_wakeup(void) {
 
 {{< pagebreak >}}
 
-### Aufgabe 2.2: X-Achse lesen (I2C Read mit Repeated Start)
+### Aufgabe 2.2: Nur das High-Byte der X-Achse
 
-Lesen Sie das High-Byte der X-Achse. Zuerst Registerzeiger per Write setzen, dann mit *Repeated Start* auf Read umschalten.
+`read_sensor_x_high()` liest genau ein Byte ab `0x3B`. Das ist nicht der 16-Bit-Wert. Zuerst den Registerzeiger per Write setzen, dann mit *Repeated Start* auf Read umschalten. Der NACK nach diesem einen Byte ist hier der vorgesehene Abschluss.
 
 ```c
 uint8_t read_sensor_x_high(void) {
@@ -141,16 +143,16 @@ uint8_t read_sensor_x_high(void) {
 
     /* 1. Adresse Write: Registerzeiger setzen */
     /* TODO: i2c_send_byte(...); */
-    wait_for_ack();
+    wait_for_ack_timeout();
 
     /* 2. Register-Adresse X-High */
     /* TODO: i2c_send_byte(...); */
-    wait_for_ack();
+    wait_for_ack_timeout();
 
     /* 3. Repeated Start, Adresse Read (R/W = 1) */
     i2c_send_start();
     /* TODO: i2c_send_byte(...); */
-    wait_for_ack();
+    wait_for_ack_timeout();
 
     uint8_t data = i2c_read_byte_nack();
     i2c_send_stop();
@@ -172,14 +174,14 @@ uint8_t read_sensor_x_high(void) {
     i2c_send_start();
 
     i2c_send_byte((0x68u << 1) | 0u);
-    wait_for_ack();
+    wait_for_ack_timeout();
 
     i2c_send_byte(0x3Bu); /* ACCEL_XOUT_H */
-    wait_for_ack();
+    wait_for_ack_timeout();
 
     i2c_send_start(); /* Repeated Start */
     i2c_send_byte((0x68u << 1) | 1u);
-    wait_for_ack();
+    wait_for_ack_timeout();
 
     uint8_t data = i2c_read_byte_nack();
     i2c_send_stop();
@@ -221,5 +223,29 @@ uint8_t lo = read_sensor_x_low();  /* z. B. 0x2A */
 int16_t x_achse = (int16_t)(((uint16_t)hi << 8) | lo);
 ```
 
-(Hinweis: `((uint16_t)hi << 8) | lo` vermeidet Mehrdeutigkeiten bei der Integer-Promotion; das Vorzeichenbit von Bit 15 bleibt nach dem Cast auf `int16_t` erhalten.)
+(Hinweis: `((uint16_t)hi << 8) | lo` vermeidet Mehrdeutigkeiten bei der Integer-Promotion; das Vorzeichenbit von Bit 15 bleibt nach dem Cast auf `int16_t` erhalten. Zwei getrennte Leseaufrufe können Werte verschiedener Abtastungen mischen. Ein zusammenhängender Burst über `0x3B` bis `0x40` hält die drei Achsen beieinander.)
+:::
+
+### Aufgabe 2.4: Sechs Byte als Beschleunigung
+
+Ein Burst liefert `10 00 E0 00 40 00`. Der Bereich $\pm 2\,\mathrm{g}$ ist mit 16384 LSB/g konfiguriert.
+
+1. Bilden Sie die drei vorzeichenbehafteten Rohwerte.
+2. Rechnen Sie sie in $g$ um.
+3. Welche Ergebnisse liefern die Grenzen `0x0000`, `0x7FFF`, `0x8000` und `0xFFFF`?
+
+::: {.content-hidden when-profile="solution"}
+### Ihre Lösung {.unnumbered}
+
+*(Notieren Sie Ihre Lösung hier.)*
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung Aufgabe 2.4**
+
+1. $X=0\mathrm{x}1000=4096$, $Y=0\mathrm{xE}000=-8192$, $Z=0\mathrm{x}4000=16384$.
+2. $+0{,}25\,\mathrm{g}$, $-0{,}5\,\mathrm{g}$, $+1\,\mathrm{g}$.
+3. $0$, $32767$, $-32768$, $-1$.
+
+Die Bytes werden unsigned zusammengesetzt und danach als `int16_t` gelesen. Ein Cast eines Bytepuffers auf `int16_t *` legt Bytefolge und Alignment nicht fest. `0x00` und `0xFF` bleiben gültige Messbytes und sind kein Fehlercode.
 :::
