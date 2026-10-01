@@ -328,6 +328,12 @@ flowchart LR
 </section>
 <section id="eva-schema" class="slide level2">
 <h2>EVA — Schema</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/04_aktorik_sicherheit/paths.png"></p>
+<figcaption>Steuerpfad, Leistungsweg und Watchdog sind getrennte Ebenen.</figcaption>
+</figure>
+</div>
 <div class="cell" data-reveal="true" data-fig-width="4" data-layout-align="default">
 <div class="cell-output-display">
 <div>
@@ -364,7 +370,7 @@ flowchart LR
 <ul>
 <li>Die CPU lebt in einer binären Welt</li>
 <li>GPIO-Pin: typisch nur HIGH (z. B. <span class="math inline">\(3{,}3\,\mathrm{V}\)</span>) oder LOW (<span class="math inline">\(0\,\mathrm{V}\)</span>)</li>
-<li>Dilemma: halbe Helligkeit / halbe Kraft bräuchte Zwischenwerte (z. B. <span class="math inline">\(1{,}65\,\mathrm{V}\)</span>)</li>
+<li>Dilemma: der Pin kennt nur zwei Pegel. Helligkeit und Kraft folgen nicht linear aus einem Zwischenwert.</li>
 <li>Viele MCU-Pins haben keinen stufenlosen Analogausgang (DAC)</li>
 <li>Lösungsidee: Trägheit der realen Welt ausnutzen</li>
 </ul>
@@ -471,7 +477,7 @@ flowchart TD
 <h2>Die Leitfrage des Tages</h2>
 <ul>
 <li>SoC-Pin: oft maximal <span class="math inline">\(3{,}3\,\mathrm{V}\)</span> (100 %) oder <span class="math inline">\(0\,\mathrm{V}\)</span> (0 %)</li>
-<li>Ziel: Motor mit ca. 50 % Leistung (<span class="math inline">\(\approx 1{,}65\,\mathrm{V}\)</span> Mittelwert)</li>
+<li>Ziel im Beispiel: 50 Prozent Tastverhaeltnis. Das ist nicht allgemein halbe Motorleistung.</li>
 <li>Ohne externe Bauteile wie digitale Potentiometer</li>
 <li>Wie dimmt man auf 50 %, wenn der Pin nur „Vollgas“ oder „Aus“ kennt?</li>
 </ul>
@@ -590,6 +596,12 @@ flowchart LR
 </section>
 <section id="counter-kette-schema" class="slide level2">
 <h2>Counter-Kette — Schema</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/04_aktorik_sicherheit/prescaler.png"></p>
+<figcaption>100 MHz durch PSC+1. PSC 99 ergibt 1 MHz. 16 Bit hat 65536 Zustaende.</figcaption>
+</figure>
+</div>
 <div class="cell" data-reveal="true" data-fig-width="4" data-layout-align="default">
 <div class="cell-output-display">
 <div>
@@ -831,7 +843,7 @@ f_{\mathrm{cnt}} = \frac{10^{8}}{10^{4}} = 10\,\mathrm{kHz}
 <li>Trick: Pin sehr schnell ein- und ausschalten</li>
 <li>Beispiel: 1 kHz, je Hälfte der Periode HIGH/LOW</li>
 <li>Motor und Auge sind zu träge, um dem Stottern zu folgen</li>
-<li>Effekt: Integration/Mittelung → wahrgenommene 50 % Leistung</li>
+<li>Effekt: schnelles Schalten. Wahrnehmung und mechanische Wirkung sind davon zu trennen.</li>
 </ul>
 <aside class="notes">
 <p>Wenn Licht sehr schnell blinkt, mittelt das Auge die Helligkeit. Motoren mitteln über Masse und Induktivität ähnlich.</p>
@@ -956,7 +968,7 @@ f_{\mathrm{cnt}} = \frac{10^{8}}{10^{4}} = 10\,\mathrm{kHz}
 </tr>
 <tr class="even">
 <td>50 %</td>
-<td>halbe Kraft</td>
+<td>halbe aktive Zeit</td>
 </tr>
 <tr class="odd">
 <td>90 %</td>
@@ -981,6 +993,12 @@ f_{\mathrm{cnt}} = \frac{10^{8}}{10^{4}} = 10\,\mathrm{kHz}
 </section>
 <section id="mittlere-spannung-berechnen" class="slide level2">
 <h2>Mittlere Spannung berechnen</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/04_aktorik_sicherheit/pwm-power.png"></p>
+<figcaption>25 Prozent: Mittelwert 0,825 V, RMS 1,65 V. Ohmsche Rechteckleistung ist nicht Vmittel zum Quadrat durch R.</figcaption>
+</figure>
+</div>
 <p>Zeitlicher Mittelwert über die Periode (nicht der Effektivwert/RMS):</p>
 <p><span class="math display">\[
 \bar{V} = V_{\mathrm{Pin}} \times \mathrm{Duty\ Cycle}
@@ -989,9 +1007,9 @@ f_{\mathrm{cnt}} = \frac{10^{8}}{10^{4}} = 10\,\mathrm{kHz}
 <p><span class="math display">\[
 \bar{V} = 3{,}3\,\mathrm{V} \times 0{,}25 = 0{,}825\,\mathrm{V}
 \]</span></p>
-<p>Zum Vergleich RMS eines Rechtecksignals: <span class="math inline">\(V_{\mathrm{RMS}} = V_{\mathrm{Pin}} \cdot \sqrt{D}\)</span> — bei 25 % also <span class="math inline">\(\approx 1{,}65\,\mathrm{V}\)</span>. Bei ohmscher Last skaliert die <em>Leistung</em> mit <span class="math inline">\(D\)</span>; der Mittelwert bleibt die Einstiegsnäherung für die „Scheinspannung“.</p>
+<p>Zum Vergleich RMS eines Rechtecksignals: <span class="math inline">\(V_{\mathrm{RMS}} = V_{\mathrm{Pin}} \cdot \sqrt{D}\)</span> — bei 25 % also <span class="math inline">\(\approx 1{,}65\,\mathrm{V}\)</span>. Bei idealer ohmscher Last gilt <span class="math inline">\(P=D\cdot V^2/R\)</span>, nicht <span class="math inline">\(V_{\mathrm{avg}}^2/R\)</span> fuer das ungefilterte Rechteck.</p>
 <aside class="notes">
-<p>Ein langsames Multimeter zeigt oft näherungsweise den Mittelwert — die Physik „glättet“ das Rechteck. Effektivwert (RMS) und Mittelwert sind verschieden; bei ohmscher Last passt „50 % Duty → 50 % Leistung“ zum Mittelwert-Pfad über <span class="math inline">\(P \propto D\)</span>.</p>
+<p>Mittelwert, RMS und Leistung sind drei Groessen. Ein langsames Multimeter zeigt nicht automatisch den Mittelwert; Modus und Bandbreite entscheiden. 50 Prozent Duty ist keine halbe Motorleistung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1006,6 +1024,12 @@ f_{\mathrm{cnt}} = \frac{10^{8}}{10^{4}} = 10\,\mathrm{kHz}
 </section>
 <section id="auflösung-resolution" class="slide level2">
 <h2>Auflösung (Resolution)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/04_aktorik_sicherheit/resolution.png"></p>
+<figcaption>Bei 1 MHz: 1 kHz hat 0,1 Prozent Schritt, 20 kHz hat 2 Prozent.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Feinheit des Dimmens, oft in Bit; gebunden an Counter/ARR</li>
 <li>8 Bit: 256 Stufen <span class="math inline">\(\Rightarrow\)</span> Schritt <span class="math inline">\(\approx 100\%/256 \approx 0{,}39\%\)</span></li>
@@ -1028,6 +1052,12 @@ f_{\mathrm{cnt}} = \frac{10^{8}}{10^{4}} = 10\,\mathrm{kHz}
 </section>
 <section id="warum-nicht-software-bit-banging" class="slide level2">
 <h2>Warum nicht Software? (Bit-Banging)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/04_aktorik_sicherheit/sw-vs-hw.png"></p>
+<figcaption>20 us verspaetete Flanke: Periode 120 us, etwa 58,3 Prozent. Hardware-PWM folgt dem Timer.</figcaption>
+</figure>
+</div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb2-1"><a aria-label="1"></a><span class="co">/* Software-PWM — blockiert die CPU */</span></span>
 <span id="cb2-2"><a aria-label="2"></a><span class="cf">while</span> <span class="op">(</span><span class="dv">1</span><span class="op">)</span> <span class="op">{</span></span>
 <span id="cb2-3"><a aria-label="3"></a>    set_pin_high<span class="op">();</span></span>
@@ -1209,6 +1239,12 @@ f_{\mathrm{cnt}} = \frac{10^{8}}{10^{4}} = 10\,\mathrm{kHz}
 </section>
 <section id="edge-aligned-pwm" class="slide level2">
 <h2>Edge-Aligned PWM</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/04_aktorik_sicherheit/edge-pwm.png"></p>
+<figcaption>CNT 0 bis 999, CCR 250: 250 aktive und 750 inaktive Tickintervalle.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Up-Counting (Sägezahn) + Vergleich mit CCR → Edge-Aligned PWM</li>
 <li>Beispiel: <code>ARR = 999</code>, <code>CCR = 250</code> → exakt 25 % Duty Cycle (Periode <span class="math inline">\(0\ldots999\)</span> = 1000 Takte)</li>
@@ -1339,6 +1375,18 @@ f_{\mathrm{cnt}} = \frac{10^{8}}{10^{4}} = 10\,\mathrm{kHz}
 </section>
 <section id="die-polarität-polarity" class="slide level2">
 <h2>Die Polarität (Polarity)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/04_aktorik_sicherheit/preload.png"></p>
+<figcaption>Preload wird erst beim Update aktiv. Drei Kanaele und Gamma-CCR 0, 47, 218, 531, 1000.</figcaption>
+</figure>
+</div>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/04_aktorik_sicherheit/rgb-gamma.png"></p>
+<figcaption>RGB und Gamma sind ein Lehrmodell, keine Farbgarantie.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Bisher Active-High: <code>CNT &lt; CCR</code> → Pin HIGH</li>
 <li>Alternative: Active-Low — Logik invertiert</li>
@@ -1447,6 +1495,12 @@ flowchart LR
 </section>
 <section id="anwendung-servomotoren" class="slide level2">
 <h2>Anwendung: Servomotoren</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/04_aktorik_sicherheit/applications.png"></p>
+<figcaption>RC-Glied, Servo mit 20 ms und H-Bruecke sind drei verschiedene Anwendungen.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Hier ist PWM oft Datenprotokoll, nicht reine Leistungsübertragung</li>
 <li>Typisch: 50 Hz (Periode 20 ms)</li>
@@ -1644,6 +1698,12 @@ flowchart TD
 </section>
 <section id="architektur-des-wdt" class="slide level2">
 <h2>Architektur des WDT</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/04_aktorik_sicherheit/watchdog.png"></p>
+<figcaption>Feeds bei 0, 0,5 und 1 s, idealer Reset bei 3 s. 0xAA55 ist fiktiv.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Oft Down-Counter</li>
 <li>Beim Start: Timeout-Wert laden (z. B. äquivalent zu 5 s) und starten</li>
@@ -1766,6 +1826,12 @@ flowchart TD
 </section>
 <section id="window-watchdog-wwdg" class="slide level2">
 <h2>Window Watchdog (WWDG)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/04_aktorik_sicherheit/window.png"></p>
+<figcaption>Weiterfuettern aus dem Tick verdeckt einen Haenger. Fenster und Normal-Feed sind verschieden.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Normaler WDT: erkennt zu langsames Füttern (Timeout)</li>
 <li>Problem: fehlerhafter Code füttert zu oft / zu früh</li>
@@ -1883,11 +1949,14 @@ flowchart TD
 <span id="cb5-3"><a aria-label="3"></a><span class="pp">#define TIMER_ARR  </span><span class="op">(*(</span><span class="dt">volatile</span><span class="pp"> </span><span class="dt">uint32_t</span><span class="pp"> </span><span class="op">*)(</span><span class="pp">TIMER_BASE </span><span class="op">+</span><span class="pp"> </span><span class="bn">0x04</span><span class="op">))</span></span>
 <span id="cb5-4"><a aria-label="4"></a><span class="pp">#define TIMER_CCR1 </span><span class="op">(*(</span><span class="dt">volatile</span><span class="pp"> </span><span class="dt">uint32_t</span><span class="pp"> </span><span class="op">*)(</span><span class="pp">TIMER_BASE </span><span class="op">+</span><span class="pp"> </span><span class="bn">0x0C</span><span class="op">))</span></span>
 <span id="cb5-5"><a aria-label="5"></a></span>
-<span id="cb5-6"><a aria-label="6"></a><span class="dt">void</span> init_pwm<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb5-7"><a aria-label="7"></a>    TIMER_PSC <span class="op">=</span> <span class="dv">99</span><span class="op">;</span></span>
-<span id="cb5-8"><a aria-label="8"></a>    TIMER_ARR <span class="op">=</span> <span class="dv">1000</span><span class="op">;</span></span>
-<span id="cb5-9"><a aria-label="9"></a>    TIMER_CCR1 <span class="op">=</span> <span class="dv">0</span><span class="op">;</span>   <span class="co">/* 0 % */</span></span>
-<span id="cb5-10"><a aria-label="10"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-6"><a aria-label="6"></a><span class="co">/* Registerausschnitt, fiktiv. Kein vollstaendiger Treiber. */</span></span>
+<span id="cb5-7"><a aria-label="7"></a><span class="dt">void</span> init_pwm_registers<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb5-8"><a aria-label="8"></a>    TIMER_PSC <span class="op">=</span> <span class="dv">99</span><span class="op">;</span>     <span class="co">/* Teiler 100 */</span></span>
+<span id="cb5-9"><a aria-label="9"></a>    TIMER_ARR <span class="op">=</span> <span class="dv">999</span><span class="op">;</span>    <span class="co">/* N = 1000 */</span></span>
+<span id="cb5-10"><a aria-label="10"></a>    TIMER_CCR1 <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb5-11"><a aria-label="11"></a><span class="op">}</span></span>
+<span id="cb5-12"><a aria-label="12"></a><span class="co">/* Danach noch noetig: Takt, Pin-Mux, Modus, Polaritaet,</span></span>
+<span id="cb5-13"><a aria-label="13"></a><span class="co">   Preload, Kanal- und Timerfreigabe laut Datenblatt. */</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li>PSC: Takt drosseln</li>
 <li>ARR: Periode / Frequenz</li>
@@ -1911,11 +1980,12 @@ flowchart TD
 <h2>Hilfsfunktion: Prozent → CCR</h2>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb6-1"><a aria-label="1"></a><span class="dt">void</span> set_led_brightness<span class="op">(</span><span class="dt">uint8_t</span> percent<span class="op">)</span> <span class="op">{</span></span>
 <span id="cb6-2"><a aria-label="2"></a>    <span class="cf">if</span> <span class="op">(</span>percent <span class="op">&gt;</span> <span class="dv">100</span><span class="op">)</span> percent <span class="op">=</span> <span class="dv">100</span><span class="op">;</span></span>
-<span id="cb6-3"><a aria-label="3"></a>    <span class="dt">uint32_t</span> ccr <span class="op">=</span> <span class="op">(</span>percent <span class="op">*</span> TIMER_ARR<span class="op">)</span> <span class="op">/</span> <span class="dv">100</span><span class="op">;</span></span>
-<span id="cb6-4"><a aria-label="4"></a>    TIMER_CCR1 <span class="op">=</span> ccr<span class="op">;</span></span>
-<span id="cb6-5"><a aria-label="5"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-3"><a aria-label="3"></a>    <span class="dt">const</span> <span class="dt">uint32_t</span> N <span class="op">=</span> <span class="dv">1000</span><span class="bu">u</span><span class="op">;</span> <span class="co">/* ARR + 1 im Kernmodell */</span></span>
+<span id="cb6-4"><a aria-label="4"></a>    <span class="dt">uint32_t</span> ccr <span class="op">=</span> <span class="op">((</span><span class="dt">uint32_t</span><span class="op">)</span>percent <span class="op">*</span> N<span class="op">)</span> <span class="op">/</span> <span class="dv">100</span><span class="bu">u</span><span class="op">;</span></span>
+<span id="cb6-5"><a aria-label="5"></a>    TIMER_CCR1 <span class="op">=</span> ccr<span class="op">;</span></span>
+<span id="cb6-6"><a aria-label="6"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li>Menschen: Prozent; Hardware: 0 … ARR</li>
+<li>0, 25, 50 und 100 Prozent ergeben CCR 0, 250, 500 und 1000.</li>
 <li>Kleine Abstraktion erleichtert die Main-Logik</li>
 </ul>
 <aside class="notes">
@@ -1939,13 +2009,13 @@ flowchart TD
 <span id="cb7-3"><a aria-label="3"></a>    <span class="dt">int</span> brightness <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
 <span id="cb7-4"><a aria-label="4"></a>    <span class="cf">while</span> <span class="op">(</span><span class="dv">1</span><span class="op">)</span> <span class="op">{</span></span>
 <span id="cb7-5"><a aria-label="5"></a>        set_led_brightness<span class="op">(</span>brightness<span class="op">);</span></span>
-<span id="cb7-6"><a aria-label="6"></a>        brightness <span class="op">=</span> <span class="op">(</span>brightness <span class="op">+</span> <span class="dv">1</span><span class="op">)</span> <span class="op">%</span> <span class="dv">101</span><span class="op">;</span></span>
-<span id="cb7-7"><a aria-label="7"></a>        delay_ms<span class="op">(</span><span class="dv">10</span><span class="op">);</span>   <span class="co">/* oder SysTick aus Block 3 */</span></span>
+<span id="cb7-6"><a aria-label="6"></a>        brightness <span class="op">=</span> <span class="op">(</span>brightness <span class="op">+</span> <span class="dv">1</span><span class="op">)</span> <span class="op">%</span> <span class="dv">101</span><span class="op">;</span> <span class="co">/* Sprung 100 auf 0 */</span></span>
+<span id="cb7-7"><a aria-label="7"></a>        <span class="co">/* Deadline aus Block 3, kein blockierendes Warten als Gesundheitsbeweis */</span></span>
 <span id="cb7-8"><a aria-label="8"></a>        wdt_feed<span class="op">();</span></span>
 <span id="cb7-9"><a aria-label="9"></a>    <span class="op">}</span></span>
 <span id="cb7-10"><a aria-label="10"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li>Sanftes Hochdimmen; Feed beweist lebendige Hauptschleife</li>
+<li>Die Rampe springt von 100 auf 0. Ein Feed beweist nur, dass diese Schleife noch laeuft.</li>
 </ul>
 <aside class="notes">
 <p>Sauberer: Wartezeiten über SysTick statt busy <code>delay</code>. Wichtig bleibt: Feed nur hier, nicht in der ISR.</p>
@@ -1963,6 +2033,12 @@ flowchart TD
 </section>
 <section id="den-crash-provozieren" class="slide level2">
 <h2>Den Crash provozieren</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/04_aktorik_sicherheit/safe-state.png"></p>
+<figcaption>Von 1,2 bis 3,0 s laeuft PWM ohne Main. Reset und sicherer Aktorzustand fallen auseinander.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Watchdog-Timeout z. B. 2 s</li>
 <li>Button → künstlicher Deadlock ohne Feed</li>

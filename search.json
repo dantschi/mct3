@@ -3203,14 +3203,14 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#eva-schema",
     "title": "04 · Aktorik & Sicherheit",
     "section": "EVA — Schema",
-    "text": "EVA — Schema\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  E[Eingabe: Sensor] --&gt; V[Verarbeitung: SoC]\n  V --&gt; A[Ausgabe: Aktorik]\n  A --&gt; M[Motor / LED]\n  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nSchematisch: Sensor → SoC → Aktor. Heute steht der Ausgangspfad im Vordergrund."
+    "text": "EVA — Schema\n\n\n\nSteuerpfad, Leistungsweg und Watchdog sind getrennte Ebenen.\n\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  E[Eingabe: Sensor] --&gt; V[Verarbeitung: SoC]\n  V --&gt; A[Ausgabe: Aktorik]\n  A --&gt; M[Motor / LED]\n  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nSchematisch: Sensor → SoC → Aktor. Heute steht der Ausgangspfad im Vordergrund."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#das-problem-der-digitalen-welt",
     "href": "vorlesungen/04_aktorik_sicherheit.html#das-problem-der-digitalen-welt",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Das Problem der digitalen Welt",
-    "text": "Das Problem der digitalen Welt\n\nDie CPU lebt in einer binären Welt\nGPIO-Pin: typisch nur HIGH (z. B. \\(3{,}3\\,\\mathrm{V}\\)) oder LOW (\\(0\\,\\mathrm{V}\\))\nDilemma: halbe Helligkeit / halbe Kraft bräuchte Zwischenwerte (z. B. \\(1{,}65\\,\\mathrm{V}\\))\nViele MCU-Pins haben keinen stufenlosen Analogausgang (DAC)\nLösungsidee: Trägheit der realen Welt ausnutzen\n\n\nFundamentales Problem digitaler Aktorik: An oder Aus — kein Zwischenwert am Pin. Wir müssen mit Ein/Aus einen Mittelwert simulieren."
+    "text": "Das Problem der digitalen Welt\n\nDie CPU lebt in einer binären Welt\nGPIO-Pin: typisch nur HIGH (z. B. \\(3{,}3\\,\\mathrm{V}\\)) oder LOW (\\(0\\,\\mathrm{V}\\))\nDilemma: der Pin kennt nur zwei Pegel. Helligkeit und Kraft folgen nicht linear aus einem Zwischenwert.\nViele MCU-Pins haben keinen stufenlosen Analogausgang (DAC)\nLösungsidee: Trägheit der realen Welt ausnutzen\n\n\nFundamentales Problem digitaler Aktorik: An oder Aus — kein Zwischenwert am Pin. Wir müssen mit Ein/Aus einen Mittelwert simulieren."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#das-problem-der-software-fehler",
@@ -3238,7 +3238,7 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#die-leitfrage-des-tages",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Die Leitfrage des Tages",
-    "text": "Die Leitfrage des Tages\n\nSoC-Pin: oft maximal \\(3{,}3\\,\\mathrm{V}\\) (100 %) oder \\(0\\,\\mathrm{V}\\) (0 %)\nZiel: Motor mit ca. 50 % Leistung (\\(\\approx 1{,}65\\,\\mathrm{V}\\) Mittelwert)\nOhne externe Bauteile wie digitale Potentiometer\nWie dimmt man auf 50 %, wenn der Pin nur „Vollgas“ oder „Aus“ kennt?\n\n\nWie erzeugen wir „Grau“, wenn wir nur Schwarz und Weiß haben? Die Antwort liegt in schneller Umschaltung — und in Hardware, die das ohne CPU-Last erledigt."
+    "text": "Die Leitfrage des Tages\n\nSoC-Pin: oft maximal \\(3{,}3\\,\\mathrm{V}\\) (100 %) oder \\(0\\,\\mathrm{V}\\) (0 %)\nZiel im Beispiel: 50 Prozent Tastverhaeltnis. Das ist nicht allgemein halbe Motorleistung.\nOhne externe Bauteile wie digitale Potentiometer\nWie dimmt man auf 50 %, wenn der Pin nur „Vollgas“ oder „Aus“ kennt?\n\n\nWie erzeugen wir „Grau“, wenn wir nur Schwarz und Weiß haben? Die Antwort liegt in schneller Umschaltung — und in Hardware, die das ohne CPU-Last erledigt."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#leitfrage-schema",
@@ -3273,7 +3273,7 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#counter-kette-schema",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Counter-Kette — Schema",
-    "text": "Counter-Kette — Schema\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[System Clock\\n100 MHz] --&gt;|Takt| B[Prescaler PSC]\n  B --&gt;|verlangsamt| C[Counter CNT]\n  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nSchematisch: Systemtakt → Prescaler → Counter."
+    "text": "Counter-Kette — Schema\n\n\n\n100 MHz durch PSC+1. PSC 99 ergibt 1 MHz. 16 Bit hat 65536 Zustaende.\n\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[System Clock\\n100 MHz] --&gt;|Takt| B[Prescaler PSC]\n  B --&gt;|verlangsamt| C[Counter CNT]\n  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nSchematisch: Systemtakt → Prescaler → Counter."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#der-prescaler-vorteiler",
@@ -3329,7 +3329,7 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#die-analoge-illusion",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Die analoge Illusion",
-    "text": "Die analoge Illusion\n\nZurück zur Leitfrage: 50 % Motorleistung mit binärem Pin?\nTrick: Pin sehr schnell ein- und ausschalten\nBeispiel: 1 kHz, je Hälfte der Periode HIGH/LOW\nMotor und Auge sind zu träge, um dem Stottern zu folgen\nEffekt: Integration/Mittelung → wahrgenommene 50 % Leistung\n\n\nWenn Licht sehr schnell blinkt, mittelt das Auge die Helligkeit. Motoren mitteln über Masse und Induktivität ähnlich."
+    "text": "Die analoge Illusion\n\nZurück zur Leitfrage: 50 % Motorleistung mit binärem Pin?\nTrick: Pin sehr schnell ein- und ausschalten\nBeispiel: 1 kHz, je Hälfte der Periode HIGH/LOW\nMotor und Auge sind zu träge, um dem Stottern zu folgen\nEffekt: schnelles Schalten. Wahrnehmung und mechanische Wirkung sind davon zu trennen.\n\n\nWenn Licht sehr schnell blinkt, mittelt das Auge die Helligkeit. Motoren mitteln über Masse und Induktivität ähnlich."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#was-ist-pwm",
@@ -3357,28 +3357,28 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#duty-cycle-in-prozent",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Duty Cycle in Prozent",
-    "text": "Duty Cycle in Prozent\nBei konstanter Frequenz:\n\n\n\nDuty Cycle\nWirkung (qualitativ)\n\n\n\n\n10 %\nkurze Pulse; schwach\n\n\n50 %\nhalbe Kraft\n\n\n90 %\nfast dauerhaft HIGH\n\n\n\nDie Periode bleibt gleich — nur die fallende Flanke wandert.\n\nModulation der Pulsweite bei festem Raster: so steuern Sie die abgegebene Energie."
+    "text": "Duty Cycle in Prozent\nBei konstanter Frequenz:\n\n\n\nDuty Cycle\nWirkung (qualitativ)\n\n\n\n\n10 %\nkurze Pulse; schwach\n\n\n50 %\nhalbe aktive Zeit\n\n\n90 %\nfast dauerhaft HIGH\n\n\n\nDie Periode bleibt gleich — nur die fallende Flanke wandert.\n\nModulation der Pulsweite bei festem Raster: so steuern Sie die abgegebene Energie."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#mittlere-spannung-berechnen",
     "href": "vorlesungen/04_aktorik_sicherheit.html#mittlere-spannung-berechnen",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Mittlere Spannung berechnen",
-    "text": "Mittlere Spannung berechnen\nZeitlicher Mittelwert über die Periode (nicht der Effektivwert/RMS):\n\\[\n\\bar{V} = V_{\\mathrm{Pin}} \\times \\mathrm{Duty\\ Cycle}\n\\]\nBeispiel: \\(V_{\\mathrm{Pin}} = 3{,}3\\,\\mathrm{V}\\), Duty Cycle \\(= 25\\,\\%\\) \\(= 0{,}25\\)\n\\[\n\\bar{V} = 3{,}3\\,\\mathrm{V} \\times 0{,}25 = 0{,}825\\,\\mathrm{V}\n\\]\nZum Vergleich RMS eines Rechtecksignals: \\(V_{\\mathrm{RMS}} = V_{\\mathrm{Pin}} \\cdot \\sqrt{D}\\) — bei 25 % also \\(\\approx 1{,}65\\,\\mathrm{V}\\). Bei ohmscher Last skaliert die Leistung mit \\(D\\); der Mittelwert bleibt die Einstiegsnäherung für die „Scheinspannung“.\n\nEin langsames Multimeter zeigt oft näherungsweise den Mittelwert — die Physik „glättet“ das Rechteck. Effektivwert (RMS) und Mittelwert sind verschieden; bei ohmscher Last passt „50 % Duty → 50 % Leistung“ zum Mittelwert-Pfad über \\(P \\propto D\\)."
+    "text": "Mittlere Spannung berechnen\n\n\n\n25 Prozent: Mittelwert 0,825 V, RMS 1,65 V. Ohmsche Rechteckleistung ist nicht Vmittel zum Quadrat durch R.\n\n\nZeitlicher Mittelwert über die Periode (nicht der Effektivwert/RMS):\n\\[\n\\bar{V} = V_{\\mathrm{Pin}} \\times \\mathrm{Duty\\ Cycle}\n\\]\nBeispiel: \\(V_{\\mathrm{Pin}} = 3{,}3\\,\\mathrm{V}\\), Duty Cycle \\(= 25\\,\\%\\) \\(= 0{,}25\\)\n\\[\n\\bar{V} = 3{,}3\\,\\mathrm{V} \\times 0{,}25 = 0{,}825\\,\\mathrm{V}\n\\]\nZum Vergleich RMS eines Rechtecksignals: \\(V_{\\mathrm{RMS}} = V_{\\mathrm{Pin}} \\cdot \\sqrt{D}\\) — bei 25 % also \\(\\approx 1{,}65\\,\\mathrm{V}\\). Bei idealer ohmscher Last gilt \\(P=D\\cdot V^2/R\\), nicht \\(V_{\\mathrm{avg}}^2/R\\) fuer das ungefilterte Rechteck.\n\nMittelwert, RMS und Leistung sind drei Groessen. Ein langsames Multimeter zeigt nicht automatisch den Mittelwert; Modus und Bandbreite entscheiden. 50 Prozent Duty ist keine halbe Motorleistung."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#auflösung-resolution",
     "href": "vorlesungen/04_aktorik_sicherheit.html#auflösung-resolution",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Auflösung (Resolution)",
-    "text": "Auflösung (Resolution)\n\nFeinheit des Dimmens, oft in Bit; gebunden an Counter/ARR\n8 Bit: 256 Stufen \\(\\Rightarrow\\) Schritt \\(\\approx 100\\%/256 \\approx 0{,}39\\%\\)\n16 Bit: \\(65\\,536\\) Stufen — sehr feines Fading\nZu grobe Stufen: sichtbarer Treppeneffekt bei LEDs\n\n\nARR und Counterbreite begrenzen die nutzbare Auflösung. Für sanftes LED-Fading oft 12–16 Bit wünschenswert."
+    "text": "Auflösung (Resolution)\n\n\n\nBei 1 MHz: 1 kHz hat 0,1 Prozent Schritt, 20 kHz hat 2 Prozent.\n\n\n\nFeinheit des Dimmens, oft in Bit; gebunden an Counter/ARR\n8 Bit: 256 Stufen \\(\\Rightarrow\\) Schritt \\(\\approx 100\\%/256 \\approx 0{,}39\\%\\)\n16 Bit: \\(65\\,536\\) Stufen — sehr feines Fading\nZu grobe Stufen: sichtbarer Treppeneffekt bei LEDs\n\n\nARR und Counterbreite begrenzen die nutzbare Auflösung. Für sanftes LED-Fading oft 12–16 Bit wünschenswert."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#warum-nicht-software-bit-banging",
     "href": "vorlesungen/04_aktorik_sicherheit.html#warum-nicht-software-bit-banging",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Warum nicht Software? (Bit-Banging)",
-    "text": "Warum nicht Software? (Bit-Banging)\n/* Software-PWM — blockiert die CPU */\nwhile (1) {\n    set_pin_high();\n    delay_us(50);   /* 50 % HIGH */\n    set_pin_low();\n    delay_us(50);\n}\n\nCPU zu 100 % im Busy Waiting — keine andere Arbeit\nJeder Interrupt zerstört das Timing\n\n\nBit-Banging ist in Embedded-Systemen meist ungeeignet: die CPU ist gebunden und kann Sensorik/Netzwerk nicht zuverlässig bedienen."
+    "text": "Warum nicht Software? (Bit-Banging)\n\n\n\n20 us verspaetete Flanke: Periode 120 us, etwa 58,3 Prozent. Hardware-PWM folgt dem Timer.\n\n\n/* Software-PWM — blockiert die CPU */\nwhile (1) {\n    set_pin_high();\n    delay_us(50);   /* 50 % HIGH */\n    set_pin_low();\n    delay_us(50);\n}\n\nCPU zu 100 % im Busy Waiting — keine andere Arbeit\nJeder Interrupt zerstört das Timing\n\n\nBit-Banging ist in Embedded-Systemen meist ungeeignet: die CPU ist gebunden und kann Sensorik/Netzwerk nicht zuverlässig bedienen."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#timing-problem-jitter",
@@ -3434,7 +3434,7 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#edge-aligned-pwm",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Edge-Aligned PWM",
-    "text": "Edge-Aligned PWM\n\nUp-Counting (Sägezahn) + Vergleich mit CCR → Edge-Aligned PWM\nBeispiel: ARR = 999, CCR = 250 → exakt 25 % Duty Cycle (Periode \\(0\\ldots999\\) = 1000 Takte)\nPin HIGH von 0 bis unter CCR, danach LOW bis ARR, dann Reset\n\n\nFlankenausgerichtet: ein Sägezahn-Durchlauf, eine klare HIGH-Phase am Anfang der Periode. Mit \\(ARR = 999\\) und Zählung \\(0\\ldots999\\) ist die Periodenlänge exakt 1000 — analog zur „PSC+1”-Falle beim Prescaler. Ob Ihr Chip \\(ARR\\) oder \\(ARR+1\\) als Periodenlänge zählt, steht im Datenblatt."
+    "text": "Edge-Aligned PWM\n\n\n\nCNT 0 bis 999, CCR 250: 250 aktive und 750 inaktive Tickintervalle.\n\n\n\nUp-Counting (Sägezahn) + Vergleich mit CCR → Edge-Aligned PWM\nBeispiel: ARR = 999, CCR = 250 → exakt 25 % Duty Cycle (Periode \\(0\\ldots999\\) = 1000 Takte)\nPin HIGH von 0 bis unter CCR, danach LOW bis ARR, dann Reset\n\n\nFlankenausgerichtet: ein Sägezahn-Durchlauf, eine klare HIGH-Phase am Anfang der Periode. Mit \\(ARR = 999\\) und Zählung \\(0\\ldots999\\) ist die Periodenlänge exakt 1000 — analog zur „PSC+1”-Falle beim Prescaler. Ob Ihr Chip \\(ARR\\) oder \\(ARR+1\\) als Periodenlänge zählt, steht im Datenblatt."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#schritt-1-start-pin-high",
@@ -3462,7 +3462,7 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#die-polarität-polarity",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Die Polarität (Polarity)",
-    "text": "Die Polarität (Polarity)\n\nBisher Active-High: CNT &lt; CCR → Pin HIGH\nAlternative: Active-Low — Logik invertiert\nWichtig bei invertierter Beschaltung (z. B. Common-Anode-LEDs, manche Treiber)\nTypisch: Polarity-Bit im Timer-Konfigurationsregister\n\n\nLaborfalle: Duty Cycle erhöhen und die LED wird dunkler → oft Active-Low. Polarity-Bit setzen, statt die Software-Logik zu verdrehen."
+    "text": "Die Polarität (Polarity)\n\n\n\nPreload wird erst beim Update aktiv. Drei Kanaele und Gamma-CCR 0, 47, 218, 531, 1000.\n\n\n\n\n\nRGB und Gamma sind ein Lehrmodell, keine Farbgarantie.\n\n\n\nBisher Active-High: CNT &lt; CCR → Pin HIGH\nAlternative: Active-Low — Logik invertiert\nWichtig bei invertierter Beschaltung (z. B. Common-Anode-LEDs, manche Treiber)\nTypisch: Polarity-Bit im Timer-Konfigurationsregister\n\n\nLaborfalle: Duty Cycle erhöhen und die LED wird dunkler → oft Active-Low. Polarity-Bit setzen, statt die Software-Logik zu verdrehen."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#mehrere-kanäle-an-einem-timer",
@@ -3490,7 +3490,7 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#anwendung-servomotoren",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Anwendung: Servomotoren",
-    "text": "Anwendung: Servomotoren\n\nHier ist PWM oft Datenprotokoll, nicht reine Leistungsübertragung\nTypisch: 50 Hz (Periode 20 ms)\nPulsbreite steuert den Winkel:\n\n\\(1{,}0\\,\\mathrm{ms}\\) → eine Endlage\n\\(1{,}5\\,\\mathrm{ms}\\) → Mitte\n\\(2{,}0\\,\\mathrm{ms}\\) → andere Endlage\n\nMotorleistung kommt über separate Versorgung\n\n\nLED-Dimmen: Energieanteil. RC-Servo: Impulsbreite als Information. Die interne Elektronik des Servos setzt den Winkel um."
+    "text": "Anwendung: Servomotoren\n\n\n\nRC-Glied, Servo mit 20 ms und H-Bruecke sind drei verschiedene Anwendungen.\n\n\n\nHier ist PWM oft Datenprotokoll, nicht reine Leistungsübertragung\nTypisch: 50 Hz (Periode 20 ms)\nPulsbreite steuert den Winkel:\n\n\\(1{,}0\\,\\mathrm{ms}\\) → eine Endlage\n\\(1{,}5\\,\\mathrm{ms}\\) → Mitte\n\\(2{,}0\\,\\mathrm{ms}\\) → andere Endlage\n\nMotorleistung kommt über separate Versorgung\n\n\nLED-Dimmen: Energieanteil. RC-Servo: Impulsbreite als Information. Die interne Elektronik des Servos setzt den Winkel um."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#anwendung-dc-motoren-und-h-brücke",
@@ -3546,7 +3546,7 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#architektur-des-wdt",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Architektur des WDT",
-    "text": "Architektur des WDT\n\nOft Down-Counter\nBeim Start: Timeout-Wert laden (z. B. äquivalent zu 5 s) und starten\nZählt rückwärts; bei vielen SoCs nach Aktivierung nicht mehr abschaltbar\nEinfachheit ist Sicherheitsfeature\n\n\nWenige Features, harte Semantik: einmal scharf, oft nicht per Software zu stoppen — auch gegen Missbrauch nach Kompromittierung."
+    "text": "Architektur des WDT\n\n\n\nFeeds bei 0, 0,5 und 1 s, idealer Reset bei 3 s. 0xAA55 ist fiktiv.\n\n\n\nOft Down-Counter\nBeim Start: Timeout-Wert laden (z. B. äquivalent zu 5 s) und starten\nZählt rückwärts; bei vielen SoCs nach Aktivierung nicht mehr abschaltbar\nEinfachheit ist Sicherheitsfeature\n\n\nWenige Features, harte Semantik: einmal scharf, oft nicht per Software zu stoppen — auch gegen Missbrauch nach Kompromittierung."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#der-biss-des-hundes",
@@ -3581,7 +3581,7 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#window-watchdog-wwdg",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Window Watchdog (WWDG)",
-    "text": "Window Watchdog (WWDG)\n\nNormaler WDT: erkennt zu langsames Füttern (Timeout)\nProblem: fehlerhafter Code füttert zu oft / zu früh\nWindow Watchdog: Füttern nur in einem Zeitfenster erlaubt\nZu früh oder zu spät → Reset\n\n\n\n\nZeitpunkt\nBewertung\n\n\n\n\nvor Fenster\nReset (zu früh)\n\n\nim Fenster\nOK\n\n\nnach Timeout\nReset (zu spät)\n\n\n\n\nFür kritische Systeme: das Fenster beweist, dass die Software im erwarteten Takt läuft — nicht nur „irgendwie noch füttert“."
+    "text": "Window Watchdog (WWDG)\n\n\n\nWeiterfuettern aus dem Tick verdeckt einen Haenger. Fenster und Normal-Feed sind verschieden.\n\n\n\nNormaler WDT: erkennt zu langsames Füttern (Timeout)\nProblem: fehlerhafter Code füttert zu oft / zu früh\nWindow Watchdog: Füttern nur in einem Zeitfenster erlaubt\nZu früh oder zu spät → Reset\n\n\n\n\nZeitpunkt\nBewertung\n\n\n\n\nvor Fenster\nReset (zu früh)\n\n\nim Fenster\nOK\n\n\nnach Timeout\nReset (zu spät)\n\n\n\n\nFür kritische Systeme: das Fenster beweist, dass die Software im erwarteten Takt läuft — nicht nur „irgendwie noch füttert“."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#zusammenfassung-watchdog",
@@ -3609,28 +3609,28 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#mmio-register-für-den-timer",
     "title": "04 · Aktorik & Sicherheit",
     "section": "MMIO-Register für den Timer",
-    "text": "MMIO-Register für den Timer\nBeispielhafte Adressen (fiktiv — immer Datenblatt prüfen):\n#define TIMER_BASE 0x40000000\n#define TIMER_PSC  (*(volatile uint32_t *)(TIMER_BASE + 0x00))\n#define TIMER_ARR  (*(volatile uint32_t *)(TIMER_BASE + 0x04))\n#define TIMER_CCR1 (*(volatile uint32_t *)(TIMER_BASE + 0x0C))\n\nvoid init_pwm(void) {\n    TIMER_PSC = 99;\n    TIMER_ARR = 1000;\n    TIMER_CCR1 = 0;   /* 0 % */\n}\n\nPSC: Takt drosseln\nARR: Periode / Frequenz\nCCR1: Duty Cycle Kanal 1\n\n\nHardware-nahe C-Programmierung: Werte aus dem Datenblatt in MMIO-Register schreiben."
+    "text": "MMIO-Register für den Timer\nBeispielhafte Adressen (fiktiv — immer Datenblatt prüfen):\n#define TIMER_BASE 0x40000000\n#define TIMER_PSC  (*(volatile uint32_t *)(TIMER_BASE + 0x00))\n#define TIMER_ARR  (*(volatile uint32_t *)(TIMER_BASE + 0x04))\n#define TIMER_CCR1 (*(volatile uint32_t *)(TIMER_BASE + 0x0C))\n\n/* Registerausschnitt, fiktiv. Kein vollstaendiger Treiber. */\nvoid init_pwm_registers(void) {\n    TIMER_PSC = 99;     /* Teiler 100 */\n    TIMER_ARR = 999;    /* N = 1000 */\n    TIMER_CCR1 = 0;\n}\n/* Danach noch noetig: Takt, Pin-Mux, Modus, Polaritaet,\n   Preload, Kanal- und Timerfreigabe laut Datenblatt. */\n\nPSC: Takt drosseln\nARR: Periode / Frequenz\nCCR1: Duty Cycle Kanal 1\n\n\nHardware-nahe C-Programmierung: Werte aus dem Datenblatt in MMIO-Register schreiben."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#hilfsfunktion-prozent-ccr",
     "href": "vorlesungen/04_aktorik_sicherheit.html#hilfsfunktion-prozent-ccr",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Hilfsfunktion: Prozent → CCR",
-    "text": "Hilfsfunktion: Prozent → CCR\nvoid set_led_brightness(uint8_t percent) {\n    if (percent &gt; 100) percent = 100;\n    uint32_t ccr = (percent * TIMER_ARR) / 100;\n    TIMER_CCR1 = ccr;\n}\n\nMenschen: Prozent; Hardware: 0 … ARR\nKleine Abstraktion erleichtert die Main-Logik\n\n\nTypische HAL-Schicht: set_led_brightness(50) statt roher Registerarithmetik in jedem Aufrufer."
+    "text": "Hilfsfunktion: Prozent → CCR\nvoid set_led_brightness(uint8_t percent) {\n    if (percent &gt; 100) percent = 100;\n    const uint32_t N = 1000u; /* ARR + 1 im Kernmodell */\n    uint32_t ccr = ((uint32_t)percent * N) / 100u;\n    TIMER_CCR1 = ccr;\n}\n\n0, 25, 50 und 100 Prozent ergeben CCR 0, 250, 500 und 1000.\nKleine Abstraktion erleichtert die Main-Logik\n\n\nTypische HAL-Schicht: set_led_brightness(50) statt roher Registerarithmetik in jedem Aufrufer."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#fading-in-der-main-schleife",
     "href": "vorlesungen/04_aktorik_sicherheit.html#fading-in-der-main-schleife",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Fading in der Main-Schleife",
-    "text": "Fading in der Main-Schleife\nint main(void) {\n    init_pwm();\n    int brightness = 0;\n    while (1) {\n        set_led_brightness(brightness);\n        brightness = (brightness + 1) % 101;\n        delay_ms(10);   /* oder SysTick aus Block 3 */\n        wdt_feed();\n    }\n}\n\nSanftes Hochdimmen; Feed beweist lebendige Hauptschleife\n\n\nSauberer: Wartezeiten über SysTick statt busy delay. Wichtig bleibt: Feed nur hier, nicht in der ISR."
+    "text": "Fading in der Main-Schleife\nint main(void) {\n    init_pwm();\n    int brightness = 0;\n    while (1) {\n        set_led_brightness(brightness);\n        brightness = (brightness + 1) % 101; /* Sprung 100 auf 0 */\n        /* Deadline aus Block 3, kein blockierendes Warten als Gesundheitsbeweis */\n        wdt_feed();\n    }\n}\n\nDie Rampe springt von 100 auf 0. Ein Feed beweist nur, dass diese Schleife noch laeuft.\n\n\nSauberer: Wartezeiten über SysTick statt busy delay. Wichtig bleibt: Feed nur hier, nicht in der ISR."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#den-crash-provozieren",
     "href": "vorlesungen/04_aktorik_sicherheit.html#den-crash-provozieren",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Den Crash provozieren",
-    "text": "Den Crash provozieren\n\nWatchdog-Timeout z. B. 2 s\nButton → künstlicher Deadlock ohne Feed\n\nif (button_pressed()) {\n    printf(\"Freeze — warte auf WDT...\\n\");\n    while (1) {\n        /* kein wdt_feed() */\n    }\n}\n\nPWM-Hardware kann die LED-Helligkeit halten, während main hängt. Nach Timeout: harter Reset durch den WDT."
+    "text": "Den Crash provozieren\n\n\n\nVon 1,2 bis 3,0 s laeuft PWM ohne Main. Reset und sicherer Aktorzustand fallen auseinander.\n\n\n\nWatchdog-Timeout z. B. 2 s\nButton → künstlicher Deadlock ohne Feed\n\nif (button_pressed()) {\n    printf(\"Freeze — warte auf WDT...\\n\");\n    while (1) {\n        /* kein wdt_feed() */\n    }\n}\n\nPWM-Hardware kann die LED-Helligkeit halten, während main hängt. Nach Timeout: harter Reset durch den WDT."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#reset-ursache-lesen",
