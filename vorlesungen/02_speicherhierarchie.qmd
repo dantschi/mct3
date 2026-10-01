@@ -6,7 +6,14 @@ author: "Prof. Dr.-Ing. Daniel Klünder"
 #           (Notizen nur mit Taste S)
 # Handout:  quarto render vorlesungen/02_speicherhierarchie.qmd --profile handout --to pdf
 #           → _handout/vorlesungen/02_speicherhierarchie.pdf
-format: revealjs
+format:
+  revealjs: {}
+  pdf:
+    include-in-header:
+      text: |
+          \renewcommand{\includegraphics}[2][]{%
+            \dhbwOldIncludegraphics[max width=0.98\linewidth,max height=0.38\textheight,keepaspectratio,center,#1]{#2}%
+          }
 lang: de
 ---
 
@@ -53,7 +60,7 @@ In Block 1 haben wir Memory Map und Linker-Skript konzeptionell eingeführt; das
 
 Aus Block 1 (Spickzettel) — die Motivation für Caches:
 
-- SRAM (6T): extrem schnell, teuer, flächenintensiv → Caches/Register
+- SRAM: schnell und flächenintensiv, häufig für Caches. Registerfiles können auch aus Flip-Flops oder Latches bestehen, nicht nur aus 6T-Zellen
 - DRAM (1T1C): dicht und günstig, aber hohe Latenz (Refresh, Multiplexing)
 - Wunsch „alles SRAM“ ist wirtschaftlich und flächenmäßig unrealistisch
 
@@ -71,20 +78,19 @@ Kurz wiederholt aus Block 1: SRAM ist schnell, aber teuer; DRAM fasst Gigabytes,
 
 ## Die CPU hungert — das Latenz-Problem
 
-- Moderne CPU: ca. 3–5 GHz ($\approx 0{,}2$–$0{,}3\,\mathrm{ns}$ pro Takt)
+- Moderne CPU: ca. 3–5 GHz
 - DRAM-Latenz: ca. 50–100 ns
-- Mismatch: Faktor $\approx 100$–$300$
-- Folge: jedes `lw` könnte hunderte Taktzyklen Stillstand bedeuten
-- Pipeline aus MCT1 würde durch diesen Load-Use Hazard weitgehend entwertet
+- Daraus folgen grob 150–500 Takte, nicht 100–300
+- Das einfache blockierende Modell unten nutzt getrennt 100 Takte Wartezeit
 
-| Schritt | Dauer (schematisch) |
-|---------|---------------------|
+| Schritt | Dauer (einfaches blockierendes Modell) |
+|---------|----------------------------------------|
 | ALU Add | 1 Takt |
-| Warten auf DRAM | $\approx 100$ Takte |
+| Warten auf DRAM | 100 Takte in diesem Modell |
 | ALU Sub | 1 Takt |
 
 ::: notes
-Hier ist unser fundamentales Problem. Unsere RISC-V Pipeline aus dem letzten Semester kann jeden Takt einen Befehl verarbeiten. Wenn wir jetzt einen Load-Befehl ausführen und auf den DRAM warten müssen, friert die gesamte CPU für 300 Taktzyklen ein. Das ist so, als ob Sie an Ihrem Schreibtisch arbeiten und für jedes einzelne Blatt Papier, das Sie lesen wollen, in den Keller ins Archiv laufen müssten.
+3 GHz und 100 ns ergeben 300 Takte. Die Spanne 3–5 GHz mal 50–100 ns ist etwa 150–500 Takte. Ein Stall friert nicht jede moderne CPU vollständig ein; das Modell hier ist die einfache Pipeline aus MCT1.
 :::
 
 ## Die Illusion erschaffen
@@ -144,22 +150,11 @@ Am Ende dieser Vorlesung können Sie Memory Wall, Lokalität und AMAT erklären 
 - Ein Cache ist nutzlos, wenn nicht die benötigten Daten darin liegen
 - Hardware muss „ahnen“, was die Software als Nächstes tut
 - Problem: Silizium kann keine C-Programme lesen und nicht in die Zukunft sehen
-- Leitfrage: Wie errät eine dumme Schaltung mit $\approx 95\,\%$ Genauigkeit die nächsten Adressen?
-- Die Antwort hat die moderne Informatik gerettet
-
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  A["Hardware sieht Load 0x1000"] --> B{Nächster Zugriff?}
-  B --> C["0x8000?"]
-  B --> D["wieder 0x1000?"]
-  B --> E["0x1004?"]
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+- Leitfrage: Welche Adressmuster nutzt ein Cache ohne das C-Programm zu lesen?
+- Eine Hit Rate von 95 % ist ein Rechenbeispiel, keine Garantie und keine Vorhersagegenauigkeit der nächsten Adresse
 
 ::: notes
-Das ist das zentrale Rätsel der heutigen Vorlesung. Wenn ich in den Keller laufe, um eine Akte zu holen, muss ich wissen, welche Akten ich gleich mit nach oben nehmen soll, sonst laufe ich ständig Treppen. Aber der Cache ist eine simple Hardware-Schaltung. Er hat keine künstliche Intelligenz. Er sieht nur nackte Adressen aufklicken. Wie schafft er es trotzdem, fast immer das Richtige bereitzuhalten?
+Der Cache speichert Blöcke und behält sie. Prefetching ist eine optionale zusätzliche Wette, nicht dasselbe wie die Hit Rate.
 :::
 
 ## Die Memory Wall im Detail
@@ -176,10 +171,10 @@ Das ist das zentrale Rätsel der heutigen Vorlesung. Wenn ich in den Keller lauf
 | 2000 | $\approx 100\times$ | $\approx 4\times$ |
 | 2020 | $\approx 10\,000\times$ | $\approx 16\times$ |
 
-*Schematisch — Trendillustration nach Harris/Harris bzw. Patterson/Hennessy, keine Messreihe.*
+*Schematische Trendillustration, workloadabhängig. Keine Messreihe und kein Beweis für 0 % Mehrleistung.*
 
 ::: notes
-Wir haben es bereits kurz in Block 1 angeschnitten, aber hier ist die dramatische Entwicklung. Architekten haben die Pipelines immer tiefer gemacht und die Taktraten erhöht. Aber der DRAM-Speicher ist auf seinem Kondensator-Prinzip sitzen geblieben. Die Latenz sank kaum. Irgendwann in den 1990er Jahren traf die CPU-Entwicklung auf eine Wand. Eine schnellere CPU brachte 0 % mehr Leistung bei speicherlastigen Programmen.
+Latenz und Bandbreite sind verschiedene Größen. Eine schnellere CPU kann bei speichergebundenen Programmen wenig bringen; „0 %“ wäre nur ein Extremfall, keine allgemeine Aussage.
 :::
 
 ## Zyklen vs. Zugriffszeiten
@@ -197,20 +192,17 @@ Zahlen sprechen lauter als Worte. Bei 3 Gigahertz tickt die Uhr der CPU alle 0,3
 
 ## Stalls und Bubbles — Link zu MCT1
 
-- Während des Wartens greift die Hazard Detection Unit ein
-- Massiver Load-Use Hazard
-- Fetch- und Decode-Stufen frieren ein
-- Hardware schiebt Bubbles (NOPs) in Execute
-- Teurer Prozessor: Strom ohne Nutzarbeit
+- Hazard-Logik kann im einfachen blockierenden Modell Fetch und Decode anhalten
+- Eine Bubble ist ein eingefügter Leertakt, keine aus dem Speicher geladene NOP-Instruktion
+- Unabhängige Befehle können in anderen Implementierungen weiterlaufen
 
 ```riscv
-lw  t0, 0(s1)      # startet lange Wartezeit
-# --- hier entstehen hunderte Bubbles ---
-add t1, t0, t2     # muss auf Daten warten
+lw   t0, 0(a0)     # abhängiger Load, blockierendes Modell
+add  t1, t0, t2    # wartet auf t0
 ```
 
 ::: notes
-Schlagen wir die Brücke zu unserem Wissen aus MCT1. Wir kennen die Konsequenz aus Pipelining-Sicht. Das ist ein extremer Load-Use Hazard. Die Hazard Unit muss die Pipeline anhalten (Stall) und wirft hunderte von leeren Blasen (NOPs) in das Fließband. Die Kühlung läuft, der Stromzähler dreht sich, aber es werden keine Berechnungen durchgeführt.
+Hunderte Bubbles beschreiben dieses Lehr-Modell, nicht jede Out-of-Order-CPU.
 :::
 
 ## Die Lösung: Speicherhierarchie
@@ -221,19 +213,13 @@ Schlagen wir die Brücke zu unserem Wissen aus MCT1. Wir kennen die Konsequenz a
 - Main Memory: riesig (z. B. 16 GB), DRAM, $\approx 300$ Takte
 - Hardware kopiert Blöcke automatisch zwischen den Schichten
 
-```{mermaid}
-%%| fig-width: 3.6
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  A[CPU] <--> B["L1: 32 KB"]
-  B <--> C["L2: 512 KB"]
-  C <--> D["L3: 32 MB"]
-  D <--> E["DRAM: 16 GB"]
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+![Fetch geht zum L1-I, Datenzugriff zum L1-D. Ein L1-Miss fragt die nächste Ebene, nicht zwingend DRAM.](../assets/figures/02_speicherhierarchie/hierarchy.png)
+
+- L1 klein und nah, weitere SRAM-Ebenen größer, DRAM oft die unterste Ebene
+- Takte auf der Folie sind Größenordnungen, keine Messreihe
 
 ::: notes
-Da wir das physikalische Dreieck (schnell, groß, billig) nicht besiegen können, kombinieren wir alles. Wir bauen Caches in mehreren Leveln. Fällt das gesuchte Datum nicht im L1-Cache an, fragt dieser den L2. Fällt es dort nicht an, fragt der den L3, und erst dann geht es zum DRAM. Das Geniale daran: Sie als Software-Entwickler müssen diese Kopiervorgänge nicht programmieren. Die Hardware macht das völlig unsichtbar im Hintergrund.
+Nicht jeder L1-Miss geht bis zum DRAM. Ein Treffer in L2 bleibt in der Hierarchie.
 :::
 
 ## Die Geheimwaffe: Lokalitätsprinzip
@@ -260,22 +246,19 @@ Die erste Säule ist die zeitliche Lokalität. Die Regel lautet: Was gerade benu
 
 ## Zeitliche Lokalität im C-Code
 
-- Schleifenzähler `i` und Grenze `limit`: in jedem Durchlauf gelesen
-- Auch die Befehle der Schleife werden hundertfach erneut geladen
-- Nach dem ersten Durchlauf: Hits aus dem L1-SRAM
+Die Schleife selbst zeigt zeitliche Lokalität der *Befehle* (L1-I). `i`, `sum` und `limit` können in Registern liegen oder wegoptimiert werden. Sie sind kein Beweis für wiederholte Data-Cache-Loads.
 
-```c
-int limit = 1000;
-int sum = 0;
-
-for (int i = 0; i < limit; i++) {
-    // i, sum und limit: hohe zeitliche Lokalität
-    sum += i;
-}
+```asm
+# explizite Load-Folge, nicht das optimierte Ergebnis der Schleife
+lw t0, 0(a0)    # 0x1000
+lw t0, 0(a0)    # wieder 0x1000
+lw t1, 4(a0)    # 0x1004, räumlich
 ```
 
+![Zeitliche Wiederholung derselben Adresse gegen benachbarte Adressen in einer Line.](../assets/figures/02_speicherhierarchie/locality.png)
+
 ::: notes
-Schauen Sie sich diesen simplen C-Code an. In dieser For-Schleife wird die Variable i tausendmal gelesen und geschrieben. Die Variable limit wird tausendmal gelesen. Die Maschinenbefehle der Schleife werden tausendmal ausgeführt. Der Cache muss also nur beim allerersten Durchlauf auf den langsamen DRAM warten. Für die restlichen 999 Durchläufe liegen die Variablen und die Befehle bereits im L1-Cache bereit!
+`volatile` kann Loads erzwingen, ist aber keine Optimierungsstrategie und umgeht den Cache nicht. Lösung der Übungsfrage: 0x1000, 0x1000 ist zeitlich; 0x1000, 0x1004 ist räumlich. Im Assembler oben existieren genau diese drei Loads.
 :::
 
 ## Säule 2: Räumliche Lokalität
@@ -312,11 +295,11 @@ Warum stimmt diese Wette der Hardware fast immer? Weil Code sequenziell ist. Der
 
 ## Array vs. Linked List
 
-- Pointer-Ketten: Knoten oft per `malloc()` im Speicher verstreut
-- Nachbarn liegen physikalisch oft Megabytes auseinander
-- Folge: räumliche Lokalität bricht zusammen
-- Cache lädt Blöcke — Nachbardaten sind für die Liste oft nutzlos
-- Linked Lists erzeugen viele Cache Misses; Arrays sind cache-freundlicher
+- Pointer-Knoten können verstreut liegen; das ist möglich, nicht zwingend
+- Dann füllt eine Line Nachbardaten, die der nächste Knoten nicht nutzt
+- Ein kompaktes Listenlayout kann räumliche Lokalität behalten
+
+![Array nutzt eine Line gemeinsam. Die Liste ist ein mögliches Streulayout.](../assets/figures/02_speicherhierarchie/array-list.png)
 
 ::: notes
 Das ist eine fundamentale Erkenntnis für Sie als Software-Entwickler. In der Informatik lernt man oft, dass verkettete Listen wegen flexibler Einfügeoperationen attraktiv sind. Aus Sicht der modernen Hardware sind sie problematisch: Die Knoten liegen quer im RAM verstreut. Der Cache lädt bei Knoten 1 oft Daten mit, die für Knoten 2 nutzlos sind. Arrays sind auf modernen CPUs deshalb oft um ein Vielfaches schneller — allein wegen besserer Cache-Nutzung.
@@ -324,41 +307,27 @@ Das ist eine fundamentale Erkenntnis für Sie als Software-Entwickler. In der In
 
 ## Layout im Speicher: Array vs. Liste
 
-```{mermaid}
-%%| fig-width: 4.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A["Array 0x1000"] --> B["0x1004"] --> C["0x1008"] --> D["0x100C"]
-  E["List 0x2000"] -.-> F["0x8040"] -.-> G["0x4010"] -.-> H["0x9000"]
-  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-  style C fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+Die Abbildung steht auf der vorigen Folie: zusammenhängende Wörter gegen ein ausdrücklich mögliches Streulayout.
 
 ::: notes
-Oben: Array-Elemente liegen physikalisch hintereinander — ideal für räumliche Lokalität. Unten: verkettete Liste mit Streuung im Adressraum — der Cache kann Nachbarn kaum sinnvoll mitnutzen.
+Nicht jede Liste ist cache-feindlich. Ein Array in C liegt im Beispiel dicht.
 :::
 
 ## Die 90/10-Regel
 
-- Faustregel: $\approx 90\,\%$ der Ausführungszeit in $\approx 10\,\%$ des Codes
-- Typisch: innere Schleifen (Rendering, Matrizen, …)
-- Dieser Hotspot passt oft vollständig in den kleinen L1-Cache
-- Deshalb kann 32 KB Cache ein 16-GB-DRAM-System massiv beschleunigen
+- Faustregel, workloadabhängig: oft liegt viel Laufzeit in wenig Code
+- Der übrige Code wird nicht grundsätzlich nur einmal geladen
 
 ::: notes
-Diese empirische Regel rettet die Architektur. Sie schreiben vielleicht ein Programm mit Millionen Zeilen Code, aber der Computer rechnet die meiste Zeit in einer winzigen For-Schleife tief im Algorithmus. Dieser winzige Hotspot passt perfekt in unseren winzigen L1-Cache. Der restliche Code stört nicht, er wird nur einmal beim Start geladen.
+„90/10“ ist eine Orientierung, keine Garantie. Der Rest des Programms kann ebenfalls wiederholt ausgeführt werden.
 :::
 
-## Fragen? — Lokalität und Memory Wall
+## Übung — Lokalität
 
-- Fragen zur Memory Wall?
-- Zeitliche vs. räumliche Lokalität klar?
-- Warum sind Arrays cache-freundlicher als Linked Lists?
+Welche Folge ist zeitlich, welche räumlich: `0x1000, 0x1000` oder `0x1000, 0x1004`? Welche Loads stehen im gezeigten Assembler wirklich?
 
 ::: notes
-Bevor wir die konkreten Vokabeln und Formeln klären: Sind diese Grundprinzipien klar? Die gesamte Existenzberechtigung von Caches basiert auf der Annahme, dass Software sich vorhersagbar verhält.
+Zeitlich: zweimal 0x1000. Räumlich: 0x1000 dann 0x1004 in derselben 64-Byte-Line. Der Assembler enthält genau diese drei `lw`, nicht die C-Variablen i, sum und limit.
 :::
 
 ## Was ist ein Cache?
@@ -381,17 +350,7 @@ Wir klären nun das Vokabular. Wichtig ist: Der Cache ist unsichtbar. In MCT1 ha
 - Vorteil: Fetch und Memory gleichzeitig, ohne Streit um denselben Port
 - L2 oft unified (gemeinsam für Code und Daten)
 
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  Fetch --> L1i[L1 Instruction]
-  Memory --> L1d[L1 Data]
-  L1i --> L2[L2 Unified]
-  L1d --> L2
-  style L1i fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-  style L1d fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+![L1-I für Fetch, L1-D für Loads/Stores, gemeinsam zur nächsten Ebene.](../assets/figures/02_speicherhierarchie/hierarchy.png)
 
 ::: notes
 Auf dem Level 1, also direkt an der CPU, haben wir fast immer zwei Caches. Einen für Code, einen für Daten. Warum? Damit unsere Pipeline aus MCT1 nicht blockiert. Wenn die Fetch-Stufe den nächsten Befehl laden will und die Memory-Stufe gleichzeitig ein Array liest, würden sie sich bei einem gemeinsamen Cache blockieren. Durch Split-Caches haben wir zwei getrennte Eingangstüren. Auf Level 2 wird dann meistens alles wieder in einem gemeinsamen (unified) Cache zusammengefasst.
@@ -402,12 +361,8 @@ Auf dem Level 1, also direkt an der CPU, haben wir fast immer zwei Caches. Einen
 Cache Hit (Treffer):
 
 - Adresse liegt als Kopie im Cache
-- Lieferung in 1–3 Takten
-
-Cache Miss (Fehlschlag):
-
-- Daten nicht im Cache
-- Weiterleitung zum Hauptspeicher (z. B. $\approx 300$ Takte)
+- Lieferung in der Hit Time des getroffenen Levels
+- Ein L1-Miss kann in L2 treffen; erst ein Miss der letzten Cache-Ebene geht zum DRAM
 
 ::: notes
 Das sind die wichtigsten Vokabeln des heutigen Tages. Ein Cache Hit ist ein Treffer, ein Erfolg. Die Pipeline rennt weiter. Ein Cache Miss ist ein Fehlschlag. Der Cache muss zugeben, dass er das gesuchte Datum nicht hat. Jetzt friert die CPU ein und wir müssen auf den lahmen Hauptspeicher warten.
@@ -422,20 +377,20 @@ $$
 
 - Hit Rate: Anteil der Zugriffe, die im Cache gefunden werden
 - Miss Rate: Anteil der Fehlschläge
-- Praxis: gute L1-Caches oft $90$–$98\,\%$ Hit Rate
+- Praxiswerte hängen vom Workload ab; 90–98 % ist ein typischer Bereich, keine Garantie
 
 ::: notes
-Die Hit Rate ist die wichtigste Kenngröße. Wenn Sie ein Programm analysieren und eine Hit Rate von 95 % sehen, bedeutet das, dass 95 von 100 Speicherzugriffen sofort vom Cache bedient werden. Nur bei 5 % müssen wir in den RAM greifen. Das klingt hervorragend, aber wir werden gleich mathematisch sehen, dass selbst 5 % Fehler extrem weh tun können.
+95 % im Rechenbeispiel heißt 95 von 100 betrachteten Zugriffen, nicht eine Vorhersagegenauigkeit der nächsten Adresse.
 :::
 
 ## Miss Penalty
 
-- Hit Time: Zeit für Treffer-Erkennung und Lieferung (z. B. $1\,\mathrm{ns}$)
-- Miss Penalty: zusätzliche Zeit bei Fehlschlag bis DRAM (z. B. $100\,\mathrm{ns}$)
-- Bei schlechter Hit Rate dominiert die Penalty die Laufzeit
+- Hit Time: Kosten jedes Zugriffs im Modell, hier 1 Takt
+- Miss Penalty: *zusätzliche* Kosten nur der Misses, hier 100 Takte
+- Das 3-GHz-Beispiel „100 ns = 300 Takte“ ist eine andere Größenordnung, nicht diese Penalty
 
 ::: notes
-Die Strafzeit ist das, was uns wehtut. Wenn wir raten und danebenliegen, verlieren wir Zeit. Wir müssen erst feststellen, dass die Daten nicht da sind (das dauert die Hit Time), und dann müssen wir den langen Weg zum RAM antreten (Miss Penalty). Die Penalty ist oft um den Faktor 100 größer als die Hit Time.
+Zusätzliche Penalty heißt: der Miss kostet Hit Time plus Penalty, nicht die Penalty statt der Hit Time.
 :::
 
 ## AMAT — Average Memory Access Time
@@ -458,18 +413,20 @@ Das ist die wichtigste Formel der Speicherarchitektur. Wenn Sie bei Intel oder A
 - L1 Hit Time: $1$ Takt
 - RAM Miss Penalty: $100$ Takte
 
-Ohne Cache: $\text{AMAT} = 100$ Takte.
+Ohne Cache in diesem Modell: jeder Zugriff 100 Takte.
 
-Mit Cache, Hit Rate $95\,\%$ (Miss Rate $5\,\%$):
+Mit 95 Hits und 5 Misses:
 
 $$
-\text{AMAT} = 1 + (0{,}05 \times 100) = 6 \text{ Takte}
+95\cdot 1 + 5\cdot(1+100) = 600,\qquad 600/100 = 6
 $$
 
-Fazit: DRAM fühlt sich für die CPU wie $\approx 6$ Takte an — massive Beschleunigung.
+![Alle 100 Zugriffe zahlen 1 Takt, fünf zahlen zusätzlich 100. AMAT = 6.](../assets/figures/02_speicherhierarchie/amat.png)
+
+6 Takte sind die mittlere Zugriffszeit. $100/6$ ist ein Verhältnis dieser Zeiten, kein gemessener Speedup des Programms.
 
 ::: notes
-Lassen Sie uns das rechnen. Wenn wir keinen Cache hätten, würden wir im Schnitt 100 Takte pro Zugriff warten. Mit unserem Cache und einer Hit Rate von 95 % sieht die Welt völlig anders aus. Wir warten 1 Takt plus 5 % von 100 Takten. Das ergibt 6 Takte! Der Cache hat unseren extrem langsamen PC gefühlt um den Faktor 16 beschleunigt. Und das nur, weil Software das Lokalitätsprinzip befolgt.
+Dieselbe Zahl folgt aus $1 + 0{,}05\cdot 100$. Eine optionale Vertiefung wäre eine rekursive L1/L2-Formel; dort müssen lokale und globale Miss Rates getrennt werden.
 :::
 
 ## Wir laden niemals einzelne Bytes
@@ -479,24 +436,27 @@ Lassen Sie uns das rechnen. Wenn wir keinen Cache hätten, würden wir im Schnit
 - Typisch 32 oder 64 Bytes zusammenhängender Speicher
 - Ein Miss lädt immer die gesamte Line aus dem DRAM
 
-| Offset | 0 | 1 | 2 | 3 | … | 63 |
-|--------|---|---|---|---|---|----|
-| Inhalt | Byte | Byte | Byte | Byte | … | Byte |
+![Adresse 1000 liegt in der Line 960–1023, Offset 40. Nicht 1000–1063.](../assets/figures/02_speicherhierarchie/line-bounds.png)
 
-*Eine Cache Line = ein zusammenhängender Block (hier 64 Bytes, schematisch).*
+| Feld | Bedeutung |
+|------|-----------|
+| Valid | Eintrag wurde geladen |
+| Tag | welcher Block |
+| Daten | 64 Byte auf Blockgrenze |
+| Dirty | nur bei Write-Back: verändert |
 
 ::: notes
-Jetzt gehen wir ins Hardware-Design. Wenn die CPU ein einziges Byte auf Adresse 1000 anfragt und der Cache dieses Byte nicht hat, dann lädt der Cache nicht etwa nur dieses eine Byte aus dem RAM. Er lädt einen Block, z. B. die Adressen 1000 bis 1063 auf einmal! Dieser Block nennt sich Cache Line.
+Die dezimale Adresse 1000: floor(1000/64)*64 = 960, Offset 40. Ein ausgerichtetes uint32_t-Array hat 16 Elemente pro Line.
 :::
 
 ## Cache Line und räumliche Lokalität
 
 - Miss bei `array[0]` lädt die ganze Line (z. B. 16 Integers)
-- `array[1]` … bis zum Line-Ende: garantierte Hits
-- Ein Miss erkauft viele Hits über Nachbarschaft
+- Weitere Elemente derselben gültigen Line sind Hits, solange die Line nicht verdrängt oder invalidiert wird
+- „Garantierte Hits“ gibt es ohne diese Annahme nicht
 
 ::: notes
-Dieses Konzept der Cache Lines implementiert die räumliche Lokalität in Silizium. Der Miss beim ersten Array-Element schmerzt, wir warten 100 Takte. Aber der Speicher-Controller zieht heimlich die nächsten 15 Elemente mit nach oben. Die nächsten 15 Schleifendurchläufe sind also reine Hits, die jeweils nur 1 Takt brauchen! Ohne Cache Lines müssten wir für jedes Element den vollen Preis zahlen.
+Ein Miss lädt die Line auf Blockgrenze. Die nächsten Elemente derselben gültigen Line sind Hits, bis sie verdrängt oder invalidiert wird. Das ist das Modell, keine Garantie für jedes kompilierte Programm.
 :::
 
 ## Anatomie einer Cache-Zeile
@@ -525,14 +485,12 @@ Im SRAM des Caches speichern wir nicht nur die Daten. Wir müssen die Daten mark
 Könnten wir nicht einfach 4-Kilobyte-Blöcke laden? Die Antwort liegt wieder im magischen Dreieck. Ein L1-Cache hat vielleicht nur 32 Kilobyte. Wenn wir 4 Kilobyte große Blöcke nutzen, passen genau 8 Blöcke in den Cache. Wenn das Programm nun an 9 verschiedenen Stellen im RAM gleichzeitig arbeitet, werfen sich diese Blöcke ständig gegenseitig aus dem Cache. Die Miss Penalty explodiert, weil das ständige Nachladen den Speicherbus blockiert. 64 Bytes haben sich heute als guter Kompromiss erwiesen.
 :::
 
-## Fragen? — Metriken und Cache Lines
+## Übung — AMAT
 
-- AMAT-Berechnung nachvollziehbar?
-- Warum ist eine Cache Line größer als ein Maschinenwort (4 Bytes)?
-- Zweck von Valid-Bit und Tag?
+Berechnen Sie AMAT für Hit Rate 95 % und 80 % bei Hit Time 1 und zusätzlicher Penalty 100. Was bedeutet „zusätzlich“?
 
 ::: notes
-Wir haben die Metriken und den logischen Aufbau einer Cache-Line besprochen. Im nächsten Schritt werden wir in die Schaltpläne eintauchen und klären, wie die Hardware blitzschnell herausfindet, in welcher der hunderten Cache-Zeilen unsere gesuchten Daten liegen. Gibt es bis hierhin noch Fragen?
+95 %: $1+0{,}05\cdot 100=6$. 80 %: $1+0{,}2\cdot 100=21$. Zusätzlich heißt: die Hit Time wird immer gezahlt, die Penalty nur bei Misses.
 :::
 
 ## Das Mapping-Problem
@@ -594,12 +552,11 @@ Beispiel mit 512 Zeilen: Block 0 und Block 512 konkurrieren um dieselbe Cache-Ze
 ## Modulo-Arithmetik in Hardware
 
 - Cache-Index $= (\text{RAM-Blockadresse}) \bmod (\text{Anzahl Cache-Zeilen})$
-- Echter Dividierer wäre zu langsam
-- Trick: Caches in Zweierpotenzen (z. B. $512 = 2^{9}$ Zeilen)
-- Modulo durch Zweierpotenz = Abschneiden der oberen Bits (Bit-Maskierung)
+- Modulo einer Zweierpotenz ist ein Bitfeld, kein allgemeiner Dividierer
+- Die Auswahl selbst ist verdrahtet; der Speicherzugriff ist deshalb nicht verzögerungsfrei
 
 ::: notes
-Wie bringt man Silizium dazu, Modulo zu rechnen, ohne einen riesigen Taschenrechner (ALU) anzuwerfen? Ganz einfach: durch reines Verdrahten von Kupferleitungen. Wenn Sie modulo 100 im Dezimalsystem rechnen, nehmen Sie einfach die letzten zwei Ziffern (1234 modulo 100 ist 34). In der Binärwelt schneiden Sie einfach Leitungen ab. Das kostet exakt 0 Taktzyklen.
+1234 mod 100 nutzt die letzten Dezimalziffern. $2^9$ nutzt neun Indexbits. Das ersetzt keinen physikalisch laufzeitfreien Pfad.
 :::
 
 ## Die Adress-Zerlegung
@@ -612,12 +569,14 @@ Die CPU legt eine 32-Bit-Adresse auf den Bus. Der Cache zerschneidet sie in drei
 
 Diese drei Felder sind der Schlüssel jeder Cache-Architektur.
 
-| Tag (z. B. 17 Bit) | Index (z. B. 9 Bit) | Offset (z. B. 6 Bit) |
-|--------------------|---------------------|----------------------|
-| oberste Bits | mittlere Bits | unterste Bits |
+![Referenzmodell: 17/9/6 bei Direct Mapped, 19/7/6 bei 4-Way, Adresse 0x12345678.](../assets/figures/02_speicherhierarchie/bitfields.png)
+
+- $S = C/(B\cdot W)$, Offset $\log_2 B$, Index $\log_2 S$, Tag $P-b-s$
+- Zweierpotenzen erlauben die Zerlegung durch Bitfelder, ohne Dividierer
+- Leitungen, Decoder, SRAM, Komparator und MUX haben trotzdem Laufzeit
 
 ::: notes
-Das ist das Rezept der Hardware. Die 32-Bit-Speicheradresse ist nicht nur eine Hausnummer, sie ist ein Wegweiser. Der Cache nimmt die 32 Kupferkabel der Adresse und teilt sie in drei Bündel auf. Das ist reine Kabelführung, es gibt hier keine logischen Gatter, die verzögern. Wir schauen uns jetzt diese drei Bündel im Detail an.
+Direct Mapped: Tag 0x2468, Index 345, Offset 56. 4-Way bei gleicher Datenkapazität: Tag 0x91A2, Set 89, Offset 56. „0 Takte“ für die Bitselektion wäre falsch.
 :::
 
 ## Feld 1: Der Block Offset
@@ -657,10 +616,11 @@ Das ist der Index. Er sagt der Hardware, in welche Schublade sie greifen muss. W
 - Alias-Problem: Millionen RAM-Blöcke teilen denselben Index
 - Beim Öffnen der Zeile: welches der vielen Blöcke liegt darin?
 - Oberste Bits = Tag
-- Komparator: CPU-Tag vs. gespeichertes Tag im Cache-SRAM
+- Bei 512 Sets hat Block 512 den Tag 1, nicht das Etikett 512
+- Der Vergleich ist ein Bitvergleich mit Reduktion, nicht ein einzelnes XOR als vollständige Schaltung
 
 ::: notes
-Hier kommt das Tag ins Spiel. Da wir nur 512 Plätze haben, müssen sich sehr viele RAM-Blöcke denselben Parkplatz teilen. Block 0 parkt auf Platz 0. Aber Block 512 parkt auch auf Platz 0. Wenn die CPU Platz 0 öffnet, muss sie auf das Etikett (das Tag) schauen. Steht auf dem Etikett „0“? Oder steht da „512“? Ein riesiges XOR-Gatter vergleicht das CPU-Tag mit dem Cache-Tag. Sind sie gleich, haben wir einen Hit!
+Tag = floor(Blocknummer / Anzahl Sets). Blocknummer 512 und Tag 1 sind verschiedene Zahlen.
 :::
 
 ## Das Valid-Bit — Boot-Problem
@@ -682,20 +642,10 @@ Das Valid-Bit rettet den Computer beim Einschalten. Ohne dieses Bit würde die C
 3. Komparator: $(\text{Tag} = \text{CPU-Tag}) \land (\text{Valid} = 1)$
 4. Hit → Daten zur CPU; Miss → Stall und Anfrage an Main Memory
 
-```{mermaid}
-%%| fig-width: 4.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  Idx[Index-Bits] -->|adressiert| SRAM[(SRAM-Zeile)]
-  SRAM -->|Tag| Comp{Komparator}
-  CPUTag[CPU-Tag] --> Comp
-  Comp -->|gleich und Valid=1| Hit[HIT]
-  Comp -->|ungleich| Miss[MISS → RAM]
-  style Comp fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+![Index öffnet das Set, Tag und Valid vergleichen, Offset wählt das Wort, Daten gehen zur CPU.](../assets/figures/02_speicherhierarchie/datapath.png)
 
 ::: notes
-Das ist der komplette logische Fluss eines Direct Mapped Caches. Alles passiert völlig parallel. Der Index öffnet den SRAM, der Komparator vergleicht die Tags, und der MUX bereitet schon mal die Daten vor. Wenn der Komparator „Hit“ meldet, wird die Tür zur CPU aufgeschoben.
+Beim 4-Way-Modell vergleichen vier Ways parallel. Der Daten-MUX wählt den treffenden Way. Die Datenkapazität bleibt 32 KiB, der Cache wird nicht viermal größer.
 :::
 
 ## Vorteil von Direct Mapped
@@ -711,14 +661,14 @@ Direct Mapped Caches sind wunderschön simpel. Die Hardware-Ingenieure lieben si
 
 ## Nachteil: Thrashing
 
-- Starrheit hat einen Preis: Thrashing (zerstörerisches Flattern)
-- Szenario: abwechselnder Zugriff auf Variable A und B (z. B. `A = A + B`)
-- A auf Block 0, B auf Block 512 → gleicher Cache-Index 0
-- Folge: A wirft B raus, B wirft A raus — Ping-Pong
-- Cache zu 99 % leer, Miss Rate trotzdem $\approx 100\,\%$
+![Acht Zugriffe auf 0x1000 und 0x9000. Direct Mapped: 8 Misses. 4-Way: 2 Misses und 6 Hits.](../assets/figures/02_speicherhierarchie/thrashing.png)
+
+- Beide Adressen treffen Set 64. Direct-Mapped-Tags 0 und 1, 4-Way-Tags 0 und 4
+- Zwei compulsory Misses, im Direct Mapped zusätzlich sechs Conflict Misses
+- Der übrige Cache kann leer bleiben; das ist kein Capacity Miss dieses Paars
 
 ::: notes
-Hier scheitert der Direct Mapped Cache brutal. Wenn zwei Variablen, die Sie im C-Code ständig abwechselnd nutzen, zufällig denselben Index im Cache haben, zerstören sie sich gegenseitig. Das nennt man Thrashing. Der Cache wirft ständig die eine Variable weg, um Platz für die andere zu machen. Der Rest des Caches bleibt komplett ungenutzt, aber Ihr Programm steht praktisch still, weil es bei jedem Zugriff auf den lahmen RAM warten muss.
+Fully associative legt beide Blöcke ohne diesen Index-Konflikt ab. Ein zu großes Working Set erzeugt trotzdem Capacity Misses.
 :::
 
 ## Thrashing-Beispiel in C
@@ -740,14 +690,12 @@ for (int i = 0; i < 1000; i++) {
 Ein harmlos wirkendes C-Programm: Zwei Arrays werden addiert. Wenn der Linker diese Arrays so platziert, dass ihre Adressen denselben Cache-Index ergeben — und der Cache Direct Mapped ist — können sich A und B gegenseitig verdrängen. Dann läuft das Programm deutlich langsamer. Ob die Kollision wirklich eintritt, hängt von Alignment, Größen und Cache-Parametern ab; dem Quelltext allein sieht man das oft nicht an.
 :::
 
-## Fragen? — Direct Mapped
+## Übung — Adressfelder
 
-- Direct Mapped verstanden?
-- Zerlegung in Tag, Index und Offset klar?
-- Warum kann Thrashing auftreten?
+Bestimmen Sie für 0x12345678 im Referenzmodell Tag, Index und Offset, direct mapped. Was liefert die Folge 0x1000, 0x9000, 0x1000 im kalten Direct-Mapped-Cache?
 
 ::: notes
-Gibt es Fragen zur Adresszerlegung? Das ist ein beliebtes Klausurthema. Wenn wir das Problem des Thrashings verstanden haben, schauen wir uns jetzt an, wie Hardware-Architekten dieses Problem in den Griff bekommen haben.
+Tag 0x2468, Index 345, Offset 56. Die Folge trifft zweimal Set 64 mit verschiedenen Tags: Miss, Miss, Miss.
 :::
 
 ## Fully Associative Cache
@@ -907,13 +855,14 @@ Die Hardware-Ingenieure haben viel experimentiert. Einfacher Zufall funktioniert
 
 ## Replacement: LRU
 
-- Least Recently Used: Block mit dem ältesten Zugriff verdrängen
-- Setzt zeitliche Lokalität am besten um
-- Hardware-Aufwand hoch (Zeitstempel pro Way)
-- Praxis oft Pseudo-LRU: Approximation mit weniger Bits
+![Folge A B C D A E in einem 4-Way-Set. FIFO verdrängt A, LRU verdrängt B.](../assets/figures/02_speicherhierarchie/fifo-lru.png)
+
+- Ein Hit macht den Block bei LRU wieder jung, bei FIFO bleibt die Ladereihenfolge
+- LRU ist eine gute Heuristik, nicht perfekt und nicht immer die beste Policy
+- Zeitstempel sind eine mögliche Umsetzung. Pseudo-LRU spart Bits
 
 ::: notes
-LRU ist der König der Ersetzungsstrategien. Es wirft exakt das weg, was wir am längsten nicht mehr angeschaut haben. Das ist perfekt. Das Problem: Die CPU muss für jeden Cache-Eintrag ständig mitschreiben, wann er zuletzt benutzt wurde. Dieses ständige Aktualisieren der Zeitstempel kostet Gatter und Strom. Deshalb nutzen echte CPUs meist eine vereinfachte Approximation, genannt Pseudo-LRU.
+Nach dem erneuten A ist A bei FIFO weiter der älteste geladene Block. LRU hat B als am längsten ungenutzt.
 :::
 
 ## Zusammenfassung Mapping-Strategien
@@ -922,7 +871,7 @@ LRU ist der König der Ersetzungsstrategien. Es wirft exakt das weg, was wir am 
 |---------|---------------|-------------------|------------------------|
 | Platzwahl | 1 fester Platz | überall | frei innerhalb eines Sets |
 | Komparatoren | 1 | sehr viele | $N$ (z. B. 4) |
-| Kollisionen | hoch (Thrashing) | keine | gering |
+| Kollisionen | Conflict Misses möglich | keine Conflict Misses | weniger pro Set |
 | Eviction | keine Wahl | LRU / Random | LRU / Random |
 | Praxis | billige Chips | kleine Puffer (z. B. TLB) | L1/L2/L3-Standard |
 
@@ -930,14 +879,12 @@ LRU ist der König der Ersetzungsstrategien. Es wirft exakt das weg, was wir am 
 Hier haben Sie alle drei Welten auf einen Blick. In der Klausur oder in der Industrie werden Sie fast immer auf Set-Associative Caches stoßen, da sie die Nachteile der beiden anderen Extreme perfekt ausbalancieren.
 :::
 
-## Fragen? — Set-Associative Mapping
+## Übung — gleiche Kapazität
 
-- N-Way Set-Associative klar?
-- Warum sinkt die Zahl der Index-Bits bei höherer Assoziativität?
-- LRU nachvollziehbar?
+32 KiB und 64-Byte-Lines: Warum hat 4-Way weniger Indexbits als Direct Mapped?
 
 ::: notes
-Haben Sie das Konzept des Set-Associative Mappings verstanden? Wenn ja, haben Sie den schwersten Teil der Computerarchitektur gemeistert. Im nächsten Schritt klären wir, was passiert, wenn wir Variablen nicht nur lesen, sondern beschreiben wollen.
+Die Set-Zahl fällt von 512 auf 128, der Index von 9 auf 7 Bit, der Tag wächst von 17 auf 19. Der Offset bleibt 6. Die Datenkapazität bleibt 32 KiB.
 :::
 
 ## Das Problem beim Schreiben
@@ -953,13 +900,15 @@ Caches machen das Lesen effizient. Beim Schreiben entsteht jedoch ein Konsistenz
 
 ## Das Cache-Kohärenz-Problem
 
-- Asynchronität = Inkonsistenz / Verlust der Cache-Kohärenz
-- Gefahr: zweiter Kern liest veralteten Wert aus dem RAM
-- Gefahr: DMA schreibt veraltete Daten auf Speichermedien
-- Architektur muss Updates rechtzeitig in den RAM bringen
+![Dirty-Kopie 5 bei altem Wert 0 ist zunächst Write-Back, kein Kohärenzfehler. Kohärente Leser und nicht kohärentes DMA sind getrennte Fälle.](../assets/figures/02_speicherhierarchie/visibility.png)
+
+- Ein kohärenter zweiter Kern kann den aktuellen Wert über das Protokoll sehen
+- Nicht kohärentes DMA braucht Sichtbarkeit am gemeinsamen Zugriffspunkt
+- Clean, Invalidate und Flush sind konzeptionell verschieden und plattformabhängig
+- Kein Zicbom und kein MESI für eine beliebige RV32I-Plattform; Multicore folgt in Block 9
 
 ::: notes
-Solange nur ein CPU-Kern mit „seinen“ Daten arbeitet, bleibt das oft unsichtbar. Sobald ein zweiter Kern oder ein DMA-Controller auf denselben Speicher zugreift, wird die Inkonsistenz kritisch: Core 2 kann aus dem RAM noch den alten Wert lesen, obwohl Core 1 bereits aktualisiert hat. Das ist das Cache-Kohärenz-Problem — wir müssen entscheiden, wann der RAM aktualisiert wird.
+DRAM muss im kohärenten Fall nicht jederzeit den neuesten Wert halten. Ein nicht kohärenter DMA-Leser sieht sonst die alte Kopie.
 :::
 
 ## Schreibstrategie 1: Write-Through
@@ -975,17 +924,10 @@ Eine einfache Methode für die RAM-Konsistenz ist das Durchschreiben. Jeder Stor
 
 ## Write-Through: Datenfluss
 
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  CPU["CPU schreibt 5"] --> Cache["L1 hält 5"]
-  CPU -->|gleichzeitig| RAM["RAM erhält 5"]
-  style Cache fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+![Stores 5 und 7: sofort, gepuffert oder nur im Cache mit Dirty.](../assets/figures/02_speicherhierarchie/write-states.png)
 
 ::: notes
-Ohne Write Buffer muss jeder Store auch den DRAM-Pfad bedienen — konsistent, aber potenziell langsam. Der Write Buffer entschärft das später.
+Die nächste Ebene des Ein-Level-Modells steht hier für den Hauptspeicher. In einer echten Hierarchie schreibt L1 zuerst zur nächsten Cache-Ebene.
 :::
 
 ## Nachteile von Write-Through
@@ -1051,28 +993,36 @@ Die Hardware muss den Überblick behalten. Neben dem Valid-Bit bekommt jede Zeil
 
 ## Eviction bei Write-Back
 
-- Daten gelangen erst bei Verdrängung in den Main Memory
-- Bei Ersetzen von Block A durch Block B: Dirty-Bit von A prüfen
-- $\text{Dirty} = 0$: A einfach verwerfen
-- $\text{Dirty} = 1$: A zuerst zurückschreiben, dann B laden
-- Folge: Miss-Penalty kann sich verdoppeln (Write-Back + Read)
+- Writebacks entstehen durch Eviction, Maintenance oder Protokollaktionen, nicht nur durch Eviction
+- Dirty = 0: die Line darf verworfen werden
+- Dirty = 1: im einfachen Modell erst zurückschreiben, dann den neuen Block laden
+- Puffer und Überlappung können die Penalty ändern; sie verdoppelt sich nicht allgemein
 
 ::: notes
-Das ist der Moment der Wahrheit. Erst wenn ein Block aus Platzmangel aus dem Cache geworfen werden muss, wird die Rechnung beglichen. Ist der Block schmutzig, muss ihn der Memory Controller erst mühsam in den RAM zurückschreiben, bevor der neue Block einziehen darf. Das verursacht bei einem Cache-Miss plötzlich die doppelte Miss-Penalty (erst rausschreiben, dann neu lesen), was für Performance-Analysen sehr relevant ist.
+Eine saubere Eviction verwirft die Line. Eine schmutzige Eviction schreibt sie zurück. Das ist das Lehr-Modell, keine vollständige Definition aller Writeback-Auslöser.
 :::
 
 ## Vergleich Schreibstrategien
 
 | Merkmal | Write-Through | Write-Back |
 |---------|---------------|------------|
-| RAM-Update | sofort | erst bei Eviction |
-| RAM aktuell | ja | oft veraltet (Dirty) |
-| Performance | schlecht (ohne Buffer) | hervorragend |
-| Bus-Last | hoch | gering |
-| Hardware | gering | Dirty-Bits nötig |
+| Weitergabe | synchron oder über Puffer | bis Writeback |
+| Store-Miss | eigene Policy | eigene Policy |
+| Bus-Last im einfachen Modell | höher | geringer |
+| Zusatzzustand | gering | Dirty-Bit |
+
+Write-Through und Write-Back bestimmen die Weitergabe geänderter Cache-Daten, nicht die RAM-Kohärenz.
+
+## Store-Miss: Write-Allocate
+
+![Weitergabe der Writes und Behandlung eines Store-Miss sind zwei Achsen.](../assets/figures/02_speicherhierarchie/write-allocate.png)
+
+- Write-Allocate: fehlenden Block laden, dann den Store im Cache ausführen
+- No-Write-Allocate: Store weitergeben und keinen neuen Cache-Eintrag anlegen
+- Typische Paarungen sind Beispiele, keine zwingende Kopplung
 
 ::: notes
-Hier der klassische Vergleich für die Klausur. Write-Through ist simpel und sicher, aber verstopft den Bus. Write-Back ist die Königsklasse für Geschwindigkeit, erkauft sich das aber durch Hardware-Aufwand und komplexe Cache-Kohärenz-Protokolle, wenn wir Multicore-Systeme in Block 9 betrachten.
+Mit Allocate entsteht nach dem Miss ein gültiger Eintrag. Ohne Allocate bleibt er draußen. Eine Dirty-Line darf verworfen werden, wenn Dirty = 0 oder der Wert bereits sichtbar geschrieben wurde.
 :::
 
 ## Software optimieren
@@ -1109,16 +1059,15 @@ Genau dieses Phänomen eignet sich gut für ein späteres Labor: Eine Matrix auf
 - `[0][0]`, `[0][1]`, `[0][2]` liegen nebeneinander
 - `[0][0]` und `[1][0]` liegen $1000$ Integers ($\approx 4000$ Bytes) auseinander
 
-```{mermaid}
-%%| fig-width: 4.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A["[0][0]"] --> B["[0][1]"] --> C["[0][2] …"] --> D["[1][0]"] --> E["[1][1]"]
-  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+![Miniaturmodell 16×16 getrennt von der 1000×1000-Matrix. Zeilenweise 16 Misses und 240 Hits, spaltenweise 256 Misses.](../assets/figures/02_speicherhierarchie/matrix.png)
+
+- C legt Zeilen hintereinander. Abstand `[0][0]` zu `[1][0]` bei 1000 Spalten und 4 Byte: 4000 Byte
+- 4000 ist kein Vielfaches von 64; die erste Line einer Zeile beginnt nicht generell bei Spalte 0
+- Die genannten Hit-/Miss-Zahlen gelten nur für das Miniaturmodell
+- Stores der großen Matrix nur unter angenommener Write-Allocate-Policy; das sind nicht alle Zugriffe eines kompilierten Programms
 
 ::: notes
-Das ist der Schlüssel. Der C-Compiler legt mehrdimensionale Arrays flach aus. Die erste Zeile liegt im RAM am Stück. Danach kommt direkt die zweite Zeile. Das bedeutet: Wenn Sie horizontal durch die Zeile gehen, spazieren Sie physikalisch zu direkten Nachbarn. Wenn Sie vertikal (von Zeile 0 in Zeile 1) springen, überspringen Sie physikalisch tausende von Bytes!
+Adresse(m[r][c]) = 0x1000 + 4*(16*r+c). „Nahe 100 % Miss Rate“ beim großen Beispiel braucht Kapazität, Alignment, Policy und Working Set. Prefetch und der Compiler können das ändern.
 :::
 
 ## Cache-Albtraum: spaltenweiser Zugriff
@@ -1140,14 +1089,12 @@ Schauen Sie sich diesen Code an. Die innere Schleife erhöht row. Das heißt, wi
 
 ## Was passiert beim spaltenweisen Zugriff?
 
-- `[0][0]`: Miss — Line lädt z. B. `[0][0]` … `[0][15]`
-- `[1][0]`: $\approx 4000$ Bytes weiter — wieder Miss
-- `[2][0]`: wieder Miss
-- Mitgebrachte Nachbarn bleiben ungenutzt und werden verdrängt
-- Resultat: Miss Rate nahe $100\,\%$
+- Im Miniaturmodell ist jeder Spaltenzugriff ein Miss
+- Beim 1000×1000-Beispiel ist „nahe 100 %“ nur unter den genannten Annahmen eine Orientierung
+- Die mitgeladenen Nachbarn einer Zeile werden bei Spaltentraversal nicht als Nächstes genutzt
 
 ::: notes
-Das ist die Definition von Thrashing durch schlechte Software. Der Cache ist so freundlich und holt 15 Nachbarn mit, weil er auf räumliche Lokalität wettet. Und was machen wir? Wir ignorieren die Nachbarn, springen 4000 Bytes weiter und zwingen den Cache zu einem neuen Miss. Wir verletzen das Lokalitätsprinzip. Die Ausführungszeit explodiert.
+Das Nullsetzen ist eine Store-Folge. Unter Write-Allocate zählt jeder erste Bezug einer Line als Miss. Writebacks kämen zusätzlich, wenn verdrängte Lines dirty sind.
 :::
 
 ## Cache-Traum: zeilenweiser Zugriff
@@ -1163,23 +1110,24 @@ for (int row = 0; row < 1000; row++) {
 }
 ```
 
-- `[0][0]`: Miss — Line lädt Nachbarn
-- `[0][1]`, `[0][2]`, …: Hits (nur Hit Time)
-- Minimale Miss Rate — oft um ein Vielfaches schneller
+- Unter Write-Allocate und gültig bleibender Line folgen auf den ersten Store einer Line weitere Hits
+- Der Compiler kann Schleifen entfernen, vertauschen oder in Bibliotheksaufrufe umwandeln
+- Ein Geschwindigkeitsfaktor ist damit nicht allgemein festgelegt
 
 ::: notes
-Zwei Schleifen vertauscht, gleiche Mathematik — aber oft deutlich schneller. Wir gehen zeilenweise durch. Die innere Schleife rückt zum physikalischen Nachbarn. Ein Miss erkauft typischerweise mehrere Hits, die nur noch die Hit Time kosten. Genau so entsteht cache-freundlicher Code für Bildverarbeitung oder lineare Algebra.
+Die innere Schleife läuft bei Row-Major über benachbarte Spalten. Das Miniaturmodell quantifiziert das; das große Bild bleibt qualitativ, weil 4000 nicht durch 64 teilbar ist.
 :::
 
 ## Ausblick: Visualisierung im Labor
 
-- Geplantes Laborziel: denselben Effekt messbar machen
-- Werkzeugkandidat: Ripes (Data-Cache-Ansicht) — Details folgen mit dem Übungsblatt
-- Matrix-Code: Hits/Misses beobachten
-- Assoziativität und Schreibstrategie vergleichen
+- Ripes kann Hit-, Miss- und Writeback-Zähler einer Zugriffsspur zeigen
+- Der Cache-Simulator modelliert laut Dokumentation keine Cache-Latenzen und damit keine CPU-Laufzeit
+- Die Memory-Ansicht zeigt auch im Write-Back-Modus die geschriebenen Werte; sie beweist keinen veralteten DRAM-Inhalt
+- Für die Zählung eignet sich das Single-Cycle-Modell; Pipeline-Stalls können zusätzliche Zugriffe zählen
+- Vergleiche nur bei gleicher Kapazität, Line-Größe, Startzustand und Spur. Ein Exponent in der UI ist keine Anzahl
 
 ::: notes
-Die Theorie endet hier bewusst mit einem Ausblick. Sobald das Übungsblatt steht, können Sie Hit-Raten messen und z. B. Direct Mapped gegen 4-Way vergleichen. Bis dahin reicht es, Row-Major vs. Column-Major und die Mapping-Konzepte sicher zu beherrschen.
+Simulatorstatistik, aus AMAT gerechnete Modellwerte und gemessene Laufzeit sind drei verschiedene Dinge. Es gibt hier keine Labor-Screenshots. Die konkrete Ripes-Version und ihre Optionen müssen im Übungsblatt geprüft werden.
 :::
 
 ## Zusammenfassung Block 2
@@ -1189,8 +1137,9 @@ Die Theorie endet hier bewusst mit einem Ausblick. Sobald das Übungsblatt steht
 - AMAT = Hit Time + Miss Rate $\times$ Miss Penalty
 - Direct Mapped: schnell, aber Thrashing-anfällig
 - Set-Associative: Kollisionen innerhalb eines Sets entschärfen
-- Write-Through / Write-Back steuern RAM-Kohärenz
-- Software: cache-freundliche Strukturen (z. B. Row-Major Traversal)
+- Write-Through und Write-Back bestimmen die Weitergabe geänderter Cache-Daten
+- Store-Miss: Write-Allocate oder No-Write-Allocate, unabhängig davon
+- Row-Major nutzt Lines; das Miniaturmodell macht die Zählung explizit
 
 ::: notes
 Wir haben damit begründet, warum CPUs trotz relativ langsamem Hauptspeicher leistungsfähig bleiben: Der Cache nutzt Lokalität aus. Im nächsten Block folgen Interrupts und System-Timer. Vielen Dank — und viel Erfolg beim Üben der Konzepte.

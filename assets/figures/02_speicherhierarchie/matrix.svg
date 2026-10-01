@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 280" width="1100" height="280">
+<rect width="1100" height="280" fill="#fff"/>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>
+<text x="16" y="20" font-size="16" font-weight="600" fill="#6A1B9A" text-anchor="start">Miniaturmodell, nicht die 1000×1000-Matrix: uint32_t m[16][16], Basis 0x1000</text>
+<text x="16" y="48" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Zeile = 64 Byte = eine Line. Cache 512 Byte, direct mapped, 8 Sets, kalt, nur diese Loads.</text>
+<text x="16" y="84" font-size="18" font-weight="600" fill="#1D1D1F" text-anchor="start">Adresse(m[r][c]) = 0x1000 + 4*(16*r + c)</text>
+<text x="16" y="124" font-size="18" font-weight="600" fill="#1B5E20" text-anchor="start">Zeilenweise: 16 Misses, 240 Hits.</text>
+<text x="16" y="156" font-size="18" font-weight="600" fill="#B71C1C" text-anchor="start">Spaltenweise: 256 Misses, 0 Hits.</text>
+<text x="16" y="196" font-size="16" font-weight="600" fill="#1D1D1F" text-anchor="start">1000×1000, 4 Byte: Zeilenabstand 4000 Byte. 4000 ist kein Vielfaches von 64.</text>
+<text x="16" y="228" font-size="16" font-weight="600" fill="#1D1D1F" text-anchor="start">Die erste Line einer Zeile beginnt dann nicht generell bei Spalte 0.</text>
+<text x="16" y="262" font-size="15" font-weight="400" fill="#5F6368" text-anchor="start">Stores nur unter genannter Write-Allocate-Policy. Compiler kann Schleifen verändern.</text>
+</svg>
