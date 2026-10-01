@@ -97,17 +97,10 @@ Polling ist „Sind wir schon da?“ — stromhungrig und starr. Interrupts lass
 
 ## Polling vs. Interrupt — Schema
 
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[Main Loop] -->|Interrupt| B[ISR]
-  B -->|Return| A
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+![Modell: Polling-Wartezeit 0,8 ms. Interrupt mit Latenz, kurzer ISR und optionalem Flag.](../assets/figures/03_interrupts_timer/poll-vs-irq.png)
 
 ::: notes
-Schematisch: Das Main-Programm läuft weiter, bis ein Interrupt die ISR anstößt; danach Rückkehr.
+Busy-Waiting und gelegentliches Polling sind verschieden. Ein Interrupt garantiert keine Energieeinsparung.
 :::
 
 ## Refresher MCT1: Das CSR-System
@@ -130,22 +123,27 @@ Ohne CSRs könnte die Hardware den Interrupt-Kontext nicht verwalten. Bei einem 
 
 ## Der rudimentäre MCT1-Trap-Handler
 
+![Hardware setzt mepc, mcause, MPIE und MIE. Software sichert den Stack. mret stellt den Status zurück.](../assets/figures/03_interrupts_timer/trap-state.png)
+
 - In MCT1 oft ein einziger Einsprung über `mtvec`
 - Alle Quellen landen an derselben Adresse
 - Software muss per `mcause` verzweigen (`if`/`else`)
 - Für wenige Quellen akzeptabel — für echte SoCs zu starr und langsam
 
 ```c
-// Logischer Ablauf des einfachen Handlers
-void trap_handler(void) {
-    int cause = read_csr(mcause);
-    if (cause == BUTTON) handle_button();
-    else if (cause == TIMER) handle_timer();
+uint32_t raw = read_csr(mcause);
+int is_irq = (raw >> 31) & 1;          /* RV32: Interrupt-Bit */
+uint32_t code = raw & 0x7fffffffu;     /* Cause-Code */
+if (is_irq && code == 7) handle_timer();
+else if (is_irq && code == 11) {
+    uint32_t id = plic_claim();        /* UART=1, nicht Cause 7 */
+    if (id == 1) handle_uart();
+    if (id != 0) plic_complete(id);
 }
 ```
 
 ::: notes
-Ein gemeinsamer Trap-Handler reicht für Übungen mit wenigen Quellen. Bei dutzenden Peripherien wird die Software-Suche zum Flaschenhals.
+BUTTON als nackter Vergleich trifft weder das Interrupt-Bit noch eine PLIC-ID. Cause 11 ist nur „extern“, die Geräte-ID kommt vom Claim.
 :::
 
 ## Agenda für den heutigen Tag
@@ -186,6 +184,8 @@ Viele Ereignisse gleichzeitig — wie Feueralarm, Telefon und Klingel auf einmal
 :::
 
 ## Viele Quellen — ein Problem
+
+![Cause 3 und 7 lokal, externe Geräte gemeinsam auf Cause 11. Die Claim-ID ist eine andere Zahl.](../assets/figures/03_interrupts_timer/two-levels.png)
 
 ```{mermaid}
 %%| fig-width: 4.0
@@ -397,7 +397,7 @@ Alle Pfade treffen sich in einem Trichter — einfach, aber nicht skalierbar.
 - Sprung in konstanter Zeit zur passenden Routine
 
 ::: notes
-Direkte Durchwahl statt Hotline: Timer → Timer-ISR, UART → UART-ISR.
+mtvec waehlt die Kategorie: Timer Cause 7, Software Cause 3, External Cause 11. UART, I2C und GPIO teilen sich Cause 11. Die Geraete-ID kommt erst vom PLIC-Claim.
 :::
 
 ## Vectored Mode — Schema
@@ -407,7 +407,7 @@ Direkte Durchwahl statt Hotline: Timer → Timer-ISR, UART → UART-ISR.
 %%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
 flowchart LR
   A[Timer] -->|Hardware| B["PC = BASE + Offset_Timer"]
-  C[UART] -->|Hardware| D["PC = BASE + Offset_UART"]
+  C[UART, I2C, GPIO] -->|Cause 11| D["PC = BASE + 44, dann Claim"]
   style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
 ```
 
@@ -416,6 +416,8 @@ Die Hardware berechnet den Ziel-PC aus BASE und Interrupt-Code.
 :::
 
 ## Wie Vectored Mode rechnet
+
+![BASE 0x80000100. MSI 0x8000010C, MTI 0x8000011C, MEI 0x8000012C.](../assets/figures/03_interrupts_timer/mtvec.png)
 
 Bei MODE = 1 und Interrupt:
 
@@ -552,6 +554,8 @@ mtime ist die unaufhaltsame Systemuhr — Software stoppt sie typischerweise nic
 
 ## Das 64-Bit-Problem auf RV32
 
+![Zerrissener Snapshot und sichere RV32-Compare-Schreibfolge.](../assets/figures/03_interrupts_timer/hi-lo.png)
+
 - RV32: native Wortbreite 32 Bit
 - 32-Bit-Zähler bei 1 MHz: Overflow nach $\approx 71$ Minuten
 - Deshalb: `mtime` im CLINT 64 Bit — auch auf RV32
@@ -580,6 +584,8 @@ Klassisches Embedded-Muster gegen Tear: solange hi stabil ist, war der 64-Bit-We
 :::
 
 ## Der Auslöser: `mtimecmp`
+
+![Pending ab mtime >= mtimecmp. Ein Trap braucht zusätzlich MTIE und MIE.](../assets/figures/03_interrupts_timer/timer-gates.png)
 
 - `mtimecmp` (Machine Time Compare), ebenfalls 64 Bit
 - Software schreibt einen Zukunftswert (Eieruhr)
@@ -659,6 +665,8 @@ Jeder Interrupt kostet Pipeline- und Registeraufwand. Bei 1 µs-Ticks bleibt kau
 
 ## Mathematik: Takte berechnen
 
+![Drift 11,2 ms statt 11,0 ms. Sechs fällige Millisekunden, nächste Deadline 16 ms.](../assets/figures/03_interrupts_timer/tick-drift.png)
+
 - `mtime` zählt Oszillator-Takte, keine Sekunden
 - Umrechnung in Software nötig
 - Beispiel: Quarz $10\,\mathrm{MHz}$ $\Rightarrow$ $10^{7}$ Takte/s
@@ -681,33 +689,25 @@ Im Datenblatt steht die Timer-Frequenz. Daraus berechnen Sie Ticks pro Milliseku
 
 ## Software-Interrupts im CLINT
 
-- Register `msip` (Machine Software Interrupt Pending)
-- Ein Bit pro Kern: Schreiben einer 1 → Soft-Interrupt (Exception Code 3)
-- Sinn: Arbeit aus einer hochprioren ISR in einen niedriger priorisierten Pfad auslagern (Deferred Interrupt Handling)
+- `msip` ist ein Pending-Bit pro Hart, Cause 3
+- Die Nutzdaten liegen daneben im Speicher, nicht im Bit selbst
+- MSI ist nicht automatisch der Deferred-Pfad unter dem Timer
 
 ::: notes
-Die CPU kann sich selbst „anklingeln“. Oft: in der schnellen ISR nur das Nötigste, Soft-Interrupt setzen, Rest später abarbeiten.
+Klassische Reihenfolge der Kategorien: External, dann Software, dann Timer. Eine Softwarestrategie kann Arbeit trotzdem später erledigen.
 :::
 
 ## Inter-Processor Interrupts (IPI)
 
+![Hart A setzt msip von Hart B. Cause 3, danach löscht B das Bit.](../assets/figures/03_interrupts_timer/ipi.png)
+
 Vorgriff auf Block 9 (Multicore):
 
-- Ein CLINT, mehrere `msip`-Bits (eines pro Kern)
-- Kern A schreibt `msip` von Kern B → asynchroner Interrupt auf B
-- Standardweg für Inter-Processor Communication / Aufwecken
-
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  C0[Core 0] -->|schreibt msip[1]| CLINT
-  CLINT -->|Interrupt| C1[Core 1]
-  style CLINT fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+- Zwei Harts, ein `msip`-Bit je Hart
+- Hart A setzt das Bit von Hart B. B erhält Cause 3 und löscht es wieder
 
 ::: notes
-Schlafende Kerne können so gezielt geweckt werden — z. B. nach Netzwerkempfang auf Kern 0 die Entschlüsselung auf Kern 1 anstoßen.
+Die Nachricht selbst liegt nicht im Bit. Block 9 vertieft die Ordnung zwischen den Harts.
 :::
 
 ## MMIO beim CLINT
@@ -720,34 +720,41 @@ Schlafende Kerne können so gezielt geweckt werden — z. B. nach Netzwerkempfan
 CSRs steuern den Kern von innen; der CLINT liegt außerhalb auf dem Bus — wie Peripherie über MMIO.
 :::
 
-## C-Beispiel: SysTick initialisieren
+## C-Beispiel: System-Tick initialisieren
 
 ```c
-#define CLINT_MTIMECMP 0x02004000
-#define CLINT_MTIME    0x0200BFF8
+/* Lehr-Modell, keine geprüfte SiFive-Map */
+#define CLINT_MTIMECMP 0x02004000u
+#define CLINT_MTIME    0x0200BFF8u
 
-/* RV32: mtime atomar hi/lo lesen (kein 64-Bit-Load!) */
 static uint64_t read_mtime(void) {
     volatile uint32_t *mt = (volatile uint32_t *)CLINT_MTIME;
     uint32_t hi, lo;
     do {
         hi = mt[1];
         lo = mt[0];
-    } while (hi != mt[1]);
+    } while (hi != mt[1]); /* nur ein konsistenter Snapshot */
     return ((uint64_t)hi << 32) | lo;
 }
 
-void init_systick(void) {
+static void write_mtimecmp(uint64_t v) {
+    volatile uint32_t *cmp = (volatile uint32_t *)CLINT_MTIMECMP;
+    cmp[0] = 0xffffffffu;          /* kein zu kleiner Zwischenwert */
+    cmp[1] = (uint32_t)(v >> 32);
+    cmp[0] = (uint32_t)v;
+}
+
+void init_system_tick(void) {
+    /* Stack und mtvec müssen schon stehen */
     uint64_t now = read_mtime();
-    *(volatile uint64_t *)CLINT_MTIMECMP = now + TICKS_PER_MS;
+    write_mtimecmp(now + 10000u);  /* 10 MHz, 1 ms */
     set_csr(mie, (1u << 7));       /* MTIE */
-    set_csr(mstatus, MSTATUS_MIE); /* MIE global */
+    set_csr(mstatus, MSTATUS_MIE);
 }
 ```
 
-- `MTIE` in `mie`: Timer-Interrupt-Quelle freigeben
-- `MIE` in `mstatus`: Interrupts global erlauben
-- Beide Schalter nötig — sonst bleibt der Alarm stumm
+- Kein 64-Bit-Store auf RV32. Die drei 32-Bit-Schreibungen sind die Compare-Sequenz.
+- Adressen sind das Lehr-Modell, nicht das Labor-Datenblatt.
 
 ::: notes
 Rezept: Zeit lesen, Intervall addieren, Compare setzen — dann `MTIE` und `MIE`. Adressen sind beispielhaft (SiFive-üblich); immer Datenblatt prüfen.
@@ -763,7 +770,7 @@ Rezept: Zeit lesen, Intervall addieren, Compare setzen — dann `MTIE` und `MIE`
 Damit haben wir die Systemzeit. Als Nächstes: externe Peripherie über den PLIC.
 :::
 
-## Fragen? — CLINT und SysTick
+## Fragen? — CLINT und System-Tick
 
 - Warum 64-Bit `mtime`?
 - Race Condition beim 64-Bit-Lesen auf RV32?
@@ -824,6 +831,8 @@ Priorität allein reicht nicht: die Quelle muss für den Zielkern auch enabled s
 
 ## Priority Thresholds
 
+![Threshold 5 lässt ID 1 stumm. ID 2 gewinnt vor ID 3.](../assets/figures/03_interrupts_timer/plic-table.png)
+
 - Pro Target (Kern): Threshold-Register
 - Weiterleitung nur wenn Priorität **strikt größer** als Threshold
 - Beispiel: Threshold $= 5$ → Prio 3 wird blockiert, Prio 7 weckt die CPU
@@ -854,6 +863,8 @@ Ohne Handshake weiß die Software nicht, wer gewonnen hat — und der PLIC kann 
 :::
 
 ## Schritt 1: Claim
+
+![Claim löscht PLIC-Pending, nicht die Ursache im UART. ID 0 nicht abschließen.](../assets/figures/03_interrupts_timer/claim.png)
 
 ```c
 void external_interrupt_handler(void) {
@@ -975,28 +986,24 @@ Bei verschachtelten Traps überschreibt die Hardware das einzige `mepc`. Ohne vo
 
 ## Nesting korrekt: zuerst Stack, dann `MIE`
 
-```asm
-addi sp, sp, -8     /* Platz fuer mepc + mstatus */
-csrr t0, mepc
-sw   t0, 0(sp)      /* mepc retten */
-csrr t1, mstatus
-sw   t1, 4(sp)      /* mstatus retten */
-/* erst jetzt: MIE = 1 und unterbrechbare Arbeit */
-/* ... innere Arbeit ... */
-lw   t1, 4(sp)      /* mstatus zurueck */
-csrw mstatus, t1
-lw   t0, 0(sp)      /* mepc zurueck */
-csrw mepc, t0
-addi sp, sp, 8
-mret
+![Konzeptionell: getrennte Frames. Der kurze Prolog ist keine sichere Vorlage.](../assets/figures/03_interrupts_timer/nesting.png)
+
+Konzeptioneller Pseudocode, keine geprüfte sichere ISR:
+
+```text
+Frame 16-Byte-ausgerichtet anlegen
+benutzte GPRs und mepc/mstatus sichern
+erst dann eine bewusst gewählte Präemption
+vor dem Epilog wieder maskieren
+CSRs restaurieren, Frame abbauen, mret
 ```
 
-- Reihenfolge: Stack-Platz → CSRs sichern → dann `MIE` setzen
-- Nach dem inneren Interrupt: Werte zurückschreiben, dann `mret`
-- `MIE=1` ohne Stack-Rettung ist unsicher
+- Acht Byte und das Überschreiben von t0/t1 reichen nicht.
+- MIE=1 erlaubt nicht nur höherpriore Quellen.
+- Der Grundkurs bleibt bei kurzen, nicht verschachtelten ISRs.
 
 ::: notes
-Klassische OS-Technik: Hardware-CSRs in RAM sichern, bevor ein zweiter Trap sie überschreiben darf. Erst danach die globalen Interrupts wieder freigeben.
+Konzeptionell: erst Kontext sichern, dann eine gewählte Präemption. Dieser Block ist kein kopierfertiger Prolog. Der Grundkurs bleibt bei nicht verschachtelten ISRs.
 :::
 
 ## Gefahren von Nested Interrupts
@@ -1019,7 +1026,7 @@ Industrie-Empfehlung: Nested Interrupts sparsam. Flag setzen, Main erledigt die 
 Wenn Stack-Rettung und Clobbering klar sind, spannen wir den Bogen zum Labor.
 :::
 
-## Ausblick Labor: SysTick-Szenario
+## Ausblick Labor: System-Tick
 
 Geplantes Laborziel:
 
@@ -1062,6 +1069,8 @@ Erinnerung MCT1: Calling Conventions. Eine ISR ist kein normales Unterprogramm �
 :::
 
 ## Background Task und Foreground ISR
+
+![uint32-Differenz über den Umbruch ist 48. volatile ersetzt keine Atomarität.](../assets/figures/03_interrupts_timer/foreground.png)
 
 - Foreground: kurze ISR inkrementiert `system_uptime_ms` (nur lesen/schreiben der Zeitbasis)
 - Background: `main` vergleicht gegen einen Merker — ohne die ISR-Zählung zu nullen
