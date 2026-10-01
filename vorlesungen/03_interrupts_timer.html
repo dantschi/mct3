@@ -387,24 +387,14 @@ flowchart LR
 </section>
 <section id="polling-vs.-interrupt-schema" class="slide level2">
 <h2>Polling vs.&nbsp;Interrupt — Schema</h2>
-<div class="cell" data-reveal="true" data-fig-width="4" data-layout-align="default">
-<div class="cell-output-display">
-<div>
-<p></p><figure class=""><p></p>
-<div>
-<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[Main Loop] --&gt;|Interrupt| B[ISR]
-  B --&gt;|Return| A
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-</pre>
-</div>
-<p></p></figure><p></p>
-</div>
-</div>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/03_interrupts_timer/poll-vs-irq.png"></p>
+<figcaption>Modell: Polling-Wartezeit 0,8 ms. Interrupt mit Latenz, kurzer ISR und optionalem Flag.</figcaption>
+</figure>
 </div>
 <aside class="notes">
-<p>Schematisch: Das Main-Programm läuft weiter, bis ein Interrupt die ISR anstößt; danach Rückkehr.</p>
+<p>Busy-Waiting und gelegentliches Polling sind verschieden. Ein Interrupt garantiert keine Energieeinsparung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -445,20 +435,29 @@ flowchart LR
 </section>
 <section id="der-rudimentäre-mct1-trap-handler" class="slide level2">
 <h2>Der rudimentäre MCT1-Trap-Handler</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/03_interrupts_timer/trap-state.png"></p>
+<figcaption>Hardware setzt mepc, mcause, MPIE und MIE. Software sichert den Stack. mret stellt den Status zurück.</figcaption>
+</figure>
+</div>
 <ul>
 <li>In MCT1 oft ein einziger Einsprung über <code>mtvec</code></li>
 <li>Alle Quellen landen an derselben Adresse</li>
 <li>Software muss per <code>mcause</code> verzweigen (<code>if</code>/<code>else</code>)</li>
 <li>Für wenige Quellen akzeptabel — für echte SoCs zu starr und langsam</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb3-1"><a aria-label="1"></a><span class="co">// Logischer Ablauf des einfachen Handlers</span></span>
-<span id="cb3-2"><a aria-label="2"></a><span class="dt">void</span> trap_handler<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb3-3"><a aria-label="3"></a>    <span class="dt">int</span> cause <span class="op">=</span> read_csr<span class="op">(</span>mcause<span class="op">);</span></span>
-<span id="cb3-4"><a aria-label="4"></a>    <span class="cf">if</span> <span class="op">(</span>cause <span class="op">==</span> BUTTON<span class="op">)</span> handle_button<span class="op">();</span></span>
-<span id="cb3-5"><a aria-label="5"></a>    <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>cause <span class="op">==</span> TIMER<span class="op">)</span> handle_timer<span class="op">();</span></span>
-<span id="cb3-6"><a aria-label="6"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb3-1"><a aria-label="1"></a><span class="dt">uint32_t</span> raw <span class="op">=</span> read_csr<span class="op">(</span>mcause<span class="op">);</span></span>
+<span id="cb3-2"><a aria-label="2"></a><span class="dt">int</span> is_irq <span class="op">=</span> <span class="op">(</span>raw <span class="op">&gt;&gt;</span> <span class="dv">31</span><span class="op">)</span> <span class="op">&amp;</span> <span class="dv">1</span><span class="op">;</span>          <span class="co">/* RV32: Interrupt-Bit */</span></span>
+<span id="cb3-3"><a aria-label="3"></a><span class="dt">uint32_t</span> code <span class="op">=</span> raw <span class="op">&amp;</span> <span class="bn">0x7fffffff</span><span class="bu">u</span><span class="op">;</span>     <span class="co">/* Cause-Code */</span></span>
+<span id="cb3-4"><a aria-label="4"></a><span class="cf">if</span> <span class="op">(</span>is_irq <span class="op">&amp;&amp;</span> code <span class="op">==</span> <span class="dv">7</span><span class="op">)</span> handle_timer<span class="op">();</span></span>
+<span id="cb3-5"><a aria-label="5"></a><span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>is_irq <span class="op">&amp;&amp;</span> code <span class="op">==</span> <span class="dv">11</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb3-6"><a aria-label="6"></a>    <span class="dt">uint32_t</span> id <span class="op">=</span> plic_claim<span class="op">();</span>        <span class="co">/* UART=1, nicht Cause 7 */</span></span>
+<span id="cb3-7"><a aria-label="7"></a>    <span class="cf">if</span> <span class="op">(</span>id <span class="op">==</span> <span class="dv">1</span><span class="op">)</span> handle_uart<span class="op">();</span></span>
+<span id="cb3-8"><a aria-label="8"></a>    <span class="cf">if</span> <span class="op">(</span>id <span class="op">!=</span> <span class="dv">0</span><span class="op">)</span> plic_complete<span class="op">(</span>id<span class="op">);</span></span>
+<span id="cb3-9"><a aria-label="9"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Ein gemeinsamer Trap-Handler reicht für Übungen mit wenigen Quellen. Bei dutzenden Peripherien wird die Software-Suche zum Flaschenhals.</p>
+<p>BUTTON als nackter Vergleich trifft weder das Interrupt-Bit noch eine PLIC-ID. Cause 11 ist nur „extern“, die Geräte-ID kommt vom Claim.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -543,6 +542,12 @@ flowchart LR
 </section>
 <section id="viele-quellen-ein-problem" class="slide level2">
 <h2>Viele Quellen — ein Problem</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/03_interrupts_timer/two-levels.png"></p>
+<figcaption>Cause 3 und 7 lokal, externe Geräte gemeinsam auf Cause 11. Die Claim-ID ist eine andere Zahl.</figcaption>
+</figure>
+</div>
 <div class="cell" data-reveal="true" data-fig-width="4" data-layout-align="default">
 <div class="cell-output-display">
 <div>
@@ -949,7 +954,7 @@ flowchart LR
 <li>Sprung in konstanter Zeit zur passenden Routine</li>
 </ul>
 <aside class="notes">
-<p>Direkte Durchwahl statt Hotline: Timer → Timer-ISR, UART → UART-ISR.</p>
+<p>mtvec waehlt die Kategorie: Timer Cause 7, Software Cause 3, External Cause 11. UART, I2C und GPIO teilen sich Cause 11. Die Geraete-ID kommt erst vom PLIC-Claim.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -972,7 +977,7 @@ flowchart LR
 <pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
 flowchart LR
   A[Timer] --&gt;|Hardware| B["PC = BASE + Offset_Timer"]
-  C[UART] --&gt;|Hardware| D["PC = BASE + Offset_UART"]
+  C[UART, I2C, GPIO] --&gt;|Cause 11| D["PC = BASE + 44, dann Claim"]
   style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
 </pre>
 </div>
@@ -996,6 +1001,12 @@ flowchart LR
 </section>
 <section id="wie-vectored-mode-rechnet" class="slide level2">
 <h2>Wie Vectored Mode rechnet</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/03_interrupts_timer/mtvec.png"></p>
+<figcaption>BASE 0x80000100. MSI 0x8000010C, MTI 0x8000011C, MEI 0x8000012C.</figcaption>
+</figure>
+</div>
 <p>Bei MODE = 1 und Interrupt:</p>
 <p><span class="math display">\[
 \mathrm{PC} = \mathrm{BASE} + 4 \times \mathrm{mcause.ExceptionCode}
@@ -1239,6 +1250,12 @@ flowchart LR
 </section>
 <section id="das-64-bit-problem-auf-rv32" class="slide level2">
 <h2>Das 64-Bit-Problem auf RV32</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/03_interrupts_timer/hi-lo.png"></p>
+<figcaption>Zerrissener Snapshot und sichere RV32-Compare-Schreibfolge.</figcaption>
+</figure>
+</div>
 <ul>
 <li>RV32: native Wortbreite 32 Bit</li>
 <li>32-Bit-Zähler bei 1 MHz: Overflow nach <span class="math inline">\(\approx 71\)</span> Minuten</li>
@@ -1287,6 +1304,12 @@ flowchart LR
 </section>
 <section id="der-auslöser-mtimecmp" class="slide level2">
 <h2>Der Auslöser: <code>mtimecmp</code></h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/03_interrupts_timer/timer-gates.png"></p>
+<figcaption>Pending ab mtime &gt;= mtimecmp. Ein Trap braucht zusätzlich MTIE und MIE.</figcaption>
+</figure>
+</div>
 <ul>
 <li><code>mtimecmp</code> (Machine Time Compare), ebenfalls 64 Bit</li>
 <li>Software schreibt einen Zukunftswert (Eieruhr)</li>
@@ -1434,6 +1457,12 @@ flowchart LR
 </section>
 <section id="mathematik-takte-berechnen" class="slide level2">
 <h2>Mathematik: Takte berechnen</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/03_interrupts_timer/tick-drift.png"></p>
+<figcaption>Drift 11,2 ms statt 11,0 ms. Sechs fällige Millisekunden, nächste Deadline 16 ms.</figcaption>
+</figure>
+</div>
 <ul>
 <li><code>mtime</code> zählt Oszillator-Takte, keine Sekunden</li>
 <li>Umrechnung in Software nötig</li>
@@ -1465,12 +1494,12 @@ flowchart LR
 <section id="software-interrupts-im-clint" class="slide level2">
 <h2>Software-Interrupts im CLINT</h2>
 <ul>
-<li>Register <code>msip</code> (Machine Software Interrupt Pending)</li>
-<li>Ein Bit pro Kern: Schreiben einer 1 → Soft-Interrupt (Exception Code 3)</li>
-<li>Sinn: Arbeit aus einer hochprioren ISR in einen niedriger priorisierten Pfad auslagern (Deferred Interrupt Handling)</li>
+<li><code>msip</code> ist ein Pending-Bit pro Hart, Cause 3</li>
+<li>Die Nutzdaten liegen daneben im Speicher, nicht im Bit selbst</li>
+<li>MSI ist nicht automatisch der Deferred-Pfad unter dem Timer</li>
 </ul>
 <aside class="notes">
-<p>Die CPU kann sich selbst „anklingeln“. Oft: in der schnellen ISR nur das Nötigste, Soft-Interrupt setzen, Rest später abarbeiten.</p>
+<p>Klassische Reihenfolge der Kategorien: External, dann Software, dann Timer. Eine Softwarestrategie kann Arbeit trotzdem später erledigen.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1485,30 +1514,19 @@ flowchart LR
 </section>
 <section id="inter-processor-interrupts-ipi" class="slide level2">
 <h2>Inter-Processor Interrupts (IPI)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/03_interrupts_timer/ipi.png"></p>
+<figcaption>Hart A setzt msip von Hart B. Cause 3, danach löscht B das Bit.</figcaption>
+</figure>
+</div>
 <p>Vorgriff auf Block 9 (Multicore):</p>
 <ul>
-<li>Ein CLINT, mehrere <code>msip</code>-Bits (eines pro Kern)</li>
-<li>Kern A schreibt <code>msip</code> von Kern B → asynchroner Interrupt auf B</li>
-<li>Standardweg für Inter-Processor Communication / Aufwecken</li>
+<li>Zwei Harts, ein <code>msip</code>-Bit je Hart</li>
+<li>Hart A setzt das Bit von Hart B. B erhält Cause 3 und löscht es wieder</li>
 </ul>
-<div class="cell" data-reveal="true" data-fig-width="3.8" data-layout-align="default">
-<div class="cell-output-display">
-<div>
-<p></p><figure class=""><p></p>
-<div>
-<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  C0[Core 0] --&gt;|schreibt msip[1]| CLINT
-  CLINT --&gt;|Interrupt| C1[Core 1]
-  style CLINT fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-</pre>
-</div>
-<p></p></figure><p></p>
-</div>
-</div>
-</div>
 <aside class="notes">
-<p>Schlafende Kerne können so gezielt geweckt werden — z. B. nach Netzwerkempfang auf Kern 0 die Entschlüsselung auf Kern 1 anstoßen.</p>
+<p>Die Nachricht selbst liegt nicht im Bit. Block 9 vertieft die Ordnung zwischen den Harts.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1542,32 +1560,39 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="c-beispiel-systick-initialisieren" class="slide level2">
-<h2>C-Beispiel: SysTick initialisieren</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb10-1"><a aria-label="1"></a><span class="pp">#define CLINT_MTIMECMP </span><span class="bn">0x02004000</span></span>
-<span id="cb10-2"><a aria-label="2"></a><span class="pp">#define CLINT_MTIME    </span><span class="bn">0x0200BFF8</span></span>
-<span id="cb10-3"><a aria-label="3"></a></span>
-<span id="cb10-4"><a aria-label="4"></a><span class="co">/* RV32: mtime atomar hi/lo lesen (kein 64-Bit-Load!) */</span></span>
+<section id="c-beispiel-system-tick-initialisieren" class="slide level2">
+<h2>C-Beispiel: System-Tick initialisieren</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb10-1"><a aria-label="1"></a><span class="co">/* Lehr-Modell, keine geprüfte SiFive-Map */</span></span>
+<span id="cb10-2"><a aria-label="2"></a><span class="pp">#define CLINT_MTIMECMP </span><span class="bn">0x02004000</span><span class="bu">u</span></span>
+<span id="cb10-3"><a aria-label="3"></a><span class="pp">#define CLINT_MTIME    </span><span class="bn">0x0200BFF8</span><span class="bu">u</span></span>
+<span id="cb10-4"><a aria-label="4"></a></span>
 <span id="cb10-5"><a aria-label="5"></a><span class="dt">static</span> <span class="dt">uint64_t</span> read_mtime<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
 <span id="cb10-6"><a aria-label="6"></a>    <span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*</span>mt <span class="op">=</span> <span class="op">(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*)</span>CLINT_MTIME<span class="op">;</span></span>
 <span id="cb10-7"><a aria-label="7"></a>    <span class="dt">uint32_t</span> hi<span class="op">,</span> lo<span class="op">;</span></span>
 <span id="cb10-8"><a aria-label="8"></a>    <span class="cf">do</span> <span class="op">{</span></span>
 <span id="cb10-9"><a aria-label="9"></a>        hi <span class="op">=</span> mt<span class="op">[</span><span class="dv">1</span><span class="op">];</span></span>
 <span id="cb10-10"><a aria-label="10"></a>        lo <span class="op">=</span> mt<span class="op">[</span><span class="dv">0</span><span class="op">];</span></span>
-<span id="cb10-11"><a aria-label="11"></a>    <span class="op">}</span> <span class="cf">while</span> <span class="op">(</span>hi <span class="op">!=</span> mt<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
+<span id="cb10-11"><a aria-label="11"></a>    <span class="op">}</span> <span class="cf">while</span> <span class="op">(</span>hi <span class="op">!=</span> mt<span class="op">[</span><span class="dv">1</span><span class="op">]);</span> <span class="co">/* nur ein konsistenter Snapshot */</span></span>
 <span id="cb10-12"><a aria-label="12"></a>    <span class="cf">return</span> <span class="op">((</span><span class="dt">uint64_t</span><span class="op">)</span>hi <span class="op">&lt;&lt;</span> <span class="dv">32</span><span class="op">)</span> <span class="op">|</span> lo<span class="op">;</span></span>
 <span id="cb10-13"><a aria-label="13"></a><span class="op">}</span></span>
 <span id="cb10-14"><a aria-label="14"></a></span>
-<span id="cb10-15"><a aria-label="15"></a><span class="dt">void</span> init_systick<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb10-16"><a aria-label="16"></a>    <span class="dt">uint64_t</span> now <span class="op">=</span> read_mtime<span class="op">();</span></span>
-<span id="cb10-17"><a aria-label="17"></a>    <span class="op">*(</span><span class="dt">volatile</span> <span class="dt">uint64_t</span> <span class="op">*)</span>CLINT_MTIMECMP <span class="op">=</span> now <span class="op">+</span> TICKS_PER_MS<span class="op">;</span></span>
-<span id="cb10-18"><a aria-label="18"></a>    set_csr<span class="op">(</span>mie<span class="op">,</span> <span class="op">(</span><span class="dv">1</span><span class="bu">u</span> <span class="op">&lt;&lt;</span> <span class="dv">7</span><span class="op">));</span>       <span class="co">/* MTIE */</span></span>
-<span id="cb10-19"><a aria-label="19"></a>    set_csr<span class="op">(</span>mstatus<span class="op">,</span> MSTATUS_MIE<span class="op">);</span> <span class="co">/* MIE global */</span></span>
-<span id="cb10-20"><a aria-label="20"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb10-15"><a aria-label="15"></a><span class="dt">static</span> <span class="dt">void</span> write_mtimecmp<span class="op">(</span><span class="dt">uint64_t</span> v<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb10-16"><a aria-label="16"></a>    <span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*</span>cmp <span class="op">=</span> <span class="op">(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*)</span>CLINT_MTIMECMP<span class="op">;</span></span>
+<span id="cb10-17"><a aria-label="17"></a>    cmp<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">=</span> <span class="bn">0xffffffff</span><span class="bu">u</span><span class="op">;</span>          <span class="co">/* kein zu kleiner Zwischenwert */</span></span>
+<span id="cb10-18"><a aria-label="18"></a>    cmp<span class="op">[</span><span class="dv">1</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)(</span>v <span class="op">&gt;&gt;</span> <span class="dv">32</span><span class="op">);</span></span>
+<span id="cb10-19"><a aria-label="19"></a>    cmp<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)</span>v<span class="op">;</span></span>
+<span id="cb10-20"><a aria-label="20"></a><span class="op">}</span></span>
+<span id="cb10-21"><a aria-label="21"></a></span>
+<span id="cb10-22"><a aria-label="22"></a><span class="dt">void</span> init_system_tick<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb10-23"><a aria-label="23"></a>    <span class="co">/* Stack und mtvec müssen schon stehen */</span></span>
+<span id="cb10-24"><a aria-label="24"></a>    <span class="dt">uint64_t</span> now <span class="op">=</span> read_mtime<span class="op">();</span></span>
+<span id="cb10-25"><a aria-label="25"></a>    write_mtimecmp<span class="op">(</span>now <span class="op">+</span> <span class="dv">10000</span><span class="bu">u</span><span class="op">);</span>  <span class="co">/* 10 MHz, 1 ms */</span></span>
+<span id="cb10-26"><a aria-label="26"></a>    set_csr<span class="op">(</span>mie<span class="op">,</span> <span class="op">(</span><span class="dv">1</span><span class="bu">u</span> <span class="op">&lt;&lt;</span> <span class="dv">7</span><span class="op">));</span>       <span class="co">/* MTIE */</span></span>
+<span id="cb10-27"><a aria-label="27"></a>    set_csr<span class="op">(</span>mstatus<span class="op">,</span> MSTATUS_MIE<span class="op">);</span></span>
+<span id="cb10-28"><a aria-label="28"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li><code>MTIE</code> in <code>mie</code>: Timer-Interrupt-Quelle freigeben</li>
-<li><code>MIE</code> in <code>mstatus</code>: Interrupts global erlauben</li>
-<li>Beide Schalter nötig — sonst bleibt der Alarm stumm</li>
+<li>Kein 64-Bit-Store auf RV32. Die drei 32-Bit-Schreibungen sind die Compare-Sequenz.</li>
+<li>Adressen sind das Lehr-Modell, nicht das Labor-Datenblatt.</li>
 </ul>
 <aside class="notes">
 <p>Rezept: Zeit lesen, Intervall addieren, Compare setzen — dann <code>MTIE</code> und <code>MIE</code>. Adressen sind beispielhaft (SiFive-üblich); immer Datenblatt prüfen.</p>
@@ -1605,8 +1630,8 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-clint-und-systick" class="slide level2">
-<h2>Fragen? — CLINT und SysTick</h2>
+<section id="fragen-clint-und-system-tick" class="slide level2">
+<h2>Fragen? — CLINT und System-Tick</h2>
 <ul>
 <li>Warum 64-Bit <code>mtime</code>?</li>
 <li>Race Condition beim 64-Bit-Lesen auf RV32?</li>
@@ -1727,6 +1752,12 @@ flowchart LR
 </section>
 <section id="priority-thresholds" class="slide level2">
 <h2>Priority Thresholds</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/03_interrupts_timer/plic-table.png"></p>
+<figcaption>Threshold 5 lässt ID 1 stumm. ID 2 gewinnt vor ID 3.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Pro Target (Kern): Threshold-Register</li>
 <li>Weiterleitung nur wenn Priorität <strong>strikt größer</strong> als Threshold</li>
@@ -1791,6 +1822,12 @@ flowchart LR
 </section>
 <section id="schritt-1-claim" class="slide level2">
 <h2>Schritt 1: Claim</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/03_interrupts_timer/claim.png"></p>
+<figcaption>Claim löscht PLIC-Pending, nicht die Ursache im UART. ID 0 nicht abschließen.</figcaption>
+</figure>
+</div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb11-1"><a aria-label="1"></a><span class="dt">void</span> external_interrupt_handler<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
 <span id="cb11-2"><a aria-label="2"></a>    <span class="dt">uint32_t</span> id <span class="op">=</span> <span class="op">*(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*)</span>PLIC_CLAIM_REG<span class="op">;</span></span>
 <span id="cb11-3"><a aria-label="3"></a>    my_isr_functions<span class="op">[</span>id<span class="op">]();</span></span>
@@ -2038,26 +2075,25 @@ flowchart LR
 </section>
 <section id="nesting-korrekt-zuerst-stack-dann-mie" class="slide level2">
 <h2>Nesting korrekt: zuerst Stack, dann <code>MIE</code></h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb13-1"><a aria-label="1"></a>addi <span class="kw">sp</span><span class="op">,</span> <span class="kw">sp</span><span class="op">,</span> <span class="op">-</span><span class="dv">8</span>     <span class="op">/*</span> Platz fuer mepc <span class="op">+</span> mstatus <span class="op">*/</span></span>
-<span id="cb13-2"><a aria-label="2"></a>csrr t0<span class="op">,</span> mepc</span>
-<span id="cb13-3"><a aria-label="3"></a>sw   t0<span class="op">,</span> <span class="dv">0</span><span class="op">(</span><span class="kw">sp</span><span class="op">)</span>      <span class="op">/*</span> mepc retten <span class="op">*/</span></span>
-<span id="cb13-4"><a aria-label="4"></a>csrr t1<span class="op">,</span> mstatus</span>
-<span id="cb13-5"><a aria-label="5"></a>sw   t1<span class="op">,</span> <span class="dv">4</span><span class="op">(</span><span class="kw">sp</span><span class="op">)</span>      <span class="op">/*</span> mstatus retten <span class="op">*/</span></span>
-<span id="cb13-6"><a aria-label="6"></a>/* erst jetzt<span class="op">:</span> MIE <span class="op">=</span> <span class="dv">1</span> und unterbrechbare Arbeit <span class="op">*/</span></span>
-<span id="cb13-7"><a aria-label="7"></a>/* ... innere Arbeit <span class="op">...</span> <span class="op">*/</span></span>
-<span id="cb13-8"><a aria-label="8"></a>lw   t1<span class="op">,</span> <span class="dv">4</span><span class="op">(</span><span class="kw">sp</span><span class="op">)</span>      <span class="op">/*</span> mstatus zurueck <span class="op">*/</span></span>
-<span id="cb13-9"><a aria-label="9"></a>csrw mstatus<span class="op">,</span> t1</span>
-<span id="cb13-10"><a aria-label="10"></a>lw   t0<span class="op">,</span> <span class="dv">0</span><span class="op">(</span><span class="kw">sp</span><span class="op">)</span>      <span class="op">/*</span> mepc zurueck <span class="op">*/</span></span>
-<span id="cb13-11"><a aria-label="11"></a>csrw mepc<span class="op">,</span> t0</span>
-<span id="cb13-12"><a aria-label="12"></a>addi <span class="kw">sp</span><span class="op">,</span> <span class="kw">sp</span><span class="op">,</span> <span class="dv">8</span></span>
-<span id="cb13-13"><a aria-label="13"></a>mret</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/03_interrupts_timer/nesting.png"></p>
+<figcaption>Konzeptionell: getrennte Frames. Der kurze Prolog ist keine sichere Vorlage.</figcaption>
+</figure>
+</div>
+<p>Konzeptioneller Pseudocode, keine geprüfte sichere ISR:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode numberSource text number-lines code-with-copy"><code class="sourceCode"><span id="cb13-1"><a aria-label="1"></a>Frame 16-Byte-ausgerichtet anlegen</span>
+<span id="cb13-2"><a aria-label="2"></a>benutzte GPRs und mepc/mstatus sichern</span>
+<span id="cb13-3"><a aria-label="3"></a>erst dann eine bewusst gewählte Präemption</span>
+<span id="cb13-4"><a aria-label="4"></a>vor dem Epilog wieder maskieren</span>
+<span id="cb13-5"><a aria-label="5"></a>CSRs restaurieren, Frame abbauen, mret</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li>Reihenfolge: Stack-Platz → CSRs sichern → dann <code>MIE</code> setzen</li>
-<li>Nach dem inneren Interrupt: Werte zurückschreiben, dann <code>mret</code></li>
-<li><code>MIE=1</code> ohne Stack-Rettung ist unsicher</li>
+<li>Acht Byte und das Überschreiben von t0/t1 reichen nicht.</li>
+<li>MIE=1 erlaubt nicht nur höherpriore Quellen.</li>
+<li>Der Grundkurs bleibt bei kurzen, nicht verschachtelten ISRs.</li>
 </ul>
 <aside class="notes">
-<p>Klassische OS-Technik: Hardware-CSRs in RAM sichern, bevor ein zweiter Trap sie überschreiben darf. Erst danach die globalen Interrupts wieder freigeben.</p>
+<p>Konzeptionell: erst Kontext sichern, dann eine gewählte Präemption. Dieser Block ist kein kopierfertiger Prolog. Der Grundkurs bleibt bei nicht verschachtelten ISRs.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2112,8 +2148,8 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="ausblick-labor-systick-szenario" class="slide level2">
-<h2>Ausblick Labor: SysTick-Szenario</h2>
+<section id="ausblick-labor-system-tick" class="slide level2">
+<h2>Ausblick Labor: System-Tick</h2>
 <p>Geplantes Laborziel:</p>
 <ul>
 <li>CLINT so konfigurieren, dass er periodisch (z. B. 1 ms) feuert</li>
@@ -2185,6 +2221,12 @@ flowchart LR
 </section>
 <section id="background-task-und-foreground-isr" class="slide level2">
 <h2>Background Task und Foreground ISR</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/03_interrupts_timer/foreground.png"></p>
+<figcaption>uint32-Differenz über den Umbruch ist 48. volatile ersetzt keine Atomarität.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Foreground: kurze ISR inkrementiert <code>system_uptime_ms</code> (nur lesen/schreiben der Zeitbasis)</li>
 <li>Background: <code>main</code> vergleicht gegen einen Merker — ohne die ISR-Zählung zu nullen</li>

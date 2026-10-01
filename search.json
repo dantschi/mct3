@@ -1432,7 +1432,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#polling-vs.-interrupt-schema",
     "title": "03 · Interrupts & Timer",
     "section": "Polling vs. Interrupt — Schema",
-    "text": "Polling vs. Interrupt — Schema\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[Main Loop] --&gt;|Interrupt| B[ISR]\n  B --&gt;|Return| A\n  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nSchematisch: Das Main-Programm läuft weiter, bis ein Interrupt die ISR anstößt; danach Rückkehr."
+    "text": "Polling vs. Interrupt — Schema\n\n\n\nModell: Polling-Wartezeit 0,8 ms. Interrupt mit Latenz, kurzer ISR und optionalem Flag.\n\n\n\nBusy-Waiting und gelegentliches Polling sind verschieden. Ein Interrupt garantiert keine Energieeinsparung."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#refresher-mct1-das-csr-system",
@@ -1446,7 +1446,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#der-rudimentäre-mct1-trap-handler",
     "title": "03 · Interrupts & Timer",
     "section": "Der rudimentäre MCT1-Trap-Handler",
-    "text": "Der rudimentäre MCT1-Trap-Handler\n\nIn MCT1 oft ein einziger Einsprung über mtvec\nAlle Quellen landen an derselben Adresse\nSoftware muss per mcause verzweigen (if/else)\nFür wenige Quellen akzeptabel — für echte SoCs zu starr und langsam\n\n// Logischer Ablauf des einfachen Handlers\nvoid trap_handler(void) {\n    int cause = read_csr(mcause);\n    if (cause == BUTTON) handle_button();\n    else if (cause == TIMER) handle_timer();\n}\n\nEin gemeinsamer Trap-Handler reicht für Übungen mit wenigen Quellen. Bei dutzenden Peripherien wird die Software-Suche zum Flaschenhals."
+    "text": "Der rudimentäre MCT1-Trap-Handler\n\n\n\nHardware setzt mepc, mcause, MPIE und MIE. Software sichert den Stack. mret stellt den Status zurück.\n\n\n\nIn MCT1 oft ein einziger Einsprung über mtvec\nAlle Quellen landen an derselben Adresse\nSoftware muss per mcause verzweigen (if/else)\nFür wenige Quellen akzeptabel — für echte SoCs zu starr und langsam\n\nuint32_t raw = read_csr(mcause);\nint is_irq = (raw &gt;&gt; 31) & 1;          /* RV32: Interrupt-Bit */\nuint32_t code = raw & 0x7fffffffu;     /* Cause-Code */\nif (is_irq && code == 7) handle_timer();\nelse if (is_irq && code == 11) {\n    uint32_t id = plic_claim();        /* UART=1, nicht Cause 7 */\n    if (id == 1) handle_uart();\n    if (id != 0) plic_complete(id);\n}\n\nBUTTON als nackter Vergleich trifft weder das Interrupt-Bit noch eine PLIC-ID. Cause 11 ist nur „extern“, die Geräte-ID kommt vom Claim."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#agenda-für-den-heutigen-tag",
@@ -1474,7 +1474,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#viele-quellen-ein-problem",
     "title": "03 · Interrupts & Timer",
     "section": "Viele Quellen — ein Problem",
-    "text": "Viele Quellen — ein Problem\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[Timer] --&gt; CPU[CPU]\n  B[UART Rx] --&gt; CPU\n  C[Not-Aus] --&gt; CPU\n  D[Sensoren] --&gt; CPU\n  style C fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nSchematisch: Viele Quellen drängen zur CPU. Ohne Priorisierung und schnelle Identifikation entsteht Chaos — besonders bei kritischen Signalen wie Not-Aus."
+    "text": "Viele Quellen — ein Problem\n\n\n\nCause 3 und 7 lokal, externe Geräte gemeinsam auf Cause 11. Die Claim-ID ist eine andere Zahl.\n\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[Timer] --&gt; CPU[CPU]\n  B[UART Rx] --&gt; CPU\n  C[Not-Aus] --&gt; CPU\n  D[Sensoren] --&gt; CPU\n  style C fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nSchematisch: Viele Quellen drängen zur CPU. Ohne Priorisierung und schnelle Identifikation entsteht Chaos — besonders bei kritischen Signalen wie Not-Aus."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#das-skalierungsproblem",
@@ -1579,21 +1579,21 @@
     "href": "vorlesungen/03_interrupts_timer.html#vectored-mode-mode-1",
     "title": "03 · Interrupts & Timer",
     "section": "Vectored Mode (MODE = 1)",
-    "text": "Vectored Mode (MODE = 1)\n\nJeder Interrupt-Typ erhält einen eigenen Einsprung\nHardware nutzt den Exception-Code aus mcause\nKein if/else zur Identifikation der Quelle\nSprung in konstanter Zeit zur passenden Routine\n\n\nDirekte Durchwahl statt Hotline: Timer → Timer-ISR, UART → UART-ISR."
+    "text": "Vectored Mode (MODE = 1)\n\nJeder Interrupt-Typ erhält einen eigenen Einsprung\nHardware nutzt den Exception-Code aus mcause\nKein if/else zur Identifikation der Quelle\nSprung in konstanter Zeit zur passenden Routine\n\n\nmtvec waehlt die Kategorie: Timer Cause 7, Software Cause 3, External Cause 11. UART, I2C und GPIO teilen sich Cause 11. Die Geraete-ID kommt erst vom PLIC-Claim."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#vectored-mode-schema",
     "href": "vorlesungen/03_interrupts_timer.html#vectored-mode-schema",
     "title": "03 · Interrupts & Timer",
     "section": "Vectored Mode — Schema",
-    "text": "Vectored Mode — Schema\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[Timer] --&gt;|Hardware| B[\"PC = BASE + Offset_Timer\"]\n  C[UART] --&gt;|Hardware| D[\"PC = BASE + Offset_UART\"]\n  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nDie Hardware berechnet den Ziel-PC aus BASE und Interrupt-Code."
+    "text": "Vectored Mode — Schema\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[Timer] --&gt;|Hardware| B[\"PC = BASE + Offset_Timer\"]\n  C[UART, I2C, GPIO] --&gt;|Cause 11| D[\"PC = BASE + 44, dann Claim\"]\n  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nDie Hardware berechnet den Ziel-PC aus BASE und Interrupt-Code."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#wie-vectored-mode-rechnet",
     "href": "vorlesungen/03_interrupts_timer.html#wie-vectored-mode-rechnet",
     "title": "03 · Interrupts & Timer",
     "section": "Wie Vectored Mode rechnet",
-    "text": "Wie Vectored Mode rechnet\nBei MODE = 1 und Interrupt:\n\\[\n\\mathrm{PC} = \\mathrm{BASE} + 4 \\times \\mathrm{mcause.ExceptionCode}\n\\]\n\nFaktor 4: ein RV32I-Befehl belegt typischerweise 4 Bytes\nBeispiel: Timer-Interrupt (Code 7) → \\(\\mathrm{BASE} + 28\\)\n\n\nSilizium multipliziert den Code mit der Befehlslänge und addiert zur Basis — deterministisch und schnell."
+    "text": "Wie Vectored Mode rechnet\n\n\n\nBASE 0x80000100. MSI 0x8000010C, MTI 0x8000011C, MEI 0x8000012C.\n\n\nBei MODE = 1 und Interrupt:\n\\[\n\\mathrm{PC} = \\mathrm{BASE} + 4 \\times \\mathrm{mcause.ExceptionCode}\n\\]\n\nFaktor 4: ein RV32I-Befehl belegt typischerweise 4 Bytes\nBeispiel: Timer-Interrupt (Code 7) → \\(\\mathrm{BASE} + 28\\)\n\n\nSilizium multipliziert den Code mit der Befehlslänge und addiert zur Basis — deterministisch und schnell."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#die-vektor-tabelle",
@@ -1663,7 +1663,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#das-64-bit-problem-auf-rv32",
     "title": "03 · Interrupts & Timer",
     "section": "Das 64-Bit-Problem auf RV32",
-    "text": "Das 64-Bit-Problem auf RV32\n\nRV32: native Wortbreite 32 Bit\n32-Bit-Zähler bei 1 MHz: Overflow nach \\(\\approx 71\\) Minuten\nDeshalb: mtime im CLINT 64 Bit — auch auf RV32\nOverflow erst nach astronomisch langen Zeiten (bei üblichen Takten)\n\n\nEingebettete Systeme laufen oft monatelang. Eine 32-Bit-Uhr würde Zeitmessung und Scheduler zerstören."
+    "text": "Das 64-Bit-Problem auf RV32\n\n\n\nZerrissener Snapshot und sichere RV32-Compare-Schreibfolge.\n\n\n\nRV32: native Wortbreite 32 Bit\n32-Bit-Zähler bei 1 MHz: Overflow nach \\(\\approx 71\\) Minuten\nDeshalb: mtime im CLINT 64 Bit — auch auf RV32\nOverflow erst nach astronomisch langen Zeiten (bei üblichen Takten)\n\n\nEingebettete Systeme laufen oft monatelang. Eine 32-Bit-Uhr würde Zeitmessung und Scheduler zerstören."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#bit-lesen-auf-rv32",
@@ -1677,7 +1677,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#der-auslöser-mtimecmp",
     "title": "03 · Interrupts & Timer",
     "section": "Der Auslöser: mtimecmp",
-    "text": "Der Auslöser: mtimecmp\n\nmtimecmp (Machine Time Compare), ebenfalls 64 Bit\nSoftware schreibt einen Zukunftswert (Eieruhr)\nBeispiel: jetzt \\(= 100\\), Intervall \\(50\\) → mtimecmp = 150\n\n\nWir lesen mtime, addieren das Intervall und programmieren den Alarm — dann weiter im Main-Loop."
+    "text": "Der Auslöser: mtimecmp\n\n\n\nPending ab mtime &gt;= mtimecmp. Ein Trap braucht zusätzlich MTIE und MIE.\n\n\n\nmtimecmp (Machine Time Compare), ebenfalls 64 Bit\nSoftware schreibt einen Zukunftswert (Eieruhr)\nBeispiel: jetzt \\(= 100\\), Intervall \\(50\\) → mtimecmp = 150\n\n\nWir lesen mtime, addieren das Intervall und programmieren den Alarm — dann weiter im Main-Loop."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#hardware-logik-im-clint",
@@ -1719,21 +1719,21 @@
     "href": "vorlesungen/03_interrupts_timer.html#mathematik-takte-berechnen",
     "title": "03 · Interrupts & Timer",
     "section": "Mathematik: Takte berechnen",
-    "text": "Mathematik: Takte berechnen\n\nmtime zählt Oszillator-Takte, keine Sekunden\nUmrechnung in Software nötig\nBeispiel: Quarz \\(10\\,\\mathrm{MHz}\\) \\(\\Rightarrow\\) \\(10^{7}\\) Takte/s\nPro ms: \\(10^{7}/1000 = 10^{4}\\) Takte\nNächster Alarm: mtimecmp = mtime + 10000\n\n#define TIMER_FREQ   10000000  /* 10 MHz */\n#define TICKS_PER_MS (TIMER_FREQ / 1000)\n\nvoid timer_isr(void) {\n    uint64_t now = read_mtime();\n    write_mtimecmp(now + TICKS_PER_MS);\n}\n\nIm Datenblatt steht die Timer-Frequenz. Daraus berechnen Sie Ticks pro Millisekunde und programmieren mtimecmp entsprechend — das ist typische Labor-Mathematik."
+    "text": "Mathematik: Takte berechnen\n\n\n\nDrift 11,2 ms statt 11,0 ms. Sechs fällige Millisekunden, nächste Deadline 16 ms.\n\n\n\nmtime zählt Oszillator-Takte, keine Sekunden\nUmrechnung in Software nötig\nBeispiel: Quarz \\(10\\,\\mathrm{MHz}\\) \\(\\Rightarrow\\) \\(10^{7}\\) Takte/s\nPro ms: \\(10^{7}/1000 = 10^{4}\\) Takte\nNächster Alarm: mtimecmp = mtime + 10000\n\n#define TIMER_FREQ   10000000  /* 10 MHz */\n#define TICKS_PER_MS (TIMER_FREQ / 1000)\n\nvoid timer_isr(void) {\n    uint64_t now = read_mtime();\n    write_mtimecmp(now + TICKS_PER_MS);\n}\n\nIm Datenblatt steht die Timer-Frequenz. Daraus berechnen Sie Ticks pro Millisekunde und programmieren mtimecmp entsprechend — das ist typische Labor-Mathematik."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#software-interrupts-im-clint",
     "href": "vorlesungen/03_interrupts_timer.html#software-interrupts-im-clint",
     "title": "03 · Interrupts & Timer",
     "section": "Software-Interrupts im CLINT",
-    "text": "Software-Interrupts im CLINT\n\nRegister msip (Machine Software Interrupt Pending)\nEin Bit pro Kern: Schreiben einer 1 → Soft-Interrupt (Exception Code 3)\nSinn: Arbeit aus einer hochprioren ISR in einen niedriger priorisierten Pfad auslagern (Deferred Interrupt Handling)\n\n\nDie CPU kann sich selbst „anklingeln“. Oft: in der schnellen ISR nur das Nötigste, Soft-Interrupt setzen, Rest später abarbeiten."
+    "text": "Software-Interrupts im CLINT\n\nmsip ist ein Pending-Bit pro Hart, Cause 3\nDie Nutzdaten liegen daneben im Speicher, nicht im Bit selbst\nMSI ist nicht automatisch der Deferred-Pfad unter dem Timer\n\n\nKlassische Reihenfolge der Kategorien: External, dann Software, dann Timer. Eine Softwarestrategie kann Arbeit trotzdem später erledigen."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#inter-processor-interrupts-ipi",
     "href": "vorlesungen/03_interrupts_timer.html#inter-processor-interrupts-ipi",
     "title": "03 · Interrupts & Timer",
     "section": "Inter-Processor Interrupts (IPI)",
-    "text": "Inter-Processor Interrupts (IPI)\nVorgriff auf Block 9 (Multicore):\n\nEin CLINT, mehrere msip-Bits (eines pro Kern)\nKern A schreibt msip von Kern B → asynchroner Interrupt auf B\nStandardweg für Inter-Processor Communication / Aufwecken\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  C0[Core 0] --&gt;|schreibt msip[1]| CLINT\n  CLINT --&gt;|Interrupt| C1[Core 1]\n  style CLINT fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nSchlafende Kerne können so gezielt geweckt werden — z. B. nach Netzwerkempfang auf Kern 0 die Entschlüsselung auf Kern 1 anstoßen."
+    "text": "Inter-Processor Interrupts (IPI)\n\n\n\nHart A setzt msip von Hart B. Cause 3, danach löscht B das Bit.\n\n\nVorgriff auf Block 9 (Multicore):\n\nZwei Harts, ein msip-Bit je Hart\nHart A setzt das Bit von Hart B. B erhält Cause 3 und löscht es wieder\n\n\nDie Nachricht selbst liegt nicht im Bit. Block 9 vertieft die Ordnung zwischen den Harts."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#mmio-beim-clint",
@@ -1743,11 +1743,11 @@
     "text": "MMIO beim CLINT\n\nmtime / mtimecmp sind keine CSRs (csrw), sondern Memory-Mapped Register\nZugriff über normale C-Pointer auf physische Adressen\nBasisadresse abhängig vom SoC (bei SiFive oft ab 0x02000000)\n\n\nCSRs steuern den Kern von innen; der CLINT liegt außerhalb auf dem Bus — wie Peripherie über MMIO."
   },
   {
-    "objectID": "vorlesungen/03_interrupts_timer.html#c-beispiel-systick-initialisieren",
-    "href": "vorlesungen/03_interrupts_timer.html#c-beispiel-systick-initialisieren",
+    "objectID": "vorlesungen/03_interrupts_timer.html#c-beispiel-system-tick-initialisieren",
+    "href": "vorlesungen/03_interrupts_timer.html#c-beispiel-system-tick-initialisieren",
     "title": "03 · Interrupts & Timer",
-    "section": "C-Beispiel: SysTick initialisieren",
-    "text": "C-Beispiel: SysTick initialisieren\n#define CLINT_MTIMECMP 0x02004000\n#define CLINT_MTIME    0x0200BFF8\n\n/* RV32: mtime atomar hi/lo lesen (kein 64-Bit-Load!) */\nstatic uint64_t read_mtime(void) {\n    volatile uint32_t *mt = (volatile uint32_t *)CLINT_MTIME;\n    uint32_t hi, lo;\n    do {\n        hi = mt[1];\n        lo = mt[0];\n    } while (hi != mt[1]);\n    return ((uint64_t)hi &lt;&lt; 32) | lo;\n}\n\nvoid init_systick(void) {\n    uint64_t now = read_mtime();\n    *(volatile uint64_t *)CLINT_MTIMECMP = now + TICKS_PER_MS;\n    set_csr(mie, (1u &lt;&lt; 7));       /* MTIE */\n    set_csr(mstatus, MSTATUS_MIE); /* MIE global */\n}\n\nMTIE in mie: Timer-Interrupt-Quelle freigeben\nMIE in mstatus: Interrupts global erlauben\nBeide Schalter nötig — sonst bleibt der Alarm stumm\n\n\nRezept: Zeit lesen, Intervall addieren, Compare setzen — dann MTIE und MIE. Adressen sind beispielhaft (SiFive-üblich); immer Datenblatt prüfen."
+    "section": "C-Beispiel: System-Tick initialisieren",
+    "text": "C-Beispiel: System-Tick initialisieren\n/* Lehr-Modell, keine geprüfte SiFive-Map */\n#define CLINT_MTIMECMP 0x02004000u\n#define CLINT_MTIME    0x0200BFF8u\n\nstatic uint64_t read_mtime(void) {\n    volatile uint32_t *mt = (volatile uint32_t *)CLINT_MTIME;\n    uint32_t hi, lo;\n    do {\n        hi = mt[1];\n        lo = mt[0];\n    } while (hi != mt[1]); /* nur ein konsistenter Snapshot */\n    return ((uint64_t)hi &lt;&lt; 32) | lo;\n}\n\nstatic void write_mtimecmp(uint64_t v) {\n    volatile uint32_t *cmp = (volatile uint32_t *)CLINT_MTIMECMP;\n    cmp[0] = 0xffffffffu;          /* kein zu kleiner Zwischenwert */\n    cmp[1] = (uint32_t)(v &gt;&gt; 32);\n    cmp[0] = (uint32_t)v;\n}\n\nvoid init_system_tick(void) {\n    /* Stack und mtvec müssen schon stehen */\n    uint64_t now = read_mtime();\n    write_mtimecmp(now + 10000u);  /* 10 MHz, 1 ms */\n    set_csr(mie, (1u &lt;&lt; 7));       /* MTIE */\n    set_csr(mstatus, MSTATUS_MIE);\n}\n\nKein 64-Bit-Store auf RV32. Die drei 32-Bit-Schreibungen sind die Compare-Sequenz.\nAdressen sind das Lehr-Modell, nicht das Labor-Datenblatt.\n\n\nRezept: Zeit lesen, Intervall addieren, Compare setzen — dann MTIE und MIE. Adressen sind beispielhaft (SiFive-üblich); immer Datenblatt prüfen."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#zusammenfassung-clint",
@@ -1757,11 +1757,11 @@
     "text": "Zusammenfassung CLINT\n\nLokale, zeitkritische Ereignisse\n64-Bit-Zähler mtime, Compare mtimecmp\nSoft-Interrupts (msip): Deferred Handling und IPI\nKonfiguration über MMIO\n\n\nDamit haben wir die Systemzeit. Als Nächstes: externe Peripherie über den PLIC."
   },
   {
-    "objectID": "vorlesungen/03_interrupts_timer.html#fragen-clint-und-systick",
-    "href": "vorlesungen/03_interrupts_timer.html#fragen-clint-und-systick",
+    "objectID": "vorlesungen/03_interrupts_timer.html#fragen-clint-und-system-tick",
+    "href": "vorlesungen/03_interrupts_timer.html#fragen-clint-und-system-tick",
     "title": "03 · Interrupts & Timer",
-    "section": "Fragen? — CLINT und SysTick",
-    "text": "Fragen? — CLINT und SysTick\n\nWarum 64-Bit mtime?\nRace Condition beim 64-Bit-Lesen auf RV32?\nWarum sofort erneuter Timer-Interrupt ohne neues mtimecmp?\n\n\nWenn Timer und Quittieren klar sind, öffnen wir die Tür zur Peripherie: PLIC."
+    "section": "Fragen? — CLINT und System-Tick",
+    "text": "Fragen? — CLINT und System-Tick\n\nWarum 64-Bit mtime?\nRace Condition beim 64-Bit-Lesen auf RV32?\nWarum sofort erneuter Timer-Interrupt ohne neues mtimecmp?\n\n\nWenn Timer und Quittieren klar sind, öffnen wir die Tür zur Peripherie: PLIC."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#auftritt-plic",
@@ -1796,7 +1796,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#priority-thresholds",
     "title": "03 · Interrupts & Timer",
     "section": "Priority Thresholds",
-    "text": "Priority Thresholds\n\nPro Target (Kern): Threshold-Register\nWeiterleitung nur wenn Priorität strikt größer als Threshold\nBeispiel: Threshold \\(= 5\\) → Prio 3 wird blockiert, Prio 7 weckt die CPU\n\n\nNützlich, wenn die CPU kritische Arbeit schützt: niedrige Alarme prallen am PLIC ab, Notfälle kommen durch."
+    "text": "Priority Thresholds\n\n\n\nThreshold 5 lässt ID 1 stumm. ID 2 gewinnt vor ID 3.\n\n\n\nPro Target (Kern): Threshold-Register\nWeiterleitung nur wenn Priorität strikt größer als Threshold\nBeispiel: Threshold \\(= 5\\) → Prio 3 wird blockiert, Prio 7 weckt die CPU\n\n\nNützlich, wenn die CPU kritische Arbeit schützt: niedrige Alarme prallen am PLIC ab, Notfälle kommen durch."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#das-pending-array",
@@ -1817,7 +1817,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#schritt-1-claim",
     "title": "03 · Interrupts & Timer",
     "section": "Schritt 1: Claim",
-    "text": "Schritt 1: Claim\nvoid external_interrupt_handler(void) {\n    uint32_t id = *(volatile uint32_t *)PLIC_CLAIM_REG;\n    my_isr_functions[id]();\n}\n\nMMIO-Read auf Claim-Register → Gewinner-ID\nDanach direkter Sprung (z. B. Funktionszeiger-Array)\n\n\nEin Read ersetzt die lange Abfragekette: ID lesen, passende ISR aufrufen."
+    "text": "Schritt 1: Claim\n\n\n\nClaim löscht PLIC-Pending, nicht die Ursache im UART. ID 0 nicht abschließen.\n\n\nvoid external_interrupt_handler(void) {\n    uint32_t id = *(volatile uint32_t *)PLIC_CLAIM_REG;\n    my_isr_functions[id]();\n}\n\nMMIO-Read auf Claim-Register → Gewinner-ID\nDanach direkter Sprung (z. B. Funktionszeiger-Array)\n\n\nEin Read ersetzt die lange Abfragekette: ID lesen, passende ISR aufrufen."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#atomares-lesen-und-löschen",
@@ -1887,7 +1887,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#nesting-korrekt-zuerst-stack-dann-mie",
     "title": "03 · Interrupts & Timer",
     "section": "Nesting korrekt: zuerst Stack, dann MIE",
-    "text": "Nesting korrekt: zuerst Stack, dann MIE\naddi sp, sp, -8     /* Platz fuer mepc + mstatus */\ncsrr t0, mepc\nsw   t0, 0(sp)      /* mepc retten */\ncsrr t1, mstatus\nsw   t1, 4(sp)      /* mstatus retten */\n/* erst jetzt: MIE = 1 und unterbrechbare Arbeit */\n/* ... innere Arbeit ... */\nlw   t1, 4(sp)      /* mstatus zurueck */\ncsrw mstatus, t1\nlw   t0, 0(sp)      /* mepc zurueck */\ncsrw mepc, t0\naddi sp, sp, 8\nmret\n\nReihenfolge: Stack-Platz → CSRs sichern → dann MIE setzen\nNach dem inneren Interrupt: Werte zurückschreiben, dann mret\nMIE=1 ohne Stack-Rettung ist unsicher\n\n\nKlassische OS-Technik: Hardware-CSRs in RAM sichern, bevor ein zweiter Trap sie überschreiben darf. Erst danach die globalen Interrupts wieder freigeben."
+    "text": "Nesting korrekt: zuerst Stack, dann MIE\n\n\n\nKonzeptionell: getrennte Frames. Der kurze Prolog ist keine sichere Vorlage.\n\n\nKonzeptioneller Pseudocode, keine geprüfte sichere ISR:\nFrame 16-Byte-ausgerichtet anlegen\nbenutzte GPRs und mepc/mstatus sichern\nerst dann eine bewusst gewählte Präemption\nvor dem Epilog wieder maskieren\nCSRs restaurieren, Frame abbauen, mret\n\nAcht Byte und das Überschreiben von t0/t1 reichen nicht.\nMIE=1 erlaubt nicht nur höherpriore Quellen.\nDer Grundkurs bleibt bei kurzen, nicht verschachtelten ISRs.\n\n\nKonzeptionell: erst Kontext sichern, dann eine gewählte Präemption. Dieser Block ist kein kopierfertiger Prolog. Der Grundkurs bleibt bei nicht verschachtelten ISRs."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#gefahren-von-nested-interrupts",
@@ -1904,11 +1904,11 @@
     "text": "Fragen? — Nesting\n\nWarum überschreibt Hardware mepc beim Nesting?\nWie schützt man sich vor Clobbering?\nWarum Nesting möglichst vermeiden?\n\n\nWenn Stack-Rettung und Clobbering klar sind, spannen wir den Bogen zum Labor."
   },
   {
-    "objectID": "vorlesungen/03_interrupts_timer.html#ausblick-labor-systick-szenario",
-    "href": "vorlesungen/03_interrupts_timer.html#ausblick-labor-systick-szenario",
+    "objectID": "vorlesungen/03_interrupts_timer.html#ausblick-labor-system-tick",
+    "href": "vorlesungen/03_interrupts_timer.html#ausblick-labor-system-tick",
     "title": "03 · Interrupts & Timer",
-    "section": "Ausblick Labor: SysTick-Szenario",
-    "text": "Ausblick Labor: SysTick-Szenario\nGeplantes Laborziel:\n\nCLINT so konfigurieren, dass er periodisch (z. B. 1 ms) feuert\nIn der ISR system_uptime_ms hochzählen\nmain-Schleife steuert Verhalten über diese Zeitbasis (z. B. LED-Takt)\nHardwarenaher C-Code für RISC-V (Simulation in Renode)\n\n\nIm Labor steht der CLINT-Herzschlag im Vordergrund — nicht der volle PLIC-Treiber. Details folgen im Übungsblatt."
+    "section": "Ausblick Labor: System-Tick",
+    "text": "Ausblick Labor: System-Tick\nGeplantes Laborziel:\n\nCLINT so konfigurieren, dass er periodisch (z. B. 1 ms) feuert\nIn der ISR system_uptime_ms hochzählen\nmain-Schleife steuert Verhalten über diese Zeitbasis (z. B. LED-Takt)\nHardwarenaher C-Code für RISC-V (Simulation in Renode)\n\n\nIm Labor steht der CLINT-Herzschlag im Vordergrund — nicht der volle PLIC-Treiber. Details folgen im Übungsblatt."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#renode-und-die-zeit",
@@ -1929,7 +1929,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#background-task-und-foreground-isr",
     "title": "03 · Interrupts & Timer",
     "section": "Background Task und Foreground ISR",
-    "text": "Background Task und Foreground ISR\n\nForeground: kurze ISR inkrementiert system_uptime_ms (nur lesen/schreiben der Zeitbasis)\nBackground: main vergleicht gegen einen Merker — ohne die ISR-Zählung zu nullen\n\nvolatile uint32_t system_uptime_ms;\nuint32_t last_toggle = 0;\n\nwhile (1) {\n    uint32_t now = system_uptime_ms;\n    if (now - last_toggle &gt;= 1000) {\n        toggle_led();\n        last_toggle = now;\n    }\n}\n\nKein blockierendes delay(): die CPU bleibt in der Main-Schleife nutzbar. Die ISR liefert nur die Uhr; main speichert den letzten Aktionszeitpunkt separat — so entsteht keine Race durch system_uptime_ms = 0."
+    "text": "Background Task und Foreground ISR\n\n\n\nuint32-Differenz über den Umbruch ist 48. volatile ersetzt keine Atomarität.\n\n\n\nForeground: kurze ISR inkrementiert system_uptime_ms (nur lesen/schreiben der Zeitbasis)\nBackground: main vergleicht gegen einen Merker — ohne die ISR-Zählung zu nullen\n\nvolatile uint32_t system_uptime_ms;\nuint32_t last_toggle = 0;\n\nwhile (1) {\n    uint32_t now = system_uptime_ms;\n    if (now - last_toggle &gt;= 1000) {\n        toggle_led();\n        last_toggle = now;\n    }\n}\n\nKein blockierendes delay(): die CPU bleibt in der Main-Schleife nutzbar. Die ISR liefert nur die Uhr; main speichert den letzten Aktionszeitpunkt separat — so entsteht keine Race durch system_uptime_ms = 0."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#geteilte-variablen",
