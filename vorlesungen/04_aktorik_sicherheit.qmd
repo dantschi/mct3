@@ -74,6 +74,8 @@ Bei Robotern, 3D-Druckern oder Smart-Home muss der SoC Leistung stufenlos reguli
 
 ## EVA — Schema
 
+![Steuerpfad, Leistungsweg und Watchdog sind getrennte Ebenen.](../assets/figures/04_aktorik_sicherheit/paths.png)
+
 ```{mermaid}
 %%| fig-width: 4.0
 %%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
@@ -92,7 +94,7 @@ Schematisch: Sensor → SoC → Aktor. Heute steht der Ausgangspfad im Vordergru
 
 - Die CPU lebt in einer binären Welt
 - GPIO-Pin: typisch nur HIGH (z. B. $3{,}3\,\mathrm{V}$) oder LOW ($0\,\mathrm{V}$)
-- Dilemma: halbe Helligkeit / halbe Kraft bräuchte Zwischenwerte (z. B. $1{,}65\,\mathrm{V}$)
+- Dilemma: der Pin kennt nur zwei Pegel. Helligkeit und Kraft folgen nicht linear aus einem Zwischenwert.
 - Viele MCU-Pins haben keinen stufenlosen Analogausgang (DAC)
 - Lösungsidee: Trägheit der realen Welt ausnutzen
 
@@ -148,7 +150,7 @@ Am Ende können Sie Leistungselektronik stufenlos ansteuern, ohne die CPU zu blo
 ## Die Leitfrage des Tages
 
 - SoC-Pin: oft maximal $3{,}3\,\mathrm{V}$ (100 %) oder $0\,\mathrm{V}$ (0 %)
-- Ziel: Motor mit ca. 50 % Leistung ($\approx 1{,}65\,\mathrm{V}$ Mittelwert)
+- Ziel im Beispiel: 50 Prozent Tastverhaeltnis. Das ist nicht allgemein halbe Motorleistung.
 - Ohne externe Bauteile wie digitale Potentiometer
 - Wie dimmt man auf 50 %, wenn der Pin nur „Vollgas“ oder „Aus“ kennt?
 
@@ -208,6 +210,8 @@ Ohne Prescaler würde ein 16-Bit-Zähler bei 100 MHz sehr schnell überlaufen �
 :::
 
 ## Counter-Kette — Schema
+
+![100 MHz durch PSC+1. PSC 99 ergibt 1 MHz. 16 Bit hat 65536 Zustaende.](../assets/figures/04_aktorik_sicherheit/prescaler.png)
 
 ```{mermaid}
 %%| fig-width: 4.0
@@ -325,7 +329,7 @@ PSC drosselt, ARR begrenzt. Als Nächstes: daraus eine „analoge“ Welt — PW
 - Trick: Pin sehr schnell ein- und ausschalten
 - Beispiel: 1 kHz, je Hälfte der Periode HIGH/LOW
 - Motor und Auge sind zu träge, um dem Stottern zu folgen
-- Effekt: Integration/Mittelung → wahrgenommene 50 % Leistung
+- Effekt: schnelles Schalten. Wahrnehmung und mechanische Wirkung sind davon zu trennen.
 
 ::: notes
 Wenn Licht sehr schnell blinkt, mittelt das Auge die Helligkeit. Motoren mitteln über Masse und Induktivität ähnlich.
@@ -381,7 +385,7 @@ Bei konstanter Frequenz:
 | Duty Cycle | Wirkung (qualitativ) |
 |------------|----------------------|
 | 10 % | kurze Pulse; schwach |
-| 50 % | halbe Kraft |
+| 50 % | halbe aktive Zeit |
 | 90 % | fast dauerhaft HIGH |
 
 Die Periode bleibt gleich — nur die fallende Flanke wandert.
@@ -391,6 +395,8 @@ Modulation der Pulsweite bei festem Raster: so steuern Sie die abgegebene Energi
 :::
 
 ## Mittlere Spannung berechnen
+
+![25 Prozent: Mittelwert 0,825 V, RMS 1,65 V. Ohmsche Rechteckleistung ist nicht Vmittel zum Quadrat durch R.](../assets/figures/04_aktorik_sicherheit/pwm-power.png)
 
 Zeitlicher Mittelwert über die Periode (nicht der Effektivwert/RMS):
 
@@ -404,13 +410,15 @@ $$
 \bar{V} = 3{,}3\,\mathrm{V} \times 0{,}25 = 0{,}825\,\mathrm{V}
 $$
 
-Zum Vergleich RMS eines Rechtecksignals: $V_{\mathrm{RMS}} = V_{\mathrm{Pin}} \cdot \sqrt{D}$ — bei 25 % also $\approx 1{,}65\,\mathrm{V}$. Bei ohmscher Last skaliert die *Leistung* mit $D$; der Mittelwert bleibt die Einstiegsnäherung für die „Scheinspannung“.
+Zum Vergleich RMS eines Rechtecksignals: $V_{\mathrm{RMS}} = V_{\mathrm{Pin}} \cdot \sqrt{D}$ — bei 25 % also $\approx 1{,}65\,\mathrm{V}$. Bei idealer ohmscher Last gilt $P=D\cdot V^2/R$, nicht $V_{\mathrm{avg}}^2/R$ fuer das ungefilterte Rechteck.
 
 ::: notes
-Ein langsames Multimeter zeigt oft näherungsweise den Mittelwert — die Physik „glättet“ das Rechteck. Effektivwert (RMS) und Mittelwert sind verschieden; bei ohmscher Last passt „50 % Duty → 50 % Leistung“ zum Mittelwert-Pfad über $P \propto D$.
+Mittelwert, RMS und Leistung sind drei Groessen. Ein langsames Multimeter zeigt nicht automatisch den Mittelwert; Modus und Bandbreite entscheiden. 50 Prozent Duty ist keine halbe Motorleistung.
 :::
 
 ## Auflösung (Resolution)
+
+![Bei 1 MHz: 1 kHz hat 0,1 Prozent Schritt, 20 kHz hat 2 Prozent.](../assets/figures/04_aktorik_sicherheit/resolution.png)
 
 - Feinheit des Dimmens, oft in Bit; gebunden an Counter/ARR
 - 8 Bit: 256 Stufen $\Rightarrow$ Schritt $\approx 100\%/256 \approx 0{,}39\%$
@@ -422,6 +430,8 @@ ARR und Counterbreite begrenzen die nutzbare Auflösung. Für sanftes LED-Fading
 :::
 
 ## Warum nicht Software? (Bit-Banging)
+
+![20 us verspaetete Flanke: Periode 120 us, etwa 58,3 Prozent. Hardware-PWM folgt dem Timer.](../assets/figures/04_aktorik_sicherheit/sw-vs-hw.png)
 
 ```c
 /* Software-PWM — blockiert die CPU */
@@ -517,6 +527,8 @@ CCR verkleinern → kürzere HIGH-Phase → dunklere LED / weniger Leistung.
 
 ## Edge-Aligned PWM
 
+![CNT 0 bis 999, CCR 250: 250 aktive und 750 inaktive Tickintervalle.](../assets/figures/04_aktorik_sicherheit/edge-pwm.png)
+
 - Up-Counting (Sägezahn) + Vergleich mit CCR → Edge-Aligned PWM
 - Beispiel: `ARR = 999`, `CCR = 250` → exakt 25 % Duty Cycle (Periode $0\ldots999$ = 1000 Takte)
 - Pin HIGH von 0 bis unter CCR, danach LOW bis ARR, dann Reset
@@ -570,6 +582,10 @@ Der Kreis schließt sich: ARR startet den Zyklus neu. Bei z. B. 10 kHz Periodenr
 :::
 
 ## Die Polarität (Polarity)
+
+![Preload wird erst beim Update aktiv. Drei Kanaele und Gamma-CCR 0, 47, 218, 531, 1000.](../assets/figures/04_aktorik_sicherheit/preload.png)
+
+![RGB und Gamma sind ein Lehrmodell, keine Farbgarantie.](../assets/figures/04_aktorik_sicherheit/rgb-gamma.png)
 
 - Bisher Active-High: `CNT < CCR` → Pin HIGH
 - Alternative: Active-Low — Logik invertiert
@@ -627,6 +643,8 @@ Ohne integrierten DAC: PWM + RC-Filter ergibt eine variable Gleichspannung für 
 :::
 
 ## Anwendung: Servomotoren
+
+![RC-Glied, Servo mit 20 ms und H-Bruecke sind drei verschiedene Anwendungen.](../assets/figures/04_aktorik_sicherheit/applications.png)
 
 - Hier ist PWM oft Datenprotokoll, nicht reine Leistungsübertragung
 - Typisch: 50 Hz (Periode 20 ms)
@@ -728,6 +746,8 @@ Der Watchdog ist eine Zeitbombe, die Software regelmäßig entschärfen muss. So
 
 ## Architektur des WDT
 
+![Feeds bei 0, 0,5 und 1 s, idealer Reset bei 3 s. 0xAA55 ist fiktiv.](../assets/figures/04_aktorik_sicherheit/watchdog.png)
+
 - Oft Down-Counter
 - Beim Start: Timeout-Wert laden (z. B. äquivalent zu 5 s) und starten
 - Zählt rückwärts; bei vielen SoCs nach Aktivierung nicht mehr abschaltbar
@@ -799,6 +819,8 @@ Sicherheit braucht Isolation. Stirbt der Systemtakt, muss der WDT weiterzählen 
 
 ## Window Watchdog (WWDG)
 
+![Weiterfuettern aus dem Tick verdeckt einen Haenger. Fenster und Normal-Feed sind verschieden.](../assets/figures/04_aktorik_sicherheit/window.png)
+
 - Normaler WDT: erkennt zu langsames Füttern (Timeout)
 - Problem: fehlerhafter Code füttert zu oft / zu früh
 - Window Watchdog: Füttern nur in einem Zeitfenster erlaubt
@@ -859,11 +881,14 @@ Beispielhafte Adressen (fiktiv — immer Datenblatt prüfen):
 #define TIMER_ARR  (*(volatile uint32_t *)(TIMER_BASE + 0x04))
 #define TIMER_CCR1 (*(volatile uint32_t *)(TIMER_BASE + 0x0C))
 
-void init_pwm(void) {
-    TIMER_PSC = 99;
-    TIMER_ARR = 1000;
-    TIMER_CCR1 = 0;   /* 0 % */
+/* Registerausschnitt, fiktiv. Kein vollstaendiger Treiber. */
+void init_pwm_registers(void) {
+    TIMER_PSC = 99;     /* Teiler 100 */
+    TIMER_ARR = 999;    /* N = 1000 */
+    TIMER_CCR1 = 0;
 }
+/* Danach noch noetig: Takt, Pin-Mux, Modus, Polaritaet,
+   Preload, Kanal- und Timerfreigabe laut Datenblatt. */
 ```
 
 - PSC: Takt drosseln
@@ -879,12 +904,13 @@ Hardware-nahe C-Programmierung: Werte aus dem Datenblatt in MMIO-Register schrei
 ```c
 void set_led_brightness(uint8_t percent) {
     if (percent > 100) percent = 100;
-    uint32_t ccr = (percent * TIMER_ARR) / 100;
+    const uint32_t N = 1000u; /* ARR + 1 im Kernmodell */
+    uint32_t ccr = ((uint32_t)percent * N) / 100u;
     TIMER_CCR1 = ccr;
 }
 ```
 
-- Menschen: Prozent; Hardware: 0 … ARR
+- 0, 25, 50 und 100 Prozent ergeben CCR 0, 250, 500 und 1000.
 - Kleine Abstraktion erleichtert die Main-Logik
 
 ::: notes
@@ -899,20 +925,22 @@ int main(void) {
     int brightness = 0;
     while (1) {
         set_led_brightness(brightness);
-        brightness = (brightness + 1) % 101;
-        delay_ms(10);   /* oder SysTick aus Block 3 */
+        brightness = (brightness + 1) % 101; /* Sprung 100 auf 0 */
+        /* Deadline aus Block 3, kein blockierendes Warten als Gesundheitsbeweis */
         wdt_feed();
     }
 }
 ```
 
-- Sanftes Hochdimmen; Feed beweist lebendige Hauptschleife
+- Die Rampe springt von 100 auf 0. Ein Feed beweist nur, dass diese Schleife noch laeuft.
 
 ::: notes
 Sauberer: Wartezeiten über SysTick statt busy `delay`. Wichtig bleibt: Feed nur hier, nicht in der ISR.
 :::
 
 ## Den Crash provozieren
+
+![Von 1,2 bis 3,0 s laeuft PWM ohne Main. Reset und sicherer Aktorzustand fallen auseinander.](../assets/figures/04_aktorik_sicherheit/safe-state.png)
 
 - Watchdog-Timeout z. B. 2 s
 - Button → künstlicher Deadlock ohne Feed
