@@ -304,7 +304,8 @@ flowchart LR
 <h2>Die SoC-Grenze</h2>
 <ul>
 <li>Beispiel: digitaler Beschleunigungssensor (IMU) auf der Platine</li>
-<li>Sensor speichert Neigung (X, Y, Z) intern als Zahlen (z. B. 16 Bit)</li>
+<li>Der Sensor speichert Beschleunigungsrohwerte (X, Y, Z), hier als 16-Bit-Zweierkomplement</li>
+<li>Neigung ist daraus nur unter Bewegungsannahmen abgeleitet, kein Registerinhalt</li>
 <li>Frage: Wie kommen diese Bits in die Register/ALU unseres SoCs?</li>
 <li>Chips sind durch Kupferbahnen getrennt</li>
 <li>Wir brauchen ein physikalisches und zeitliches Regelwerk — ein Protokoll</li>
@@ -325,6 +326,12 @@ flowchart LR
 </section>
 <section id="soc-und-sensor-schema" class="slide level2">
 <h2>SoC und Sensor — Schema</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/05_serielle_bussysteme/path.png"></p>
+<figcaption>Drei Adressen: MMIO im SoC, I²C-Geräteadresse 0x68, Sensorregister ab 0x3B.</figcaption>
+</figure>
+</div>
 <div class="cell" data-reveal="true" data-fig-width="3.8" data-layout-align="default">
 <div class="cell-output-display">
 <div>
@@ -418,7 +425,9 @@ flowchart TD
 <li>Kosten und Platz: wenige Pins am Gehäuse sind günstiger</li>
 <li>Crosstalk: viele parallele Bahnen stören sich gegenseitig</li>
 <li>Clock Skew: bei hohen Frequenzen kommen Bits nicht mehr gleichzeitig an</li>
-<li>Seriell: sehr hohe Taktraten auf wenigen Leitungen möglich</li>
+<li>Seriell kann hohe Symbolraten auf wenigen Leitungen erreichen</li>
+<li>„Seriell ist schneller“ gilt nicht pauschal: Pins, Takt und Nutzdatenrate getrennt betrachten</li>
+<li>Mehrere serielle Lanes (USB, PCIe) sind ein anderes Modell als UART/SPI/I2C</li>
 </ul>
 <aside class="notes">
 <p>Bei hohen Frequenzen wirken parallele Bahnen problematisch (Störung, Laufzeitunterschiede). Seriell braucht mehr Takte, erlaubt aber oft höhere Bitraten am Ende.</p>
@@ -436,6 +445,12 @@ flowchart TD
 </section>
 <section id="das-schieberegister" class="slide level2">
 <h2>Das Schieberegister</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/05_serielle_bussysteme/shift.png"></p>
+<figcaption>0x53 steht als 0101 0011 und geht als UART-Folge 1 1 0 0 1 0 1 0 hinaus.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Wandlung: parallele CPU-Daten → serieller Bitstrom</li>
 <li>Kern: Schieberegister (Kette von D-Flip-Flops, MCT1)</li>
@@ -615,9 +630,9 @@ flowchart TD
 </thead>
 <tbody>
 <tr class="odd">
-<td>Leitungen</td>
+<td>Signale ohne GND</td>
 <td>2</td>
-<td>4+</td>
+<td>4, plus weitere CS</td>
 <td>2</td>
 </tr>
 <tr class="even">
@@ -629,14 +644,14 @@ flowchart TD
 <tr class="odd">
 <td>Duplex</td>
 <td>Full</td>
-<td>Full</td>
+<td>Full im 4-Signal-Modell</td>
 <td>Half</td>
 </tr>
 <tr class="even">
-<td>Speed (Faust)</td>
-<td>niedrig–mittel</td>
-<td>hoch (SCK oft 10–50 MHz)</td>
-<td>moderat (<span class="math inline">\(100\)</span>–<span class="math inline">\(400\,\mathrm{kHz}\)</span>)</td>
+<td>Grundtempo</td>
+<td>Baud plus Framing</td>
+<td>SCK aus dem Timingbudget</td>
+<td>100/400 kHz als Fokus</td>
 </tr>
 </tbody>
 </table>
@@ -683,8 +698,9 @@ flowchart TD
 <li>UART: Universal Asynchronous Receiver-Transmitter</li>
 <li>Eher Schnittstelle/Direktverbindung als Multi-Drop-Bus</li>
 <li>Asynchron: kein Taktkabel</li>
-<li>Historisch: serielle Schnittstelle (RS-232, COM)</li>
-<li>Heute oft: Debug/<code>printf</code> über USB-UART-Wandler</li>
+<li>Der UART-Frame ist nicht die elektrische Schnittstelle</li>
+<li>RS-232 nutzt andere Pegel; ein 0/3,3-V-Pin darf daran nicht direkt</li>
+<li>Heute oft: Debug/<code>printf</code> über einen Pegelwandler oder USB-UART</li>
 </ul>
 <aside class="notes">
 <p>Mindestens ein UART-Controller ist in MCUs üblich. Terminal-Ausgabe läuft typischerweise über UART-Hardware.</p>
@@ -706,8 +722,8 @@ flowchart TD
 <li>Typisch genau zwei Teilnehmer</li>
 <li>TX (Transmit) und RX (Receive)</li>
 <li>Kreuzverkabelung: TX1 → RX2, TX2 → RX1</li>
-<li>Gemeinsames GND zwingend</li>
-<li>Full-Duplex auf zwei Datenleitungen</li>
+<li>Direktes 0/3,3-V-Modell: gemeinsamer Bezug zwingend, keine galvanische Trennung</li>
+<li>Full-Duplex auf zwei Datenleitungen; GND, Versorgung und RTS/CTS zählen extra</li>
 </ul>
 <div class="cell" data-reveal="true" data-fig-width="3.8" data-layout-align="default">
 <div class="cell-output-display">
@@ -783,6 +799,12 @@ flowchart LR
 </section>
 <section id="der-uart-frame" class="slide level2">
 <h2>Der UART-Frame</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/05_serielle_bussysteme/uart-frame.png"></p>
+<figcaption>8N1 bei 115200 Baud: etwa 8,681 µs je Bit und 86,806 µs je Frame.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Idle: Leitung typisch HIGH</li>
 <li>Frame-Aufbau:
@@ -926,6 +948,12 @@ flowchart LR
 <td>0</td>
 <td>1</td>
 </tr>
+<tr class="odd">
+<td><code>0x53</code> = <code>0101 0011</code></td>
+<td>4</td>
+<td>0</td>
+<td>1</td>
+</tr>
 </tbody>
 </table>
 <aside class="notes">
@@ -944,6 +972,12 @@ flowchart LR
 </section>
 <section id="fifos-im-uart" class="slide level2">
 <h2>FIFOs im UART</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/05_serielle_bussysteme/uart-fifo.png"></p>
+<figcaption>Höchstens 11520 Byte/s. Acht freie RX-Plätze sind etwa 694 µs Spielraum.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Bei 115200 Baud und 8N1 (10 Bit/Frame): grob alle <span class="math inline">\(\approx 87\,\mu\mathrm{s}\)</span> ein Byte</li>
 <li>Interrupt pro Byte belastet die CPU stark</li>
@@ -1051,15 +1085,16 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-uart-und-grundlagen" class="slide level2">
-<h2>Fragen? — UART und Grundlagen</h2>
+<section id="aufgabe-uart-frame" class="slide level2">
+<h2>Aufgabe — UART-Frame</h2>
+<p>Dekodieren Sie das Datenbyte. Idle ist HIGH, dann folgen Start, acht Datenbits LSB first und Stop.</p>
 <ul>
-<li>Warum oft seriell statt parallel extern?</li>
-<li>Warum Start- und Stop-Bit?</li>
-<li>Welche Rolle spielen Hardware-FIFOs?</li>
+<li>Sichtbare Datenbits nach dem Start: 1, 1, 0, 0, 1, 0, 1, 0</li>
+<li>Welche schriftliche MSB-Darstellung hat das Byte?</li>
+<li>Even Parity: welches Parity-Bit entsteht?</li>
 </ul>
 <aside class="notes">
-<p>Wenn Framing und Baudrate klar sind, führen wir den Takt explizit ein: SPI.</p>
+<p>Lösung: die Folge ist d0 bis d7, also 0x53 = 0101 0011. Vier Einsen, Even Parity = 0. Ein einzelner Bitfehler wäre erkennbar, zwei Bitfehler nicht sicher. Framing- und Parity-Fehler sind getrennte Statusbits.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1081,7 +1116,7 @@ flowchart LR
 <li>Wenig Framing-Overhead: Bits folgen dem Takt</li>
 </ul>
 <aside class="notes">
-<p>Der Master gibt den Takt vor. Empfänger folgen dem Schlag — keine vorherige Baudraten-Einigung nötig.</p>
+<p>Der Controller gibt den Takt vor. Die Targets folgen dem Schlag. Eine gemeinsame Taktleitung verhindert die UART-Bauddrift, nicht jede beliebig hohe Frequenz.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1121,7 +1156,7 @@ flowchart LR
 </tbody>
 </table>
 <aside class="notes">
-<p>Eine gemeinsame Uhr für Master und Slave — Uhren können nicht „auseinanderlaufen“ wie bei UART.</p>
+<p>Eine gemeinsame Uhr für Controller und Target. Die Uhren laufen nicht wie bei UART auseinander; das Timingbudget beider Datenblätter bleibt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1169,7 +1204,7 @@ flowchart LR
 </tbody>
 </table>
 <aside class="notes">
-<p>Kein UART-Kreuz: MOSI an MOSI-Logik, MISO entsprechend. Neuere Namen oft SDO/SDI — Konzept gleich.</p>
+<p>MOSI des Controllers trifft den Dateneingang des Targets. SDO und SDI gehören immer zu einem Baustein: Controller-SDO ist Target-SDI. Gleichnamig verbinden ist keine Regel.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1182,13 +1217,14 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="master-slave" class="slide level2">
-<h2>Master-Slave</h2>
+<section id="controller-und-target" class="slide level2">
+<h2>Controller und Target</h2>
+<p>Ältere Datenblätter sagen Master und Slave. Hier: Controller und Target. MOSI und MISO bleiben die Signalnamen.</p>
 <ul>
-<li>Master (meist die MCU): erzeugt SCK, steuert CS, startet Transfers</li>
-<li>Slave: antwortet nur, wenn selektiert und getaktet</li>
-<li>Single-Master: ein aktiver Taktgeber auf dem Bus</li>
-<li>Slave „redet“ nicht von selbst</li>
+<li>Controller (meist die MCU): erzeugt SCK, steuert CS, startet Transfers</li>
+<li>Target: antwortet nur, wenn selektiert und getaktet</li>
+<li>Ein Controller: ein aktiver Taktgeber in diesem Grundmodell</li>
+<li>Das Target sendet nicht unaufgefordert</li>
 </ul>
 <aside class="notes">
 <p>Keine Buskollision durch unaufgefordertes Senden: der Master saugt/schiebt Daten aktiv.</p>
@@ -1206,6 +1242,12 @@ flowchart LR
 </section>
 <section id="full-duplex-ringtausch" class="slide level2">
 <h2>Full-Duplex: Ringtausch</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/05_serielle_bussysteme/spi-ring.png"></p>
+<figcaption>Mode 0: 0x96 und 0x3C. Nach vier Takten 0x63 und 0xC9.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Pro Takt: Bit auf MOSI hinaus und Bit auf MISO herein</li>
 <li>Nach <span class="math inline">\(n\)</span> Takten: Schieberegister getauscht</li>
@@ -1303,6 +1345,12 @@ flowchart LR
 </section>
 <section id="daisy-chaining" class="slide level2">
 <h2>Daisy-Chaining</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/05_serielle_bussysteme/spi-topo.png"></p>
+<figcaption>Nur geeignete Bausteine. Nach 8, 16 und 24 Takten stehen 0x33, dann 0x22, dann 0x11 vorn.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Ein CS für mehrere Schieberegister in Serie</li>
 <li>MOSI → Slave1 → … → zurück MISO</li>
@@ -1362,6 +1410,12 @@ flowchart LR
 </section>
 <section id="cpol-und-cpha" class="slide level2">
 <h2>CPOL und CPHA</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/05_serielle_bussysteme/spi-modes.png"></p>
+<figcaption>Vier Modi, gleiche Datenfolge. Sample und Datenwechsel sind verschiedene Flanken.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Vier SPI-Modi (0–3): Kombination aus Ruhepegel und Abtastflanke</li>
 <li>CPOL: Idle LOW oder HIGH?</li>
@@ -1515,15 +1569,15 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-spi" class="slide level2">
-<h2>Fragen? — SPI</h2>
+<section id="aufgabe-spi-flanke" class="slide level2">
+<h2>Aufgabe — SPI-Flanke</h2>
+<p>Mode 0, Idle LOW. Controller sendet <code>0x96</code>, Target sendet <code>0x3C</code>, MSB first.</p>
 <ul>
-<li>Warum hilft eine Taktleitung gegenüber UART?</li>
-<li>MOSI/MISO und Ringtausch klar?</li>
-<li>Warum limitiert Star-Routing mit CS die Skalierbarkeit?</li>
+<li>Welche Flanke tastet ab, welche darf das nächste Bit setzen?</li>
+<li>Welcher Registerstand gilt nach vier Takten im Links-Schiebe-Modell?</li>
 </ul>
 <aside class="notes">
-<p>Wenn Master, Takt und CS klar sind, folgt das Multi-Drop-Protokoll I2C.</p>
+<p>Lösung: Sample steigend, Wechsel fallend. Nach vier Takten 0x63 und 0xC9, nach acht Takten 0x3C und 0x96. CPHA = 0 verlangt das erste Bit schon vor der ersten Sample-Flanke.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1663,8 +1717,15 @@ flowchart TD
 </section>
 <section id="pull-up-widerstände" class="slide level2">
 <h2>Pull-Up-Widerstände</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/05_serielle_bussysteme/open-drain.png"></p>
+<figcaption>Lehrrechnung: 2,2 kΩ etwa 186 ns. Fast-Mode etwa 967 Ω bis 3,54 kΩ.</figcaption>
+</figure>
+</div>
 <ul>
-<li>Ohne aktives HIGH: externe Pull-ups nötig (typisch wenige kΩ)</li>
+<li>Ohne aktives HIGH: je ein Pull-up an SDA und an SCL</li>
+<li>„Wenige kΩ“ ist keine Dimensionierung: Kapazität, Rise Time und Sinkstrom begrenzen <span class="math inline">\(R_P\)</span></li>
 <li>Je einer an SDA und SCL gegen <span class="math inline">\(V_{IO}\)</span> (z. B. <span class="math inline">\(3{,}3\,\mathrm{V}\)</span>)</li>
 <li>Alle loslassen → Pull-up zieht HIGH (logisch 1)</li>
 <li>Ein Chip zieht → Leitung LOW (logisch 0)</li>
@@ -1757,11 +1818,17 @@ flowchart TD
 </section>
 <section id="ack-und-nack" class="slide level2">
 <h2>ACK und NACK</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/05_serielle_bussysteme/i2c-byte.png"></p>
+<figcaption>Write 0xD0, 0x6B, 0x00. Der letzte Read-NACK ist der normale Abschluss.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Nach jedem Byte: 9. Takt für Quittung</li>
 <li>Sender lässt SDA los (Tendenz HIGH = NACK)</li>
 <li>Empfänger zieht SDA auf LOW = ACK</li>
-<li>Kein ACK → Gerät fehlt / nicht bereit (Status in Hardware)</li>
+<li>Address-NACK: Gerät fehlt oder hört nicht. Data-NACK: unerwartete Ablehnung. Letzter Read-NACK: normaler Abschluss durch den Controller.</li>
 </ul>
 <aside class="notes">
 <p>Vorteil gegenüber SPI: die MCU erkennt fehlende Slaves auf Protokollebene.</p>
@@ -1825,6 +1892,12 @@ flowchart TD
 </section>
 <section id="clock-stretching" class="slide level2">
 <h2>Clock Stretching</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/05_serielle_bussysteme/stretch.png"></p>
+<figcaption>SCL bleibt LOW, solange das Target hält. Arbitration: 0xA0 gegen 0xD0.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Zu schneller Master-Takt? Slave kann SCL auf LOW halten</li>
 <li>Master will HIGH, sieht aber LOW (Wired-AND) → wartet</li>
@@ -1926,40 +1999,40 @@ flowchart TD
 </thead>
 <tbody>
 <tr class="odd">
-<td>Leitungen</td>
-<td>2</td>
-<td>4+</td>
-<td>2</td>
+<td>Signale ohne GND</td>
+<td>TX, RX</td>
+<td>SCK, MOSI, MISO, CS</td>
+<td>SDA, SCL</td>
 </tr>
 <tr class="even">
 <td>Takt</td>
 <td>asynchron</td>
-<td>synchron</td>
-<td>synchron</td>
+<td>Controller-Takt</td>
+<td>Controller-Takt</td>
 </tr>
 <tr class="odd">
 <td>Routing</td>
 <td>Punkt-zu-Punkt</td>
-<td>CS / Daisy</td>
+<td>CS oder geeignete Daisy-Chain</td>
 <td>adressierter Bus</td>
 </tr>
 <tr class="even">
-<td>Speed</td>
-<td>niedrig–mittel</td>
-<td>SCK oft 10–50 MHz</td>
-<td><span class="math inline">\(100\)</span>–<span class="math inline">\(400\,\mathrm{kHz}\)</span></td>
+<td>Tempo</td>
+<td>Baud mal Framing</td>
+<td>Timingbudget beider Bausteine</td>
+<td>100/400 kHz als Fokus</td>
 </tr>
 <tr class="odd">
-<td>Hardware</td>
-<td>Baud, Framing, FIFO</td>
+<td>Treiber</td>
+<td>Push-Pull, Pegel beachten</td>
 <td>Push-Pull</td>
 <td>Open-Drain, Pull-ups</td>
 </tr>
 <tr class="even">
 <td>Einsatz</td>
 <td>Debug, Module</td>
-<td>Display, SD, Flash</td>
-<td>Sensornetz</td>
+<td>Display, Flash</td>
+<td>Sensoren auf der Platine</td>
 </tr>
 </tbody>
 </table>
@@ -1977,15 +2050,15 @@ flowchart TD
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-i2c" class="slide level2">
-<h2>Fragen? — I2C</h2>
+<section id="aufgabe-adresse-ack-und-pull-up" class="slide level2">
+<h2>Aufgabe — Adresse, ACK und Pull-up</h2>
 <ul>
-<li>Warum verhindert Open-Drain Kurzschlüsse?</li>
-<li>Wie adressiert I2C ohne CS?</li>
-<li>Wie funktioniert ACK/NACK?</li>
+<li>Geräteadresse <code>0x68</code>. Welches Byte geht bei Write, welches bei Read auf den Bus?</li>
+<li>Wer zieht SDA im neunten Takt eines Writes? Wer erzeugt den NACK nach dem letzten gelesenen Byte?</li>
+<li>Lehrannahme: <span class="math inline">\(V_{IO}=3{,}3\,\mathrm{V}\)</span>, <span class="math inline">\(C_B=100\,\mathrm{pF}\)</span>, <span class="math inline">\(3\,\mathrm{mA}\)</span> bei <span class="math inline">\(0{,}4\,\mathrm{V}\)</span>, <span class="math inline">\(t_r=0{,}8473\,R_P C_B\)</span>. Liegt <span class="math inline">\(2{,}2\,\mathrm{k}\Omega\)</span> im Fast-Mode-Fenster?</li>
 </ul>
 <aside class="notes">
-<p>Als Nächstes: Was, wenn wir die Platine verlassen und lange Kabel in rauen Umgebungen brauchen?</p>
+<p>Lösung: Write 0xD0, Read 0xD1. Das Target zieht ACK, der Controller erzeugt den letzten Read-NACK. Rp,min etwa 967 Ohm, Rp,max bei 300 ns etwa 3,54 kOhm. 2,2 kOhm liegt in diesem Rechenmodell dazwischen. Zwei vorhandene 4,7 kOhm parallel sind 2,35 kOhm. Datenblattgrenzen bleiben zu prüfen.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2042,10 +2115,17 @@ flowchart TD
 </section>
 <section id="differentielle-übertragung" class="slide level2">
 <h2>Differentielle Übertragung</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/05_serielle_bussysteme/diff.png"></p>
+<figcaption>2,5 V und 0,5 V: Differenz 2 V, Common Mode 1,5 V. +0,8 V hebt nur den Common Mode.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Signal auf zwei Leitungen: normal und invertiert</li>
 <li>Empfänger misst Differenz <span class="math inline">\(V_A - V_B\)</span>, nicht gegen GND</li>
-<li>Absolute Masseverschiebung wird irrelevant</li>
+<li>Gleiche Störung auf beiden Leitungen ändert die Differenz nicht</li>
+<li>Der Common-Mode-Bereich des Empfängers bleibt endlich; große Potentialunterschiede können weiter stören oder schädigen</li>
 </ul>
 <div class="cell" data-reveal="true" data-fig-width="3.6" data-layout-align="default">
 <div class="cell-output-display">
@@ -2104,7 +2184,7 @@ flowchart LR
 <ul>
 <li>Physikalische Schicht für lange Strecken (oft mit UART-Logik)</li>
 <li>Transceiver: Single-Ended TX/RX → differenziell A/B</li>
-<li>Reichweiten im dreistelligen Meterbereich möglich</li>
+<li>Reichweite und Bitrate gelten gemeinsam; „einige hundert Meter“ ist keine beliebige Geschwindigkeit</li>
 <li>Häufig mit Protokollen wie Modbus</li>
 </ul>
 <aside class="notes">
@@ -2164,15 +2244,14 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-differentiell-und-feldbusse" class="slide level2">
-<h2>Fragen? — Differentiell und Feldbusse</h2>
+<section id="aufgabe-burst-und-common-mode" class="slide level2">
+<h2>Aufgabe — Burst und Common Mode</h2>
 <ul>
-<li>Wie funktioniert differentielle Übertragung?</li>
-<li>Warum hilft Twisted Pair gegen EMI?</li>
-<li>Wann RS-485/CAN statt I2C?</li>
+<li>Bytes <code>10 00 E0 00 40 00</code> ab Register <code>0x3B</code>, Bereich <span class="math inline">\(\pm 2\,\mathrm{g}\)</span> mit 16384 LSB/g. Welche Werte in g entstehen?</li>
+<li><span class="math inline">\(V_A=2{,}5\,\mathrm{V}\)</span>, <span class="math inline">\(V_B=0{,}5\,\mathrm{V}\)</span>, danach <span class="math inline">\(+0{,}8\,\mathrm{V}\)</span> auf beiden Leitungen. Was bleibt gleich, was ändert sich?</li>
 </ul>
 <aside class="notes">
-<p>Als Nächstes: Ausblick Labor — Beschleunigungssensor per I2C (Renode).</p>
+<p>Lösung: X = 4096 = +0,25 g, Y = -8192 = -0,5 g, Z = 16384 = +1 g. Vdiff bleibt 2 V, Vcm steigt von 1,5 V auf 2,3 V. Ob 2,3 V erlaubt ist, steht im Transceiver-Datenblatt. Vertiefung: Multi-Controller, Daisy-Chain und die elektrische Auslegung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2234,10 +2313,11 @@ flowchart LR
 <h2>Registerkarte des Sensors</h2>
 <ul>
 <li>Sensor hat eigene Memory Map (Datenblatt!)</li>
-<li>Beispiele (MPU6050-ähnlich):
+<li>Beispiele aus der MPU-6000/MPU-6050-Registerkarte, im Labor gegen das Datenblatt prüfen:
 <ul>
-<li><code>0x6B</code>: Power Management</li>
-<li><code>0x3B</code>/<code>0x3C</code>: X-Achse High/Low</li>
+<li><code>0x6B</code>: Power Management, Aufwecken ist bausteinspezifisch</li>
+<li><code>0x1C</code>: Beschleunigungsbereich; <span class="math inline">\(\pm 2\,\mathrm{g}\)</span> entspricht im Datenblatt oft 16384 LSB/g</li>
+<li><code>0x3B</code> bis <code>0x40</code>: X, Y, Z je High/Low, zusammenhängend lesbar</li>
 </ul></li>
 <li>I2C: erst Geräteadresse, dann Registerzeiger, dann Daten</li>
 </ul>
@@ -2262,9 +2342,10 @@ flowchart LR
 <span id="cb2-2"><a aria-label="2"></a><span class="pp">#define I2C_CR1  </span><span class="op">(*(</span><span class="dt">volatile</span><span class="pp"> </span><span class="dt">uint32_t</span><span class="pp"> </span><span class="op">*)(</span><span class="pp">I2C_BASE </span><span class="op">+</span><span class="pp"> </span><span class="bn">0x00</span><span class="op">))</span></span>
 <span id="cb2-3"><a aria-label="3"></a></span>
 <span id="cb2-4"><a aria-label="4"></a><span class="dt">void</span> i2c_init<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb2-5"><a aria-label="5"></a>    I2C_CR1 <span class="op">|=</span> <span class="op">(</span><span class="dv">1</span><span class="bu">u</span> <span class="op">&lt;&lt;</span> <span class="dv">0</span><span class="op">);</span>  <span class="co">/* Enable — Bitlage SoC-spezifisch */</span></span>
-<span id="cb2-6"><a aria-label="6"></a>    I2C_CR1 <span class="op">|=</span> <span class="op">(</span><span class="dv">1</span><span class="bu">u</span> <span class="op">&lt;&lt;</span> <span class="dv">8</span><span class="op">);</span>  <span class="co">/* Master — nur schematisch! */</span></span>
-<span id="cb2-7"><a aria-label="7"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-5"><a aria-label="5"></a>    <span class="co">/* Davor, plattformspezifisch: Taktfreigabe, Pin-Mux, Open-Drain, Pull-up. */</span></span>
+<span id="cb2-6"><a aria-label="6"></a>    I2C_CR1 <span class="op">|=</span> <span class="op">(</span><span class="dv">1</span><span class="bu">u</span> <span class="op">&lt;&lt;</span> <span class="dv">0</span><span class="op">);</span>  <span class="co">/* Enable — Bitlage nur im Lehrmodell */</span></span>
+<span id="cb2-7"><a aria-label="7"></a>    I2C_CR1 <span class="op">|=</span> <span class="op">(</span><span class="dv">1</span><span class="bu">u</span> <span class="op">&lt;&lt;</span> <span class="dv">8</span><span class="op">);</span>  <span class="co">/* Controller-Modus — nur schematisch */</span></span>
+<span id="cb2-8"><a aria-label="8"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li>Register-Offsets und Bitpositionen sind plattformspezifisch</li>
 <li>Nicht 1:1 auf einen realen Chip übernehmen</li>
@@ -2292,10 +2373,11 @@ flowchart LR
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb3-1"><a aria-label="1"></a><span class="pp">#define I2C_CLK_DIV </span><span class="op">(*(</span><span class="dt">volatile</span><span class="pp"> </span><span class="dt">uint32_t</span><span class="pp"> </span><span class="op">*)(</span><span class="pp">I2C_BASE </span><span class="op">+</span><span class="pp"> </span><span class="bn">0x10</span><span class="op">))</span></span>
 <span id="cb3-2"><a aria-label="2"></a></span>
 <span id="cb3-3"><a aria-label="3"></a><span class="dt">void</span> i2c_set_speed<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb3-4"><a aria-label="4"></a>    I2C_CLK_DIV <span class="op">=</span> <span class="dv">1000</span><span class="op">;</span>  <span class="co">/* schematisch: 100 MHz / 100 kHz */</span></span>
-<span id="cb3-5"><a aria-label="5"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-4"><a aria-label="4"></a>    <span class="co">/* 100 MHz / 1000 = 100 kHz ist nur dieses Rechenmodell. */</span></span>
+<span id="cb3-5"><a aria-label="5"></a>    I2C_CLK_DIV <span class="op">=</span> <span class="dv">1000</span><span class="op">;</span></span>
+<span id="cb3-6"><a aria-label="6"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Prescaler/Divider so wählen, dass SCL die Spezifikation des Sensors einhält.</p>
+<p>Prescaler allein ist keine universelle I2C-Formel. SCL-High, SCL-Low, Filter und die Anstiegszeit können getrennte Felder sein.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2311,18 +2393,19 @@ flowchart LR
 <section id="c-write-transaktion" class="slide level2">
 <h2>C: Write-Transaktion</h2>
 <p>Ablauf: START → Adresse+W → Reg → Daten → STOP</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb4-1"><a aria-label="1"></a><span class="dt">void</span> sensor_wakeup<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb4-1"><a aria-label="1"></a><span class="dt">int</span> sensor_wakeup<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
 <span id="cb4-2"><a aria-label="2"></a>    i2c_send_start<span class="op">();</span></span>
-<span id="cb4-3"><a aria-label="3"></a>    i2c_send_byte<span class="op">((</span><span class="bn">0x68</span><span class="bu">u</span> <span class="op">&lt;&lt;</span> <span class="dv">1</span><span class="op">)</span> <span class="op">|</span> <span class="dv">0</span><span class="bu">u</span><span class="op">);</span>  <span class="co">/* Addr + Write */</span></span>
-<span id="cb4-4"><a aria-label="4"></a>    wait_for_ack<span class="op">();</span></span>
-<span id="cb4-5"><a aria-label="5"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x6B</span><span class="op">);</span>               <span class="co">/* Register */</span></span>
-<span id="cb4-6"><a aria-label="6"></a>    wait_for_ack<span class="op">();</span></span>
-<span id="cb4-7"><a aria-label="7"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x00</span><span class="op">);</span>               <span class="co">/* Wert */</span></span>
-<span id="cb4-8"><a aria-label="8"></a>    wait_for_ack<span class="op">();</span></span>
+<span id="cb4-3"><a aria-label="3"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0xD0</span><span class="bu">u</span><span class="op">);</span>          <span class="co">/* 0x68 &lt;&lt; 1 | Write */</span></span>
+<span id="cb4-4"><a aria-label="4"></a>    <span class="cf">if</span> <span class="op">(!</span>wait_for_ack_timeout<span class="op">())</span> <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
+<span id="cb4-5"><a aria-label="5"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x6B</span><span class="bu">u</span><span class="op">);</span>          <span class="co">/* PWR_MGMT_1 */</span></span>
+<span id="cb4-6"><a aria-label="6"></a>    <span class="cf">if</span> <span class="op">(!</span>wait_for_ack_timeout<span class="op">())</span> <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
+<span id="cb4-7"><a aria-label="7"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x00</span><span class="bu">u</span><span class="op">);</span>          <span class="co">/* Sleep aus, Lehrwert */</span></span>
+<span id="cb4-8"><a aria-label="8"></a>    <span class="cf">if</span> <span class="op">(!</span>wait_for_ack_timeout<span class="op">())</span> <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
 <span id="cb4-9"><a aria-label="9"></a>    i2c_send_stop<span class="op">();</span></span>
-<span id="cb4-10"><a aria-label="10"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-10"><a aria-label="10"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb4-11"><a aria-label="11"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>7-Bit-Adresse um 1 nach links, R/W im LSB. Konkrete API hängt vom Treiber/SoC ab.</p>
+<p>Ein NACK oder ein abgelaufenes Zeitlimit beendet die Funktion. <code>wait_for_ack()</code> ohne Timeout darf bei fehlendem Sensor nicht hängen bleiben. STOP nur, solange dieser Controller den Bus besitzt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2337,21 +2420,29 @@ flowchart LR
 </section>
 <section id="c-read-mit-repeated-start" class="slide level2">
 <h2>C: Read mit Repeated Start</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/05_serielle_bussysteme/i2c-burst.png"></p>
+<figcaption>Sechs Bytes ab 0x3B. Das Beispiel ergibt +0,25 g, −0,5 g und +1 g.</figcaption>
+</figure>
+</div>
 <p>Zuerst Registerzeiger setzen (Write), dann Repeated START und Read:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb5-1"><a aria-label="1"></a><span class="dt">uint8_t</span> read_sensor_x<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb5-2"><a aria-label="2"></a>    i2c_send_start<span class="op">();</span></span>
-<span id="cb5-3"><a aria-label="3"></a>    i2c_send_byte<span class="op">((</span><span class="bn">0x68</span><span class="bu">u</span> <span class="op">&lt;&lt;</span> <span class="dv">1</span><span class="op">)</span> <span class="op">|</span> <span class="dv">0</span><span class="bu">u</span><span class="op">);</span></span>
-<span id="cb5-4"><a aria-label="4"></a>    wait_for_ack<span class="op">();</span></span>
-<span id="cb5-5"><a aria-label="5"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x3B</span><span class="op">);</span></span>
-<span id="cb5-6"><a aria-label="6"></a>    wait_for_ack<span class="op">();</span></span>
-<span id="cb5-7"><a aria-label="7"></a></span>
-<span id="cb5-8"><a aria-label="8"></a>    i2c_send_start<span class="op">();</span>  <span class="co">/* Repeated Start */</span></span>
-<span id="cb5-9"><a aria-label="9"></a>    i2c_send_byte<span class="op">((</span><span class="bn">0x68</span><span class="bu">u</span> <span class="op">&lt;&lt;</span> <span class="dv">1</span><span class="op">)</span> <span class="op">|</span> <span class="dv">1</span><span class="bu">u</span><span class="op">);</span></span>
-<span id="cb5-10"><a aria-label="10"></a>    wait_for_ack<span class="op">();</span></span>
-<span id="cb5-11"><a aria-label="11"></a>    <span class="dt">uint8_t</span> data <span class="op">=</span> i2c_read_byte_nack<span class="op">();</span></span>
-<span id="cb5-12"><a aria-label="12"></a>    i2c_send_stop<span class="op">();</span></span>
-<span id="cb5-13"><a aria-label="13"></a>    <span class="cf">return</span> data<span class="op">;</span></span>
-<span id="cb5-14"><a aria-label="14"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb5-1"><a aria-label="1"></a><span class="co">/* Timeout. Fehlercode bleibt getrennt von den Bytes. */</span></span>
+<span id="cb5-2"><a aria-label="2"></a><span class="dt">int</span> read_accel_xyz<span class="op">(</span><span class="dt">uint8_t</span> out<span class="op">[</span><span class="dv">6</span><span class="op">])</span> <span class="op">{</span></span>
+<span id="cb5-3"><a aria-label="3"></a>    i2c_send_start<span class="op">();</span></span>
+<span id="cb5-4"><a aria-label="4"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0xD0</span><span class="bu">u</span><span class="op">);</span>          <span class="co">/* 0x68 &lt;&lt; 1 | Write */</span></span>
+<span id="cb5-5"><a aria-label="5"></a>    <span class="cf">if</span> <span class="op">(!</span>wait_for_ack_timeout<span class="op">())</span> <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
+<span id="cb5-6"><a aria-label="6"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x3B</span><span class="bu">u</span><span class="op">);</span></span>
+<span id="cb5-7"><a aria-label="7"></a>    <span class="cf">if</span> <span class="op">(!</span>wait_for_ack_timeout<span class="op">())</span> <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
+<span id="cb5-8"><a aria-label="8"></a>    i2c_send_start<span class="op">();</span>              <span class="co">/* Repeated Start */</span></span>
+<span id="cb5-9"><a aria-label="9"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0xD1</span><span class="bu">u</span><span class="op">);</span>          <span class="co">/* Read */</span></span>
+<span id="cb5-10"><a aria-label="10"></a>    <span class="cf">if</span> <span class="op">(!</span>wait_for_ack_timeout<span class="op">())</span> <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
+<span id="cb5-11"><a aria-label="11"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> <span class="dv">5</span><span class="op">;</span> i<span class="op">++)</span></span>
+<span id="cb5-12"><a aria-label="12"></a>        out<span class="op">[</span>i<span class="op">]</span> <span class="op">=</span> i2c_read_byte_ack<span class="op">();</span></span>
+<span id="cb5-13"><a aria-label="13"></a>    out<span class="op">[</span><span class="dv">5</span><span class="op">]</span> <span class="op">=</span> i2c_read_byte_nack<span class="op">();</span> <span class="co">/* normaler Abschluss */</span></span>
+<span id="cb5-14"><a aria-label="14"></a>    i2c_send_stop<span class="op">();</span></span>
+<span id="cb5-15"><a aria-label="15"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb5-16"><a aria-label="16"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p>Klassisches Muster: Pointer setzen, dann lesen — oft ohne STOP dazwischen (Repeated Start).</p>
 <style type="text/css">
@@ -2369,9 +2460,9 @@ flowchart LR
 <section id="renode-virtueller-i2c-sensor" class="slide level2">
 <h2>Renode: virtueller I2C-Sensor</h2>
 <ul>
-<li>Geplant: Sensor als Modell in Renode (ACK/NACK, Register)</li>
-<li>C-Treiber sieht dasselbe Timing-Verhalten wie auf dem Chip</li>
-<li>Validierung ohne Lötarbeit</li>
+<li>Ein Registermodell kann ACK und Bursts nachbilden</li>
+<li>Es beweist keine realen Flanken, keine RC-Zeit und keine zyklusgenaue Controllerlatenz</li>
+<li><code>Sensors.MPU6050</code> und <code>FeedSample</code> sind hier nicht als vorhandene API geprüft</li>
 </ul>
 <aside class="notes">
 <p>Simulator ersetzt die physische IMU für Treiberentwicklung — Datenblattverhalten nachbilden.</p>
@@ -2389,11 +2480,12 @@ flowchart LR
 </section>
 <section id="platine-beschreiben-.repl" class="slide level2">
 <h2>Platine beschreiben (<code>.repl</code>)</h2>
-<p>Schematisch:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource text number-lines code-with-copy"><code class="sourceCode"><span id="cb6-1"><a aria-label="1"></a>sensor: Sensors.MPU6050 @ i2c0 0x68</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Im Repository liegt keine <code>.repl</code>. Der folgende Typname ist ein ungeprüftes Schema, keine Renode-API dieser Lehrveranstaltung:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource text number-lines code-with-copy"><code class="sourceCode"><span id="cb6-1"><a aria-label="1"></a># nicht ausgefuehrt, Typname nicht verifiziert</span>
+<span id="cb6-2"><a aria-label="2"></a># sensor: Sensors.MPU6050 @ i2c0 0x68</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li>Sensor an I2C0, Adresse <code>0x68</code></li>
-<li>Verknüpft CPU-I2C mit dem Sensor-Modell</li>
+<li>Erst die installierte Renode-Version und das echte Peripheriemodell prüfen</li>
+<li>Fehlt das Modell, bleibt der Treiber ein Lehrmodell mit explizitem Registervertrag</li>
 </ul>
 <aside class="notes">
 <p>Die <code>.repl</code>-Datei beschreibt die virtuelle Verdrahtung — Ihr „Lötkolben“ in Textform.</p>
@@ -2412,13 +2504,13 @@ flowchart LR
 <section id="stimuli-im-startskript-.resc" class="slide level2">
 <h2>Stimuli im Startskript (<code>.resc</code>)</h2>
 <p>Schematisch:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource text number-lines code-with-copy"><code class="sourceCode"><span id="cb7-1"><a aria-label="1"></a>machine LoadPlatformDescription @board.repl</span>
-<span id="cb7-2"><a aria-label="2"></a>sysbus LoadELF @firmware.elf</span>
-<span id="cb7-3"><a aria-label="3"></a>machine.sensor FeedSample 1.5 0.0 -9.8</span>
-<span id="cb7-4"><a aria-label="4"></a>start</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource text number-lines code-with-copy"><code class="sourceCode"><span id="cb7-1"><a aria-label="1"></a># Schema, in dieser Version nicht ausgefuehrt</span>
+<span id="cb7-2"><a aria-label="2"></a># machine LoadPlatformDescription @board.repl</span>
+<span id="cb7-3"><a aria-label="3"></a># sysbus LoadELF @firmware.elf</span>
+<span id="cb7-4"><a aria-label="4"></a># FeedSample ist kein gepruefter Befehl mit drei Fließkomma-Argumenten</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li>Virtuelle Beschleunigungswerte einspeisen</li>
-<li>Firmware liest dieselben Registerpfade</li>
+<li>Virtuelle Registertransfers können Treiberfehler zeigen</li>
+<li>Sie beweisen keine Pull-up-Auslegung, keine RC-Flanke und keine Controllerlatenz</li>
 </ul>
 <aside class="notes">
 <p>Laboridee: eingespeiste Vektoren müssen nach korrektem I2C-Read in Ihrer Ausgabe erscheinen.</p>
@@ -2440,9 +2532,12 @@ flowchart LR
 <li>16-Bit-Werte oft als High- dann Low-Byte (Big-Endian am Sensor)</li>
 <li>In C zusammensetzen:</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb8-1"><a aria-label="1"></a><span class="dt">uint8_t</span> hi <span class="op">=</span> read_sensor_x_high<span class="op">();</span></span>
-<span id="cb8-2"><a aria-label="2"></a><span class="dt">uint8_t</span> lo <span class="op">=</span> read_sensor_x_low<span class="op">();</span></span>
-<span id="cb8-3"><a aria-label="3"></a><span class="dt">int16_t</span> x <span class="op">=</span> <span class="op">(</span><span class="dt">int16_t</span><span class="op">)((</span>hi <span class="op">&lt;&lt;</span> <span class="dv">8</span><span class="op">)</span> <span class="op">|</span> lo<span class="op">);</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb8-1"><a aria-label="1"></a><span class="dt">uint8_t</span> b<span class="op">[</span><span class="dv">6</span><span class="op">];</span></span>
+<span id="cb8-2"><a aria-label="2"></a><span class="cf">if</span> <span class="op">(</span>read_accel_xyz<span class="op">(</span>b<span class="op">)</span> <span class="op">!=</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb8-3"><a aria-label="3"></a>    <span class="co">/* Timeout, NACK oder Busfehler. 0x00 wäre ein gültiger Messwert. */</span></span>
+<span id="cb8-4"><a aria-label="4"></a><span class="op">}</span></span>
+<span id="cb8-5"><a aria-label="5"></a><span class="dt">uint16_t</span> ux <span class="op">=</span> <span class="op">(</span><span class="dt">uint16_t</span><span class="op">)(((</span><span class="dt">uint16_t</span><span class="op">)</span>b<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">&lt;&lt;</span> <span class="dv">8</span><span class="op">)</span> <span class="op">|</span> b<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
+<span id="cb8-6"><a aria-label="6"></a><span class="dt">int16_t</span> x <span class="op">=</span> <span class="op">(</span><span class="dt">int16_t</span><span class="op">)</span>ux<span class="op">;</span>   <span class="co">/* 0x1000 -&gt; 4096 */</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p>Häufiger Fehler: Bytes vertauscht oder Vorzeichen falsch interpretiert.</p>
 <style type="text/css">
@@ -2460,9 +2555,9 @@ flowchart LR
 <section id="polling-vs.-interrupt" class="slide level2">
 <h2>Polling vs.&nbsp;Interrupt</h2>
 <ul>
-<li>I2C ist relativ langsam — <code>wait_for_ack()</code> ist Polling</li>
-<li>Professionell oft: Transfer starten, auf I2C-IRQ (z. B. über PLIC) warten</li>
-<li>Für Einstiegslabor: Polling ist didaktisch ausreichend</li>
+<li>Blockierendes Polling, Zustands-Polling und IRQ/DMA sind drei Implementierungen</li>
+<li>Ein I2C-IRQ ist auf RISC-V eine externe Quelle, bei einem PLIC die Claim-ID, keine eigene <code>mcause</code>-Gerätekennung</li>
+<li>Jede Warteschleife braucht eine Deadline. Ein CPU-Reset setzt den extern versorgten Sensor nicht zurück</li>
 </ul>
 <aside class="notes">
 <p>Erinnerung Block 3: Polling blockiert; Interrupts entlasten die CPU bei längeren Transfers.</p>

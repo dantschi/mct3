@@ -851,14 +851,14 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#die-soc-grenze",
     "title": "05 · Serielle Bussysteme",
     "section": "Die SoC-Grenze",
-    "text": "Die SoC-Grenze\n\nBeispiel: digitaler Beschleunigungssensor (IMU) auf der Platine\nSensor speichert Neigung (X, Y, Z) intern als Zahlen (z. B. 16 Bit)\nFrage: Wie kommen diese Bits in die Register/ALU unseres SoCs?\nChips sind durch Kupferbahnen getrennt\nWir brauchen ein physikalisches und zeitliches Regelwerk — ein Protokoll\n\n\nInnerhalb der CPU verschieben wir Worte über breite interne Busse. Zwischen zwei Chips zählen Laufzeiten, Störungen und gemeinsame Regeln."
+    "text": "Die SoC-Grenze\n\nBeispiel: digitaler Beschleunigungssensor (IMU) auf der Platine\nDer Sensor speichert Beschleunigungsrohwerte (X, Y, Z), hier als 16-Bit-Zweierkomplement\nNeigung ist daraus nur unter Bewegungsannahmen abgeleitet, kein Registerinhalt\nFrage: Wie kommen diese Bits in die Register/ALU unseres SoCs?\nChips sind durch Kupferbahnen getrennt\nWir brauchen ein physikalisches und zeitliches Regelwerk — ein Protokoll\n\n\nInnerhalb der CPU verschieben wir Worte über breite interne Busse. Zwischen zwei Chips zählen Laufzeiten, Störungen und gemeinsame Regeln."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#soc-und-sensor-schema",
     "href": "vorlesungen/05_serielle_bussysteme.html#soc-und-sensor-schema",
     "title": "05 · Serielle Bussysteme",
     "section": "SoC und Sensor — Schema",
-    "text": "SoC und Sensor — Schema\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[RISC-V SoC] &lt;--&gt;|Kupferbahnen| B[Sensor-Chip]\n  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nSchematisch: zwei getrennte Silizium-Bausteine, verbunden über die Platine."
+    "text": "SoC und Sensor — Schema\n\n\n\nDrei Adressen: MMIO im SoC, I²C-Geräteadresse 0x68, Sensorregister ab 0x3B.\n\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[RISC-V SoC] &lt;--&gt;|Kupferbahnen| B[Sensor-Chip]\n  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nSchematisch: zwei getrennte Silizium-Bausteine, verbunden über die Platine."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#parallel-vs.-seriell",
@@ -879,14 +879,14 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#warum-sich-seriell-durchgesetzt-hat",
     "title": "05 · Serielle Bussysteme",
     "section": "Warum sich Seriell durchgesetzt hat",
-    "text": "Warum sich Seriell durchgesetzt hat\n\nKosten und Platz: wenige Pins am Gehäuse sind günstiger\nCrosstalk: viele parallele Bahnen stören sich gegenseitig\nClock Skew: bei hohen Frequenzen kommen Bits nicht mehr gleichzeitig an\nSeriell: sehr hohe Taktraten auf wenigen Leitungen möglich\n\n\nBei hohen Frequenzen wirken parallele Bahnen problematisch (Störung, Laufzeitunterschiede). Seriell braucht mehr Takte, erlaubt aber oft höhere Bitraten am Ende."
+    "text": "Warum sich Seriell durchgesetzt hat\n\nKosten und Platz: wenige Pins am Gehäuse sind günstiger\nCrosstalk: viele parallele Bahnen stören sich gegenseitig\nClock Skew: bei hohen Frequenzen kommen Bits nicht mehr gleichzeitig an\nSeriell kann hohe Symbolraten auf wenigen Leitungen erreichen\n„Seriell ist schneller“ gilt nicht pauschal: Pins, Takt und Nutzdatenrate getrennt betrachten\nMehrere serielle Lanes (USB, PCIe) sind ein anderes Modell als UART/SPI/I2C\n\n\nBei hohen Frequenzen wirken parallele Bahnen problematisch (Störung, Laufzeitunterschiede). Seriell braucht mehr Takte, erlaubt aber oft höhere Bitraten am Ende."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#das-schieberegister",
     "href": "vorlesungen/05_serielle_bussysteme.html#das-schieberegister",
     "title": "05 · Serielle Bussysteme",
     "section": "Das Schieberegister",
-    "text": "Das Schieberegister\n\nWandlung: parallele CPU-Daten → serieller Bitstrom\nKern: Schieberegister (Kette von D-Flip-Flops, MCT1)\nCPU schreibt parallel; Kommunikations-Hardware schiebt Bit für Bit auf die Leitung\nEmpfänger schiebt Bits wieder zu einem Wort zusammen\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[Bit 7] --&gt; B[Bit 6] --&gt; C[...] --&gt; D[Bit 0] --&gt;|Leitung| E[Empfänger]\n  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nUART-, SPI- und I2C-Controller basieren im Kern auf solchen Schieberegistern — parallel rein, seriell raus und umgekehrt."
+    "text": "Das Schieberegister\n\n\n\n0x53 steht als 0101 0011 und geht als UART-Folge 1 1 0 0 1 0 1 0 hinaus.\n\n\n\nWandlung: parallele CPU-Daten → serieller Bitstrom\nKern: Schieberegister (Kette von D-Flip-Flops, MCT1)\nCPU schreibt parallel; Kommunikations-Hardware schiebt Bit für Bit auf die Leitung\nEmpfänger schiebt Bits wieder zu einem Wort zusammen\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[Bit 7] --&gt; B[Bit 6] --&gt; C[...] --&gt; D[Bit 0] --&gt;|Leitung| E[Empfänger]\n  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nUART-, SPI- und I2C-Controller basieren im Kern auf solchen Schieberegistern — parallel rein, seriell raus und umgekehrt."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#synchron-vs.-asynchron",
@@ -921,7 +921,7 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#agenda-die-big-3",
     "title": "05 · Serielle Bussysteme",
     "section": "Agenda: Die „Big 3“",
-    "text": "Agenda: Die „Big 3“\nIndustrie-Standards für On-Board-Kommunikation:\n\nUART — asynchron, Punkt-zu-Punkt\nSPI — synchron, sehr schnell (Displays, Flash)\nI2C — synchron, Netzwerk auf zwei Leitungen\n\n\n\n\n\n\n\n\n\n\n\nUART\nSPI\nI2C\n\n\n\n\nLeitungen\n2\n4+\n2\n\n\nTakt\nasynchron\nsynchron\nsynchron\n\n\nDuplex\nFull\nFull\nHalf\n\n\nSpeed (Faust)\nniedrig–mittel\nhoch (SCK oft 10–50 MHz)\nmoderat (\\(100\\)–\\(400\\,\\mathrm{kHz}\\))\n\n\n\n\nAlle drei finden Sie in typischen MCU-Datenblättern. Heute: wann welches Protokoll — Start mit UART."
+    "text": "Agenda: Die „Big 3“\nIndustrie-Standards für On-Board-Kommunikation:\n\nUART — asynchron, Punkt-zu-Punkt\nSPI — synchron, sehr schnell (Displays, Flash)\nI2C — synchron, Netzwerk auf zwei Leitungen\n\n\n\n\n\n\n\n\n\n\n\nUART\nSPI\nI2C\n\n\n\n\nSignale ohne GND\n2\n4, plus weitere CS\n2\n\n\nTakt\nasynchron\nsynchron\nsynchron\n\n\nDuplex\nFull\nFull im 4-Signal-Modell\nHalf\n\n\nGrundtempo\nBaud plus Framing\nSCK aus dem Timingbudget\n100/400 kHz als Fokus\n\n\n\n\nAlle drei finden Sie in typischen MCU-Datenblättern. Heute: wann welches Protokoll — Start mit UART."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#lernziele-block-5",
@@ -935,14 +935,14 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#was-ist-uart",
     "title": "05 · Serielle Bussysteme",
     "section": "Was ist UART?",
-    "text": "Was ist UART?\n\nUART: Universal Asynchronous Receiver-Transmitter\nEher Schnittstelle/Direktverbindung als Multi-Drop-Bus\nAsynchron: kein Taktkabel\nHistorisch: serielle Schnittstelle (RS-232, COM)\nHeute oft: Debug/printf über USB-UART-Wandler\n\n\nMindestens ein UART-Controller ist in MCUs üblich. Terminal-Ausgabe läuft typischerweise über UART-Hardware."
+    "text": "Was ist UART?\n\nUART: Universal Asynchronous Receiver-Transmitter\nEher Schnittstelle/Direktverbindung als Multi-Drop-Bus\nAsynchron: kein Taktkabel\nDer UART-Frame ist nicht die elektrische Schnittstelle\nRS-232 nutzt andere Pegel; ein 0/3,3-V-Pin darf daran nicht direkt\nHeute oft: Debug/printf über einen Pegelwandler oder USB-UART\n\n\nMindestens ein UART-Controller ist in MCUs üblich. Terminal-Ausgabe läuft typischerweise über UART-Hardware."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#punkt-zu-punkt",
     "href": "vorlesungen/05_serielle_bussysteme.html#punkt-zu-punkt",
     "title": "05 · Serielle Bussysteme",
     "section": "Punkt-zu-Punkt",
-    "text": "Punkt-zu-Punkt\n\nTypisch genau zwei Teilnehmer\nTX (Transmit) und RX (Receive)\nKreuzverkabelung: TX1 → RX2, TX2 → RX1\nGemeinsames GND zwingend\nFull-Duplex auf zwei Datenleitungen\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  T1[Gerät 1 TX] --&gt;|Kabel| R2[Gerät 2 RX]\n  R1[Gerät 1 RX] --&gt;|Kabel| T2[Gerät 2 TX]\n\n\n\n\n\n\n\nEinfache Verkabelung, gleichzeitiges Senden möglich — aber keine dritte Station am selben Link."
+    "text": "Punkt-zu-Punkt\n\nTypisch genau zwei Teilnehmer\nTX (Transmit) und RX (Receive)\nKreuzverkabelung: TX1 → RX2, TX2 → RX1\nDirektes 0/3,3-V-Modell: gemeinsamer Bezug zwingend, keine galvanische Trennung\nFull-Duplex auf zwei Datenleitungen; GND, Versorgung und RTS/CTS zählen extra\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  T1[Gerät 1 TX] --&gt;|Kabel| R2[Gerät 2 RX]\n  R1[Gerät 1 RX] --&gt;|Kabel| T2[Gerät 2 TX]\n\n\n\n\n\n\n\nEinfache Verkabelung, gleichzeitiges Senden möglich — aber keine dritte Station am selben Link."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#die-asynchronität",
@@ -963,7 +963,7 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#der-uart-frame",
     "title": "05 · Serielle Bussysteme",
     "section": "Der UART-Frame",
-    "text": "Der UART-Frame\n\nIdle: Leitung typisch HIGH\nFrame-Aufbau:\n\nStart-Bit: LOW\nDaten: meist 8 Bit (oft LSB first)\nParity: optional\nStop-Bit(s): HIGH\n\n\n\n\n\nAbschnitt\nPegel / Inhalt\n\n\n\n\nIdle\nHIGH\n\n\nStart\nLOW\n\n\nData\n8 Bits\n\n\nStop\nHIGH\n\n\n\n\nJedes Byte wird eingerahmt. Das Start-Bit markiert den Paketbeginn im Bitstrom."
+    "text": "Der UART-Frame\n\n\n\n8N1 bei 115200 Baud: etwa 8,681 µs je Bit und 86,806 µs je Frame.\n\n\n\nIdle: Leitung typisch HIGH\nFrame-Aufbau:\n\nStart-Bit: LOW\nDaten: meist 8 Bit (oft LSB first)\nParity: optional\nStop-Bit(s): HIGH\n\n\n\n\n\nAbschnitt\nPegel / Inhalt\n\n\n\n\nIdle\nHIGH\n\n\nStart\nLOW\n\n\nData\n8 Bits\n\n\nStop\nHIGH\n\n\n\n\nJedes Byte wird eingerahmt. Das Start-Bit markiert den Paketbeginn im Bitstrom."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#das-start-bit",
@@ -991,14 +991,14 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#das-parity-bit",
     "title": "05 · Serielle Bussysteme",
     "section": "Das Parity-Bit",
-    "text": "Das Parity-Bit\n\nOptional: Even oder Odd Parity über die Datenbits\nEmpfänger prüft; bei Fehler oft Status/Interrupt (Framing/Parity Error)\n\n\n\n\nDaten (Beispiel)\nEinsen\nEven\nOdd\n\n\n\n\n1010 0001\n3\n1\n0\n\n\n0000 0000\n0\n0\n1\n\n\n\n\nParity erkennt ungerade Bitfehler; doppelte Kipper können unbemerkt bleiben. Für hohe Sicherheit: stärkere Prüfsummen in Software."
+    "text": "Das Parity-Bit\n\nOptional: Even oder Odd Parity über die Datenbits\nEmpfänger prüft; bei Fehler oft Status/Interrupt (Framing/Parity Error)\n\n\n\n\nDaten (Beispiel)\nEinsen\nEven\nOdd\n\n\n\n\n1010 0001\n3\n1\n0\n\n\n0000 0000\n0\n0\n1\n\n\n0x53 = 0101 0011\n4\n0\n1\n\n\n\n\nParity erkennt ungerade Bitfehler; doppelte Kipper können unbemerkt bleiben. Für hohe Sicherheit: stärkere Prüfsummen in Software."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#fifos-im-uart",
     "href": "vorlesungen/05_serielle_bussysteme.html#fifos-im-uart",
     "title": "05 · Serielle Bussysteme",
     "section": "FIFOs im UART",
-    "text": "FIFOs im UART\n\nBei 115200 Baud und 8N1 (10 Bit/Frame): grob alle \\(\\approx 87\\,\\mu\\mathrm{s}\\) ein Byte\nInterrupt pro Byte belastet die CPU stark\nLösung: RX/TX-FIFOs (z. B. 16–64 Bytes), Interrupt bei Watermark\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  K[Kabel] --&gt; F[UART-FIFO]\n  F --&gt;|Watermark| ISR[CPU-ISR]\n  style F fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nErinnerung Block 1: FIFOs entkoppeln. Die CPU holt Burst-weise Bytes aus MMIO, statt jedes Zeichen einzeln zu bedienen."
+    "text": "FIFOs im UART\n\n\n\nHöchstens 11520 Byte/s. Acht freie RX-Plätze sind etwa 694 µs Spielraum.\n\n\n\nBei 115200 Baud und 8N1 (10 Bit/Frame): grob alle \\(\\approx 87\\,\\mu\\mathrm{s}\\) ein Byte\nInterrupt pro Byte belastet die CPU stark\nLösung: RX/TX-FIFOs (z. B. 16–64 Bytes), Interrupt bei Watermark\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  K[Kabel] --&gt; F[UART-FIFO]\n  F --&gt;|Watermark| ISR[CPU-ISR]\n  style F fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nErinnerung Block 1: FIFOs entkoppeln. Die CPU holt Burst-weise Bytes aus MMIO, statt jedes Zeichen einzeln zu bedienen."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#nachteile-von-uart",
@@ -1015,46 +1015,46 @@
     "text": "Zusammenfassung UART\n\n\n\nEigenschaft\nUART\n\n\n\n\nLeitungen\nTX, RX (+ GND)\n\n\nTakt\nasynchron (Baudrate)\n\n\nDuplex\nFull-Duplex\n\n\nTopologie\nPoint-to-Point (2 Teilnehmer)\n\n\nOverhead\nStart/Stop/(Parity)\n\n\nEinsatz\nTerminal, GPS, Bluetooth-Module\n\n\n\n\nMerksatz: UART = asynchron, 2 Leitungen, 2 Teilnehmer. Als Nächstes: synchron mit Taktleitung — SPI."
   },
   {
-    "objectID": "vorlesungen/05_serielle_bussysteme.html#fragen-uart-und-grundlagen",
-    "href": "vorlesungen/05_serielle_bussysteme.html#fragen-uart-und-grundlagen",
+    "objectID": "vorlesungen/05_serielle_bussysteme.html#aufgabe-uart-frame",
+    "href": "vorlesungen/05_serielle_bussysteme.html#aufgabe-uart-frame",
     "title": "05 · Serielle Bussysteme",
-    "section": "Fragen? — UART und Grundlagen",
-    "text": "Fragen? — UART und Grundlagen\n\nWarum oft seriell statt parallel extern?\nWarum Start- und Stop-Bit?\nWelche Rolle spielen Hardware-FIFOs?\n\n\nWenn Framing und Baudrate klar sind, führen wir den Takt explizit ein: SPI."
+    "section": "Aufgabe — UART-Frame",
+    "text": "Aufgabe — UART-Frame\nDekodieren Sie das Datenbyte. Idle ist HIGH, dann folgen Start, acht Datenbits LSB first und Stop.\n\nSichtbare Datenbits nach dem Start: 1, 1, 0, 0, 1, 0, 1, 0\nWelche schriftliche MSB-Darstellung hat das Byte?\nEven Parity: welches Parity-Bit entsteht?\n\n\nLösung: die Folge ist d0 bis d7, also 0x53 = 0101 0011. Vier Einsen, Even Parity = 0. Ein einzelner Bitfehler wäre erkennbar, zwei Bitfehler nicht sicher. Framing- und Parity-Fehler sind getrennte Statusbits."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#was-ist-spi",
     "href": "vorlesungen/05_serielle_bussysteme.html#was-ist-spi",
     "title": "05 · Serielle Bussysteme",
     "section": "Was ist SPI?",
-    "text": "Was ist SPI?\n\nSPI: Serial Peripheral Interface (u. a. Motorola, 1980er)\nSynchron: eigene Taktleitung — kein Baudraten-Drift wie bei UART\nFull-Duplex, oft sehr hohe SCK-Taktraten (einige zehn MHz möglich; Bitrate \\(\\approx\\) SCK bei 1 Bit/Takt)\nWenig Framing-Overhead: Bits folgen dem Takt\n\n\nDer Master gibt den Takt vor. Empfänger folgen dem Schlag — keine vorherige Baudraten-Einigung nötig."
+    "text": "Was ist SPI?\n\nSPI: Serial Peripheral Interface (u. a. Motorola, 1980er)\nSynchron: eigene Taktleitung — kein Baudraten-Drift wie bei UART\nFull-Duplex, oft sehr hohe SCK-Taktraten (einige zehn MHz möglich; Bitrate \\(\\approx\\) SCK bei 1 Bit/Takt)\nWenig Framing-Overhead: Bits folgen dem Takt\n\n\nDer Controller gibt den Takt vor. Die Targets folgen dem Schlag. Eine gemeinsame Taktleitung verhindert die UART-Bauddrift, nicht jede beliebig hohe Frequenz."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#die-synchronität-sck",
     "href": "vorlesungen/05_serielle_bussysteme.html#die-synchronität-sck",
     "title": "05 · Serielle Bussysteme",
     "section": "Die Synchronität (SCK)",
-    "text": "Die Synchronität (SCK)\n\nTaktleitung: SCK (Serial Clock)\nEmpfänger braucht keinen eigenen Baud-Generator\nTypisch: bei definierter Flanke Datenleitung abtasten\nDeterministisch, unempfindlich gegen Quarz-Abweichungen zwischen den Chips\n\n\n\n\nPhase\nBedeutung\n\n\n\n\nSCK-Flanke\nAbtast-/Verschiebezeitpunkt\n\n\nDatenleitung\ngültiges Bit im vereinbarten Fenster\n\n\n\n\nEine gemeinsame Uhr für Master und Slave — Uhren können nicht „auseinanderlaufen“ wie bei UART."
+    "text": "Die Synchronität (SCK)\n\nTaktleitung: SCK (Serial Clock)\nEmpfänger braucht keinen eigenen Baud-Generator\nTypisch: bei definierter Flanke Datenleitung abtasten\nDeterministisch, unempfindlich gegen Quarz-Abweichungen zwischen den Chips\n\n\n\n\nPhase\nBedeutung\n\n\n\n\nSCK-Flanke\nAbtast-/Verschiebezeitpunkt\n\n\nDatenleitung\ngültiges Bit im vereinbarten Fenster\n\n\n\n\nEine gemeinsame Uhr für Controller und Target. Die Uhren laufen nicht wie bei UART auseinander; das Timingbudget beider Datenblätter bleibt."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#die-4-draht-architektur",
     "href": "vorlesungen/05_serielle_bussysteme.html#die-4-draht-architektur",
     "title": "05 · Serielle Bussysteme",
     "section": "Die 4-Draht-Architektur",
-    "text": "Die 4-Draht-Architektur\nKlassisch 4 Signale (+ GND):\n\n\n\nSignal\nRichtung\nZweck\n\n\n\n\nSCK\nMaster → Slave\nTakt\n\n\nMOSI\nMaster → Slave\nDaten zum Slave\n\n\nMISO\nSlave → Master\nDaten zum Master\n\n\nCS / SS\nMaster → Slave\nSlave auswählen (meist Active-Low)\n\n\n\n\nKein UART-Kreuz: MOSI an MOSI-Logik, MISO entsprechend. Neuere Namen oft SDO/SDI — Konzept gleich."
+    "text": "Die 4-Draht-Architektur\nKlassisch 4 Signale (+ GND):\n\n\n\nSignal\nRichtung\nZweck\n\n\n\n\nSCK\nMaster → Slave\nTakt\n\n\nMOSI\nMaster → Slave\nDaten zum Slave\n\n\nMISO\nSlave → Master\nDaten zum Master\n\n\nCS / SS\nMaster → Slave\nSlave auswählen (meist Active-Low)\n\n\n\n\nMOSI des Controllers trifft den Dateneingang des Targets. SDO und SDI gehören immer zu einem Baustein: Controller-SDO ist Target-SDI. Gleichnamig verbinden ist keine Regel."
   },
   {
-    "objectID": "vorlesungen/05_serielle_bussysteme.html#master-slave",
-    "href": "vorlesungen/05_serielle_bussysteme.html#master-slave",
+    "objectID": "vorlesungen/05_serielle_bussysteme.html#controller-und-target",
+    "href": "vorlesungen/05_serielle_bussysteme.html#controller-und-target",
     "title": "05 · Serielle Bussysteme",
-    "section": "Master-Slave",
-    "text": "Master-Slave\n\nMaster (meist die MCU): erzeugt SCK, steuert CS, startet Transfers\nSlave: antwortet nur, wenn selektiert und getaktet\nSingle-Master: ein aktiver Taktgeber auf dem Bus\nSlave „redet“ nicht von selbst\n\n\nKeine Buskollision durch unaufgefordertes Senden: der Master saugt/schiebt Daten aktiv."
+    "section": "Controller und Target",
+    "text": "Controller und Target\nÄltere Datenblätter sagen Master und Slave. Hier: Controller und Target. MOSI und MISO bleiben die Signalnamen.\n\nController (meist die MCU): erzeugt SCK, steuert CS, startet Transfers\nTarget: antwortet nur, wenn selektiert und getaktet\nEin Controller: ein aktiver Taktgeber in diesem Grundmodell\nDas Target sendet nicht unaufgefordert\n\n\nKeine Buskollision durch unaufgefordertes Senden: der Master saugt/schiebt Daten aktiv."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#full-duplex-ringtausch",
     "href": "vorlesungen/05_serielle_bussysteme.html#full-duplex-ringtausch",
     "title": "05 · Serielle Bussysteme",
     "section": "Full-Duplex: Ringtausch",
-    "text": "Full-Duplex: Ringtausch\n\nPro Takt: Bit auf MOSI hinaus und Bit auf MISO herein\nNach \\(n\\) Takten: Schieberegister getauscht\nAuch zum reinen Lesen: Dummy-Bytes senden, damit SCK läuft\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  M[Master-Schieberegister] --&gt;|MOSI| S[Slave-Schieberegister]\n  S --&gt;|MISO| M\n  style M fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nSPI ist immer Tausch. Schreiben erzeugt Empfangsbytes (oft ignorieren); Lesen braucht Dummy-Writes."
+    "text": "Full-Duplex: Ringtausch\n\n\n\nMode 0: 0x96 und 0x3C. Nach vier Takten 0x63 und 0xC9.\n\n\n\nPro Takt: Bit auf MOSI hinaus und Bit auf MISO herein\nNach \\(n\\) Takten: Schieberegister getauscht\nAuch zum reinen Lesen: Dummy-Bytes senden, damit SCK läuft\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  M[Master-Schieberegister] --&gt;|MOSI| S[Slave-Schieberegister]\n  S --&gt;|MISO| M\n  style M fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nSPI ist immer Tausch. Schreiben erzeugt Empfangsbytes (oft ignorieren); Lesen braucht Dummy-Writes."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#chip-select-cs",
@@ -1075,7 +1075,7 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#daisy-chaining",
     "title": "05 · Serielle Bussysteme",
     "section": "Daisy-Chaining",
-    "text": "Daisy-Chaining\n\nEin CS für mehrere Schieberegister in Serie\nMOSI → Slave1 → … → zurück MISO\nCPU schiebt lange Bitkette; Daten wandern durch die Kette\nTypisch bei LED-Ketten / Schieberegister-Arrays\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  CPU --&gt;|MOSI| S1[Slave 1]\n  S1 --&gt; S2[Slave 2]\n  S2 --&gt;|MISO| CPU\n\n\n\n\n\n\n\nCS-Pins sparen, aber Updates betreffen die ganze Kette — für einzelne Slaves oft ineffizient."
+    "text": "Daisy-Chaining\n\n\n\nNur geeignete Bausteine. Nach 8, 16 und 24 Takten stehen 0x33, dann 0x22, dann 0x11 vorn.\n\n\n\nEin CS für mehrere Schieberegister in Serie\nMOSI → Slave1 → … → zurück MISO\nCPU schiebt lange Bitkette; Daten wandern durch die Kette\nTypisch bei LED-Ketten / Schieberegister-Arrays\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  CPU --&gt;|MOSI| S1[Slave 1]\n  S1 --&gt; S2[Slave 2]\n  S2 --&gt;|MISO| CPU\n\n\n\n\n\n\n\nCS-Pins sparen, aber Updates betreffen die ganze Kette — für einzelne Slaves oft ineffizient."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#push-pull-und-geschwindigkeit",
@@ -1089,7 +1089,7 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#cpol-und-cpha",
     "title": "05 · Serielle Bussysteme",
     "section": "CPOL und CPHA",
-    "text": "CPOL und CPHA\n\nVier SPI-Modi (0–3): Kombination aus Ruhepegel und Abtastflanke\nCPOL: Idle LOW oder HIGH?\nCPHA: Abtastung bei erster oder zweiter Flanke?\nImmer Sensor-Datenblatt und Master-Register abgleichen — der Modus entscheidet über gültige Daten\n\n\n\n\nModus\nCPOL\nCPHA\nKurz\n\n\n\n\n0\n0\n0\nIdle LOW, Sample steigend\n\n\n1\n0\n1\nIdle LOW, Sample fallend\n\n\n2\n1\n0\nIdle HIGH, Sample fallend\n\n\n3\n1\n1\nIdle HIGH, Sample steigend\n\n\n\n\nFalscher Modus → Datenmüll trotz korrekter Verkabelung. Klassiker im Labor: alle vier Modi existieren; zwei Beispiele reichen nicht — Datenblatt lesen."
+    "text": "CPOL und CPHA\n\n\n\nVier Modi, gleiche Datenfolge. Sample und Datenwechsel sind verschiedene Flanken.\n\n\n\nVier SPI-Modi (0–3): Kombination aus Ruhepegel und Abtastflanke\nCPOL: Idle LOW oder HIGH?\nCPHA: Abtastung bei erster oder zweiter Flanke?\nImmer Sensor-Datenblatt und Master-Register abgleichen — der Modus entscheidet über gültige Daten\n\n\n\n\nModus\nCPOL\nCPHA\nKurz\n\n\n\n\n0\n0\n0\nIdle LOW, Sample steigend\n\n\n1\n0\n1\nIdle LOW, Sample fallend\n\n\n2\n1\n0\nIdle HIGH, Sample fallend\n\n\n3\n1\n1\nIdle HIGH, Sample steigend\n\n\n\n\nFalscher Modus → Datenmüll trotz korrekter Verkabelung. Klassiker im Labor: alle vier Modi existieren; zwei Beispiele reichen nicht — Datenblatt lesen."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#nachteile-von-spi",
@@ -1113,11 +1113,11 @@
     "text": "Zusammenfassung SPI\n\n\n\n\n\n\n\nEigenschaft\nSPI\n\n\n\n\nLeitungen\nSCK, MOSI, MISO, CS (+…)\n\n\nTakt\nsynchron (Master)\n\n\nDuplex\nFull (Ringtausch)\n\n\nNetz\nMaster/Slave, Star oder Daisy-Chain\n\n\nSpeed\nhoch: SCK oft 10–50 MHz (\\(\\approx\\) Bitrate in Mbit/s bei 1 Bit/Takt)\n\n\nEinsatz\nDisplay, SD, Flash\n\n\n\n\nAls Nächstes: zwei Leitungen, Takt behalten, viele Adressen — I2C."
   },
   {
-    "objectID": "vorlesungen/05_serielle_bussysteme.html#fragen-spi",
-    "href": "vorlesungen/05_serielle_bussysteme.html#fragen-spi",
+    "objectID": "vorlesungen/05_serielle_bussysteme.html#aufgabe-spi-flanke",
+    "href": "vorlesungen/05_serielle_bussysteme.html#aufgabe-spi-flanke",
     "title": "05 · Serielle Bussysteme",
-    "section": "Fragen? — SPI",
-    "text": "Fragen? — SPI\n\nWarum hilft eine Taktleitung gegenüber UART?\nMOSI/MISO und Ringtausch klar?\nWarum limitiert Star-Routing mit CS die Skalierbarkeit?\n\n\nWenn Master, Takt und CS klar sind, folgt das Multi-Drop-Protokoll I2C."
+    "section": "Aufgabe — SPI-Flanke",
+    "text": "Aufgabe — SPI-Flanke\nMode 0, Idle LOW. Controller sendet 0x96, Target sendet 0x3C, MSB first.\n\nWelche Flanke tastet ab, welche darf das nächste Bit setzen?\nWelcher Registerstand gilt nach vier Takten im Links-Schiebe-Modell?\n\n\nLösung: Sample steigend, Wechsel fallend. Nach vier Takten 0x63 und 0xC9, nach acht Takten 0x3C und 0x96. CPHA = 0 verlangt das erste Bit schon vor der ersten Sample-Flanke."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#was-ist-i2c",
@@ -1152,7 +1152,7 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#pull-up-widerstände",
     "title": "05 · Serielle Bussysteme",
     "section": "Pull-Up-Widerstände",
-    "text": "Pull-Up-Widerstände\n\nOhne aktives HIGH: externe Pull-ups nötig (typisch wenige kΩ)\nJe einer an SDA und SCL gegen \\(V_{IO}\\) (z. B. \\(3{,}3\\,\\mathrm{V}\\))\nAlle loslassen → Pull-up zieht HIGH (logisch 1)\nEin Chip zieht → Leitung LOW (logisch 0)\n\n\nOhne Pull-ups funktioniert I2C physikalisch nicht. HIGH heißt „niemand zieht“; LOW heißt „jemand zieht“."
+    "text": "Pull-Up-Widerstände\n\n\n\nLehrrechnung: 2,2 kΩ etwa 186 ns. Fast-Mode etwa 967 Ω bis 3,54 kΩ.\n\n\n\nOhne aktives HIGH: je ein Pull-up an SDA und an SCL\n„Wenige kΩ“ ist keine Dimensionierung: Kapazität, Rise Time und Sinkstrom begrenzen \\(R_P\\)\nJe einer an SDA und SCL gegen \\(V_{IO}\\) (z. B. \\(3{,}3\\,\\mathrm{V}\\))\nAlle loslassen → Pull-up zieht HIGH (logisch 1)\nEin Chip zieht → Leitung LOW (logisch 0)\n\n\nOhne Pull-ups funktioniert I2C physikalisch nicht. HIGH heißt „niemand zieht“; LOW heißt „jemand zieht“."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#dominantes-low-wired-and",
@@ -1173,7 +1173,7 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#ack-und-nack",
     "title": "05 · Serielle Bussysteme",
     "section": "ACK und NACK",
-    "text": "ACK und NACK\n\nNach jedem Byte: 9. Takt für Quittung\nSender lässt SDA los (Tendenz HIGH = NACK)\nEmpfänger zieht SDA auf LOW = ACK\nKein ACK → Gerät fehlt / nicht bereit (Status in Hardware)\n\n\nVorteil gegenüber SPI: die MCU erkennt fehlende Slaves auf Protokollebene."
+    "text": "ACK und NACK\n\n\n\nWrite 0xD0, 0x6B, 0x00. Der letzte Read-NACK ist der normale Abschluss.\n\n\n\nNach jedem Byte: 9. Takt für Quittung\nSender lässt SDA los (Tendenz HIGH = NACK)\nEmpfänger zieht SDA auf LOW = ACK\nAddress-NACK: Gerät fehlt oder hört nicht. Data-NACK: unerwartete Ablehnung. Letzter Read-NACK: normaler Abschluss durch den Controller.\n\n\nVorteil gegenüber SPI: die MCU erkennt fehlende Slaves auf Protokollebene."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#senden-vs.-empfangen",
@@ -1194,7 +1194,7 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#clock-stretching",
     "title": "05 · Serielle Bussysteme",
     "section": "Clock Stretching",
-    "text": "Clock Stretching\n\nZu schneller Master-Takt? Slave kann SCL auf LOW halten\nMaster will HIGH, sieht aber LOW (Wired-AND) → wartet\nSlave lässt los → Transfer geht weiter\n\n\nFeature, das SPI so nicht hat: der Slave darf den Takt pausieren (z. B. interne Arbeit)."
+    "text": "Clock Stretching\n\n\n\nSCL bleibt LOW, solange das Target hält. Arbitration: 0xA0 gegen 0xD0.\n\n\n\nZu schneller Master-Takt? Slave kann SCL auf LOW halten\nMaster will HIGH, sieht aber LOW (Wired-AND) → wartet\nSlave lässt los → Transfer geht weiter\n\n\nFeature, das SPI so nicht hat: der Slave darf den Takt pausieren (z. B. interne Arbeit)."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#multi-master",
@@ -1222,14 +1222,14 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#zusammenfassung-der-big-3",
     "title": "05 · Serielle Bussysteme",
     "section": "Zusammenfassung der Big 3",
-    "text": "Zusammenfassung der Big 3\n\n\n\n\n\n\n\n\n\nMerkmal\nUART\nSPI\nI2C\n\n\n\n\nLeitungen\n2\n4+\n2\n\n\nTakt\nasynchron\nsynchron\nsynchron\n\n\nRouting\nPunkt-zu-Punkt\nCS / Daisy\nadressierter Bus\n\n\nSpeed\nniedrig–mittel\nSCK oft 10–50 MHz\n\\(100\\)–\\(400\\,\\mathrm{kHz}\\)\n\n\nHardware\nBaud, Framing, FIFO\nPush-Pull\nOpen-Drain, Pull-ups\n\n\nEinsatz\nDebug, Module\nDisplay, SD, Flash\nSensornetz\n\n\n\n\nAuswahlkriterium: Pins vs. Bandbreite vs. Topologie."
+    "text": "Zusammenfassung der Big 3\n\n\n\n\n\n\n\n\n\nMerkmal\nUART\nSPI\nI2C\n\n\n\n\nSignale ohne GND\nTX, RX\nSCK, MOSI, MISO, CS\nSDA, SCL\n\n\nTakt\nasynchron\nController-Takt\nController-Takt\n\n\nRouting\nPunkt-zu-Punkt\nCS oder geeignete Daisy-Chain\nadressierter Bus\n\n\nTempo\nBaud mal Framing\nTimingbudget beider Bausteine\n100/400 kHz als Fokus\n\n\nTreiber\nPush-Pull, Pegel beachten\nPush-Pull\nOpen-Drain, Pull-ups\n\n\nEinsatz\nDebug, Module\nDisplay, Flash\nSensoren auf der Platine\n\n\n\n\nAuswahlkriterium: Pins vs. Bandbreite vs. Topologie."
   },
   {
-    "objectID": "vorlesungen/05_serielle_bussysteme.html#fragen-i2c",
-    "href": "vorlesungen/05_serielle_bussysteme.html#fragen-i2c",
+    "objectID": "vorlesungen/05_serielle_bussysteme.html#aufgabe-adresse-ack-und-pull-up",
+    "href": "vorlesungen/05_serielle_bussysteme.html#aufgabe-adresse-ack-und-pull-up",
     "title": "05 · Serielle Bussysteme",
-    "section": "Fragen? — I2C",
-    "text": "Fragen? — I2C\n\nWarum verhindert Open-Drain Kurzschlüsse?\nWie adressiert I2C ohne CS?\nWie funktioniert ACK/NACK?\n\n\nAls Nächstes: Was, wenn wir die Platine verlassen und lange Kabel in rauen Umgebungen brauchen?"
+    "section": "Aufgabe — Adresse, ACK und Pull-up",
+    "text": "Aufgabe — Adresse, ACK und Pull-up\n\nGeräteadresse 0x68. Welches Byte geht bei Write, welches bei Read auf den Bus?\nWer zieht SDA im neunten Takt eines Writes? Wer erzeugt den NACK nach dem letzten gelesenen Byte?\nLehrannahme: \\(V_{IO}=3{,}3\\,\\mathrm{V}\\), \\(C_B=100\\,\\mathrm{pF}\\), \\(3\\,\\mathrm{mA}\\) bei \\(0{,}4\\,\\mathrm{V}\\), \\(t_r=0{,}8473\\,R_P C_B\\). Liegt \\(2{,}2\\,\\mathrm{k}\\Omega\\) im Fast-Mode-Fenster?\n\n\nLösung: Write 0xD0, Read 0xD1. Das Target zieht ACK, der Controller erzeugt den letzten Read-NACK. Rp,min etwa 967 Ohm, Rp,max bei 300 ns etwa 3,54 kOhm. 2,2 kOhm liegt in diesem Rechenmodell dazwischen. Zwei vorhandene 4,7 kOhm parallel sind 2,35 kOhm. Datenblattgrenzen bleiben zu prüfen."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#grenzen-von-single-ended",
@@ -1250,7 +1250,7 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#differentielle-übertragung",
     "title": "05 · Serielle Bussysteme",
     "section": "Differentielle Übertragung",
-    "text": "Differentielle Übertragung\n\nSignal auf zwei Leitungen: normal und invertiert\nEmpfänger misst Differenz \\(V_A - V_B\\), nicht gegen GND\nAbsolute Masseverschiebung wird irrelevant\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  S[Sender] --&gt;|A| E[Empfänger]\n  S --&gt;|B invertiert| E\n  E --&gt;|Differenz| CPU[Logik]\n  style E fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nLogik aus dem Vorzeichen/der Differenz der beiden Adern — nicht aus absolutem Pegel gegen GND."
+    "text": "Differentielle Übertragung\n\n\n\n2,5 V und 0,5 V: Differenz 2 V, Common Mode 1,5 V. +0,8 V hebt nur den Common Mode.\n\n\n\nSignal auf zwei Leitungen: normal und invertiert\nEmpfänger misst Differenz \\(V_A - V_B\\), nicht gegen GND\nGleiche Störung auf beiden Leitungen ändert die Differenz nicht\nDer Common-Mode-Bereich des Empfängers bleibt endlich; große Potentialunterschiede können weiter stören oder schädigen\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  S[Sender] --&gt;|A| E[Empfänger]\n  S --&gt;|B invertiert| E\n  E --&gt;|Differenz| CPU[Logik]\n  style E fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nLogik aus dem Vorzeichen/der Differenz der beiden Adern — nicht aus absolutem Pegel gegen GND."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#twisted-pair",
@@ -1264,7 +1264,7 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#rs-485",
     "title": "05 · Serielle Bussysteme",
     "section": "RS-485",
-    "text": "RS-485\n\nPhysikalische Schicht für lange Strecken (oft mit UART-Logik)\nTransceiver: Single-Ended TX/RX → differenziell A/B\nReichweiten im dreistelligen Meterbereich möglich\nHäufig mit Protokollen wie Modbus\n\n\nSie programmieren weiter UART-ähnlich; der Transceiver macht die robuste Leitung."
+    "text": "RS-485\n\nPhysikalische Schicht für lange Strecken (oft mit UART-Logik)\nTransceiver: Single-Ended TX/RX → differenziell A/B\nReichweite und Bitrate gelten gemeinsam; „einige hundert Meter“ ist keine beliebige Geschwindigkeit\nHäufig mit Protokollen wie Modbus\n\n\nSie programmieren weiter UART-ähnlich; der Transceiver macht die robuste Leitung."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#can-bus",
@@ -1281,11 +1281,11 @@
     "text": "Warum im Labor I2C?\n\nMCT3-Fokus: Sensoren wenige Zentimeter neben der MCU\nDifferentielle Transceiver: Platz, Strom, Kosten\nFür die „letzte Meile“ auf dem Board: I2C oft die passende Wahl\n\n\nDer Exkurs erklärt Feldverkabelung. Zurück aufs Board: I2C-Sensor ansteuern."
   },
   {
-    "objectID": "vorlesungen/05_serielle_bussysteme.html#fragen-differentiell-und-feldbusse",
-    "href": "vorlesungen/05_serielle_bussysteme.html#fragen-differentiell-und-feldbusse",
+    "objectID": "vorlesungen/05_serielle_bussysteme.html#aufgabe-burst-und-common-mode",
+    "href": "vorlesungen/05_serielle_bussysteme.html#aufgabe-burst-und-common-mode",
     "title": "05 · Serielle Bussysteme",
-    "section": "Fragen? — Differentiell und Feldbusse",
-    "text": "Fragen? — Differentiell und Feldbusse\n\nWie funktioniert differentielle Übertragung?\nWarum hilft Twisted Pair gegen EMI?\nWann RS-485/CAN statt I2C?\n\n\nAls Nächstes: Ausblick Labor — Beschleunigungssensor per I2C (Renode)."
+    "section": "Aufgabe — Burst und Common Mode",
+    "text": "Aufgabe — Burst und Common Mode\n\nBytes 10 00 E0 00 40 00 ab Register 0x3B, Bereich \\(\\pm 2\\,\\mathrm{g}\\) mit 16384 LSB/g. Welche Werte in g entstehen?\n\\(V_A=2{,}5\\,\\mathrm{V}\\), \\(V_B=0{,}5\\,\\mathrm{V}\\), danach \\(+0{,}8\\,\\mathrm{V}\\) auf beiden Leitungen. Was bleibt gleich, was ändert sich?\n\n\nLösung: X = 4096 = +0,25 g, Y = -8192 = -0,5 g, Z = 16384 = +1 g. Vdiff bleibt 2 V, Vcm steigt von 1,5 V auf 2,3 V. Ob 2,3 V erlaubt ist, steht im Transceiver-Datenblatt. Vertiefung: Multi-Controller, Daisy-Chain und die elektrische Auslegung."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#ausblick-labor-imu-per-i2c",
@@ -1306,70 +1306,70 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#registerkarte-des-sensors",
     "title": "05 · Serielle Bussysteme",
     "section": "Registerkarte des Sensors",
-    "text": "Registerkarte des Sensors\n\nSensor hat eigene Memory Map (Datenblatt!)\nBeispiele (MPU6050-ähnlich):\n\n0x6B: Power Management\n0x3B/0x3C: X-Achse High/Low\n\nI2C: erst Geräteadresse, dann Registerzeiger, dann Daten\n\n\nWie ein internes Regal: Adresse des Chips und Adresse des Fachs (Register)."
+    "text": "Registerkarte des Sensors\n\nSensor hat eigene Memory Map (Datenblatt!)\nBeispiele aus der MPU-6000/MPU-6050-Registerkarte, im Labor gegen das Datenblatt prüfen:\n\n0x6B: Power Management, Aufwecken ist bausteinspezifisch\n0x1C: Beschleunigungsbereich; \\(\\pm 2\\,\\mathrm{g}\\) entspricht im Datenblatt oft 16384 LSB/g\n0x3B bis 0x40: X, Y, Z je High/Low, zusammenhängend lesbar\n\nI2C: erst Geräteadresse, dann Registerzeiger, dann Daten\n\n\nWie ein internes Regal: Adresse des Chips und Adresse des Fachs (Register)."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#c-i2c-initialisieren",
     "href": "vorlesungen/05_serielle_bussysteme.html#c-i2c-initialisieren",
     "title": "05 · Serielle Bussysteme",
     "section": "C: I2C initialisieren",
-    "text": "C: I2C initialisieren\nBeispielhafte Adressen und Bits (fiktiv — immer Datenblatt prüfen):\n#define I2C_BASE 0x40010000u\n#define I2C_CR1  (*(volatile uint32_t *)(I2C_BASE + 0x00))\n\nvoid i2c_init(void) {\n    I2C_CR1 |= (1u &lt;&lt; 0);  /* Enable — Bitlage SoC-spezifisch */\n    I2C_CR1 |= (1u &lt;&lt; 8);  /* Master — nur schematisch! */\n}\n\nRegister-Offsets und Bitpositionen sind plattformspezifisch\nNicht 1:1 auf einen realen Chip übernehmen\n\n\nWie Timer/PWM: Steuerung über MMIO. Enable-/Master-Bits hier nur zur Didaktik — im Labor die Referenz Ihres SoCs/Renode-Modells verwenden."
+    "text": "C: I2C initialisieren\nBeispielhafte Adressen und Bits (fiktiv — immer Datenblatt prüfen):\n#define I2C_BASE 0x40010000u\n#define I2C_CR1  (*(volatile uint32_t *)(I2C_BASE + 0x00))\n\nvoid i2c_init(void) {\n    /* Davor, plattformspezifisch: Taktfreigabe, Pin-Mux, Open-Drain, Pull-up. */\n    I2C_CR1 |= (1u &lt;&lt; 0);  /* Enable — Bitlage nur im Lehrmodell */\n    I2C_CR1 |= (1u &lt;&lt; 8);  /* Controller-Modus — nur schematisch */\n}\n\nRegister-Offsets und Bitpositionen sind plattformspezifisch\nNicht 1:1 auf einen realen Chip übernehmen\n\n\nWie Timer/PWM: Steuerung über MMIO. Enable-/Master-Bits hier nur zur Didaktik — im Labor die Referenz Ihres SoCs/Renode-Modells verwenden."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#c-bus-frequenz",
     "href": "vorlesungen/05_serielle_bussysteme.html#c-bus-frequenz",
     "title": "05 · Serielle Bussysteme",
     "section": "C: Bus-Frequenz",
-    "text": "C: Bus-Frequenz\n\nTypisch \\(100\\,\\mathrm{kHz}\\) oder \\(400\\,\\mathrm{kHz}\\)\nAus Systemtakt (z. B. \\(100\\,\\mathrm{MHz}\\)) Teiler setzen\n\n#define I2C_CLK_DIV (*(volatile uint32_t *)(I2C_BASE + 0x10))\n\nvoid i2c_set_speed(void) {\n    I2C_CLK_DIV = 1000;  /* schematisch: 100 MHz / 100 kHz */\n}\n\nPrescaler/Divider so wählen, dass SCL die Spezifikation des Sensors einhält."
+    "text": "C: Bus-Frequenz\n\nTypisch \\(100\\,\\mathrm{kHz}\\) oder \\(400\\,\\mathrm{kHz}\\)\nAus Systemtakt (z. B. \\(100\\,\\mathrm{MHz}\\)) Teiler setzen\n\n#define I2C_CLK_DIV (*(volatile uint32_t *)(I2C_BASE + 0x10))\n\nvoid i2c_set_speed(void) {\n    /* 100 MHz / 1000 = 100 kHz ist nur dieses Rechenmodell. */\n    I2C_CLK_DIV = 1000;\n}\n\nPrescaler allein ist keine universelle I2C-Formel. SCL-High, SCL-Low, Filter und die Anstiegszeit können getrennte Felder sein."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#c-write-transaktion",
     "href": "vorlesungen/05_serielle_bussysteme.html#c-write-transaktion",
     "title": "05 · Serielle Bussysteme",
     "section": "C: Write-Transaktion",
-    "text": "C: Write-Transaktion\nAblauf: START → Adresse+W → Reg → Daten → STOP\nvoid sensor_wakeup(void) {\n    i2c_send_start();\n    i2c_send_byte((0x68u &lt;&lt; 1) | 0u);  /* Addr + Write */\n    wait_for_ack();\n    i2c_send_byte(0x6B);               /* Register */\n    wait_for_ack();\n    i2c_send_byte(0x00);               /* Wert */\n    wait_for_ack();\n    i2c_send_stop();\n}\n\n7-Bit-Adresse um 1 nach links, R/W im LSB. Konkrete API hängt vom Treiber/SoC ab."
+    "text": "C: Write-Transaktion\nAblauf: START → Adresse+W → Reg → Daten → STOP\nint sensor_wakeup(void) {\n    i2c_send_start();\n    i2c_send_byte(0xD0u);          /* 0x68 &lt;&lt; 1 | Write */\n    if (!wait_for_ack_timeout()) return -1;\n    i2c_send_byte(0x6Bu);          /* PWR_MGMT_1 */\n    if (!wait_for_ack_timeout()) return -1;\n    i2c_send_byte(0x00u);          /* Sleep aus, Lehrwert */\n    if (!wait_for_ack_timeout()) return -1;\n    i2c_send_stop();\n    return 0;\n}\n\nEin NACK oder ein abgelaufenes Zeitlimit beendet die Funktion. wait_for_ack() ohne Timeout darf bei fehlendem Sensor nicht hängen bleiben. STOP nur, solange dieser Controller den Bus besitzt."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#c-read-mit-repeated-start",
     "href": "vorlesungen/05_serielle_bussysteme.html#c-read-mit-repeated-start",
     "title": "05 · Serielle Bussysteme",
     "section": "C: Read mit Repeated Start",
-    "text": "C: Read mit Repeated Start\nZuerst Registerzeiger setzen (Write), dann Repeated START und Read:\nuint8_t read_sensor_x(void) {\n    i2c_send_start();\n    i2c_send_byte((0x68u &lt;&lt; 1) | 0u);\n    wait_for_ack();\n    i2c_send_byte(0x3B);\n    wait_for_ack();\n\n    i2c_send_start();  /* Repeated Start */\n    i2c_send_byte((0x68u &lt;&lt; 1) | 1u);\n    wait_for_ack();\n    uint8_t data = i2c_read_byte_nack();\n    i2c_send_stop();\n    return data;\n}\n\nKlassisches Muster: Pointer setzen, dann lesen — oft ohne STOP dazwischen (Repeated Start)."
+    "text": "C: Read mit Repeated Start\n\n\n\nSechs Bytes ab 0x3B. Das Beispiel ergibt +0,25 g, −0,5 g und +1 g.\n\n\nZuerst Registerzeiger setzen (Write), dann Repeated START und Read:\n/* Timeout. Fehlercode bleibt getrennt von den Bytes. */\nint read_accel_xyz(uint8_t out[6]) {\n    i2c_send_start();\n    i2c_send_byte(0xD0u);          /* 0x68 &lt;&lt; 1 | Write */\n    if (!wait_for_ack_timeout()) return -1;\n    i2c_send_byte(0x3Bu);\n    if (!wait_for_ack_timeout()) return -1;\n    i2c_send_start();              /* Repeated Start */\n    i2c_send_byte(0xD1u);          /* Read */\n    if (!wait_for_ack_timeout()) return -1;\n    for (int i = 0; i &lt; 5; i++)\n        out[i] = i2c_read_byte_ack();\n    out[5] = i2c_read_byte_nack(); /* normaler Abschluss */\n    i2c_send_stop();\n    return 0;\n}\n\nKlassisches Muster: Pointer setzen, dann lesen — oft ohne STOP dazwischen (Repeated Start)."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#renode-virtueller-i2c-sensor",
     "href": "vorlesungen/05_serielle_bussysteme.html#renode-virtueller-i2c-sensor",
     "title": "05 · Serielle Bussysteme",
     "section": "Renode: virtueller I2C-Sensor",
-    "text": "Renode: virtueller I2C-Sensor\n\nGeplant: Sensor als Modell in Renode (ACK/NACK, Register)\nC-Treiber sieht dasselbe Timing-Verhalten wie auf dem Chip\nValidierung ohne Lötarbeit\n\n\nSimulator ersetzt die physische IMU für Treiberentwicklung — Datenblattverhalten nachbilden."
+    "text": "Renode: virtueller I2C-Sensor\n\nEin Registermodell kann ACK und Bursts nachbilden\nEs beweist keine realen Flanken, keine RC-Zeit und keine zyklusgenaue Controllerlatenz\nSensors.MPU6050 und FeedSample sind hier nicht als vorhandene API geprüft\n\n\nSimulator ersetzt die physische IMU für Treiberentwicklung — Datenblattverhalten nachbilden."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#platine-beschreiben-.repl",
     "href": "vorlesungen/05_serielle_bussysteme.html#platine-beschreiben-.repl",
     "title": "05 · Serielle Bussysteme",
     "section": "Platine beschreiben (.repl)",
-    "text": "Platine beschreiben (.repl)\nSchematisch:\nsensor: Sensors.MPU6050 @ i2c0 0x68\n\nSensor an I2C0, Adresse 0x68\nVerknüpft CPU-I2C mit dem Sensor-Modell\n\n\nDie .repl-Datei beschreibt die virtuelle Verdrahtung — Ihr „Lötkolben“ in Textform."
+    "text": "Platine beschreiben (.repl)\nIm Repository liegt keine .repl. Der folgende Typname ist ein ungeprüftes Schema, keine Renode-API dieser Lehrveranstaltung:\n# nicht ausgefuehrt, Typname nicht verifiziert\n# sensor: Sensors.MPU6050 @ i2c0 0x68\n\nErst die installierte Renode-Version und das echte Peripheriemodell prüfen\nFehlt das Modell, bleibt der Treiber ein Lehrmodell mit explizitem Registervertrag\n\n\nDie .repl-Datei beschreibt die virtuelle Verdrahtung — Ihr „Lötkolben“ in Textform."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#stimuli-im-startskript-.resc",
     "href": "vorlesungen/05_serielle_bussysteme.html#stimuli-im-startskript-.resc",
     "title": "05 · Serielle Bussysteme",
     "section": "Stimuli im Startskript (.resc)",
-    "text": "Stimuli im Startskript (.resc)\nSchematisch:\nmachine LoadPlatformDescription @board.repl\nsysbus LoadELF @firmware.elf\nmachine.sensor FeedSample 1.5 0.0 -9.8\nstart\n\nVirtuelle Beschleunigungswerte einspeisen\nFirmware liest dieselben Registerpfade\n\n\nLaboridee: eingespeiste Vektoren müssen nach korrektem I2C-Read in Ihrer Ausgabe erscheinen."
+    "text": "Stimuli im Startskript (.resc)\nSchematisch:\n# Schema, in dieser Version nicht ausgefuehrt\n# machine LoadPlatformDescription @board.repl\n# sysbus LoadELF @firmware.elf\n# FeedSample ist kein gepruefter Befehl mit drei Fließkomma-Argumenten\n\nVirtuelle Registertransfers können Treiberfehler zeigen\nSie beweisen keine Pull-up-Auslegung, keine RC-Flanke und keine Controllerlatenz\n\n\nLaboridee: eingespeiste Vektoren müssen nach korrektem I2C-Read in Ihrer Ausgabe erscheinen."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#endianness",
     "href": "vorlesungen/05_serielle_bussysteme.html#endianness",
     "title": "05 · Serielle Bussysteme",
     "section": "Endianness",
-    "text": "Endianness\n\n16-Bit-Werte oft als High- dann Low-Byte (Big-Endian am Sensor)\nIn C zusammensetzen:\n\nuint8_t hi = read_sensor_x_high();\nuint8_t lo = read_sensor_x_low();\nint16_t x = (int16_t)((hi &lt;&lt; 8) | lo);\n\nHäufiger Fehler: Bytes vertauscht oder Vorzeichen falsch interpretiert."
+    "text": "Endianness\n\n16-Bit-Werte oft als High- dann Low-Byte (Big-Endian am Sensor)\nIn C zusammensetzen:\n\nuint8_t b[6];\nif (read_accel_xyz(b) != 0) {\n    /* Timeout, NACK oder Busfehler. 0x00 wäre ein gültiger Messwert. */\n}\nuint16_t ux = (uint16_t)(((uint16_t)b[0] &lt;&lt; 8) | b[1]);\nint16_t x = (int16_t)ux;   /* 0x1000 -&gt; 4096 */\n\nHäufiger Fehler: Bytes vertauscht oder Vorzeichen falsch interpretiert."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#polling-vs.-interrupt",
     "href": "vorlesungen/05_serielle_bussysteme.html#polling-vs.-interrupt",
     "title": "05 · Serielle Bussysteme",
     "section": "Polling vs. Interrupt",
-    "text": "Polling vs. Interrupt\n\nI2C ist relativ langsam — wait_for_ack() ist Polling\nProfessionell oft: Transfer starten, auf I2C-IRQ (z. B. über PLIC) warten\nFür Einstiegslabor: Polling ist didaktisch ausreichend\n\n\nErinnerung Block 3: Polling blockiert; Interrupts entlasten die CPU bei längeren Transfers."
+    "text": "Polling vs. Interrupt\n\nBlockierendes Polling, Zustands-Polling und IRQ/DMA sind drei Implementierungen\nEin I2C-IRQ ist auf RISC-V eine externe Quelle, bei einem PLIC die Claim-ID, keine eigene mcause-Gerätekennung\nJede Warteschleife braucht eine Deadline. Ein CPU-Reset setzt den extern versorgten Sensor nicht zurück\n\n\nErinnerung Block 3: Polling blockiert; Interrupts entlasten die CPU bei längeren Transfers."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#zusammenfassung-block-5",
