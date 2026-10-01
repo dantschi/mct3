@@ -6,7 +6,15 @@ author: "Prof. Dr.-Ing. Daniel Klünder"
 #           (Notizen nur mit Taste S)
 # Handout:  quarto render vorlesungen/01_speicherphysik.qmd --profile handout --to pdf
 #           → _handout/vorlesungen/01_speicherphysik.pdf
-format: revealjs
+format:
+  revealjs: {}
+  pdf:
+    include-in-header:
+      text: |
+          % VL01: Schaltbilder brauchen mehr Höhe als der globale Handout-Deckel
+          \renewcommand{\includegraphics}[2][]{%
+            \dhbwOldIncludegraphics[max width=0.98\linewidth,max height=0.40\textheight,keepaspectratio,center,#1]{#2}%
+          }
 lang: de
 ---
 
@@ -67,30 +75,14 @@ Der Begriff Mikroprozessor ist heute eigentlich fast überholt; wir sprechen mei
 
 ## SoC: Komponenten am Systembus
 
-```{mermaid}
-%%| fig-width: 4.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TB
-  subgraph SoC["System-on-Chip"]
-    CPU[CPU]
-    Cache[Cache]
-    Flash[Flash]
-    RAM[RAM]
-    Timer[Timer]
-    UART[UART]
-    Bus[Systembus]
-    CPU --- Bus
-    Cache --- Bus
-    Flash --- Bus
-    RAM --- Bus
-    Timer --- Bus
-    UART --- Bus
-  end
-  style Bus fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+![On-Chip: CPU, getrennte L1-Pfade, SRAM, NOR-Flash und MMIO. DRAM nur als optionales Off-Chip-Bauteil.](../assets/figures/01_speicherphysik/soc-interconnect.png)
+
+- Cache hängt am Kern, nicht „irgendwo am Bus“ wie ein UART
+- NOR-Flash und SRAM können on-chip sein; großer DRAM meist eigener Chip
+- Nicht jeder SoC trägt den gesamten Hauptspeicher auf demselben Die
 
 ::: notes
-Im SoC hängen CPU, Cache, Flash, RAM und Peripherie am gemeinsamen Systembus. Der Bus muss den Datenhunger der CPU stillen — ohne ihn bleibt selbst der schnellste Kern untätig.
+Die Abbildung trennt L1 von SRAM/Flash/MMIO und zeichnet DRAM gestrichelt außerhalb des Dies. Ein Sensor-MCU hat oft gar kein DRAM.
 :::
 
 ## Unsere Werkzeuge in MCT3
@@ -121,7 +113,8 @@ Da wir nun komplexe Systeme bauen, reicht uns nackter Assembler nicht mehr — d
 - Industrie-Standard: u. a. bei Google, Intel und Microchip zur Chip-Simulation
 - Vollständige SoC-Simulation: CPU, Busse, Timer und RAM
 - Professionelles Kommandozeilen-Tool (ohne grafisches Breadboard)
-- Virtuelle I/O: Sensoren per Skript an I2C- oder SPI-Bus
+- Funktionale Emulation von CPU, Bussen und Peripherie — kein Versprechen taktgenauer Chip-Nachbildung
+- Virtuelle Zeit des Simulators ist nicht dasselbe wie ein HDL-Timing-Modell
 - Skript-gesteuert: SoCs über Textdateien (`.resc` / `.repl`)
 
 ```text
@@ -133,7 +126,7 @@ start
 ```
 
 ::: notes
-Renode ist ein fantastisches Werkzeug. Anstatt zu warten, bis eine Chipfabrik das neue Silizium ausliefert, können Software-Ingenieure in Renode bereits den Code für den neuen Chip schreiben. Renode simuliert das exakte Timing und die Memory Map des Chips. Sie werden im Labor lernen, wie man C-Code lokal kompiliert und das fertige Binary direkt in diese simulierte Hardware lädt.
+Renode eignet sich, um Firmware gegen eine beschriebene Memory Map und Peripherie zu prüfen. Die virtuelle Zeit steuert die funktionale Simulation; taktgenaue Nachbildung eines konkreten Siliziums braucht ein eigenes Timing-Modell oder HDL-Co-Simulation. Im Repository liegt keine `.repl`-Plattform — Adressen in den Folien bleiben deshalb schematisch.
 :::
 
 ## Modul-Übersicht: Unser Fahrplan
@@ -228,17 +221,13 @@ Das D-Flip-Flop aus MCT1 ist großartig, um 32 Register zu bauen. Aber wenn wir 
 - Von-Neumann-Flaschenhals: kein paralleles Laden von Befehl und Variable
 - Folge: Structural Hazards auf dem Fließband
 
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  CPU[CPU] <-->|Ein Bus für Code und Daten| RAM[RAM]
-  style RAM fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+![Links: ein physischer Port für Code und Daten. Rechts: getrennte L1-I/D, darunter gemeinsamer Speicher.](../assets/figures/01_speicherphysik/von-harvard.png)
 
-```
+- Gemeinsamer Adressraum heißt nicht automatisch ein gemeinsamer physischer Port
+- Am einfachen Ein-Port-Modell kollidieren Fetch und Load
 
 ::: notes
-Starten wir mit der Systemarchitektur. Die Von-Neumann-Architektur ist das Konzept, das fast alle modernen Desktop-PCs nutzen. Alles liegt im selben RAM. Der große Nachteil: Wenn der Datenpfad aus MCT1 einen Load-Befehl ausführt, muss er Daten aus dem RAM holen. Wenn er gleichzeitig den nächsten Befehl fetchen möchte, knallt es auf dem Bus. Dieser Stau ist der berühmte Von-Neumann-Flaschenhals.
+Linkes Panel: ein Bus. Fetch und Datenzugriff können nicht gleichzeitig. Rechtes Panel ist Modified Harvard und gehört zur nächsten Folie.
 :::
 
 ## Systemarchitektur: Harvard
@@ -249,37 +238,27 @@ Starten wir mit der Systemarchitektur. Die Von-Neumann-Architektur ist das Konze
 - Vorteil: Fetch und Memory im selben Taktzyklus möglich
 - Modified Harvard: extern Von-Neumann, intern getrennte L1-Caches
 
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  IM[Code Memory] <-->|Instruction Bus| CPU[CPU]
-  CPU <-->|Data Bus| DM[Data Memory]
-  style CPU fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
+![Rechtes Panel: L1-I und L1-D getrennt, darunter ein gemeinsamer Speicher.](../assets/figures/01_speicherphysik/von-harvard.png)
 
-```
+- Striktes Harvard: getrennte Speicher *und* getrennte Busse
+- Modified Harvard: getrennte L1-Caches, gemeinsamer Speicher darunter
+- Der Adressraum kann trotzdem ein linearer 32-Bit-Raum bleiben
 
 ::: notes
-In der Harvard-Architektur entzerren wir den Verkehr. Wir haben zwei Busse. Genau dieses Modell haben wir in MCT1 für unseren 5-Stufen-Prozessor genutzt: einen Instruction Memory und einen Data Memory. In echten SoCs findet man heute oft das „Modified Harvard“-Design: Der Hauptspeicher draußen ist ein großer Block (Von-Neumann), aber direkt am Prozessorkern gibt es getrennte L1-Instruction- und L1-Data-Caches, die wie eine Harvard-Architektur wirken.
+MCT1 nutzte getrennte Instruction- und Data-Memories. Viele SoCs sehen von außen wie Von-Neumann aus und entzerren den Kern nur in den L1-Caches — das rechte Panel.
 :::
 
 ## Die Memory Wall
 
 - Moores Gesetz: Transistoren kleiner, CPUs schneller
 - Ungleichgewicht: RAM-Geschwindigkeit hielt nicht mit
-- Memory Wall: wachsende Lücke zwischen CPU- und RAM-Speed
-- Warte-Problem: oft mehr Stalls als echte Rechenzeit
-- Lösung: hierarchischer Aufbau in mehreren Speicherschichten
+- Kenngröße hier: Durchsatz (Arbeit pro Zeit), nicht Latenz mit Bandbreite vermischt
+- Voll abhängig, ohne Überlappung: $4\,\mathrm{GHz}\times 100\,\mathrm{ns} = 400$ Takte
 
-| Generation | CPU relativ | RAM relativ |
-|------------|-------------|-------------|
-| früh       | $1\times$  | $1\times$  |
-| später     | $16\times$ | $\approx 3\times$ |
-
-*Schematisch — Trendillustration, keine Messdaten.*
+![Zwei schematische Durchsatz-Kurven: CPU steigt deutlich stärker als die Rate der Speicherzugriffe.](../assets/figures/01_speicherphysik/memory-wall.png)
 
 ::: notes
-Die Tabelle ist bewusst schematisch — sie illustriert den Trend, keine konkreten Messreihen. Jahrelang haben wir CPUs höher getaktet. Aber der Arbeitsspeicher, der auf einer anderen Platine liegt, wird physikalisch nicht im selben Maß schneller. Die Folge: Die CPU verhungert am Datenbus. Wenn eine CPU bei 4 GHz arbeitet und der RAM 100 Nanosekunden für eine Antwort braucht, vergehen 400 Taktzyklen, in denen die CPU einfach nichts tun kann!
+Die Kurven sind keine Messreihe. Die 400 Takte gelten nur für einen Zugriff, der die Pipeline vollständig blockiert und sich nicht mit anderen Befehlen überlappt.
 :::
 
 ## Das magische Speicher-Dreieck
@@ -290,7 +269,7 @@ Drei Ziele, die sich gegenseitig ausschließen:
 2. Kapazität — wie viele Gigabyte auf dem Chip?
 3. Kosten — wie teuer ist ein Bit in der Herstellung?
 
-Eiserne Regel: immer nur zwei Ziele gleichzeitig optimierbar.\
+Eiserne Regel als Modell: Geschwindigkeit, Kapazität und geringe Kosten lassen sich nicht alle drei gleichzeitig maximieren.
 Beispiel: schnell und groß ist extrem teuer (SRAM); groß und billig ist langsam (Massenspeicher).
 
 ```{mermaid}
@@ -330,8 +309,8 @@ Die grundlegendste Unterscheidung von Speichern ist die Frage nach dem Stromausf
 
 **Random Access (wahlfreier Zugriff)**
 
-- Jede Adresse in derselben Zeit direkt auslesbar
-- Latenz unabhängig vom Ort (Beispiel: RAM)
+- Jede Adresse ist direkt ansprechbar — die Latenz muss deshalb nicht für jede Anfrage gleich sein
+- Beispiel RAM: kein Spulen wie bei einem Band; Caches und DRAM-Zeilen ändern die konkrete Wartezeit trotzdem
 
 **Sequenzieller Zugriff**
 
@@ -353,21 +332,12 @@ Um die Memory Wall zu überwinden, stapeln Architekten Speicher übereinander:
 - Ebene 3: Main Memory (DRAM — Gigabytes, moderat)
 - Basis: Massenspeicher (Flash/SSD — Terabytes, langsam, billig, non-volatil)
 
-Prinzip: Daten wandern je nach Nutzungshäufigkeit in der Pyramide.
+Prinzip: häufig genutzte Daten liegen weiter oben.
 
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  A["CPU Register < 1 ns"] --> B["L1/L2 Cache ~2-10 ns"]
-  B --> C["Main Memory DRAM ~100 ns"]
-  C --> D["Flash / SSD ~100000 ns"]
-  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-
-```
+![Gestufte Ebenen. Oben weniger Kapazität, kürzere Zugriffszeit, höhere Kosten pro Bit. MCU oft nur Flash+SRAM.](../assets/figures/01_speicherphysik/hierarchy.png)
 
 ::: notes
-Da wir das magische Dreieck nicht brechen können, bauen wir eine Pyramide. Oben haben wir extrem teuren, rasend schnellen Speicher, aber eben nur sehr wenig davon. Unten haben wir den billigen, riesigen Speicher. Die Kunst der Computerarchitektur — und das werden wir in Block 2 ausführlich beleuchten — liegt darin, die Daten, die die CPU in den nächsten Millisekunden braucht, unbemerkt in der Pyramide nach oben zu schieben.
+Die Pyramide ersetzt die schmale Kästchenkette. Nanosekunden-Angaben der alten Folie vermischten Zellzeit, Cache-Hit und DRAM-Zugriff — die Abbildung bleibt qualitativ.
 :::
 
 ## Fokus heute: Wir öffnen die Chips
@@ -388,7 +358,9 @@ Nachdem wir nun die Motivation und die Einordnung im System haben, greifen wir u
 - Überbegriff: ROM (Read-Only Memory)
 - Historisch wirklich nur lesbar
 - Evolution: Firmware nachträglich updatebar machen
-- Weg: Mask-ROM $\rightarrow$ PROM $\rightarrow$ EPROM $\rightarrow$ EEPROM $\rightarrow$ Flash
+- Weg: Mask-ROM, PROM, EPROM, EEPROM, Flash
+
+![Vergleichsleiste: Programmier- und Löschmethode, ohne Bauteilfotos.](../assets/figures/01_speicherphysik/rom-evolution.png)
 
 ::: notes
 Beginnen wir mit dem Langzeitgedächtnis. Jeder Computer muss beim Einschalten wissen, was er tun soll. Er braucht Boot-Code. Dieser Code muss zwingend auf einem nicht-flüchtigen Speicher liegen. Die Geschichte dieses Speichers ist eine faszinierende Reise davon, wie Hardware immer flexibler und softwareähnlicher wurde.
@@ -459,21 +431,13 @@ In den 80er Jahren suchte die Industrie nach einem Weg, die Vorteile von EEPROMs
 - Flash speichert Bits ohne Strom über Floating-Gate-Transistoren
 - Zwei Gates: Control-Gate und isoliertes Floating-Gate
 - Floating-Gate vollständig in Siliziumdioxid eingeschlossen
-- Hohe Spannung ($\approx +20\,\mathrm{V}$): Elektronen tunneln ins Floating-Gate
-- Ohne Spannung: Elektronen gefangen — gespeichertes Bit (oft Jahre haltbar)
+- Hohe Spannung kann Elektronen auf das Floating Gate bringen
+- Die CPU sieht keine Elektronen, sondern eine verschobene Schwellspannung
 
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  A[Control Gate] -->|Hohe Spannung| B[Floating Gate]
-  B -->|Elektronen gefangen = Bit 0| C[Substrat / Kanal]
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-
-```
+![Querschnitt: Source, Drain, Kanal, Oxid, Floating Gate, Control Gate — mit und ohne Ladung.](../assets/figures/01_speicherphysik/floating-gate.png)
 
 ::: notes
-Wir lassen die Quantenphysik außen vor und betrachten es logisch: Ein normaler Transistor schaltet Strom. Beim Flash bauen wir eine kleine, isolierte Insel in den Transistor ein — das Floating-Gate. Wenn wir sehr viel Spannung anlegen, tunneln Elektronen durch die Isolationsschicht auf diese Insel. Wenn wir den Strom abschalten, können sie nicht mehr zurück. Sie sind gefangen. Diese gefangene Ladung verändert das Schaltverhalten des Transistors. Die CPU misst diesen Transistor und weiß: Hier ist eine Null gespeichert.
+Linkes Panel: leeres Floating Gate, niedrigere Vth. Rechtes Panel: gefangene Elektronen, höhere Vth. Charge-Trap-Flash ohne Floating Gate ist hier nicht gezeichnet.
 :::
 
 ## NAND vs. NOR Flash
@@ -484,67 +448,62 @@ Flash spaltet sich in zwei Architekturen — je nach Verdrahtung der Floating-Ga
 |---|---|---|
 | Verdrahtung | parallel | seriell (Kette) |
 | Zugriff | Byte/Wort (Random Access) | Seiten (Pages) |
-| Typischer Einsatz | Mikrocontroller | SSD, Smartphones |
+| Typischer Einsatz | Mikrocontroller, XIP | SSD, Smartphones |
+
+![NOR: parallele Pfade zur Bitline. NAND: serieller String mit Auswahltransistoren. Darunter die unterschiedliche Schnittstelle.](../assets/figures/01_speicherphysik/nand-nor.png)
 
 ::: notes
-Flash ist nicht gleich Flash. Je nachdem, wie Sie diese isolierten Transistoren auf dem Silizium anordnen, erhalten Sie völlig unterschiedliche Eigenschaften. NOR-Flash verdrahtet die Zellen parallel, was viel Platz kostet, aber extrem schnellen und direkten Zugriff erlaubt. NAND-Flash schaltet sie in Serie, was Platz spart, den Zugriff aber sehr starr und blockbasiert macht.
+Die Verschaltung erklärt den Zugriff: NOR kann ein Wort adressieren, NAND liefert eine Page in einen Buffer. NAND ist pageorientiert, nicht „sequenziell wie ein Band“.
 :::
 
 ## NOR-Flash & Execute-In-Place (XIP)
 
-- Random Access: direkte Adressierung, z. B. `0x08000004`
-- XIP: CPU holt Befehle direkt aus dem NOR-Flash (ohne RAM-Kopie)
+- XIP: Fetch holt Befehle direkt aus dem NOR-Flash (ohne vorherige RAM-Kopie des Codes)
 - Fetch-Stage der RISC-V-Pipeline liest Code aus dem Flash
-- Nachteil: teurer, geringe Kapazität (oft 1–16 MB auf dem SoC)
-- In MCT3: `.text`-Section landet im NOR-Flash des Controllers
+- Nachteil: geringere Dichte als NAND; Lesezugriff hat Waitstates, ist kein SRAM
+- XIP heißt: der Fetch holt den Befehl aus dem NOR, nicht dass jede Adresse dieselbe Latenz hat
 
 ::: notes
-NOR-Flash verhält sich beim Lesen genau wie das SRAM aus unserer Architektur-Vorlesung. Das ist essenziell für kleine Embedded-Systeme! Die CPU schickt eine Adresse, der NOR-Flash antwortet sofort mit dem Assembler-Befehl. Das nennt man Execute-In-Place (XIP). Das Programm läuft direkt aus dem Flash. Das spart immens viel teuren Arbeitsspeicher, da der Code nicht erst kopiert werden muss.
+NOR-Flash erlaubt wortweisen Lesezugriff, deshalb kann die Pipeline Befehle direkt daraus holen. Die Latenz liegt typisch über einem SRAM-Hit; „sofort wie SRAM“ wäre die falsche Ebene.
 :::
 
 ## C-Code und der Flash-Speicher
 
-- `const` zwingt den Compiler zu ROM/Flash (Section `.rodata`), nicht RAM
-- C-Pointer können direkt auf Flash-Adressen zeigen
-- Lesen erlaubt: `int wert = *flash_ptr;` (schnell, XIP)
-- Schreiben verboten: `*flash_ptr = 42;` → Store/AMO Access Fault (`mcause` 7; kein einfacher Store)
+- `const` erzwingt in C keine Flash-Platzierung
+- Bei der hier betrachteten Embedded-Toolchain liegen *statische* Konstanten typischerweise in `.rodata`
+- Welche Region `.rodata` trifft, entscheidet Linker-Skript und Startup, nicht das Schlüsselwort allein
+- Ein normaler Store in eine nicht beschreibbare Region und ein konkreter RISC-V-Trap (`mcause`) sind zwei Ebenen
+- Ohne Plattformmodell (kein `.repl` im Repo) wird hier kein bestimmter `mcause`-Wert behauptet
 
 ```c
-// Pointer auf internen NOR-Flash
-const uint32_t *firmware_version =
-    (const uint32_t *)0x08000000;
-
-// Lesen klappt sofort (Random Access)
-uint32_t ver = *firmware_version;
-
+static const uint32_t table[] = {1, 2}; /* typisch .rodata */
 ```
 
 ::: notes
-Hier schlagen wir die Brücke zur C-Programmierung. Wenn Sie große Tabellen, Bilder oder Fonts in Ihrem Programm haben, setzen Sie das Keyword const davor. Der Linker legt diese Daten in den Flash. Da NOR-Flash Random-Access bietet, können Sie per Pointer darauf zugreifen, als wäre es normaler RAM. Aber wehe, Sie versuchen per Software einen Wert dorthin zu speichern — das wird von der Hardware blockiert, da Flash-Speicher einen aufwendigen Erase-Write-Zyklus benötigt.
+Ein AVR-`__flash`-Attribut ist ein Gegenbeispiel: erst ein herstellerspezifisches Attribut zwingt Daten in den Programmspeicher. In diesem Modul bleibt es bei der üblichen `.rodata`-Konvention.
 :::
 
 ## NAND-Flash (Massenspeicher)
 
 - Höchste Dichte durch serielle Verkettung der Zellen
-- Kein Random Access: immer ganze Page (z. B. 4096 Bytes) lesen
-- Kein XIP: CPU führt Code nicht direkt aus NAND aus
-- Boot: Code zuerst von NAND nach DDR-RAM kopieren
-- Einsatz: SSDs, SD-Karten, USB-Sticks (Terabyte-Bereich)
+- Page-orientiert: der Controller liefert eine Seite in einen Buffer, keine einzelne CPU-Adresse wie NOR
+- Kein XIP: Code wird nach RAM kopiert
+- Nicht rein sequenziell wie ein Magnetband — innerhalb der Page wählt der Controller
+
+![SLC-Modell: gelöscht alles 1, Programmieren setzt ausgewählte Bits auf 0, Erase nur blockweise zurück.](../assets/figures/01_speicherphysik/flash-program-erase.png)
 
 ::: notes
-NAND-Flash hat die Datenspeicherung revolutioniert. Es ist der Grund, warum wir Terabytes in unseren Laptops haben. Aber die CPU hasst NAND-Flash. Wenn der Program Counter einen Befehl holen will, kann der NAND-Flash nicht antworten, sondern liefert nur einen riesigen Datenblock zurück. Deshalb muss beim Start Ihres Laptops das Betriebssystem erst langwierig von der SSD in den Arbeitsspeicher (RAM) kopiert werden.
+Ein gewöhnlicher Store kann weder die hohe Programmierspannung noch die Block-Löschung ersetzen. Page- und Blockgrößen stehen im Datenblatt, nicht als universelle Konstanten.
 :::
 
 ## Die Flash-Krankheit: Wear and Tear
 
 - Geheimnis: Flash verschleißt bei jedem Schreibvorgang
 - Hohe Spannung beim Tunneln beschädigt die Oxid-Isolation
-- Limit: ca. $10\,000$ bis $100\,000$ Erase/Write-Zyklen — je nach Zelltyp (NOR/SLC höher, TLC/QLC oft nur $\sim 1000$–$10000$)
-- Danach: Zelle hält Ladung nicht mehr (physisch defekt)
-- Gefahr: ständiges Schreiben in denselben Sektor zerstört den Chip
+- Viele Schreib-/Löschzyklen ermüden das Oxid — die Zahl hängt vom Zelltyp ab, sie ist nicht unendlich und nicht für alle Technologien gleich
 
 ::: notes
-Hier müssen Sie als Systemarchitekt extrem aufpassen. Wenn Sie RAM beschreiben, können Sie das unendlich oft tun. Wenn Sie Daten in einen Flash-Speicher schreiben, beschädigen Sie ihn auf mikroskopischer Ebene. Die Glasisolierung bekommt Risse, durch die die gefangenen Elektronen wieder entkommen. Nach 100.000 Schreibvorgängen ist der Sektor tot.
+Wenn Sie RAM beschreiben, hält die Zelle das ohne Programmier-Oxid. Flash altert mit Programmier-/Löschzyklen; wie viele Zyklen ein konkretes Medium verträgt, steht im Datenblatt.
 :::
 
 ## Die Rettung: Wear Leveling (FTL)
@@ -552,34 +511,23 @@ Hier müssen Sie als Systemarchitekt extrem aufpassen. Wenn Sie RAM beschreiben,
 - Wear Leveling: Verschleißausgleich über wechselnde physische Blöcke
 - Logischer Sektor → jedes Mal anderer physischer Flash-Block
 - Flash Translation Layer (FTL) übersetzt logisch $\leftrightarrow$ physisch
-- SD-Karte/SSD: eigener Controller; Bare-Metal: Software muss Wear Leveling leisten
+- SD/SSD: FTL im Controller. Bare-Metal: Software muss das selbst leisten
 
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  OS[OS: Schreibe Sektor 0] --> FTL[Flash Translation Layer]
-  FTL --> B1[Physisch Block 12]
-  FTL -.->|danach| B2[Physisch Block 88]
-  style FTL fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-
-```
+![Dieselbe logische Adresse wandert über Updates auf neue physische Blöcke. Alte Kopien werden ungültig.](../assets/figures/01_speicherphysik/wear-leveling.png)
 
 ::: notes
-Damit Ihre teure SSD nicht nach einem Jahr defekt ist, trickst der Controller. Wenn das Betriebssystem sagt „Schreibe Sektor 0“, schreibt die SSD es in Wirklichkeit in Block 12. Beim nächsten Mal in Block 88. Ein interner Algorithmus (Wear Leveling) verteilt die Schreibzugriffe gleichmäßig über alle Millionen Zellen des Chips, damit alle gleichzeitig altern. Wenn Sie in MCT3 auf einem nackten RISC-V SoC Daten in den Flash schreiben wollen, haben Sie diese Luxus-Schicht nicht. Sie müssen das selbst programmieren!
+Adressübersetzung, Verschleißausgleich und Garbage Collection sind drei Aufgaben. Die Abbildung zeigt nur die Zuordnung und ungültige Alt-Daten.
 :::
 
 ## Memory Map: Wo liegt der Flash im SoC?
 
 - In der 32-Bit Memory Map ist ein Block für Flash reserviert
-- Beispiel (STM32-artig): `0x0800 0000` bis `0x080F FFFF` (1 MB NOR-Flash)
-- RISC-V/SiFive oft anders: Boot-ROM bei `0x0000_1000`, QSPI-Flash ab `0x2000_0000`
-- Linker legt Maschinen-Code (`.text`) auf die Plattform-Startadresse
-- Nach Reset: PC springt hartverdrahtet auf den Reset-Vektor (plattformspezifisch)
-- Boot per Execute-in-Place aus dem NOR-Flash
+- Beispieladressen stehen im Datenblatt der jeweiligen Plattform
+- Im Repo gibt es kein `.repl` und kein Linker-Skript — die spätere Map ist ausdrücklich schematisch
+- Boot per XIP nur, wenn der Fetch-Pfad den NOR-Flash wortweise lesen kann
 
 ::: notes
-Lassen Sie uns den Bogen zurück zu MCT1 schlagen. Der Prozessor legt eine 32-Bit Adresse auf den Bus. Der Adress-Decoder erkennt den Flash-Bereich, weckt den NOR-Flash auf und leitet den Befehl an die CPU. Die konkreten Basisadressen sind plattformspezifisch — STM32 nutzt oft `0x0800_0000`, SiFive/Renode-RISC-V andere Maps. Das Prinzip bleibt: Boot per XIP aus NOR-Flash.
+Lassen Sie uns den Bogen zurück zu MCT1 schlagen. Der Adressdecoder wählt den Flash-Bereich. Konkrete Basisadressen mischen wir nicht aus STM32- und SiFive-Beispielen.
 :::
 
 ## Zusammenfassung: Non-Volatile Memory
@@ -598,8 +546,8 @@ Damit haben wir die Basis unserer Speicherpyramide durchleuchtet. Wir wissen nun
 
 Wir brauchen Speicher, der:
 
-- im Takt der CPU (Nanosekunden) liest und schreibt
-- unendlich oft beschreibbar ist, ohne zu verschleißen
+- im Bereich der Pipeline nutzbar liest und schreibt
+- sehr oft beschreibbar ist, ohne Flash-artigen Verschleiß
 
 Antwort: volatiler Speicher (RAM).\
 Zwei Technologien: **SRAM** und **DRAM**.
@@ -717,23 +665,10 @@ Statt rund 20 Transistoren bleiben sechs: zwei Inverter im Ring und zwei Schalte
 
 ## 6T-Zelle: Überblick
 
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  WL[Wordline] --> M5[Access M5]
-  WL --> M6[Access M6]
-  M5 --> Inv1[Inverter 1]
-  M6 --> Inv2[Inverter 2]
-  Inv1 <-->|Kreuzkopplung| Inv2
-  BL[Bitline] --- M5
-  BLB[Bitline Inverse] --- M6
-  style Inv1 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-  style Inv2 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+![Dieselbe 6T-Geometrie: vier Inverter-Transistoren, zwei Access-Transistoren, Q/Q̅, BL/BL̅, WL, VDD, GND. Hold, Lesen und Schreiben ändern nur die Signale.](../assets/figures/01_speicherphysik/sram-6t-states.png)
 
 ::: notes
-Wordline steuert die Access-Transistoren; die gekreuzten Inverter halten das Bit. Bitline und inverse Bitline tragen Lesen und Schreiben.
+Beide Rückkopplungen sind eingezeichnet: Q steuert den rechten Inverter, Q̅ den linken. Die Access-Transistoren hängen an WL.
 :::
 
 ## Der kreuzgekoppelte Inverter-Ring
@@ -762,50 +697,36 @@ Die meiste Zeit bleibt die Zelle im Hold State: Türen zu, Bit im Ring gefangen.
 
 ## Hold State — Schema
 
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A["Wordline = 0 V"] --> B[M5 gesperrt]
-  A --> C[M6 gesperrt]
-  B -.-> D[Inverter-Ring isoliert]
-  C -.-> D
-  D --> E[Bit bleibt gespeichert]
-  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+Linkes Panel der 6T-Abbildung: WL = 0, Access-Transistoren sperren, der Ring bleibt geschlossen.
 
 ::: notes
-Schematisch: Gesperrte Access-Transistoren trennen den Ring von den Bitlines.
+Gleiche Geometrie wie Lesen und Schreiben. Nur WL und die Bitline-Treiber ändern sich.
 :::
 
 ## SRAM Lesen
 
-- Precharge: BL und $\overline{\mathrm{BL}}$ auf hohe Spannung
-- Wordline High: Access-Transistoren öffnen
-- Zelle mit Bitlines verbunden
-- Gespeicherte 0 saugt eine Bitline leicht leer
-- Sense Amplifier erkennt die Differenz und liefert das Bit
+![Drei Panels: Vorladen, WL aktiv mit kleiner Bitline-Differenz, Sense Amplifier. Der Zellzustand bleibt erhalten.](../assets/figures/01_speicherphysik/sram-read.png)
+
+- Die Zelle zieht eine Leitung nur leicht; sie wird im vorgesehenen Lesen nicht umgeschrieben
 
 ::: notes
-Beim Lesen öffnet die Wordline die Türen. Die Null-Seite zieht die Bitline minimal nach unten; Sense Amplifier erkennen die Differenz und melden 0 oder 1 an die ALU.
+Panel 1: BL und BL̅ auf hoher Spannung. Panel 2: WL = 1, kleine Differenz. Panel 3: der Leseverstärker digitalisiert, Q bleibt.
 :::
 
 ## SRAM Schreiben
 
-- Überwältigung durch stärkere Schreibtreiber
-- CPU legt hart 1 auf BL und 0 auf $\overline{\mathrm{BL}}$ (oder umgekehrt)
-- Wordline High: Türen öffnen
-- Schreibtreiber sind größer als die Zell-Inverter
-- Inverter kippen — neues Bit ist gefangen
+![Beispiel Q von 0 nach 1: komplementäre Treiber, WL an, Zustand kippt, WL wieder aus.](../assets/figures/01_speicherphysik/sram-write.png)
+
+- Die Schreibtreiber müssen die Rückkopplung überwinden; eine feste Transistor-Größenregel gilt nicht für jede Bibliothek
 
 ::: notes
-Schreiben ist ein physikalischer Kraftakt: Die großen Treiber des Controllers zwingen die winzigen Zell-Inverter um. Nach dem Schließen der Wordline bleibt der neue Zustand im Ring.
+Panel 1 setzt BL und BL̅ gegensinnig. Panel 2 öffnet WL. Panel 3 isoliert die Zelle mit dem neuen Wert.
 :::
 
 ## Vorteile von SRAM
 
-- Extrem hohe Geschwindigkeit (Sub-Nanosekunden)
-- Kein Refresh — keine erzwungenen Pausen
+- Sehr kurze Zugriffszeit auf Makro-Ebene — nicht mit einem kompletten DRAM-Burst vergleichen
+- Kein Refresh der Zelle
 - Einfache Schnittstelle: Adresse anlegen, Daten abholen
 - Geringer Stromverbrauch bei Inaktivität
 - Integration im selben Logic-Prozess wie die ALU
@@ -838,10 +759,9 @@ Bei wenigen Nanometern „lecken“ Transistoren. Große SRAM-Caches können im 
 
 ## Einsatzgebiet von SRAM im SoC
 
-- Register File: `x0`–`x31` im RISC-V-Kern
-- L1-Cache: 32–64 KB, extrem niedrige Latenz
-- L2-/L3-Cache: geteilt, mehrere MB
-- Tightly Coupled Memory (TCM): Echtzeit-Routinen in MCUs
+- Registerfiles können aus Flip-Flops, Latches oder speziellen SRAM-Strukturen bestehen
+- Ein RISC-V-Register ist nicht pauschal eine Standard-6T-Zelle
+- L1/L2 sind häufig SRAM-Makros; die Latenz eines Cache-Hits ist nicht die Zellzeit allein
 
 ::: notes
 SRAM sitzt an der Spitze der Speicherpyramide: Register und Caches. Nur bei Miss geht es weiter zum DRAM.
@@ -864,15 +784,12 @@ flowchart LR
 Schematisch: Jede Stufe fragt die nächste, wenn Daten fehlen. Moderne Kerne sind oft von großen SRAM-Caches umgeben.
 :::
 
-## Ansicht eines Chip-Dies
+## Schematischer Floorplan
 
-- Blick auf ein modernes Silizium-Die unter dem Mikroskop
-- Dunkle, regelmäßige Flächen: typischerweise SRAM (L2/L3)
-- Unregelmäßige Bereiche: Rechenlogik (ALU, Steuerwerk)
-- Moderne Server-/Desktop-CPUs: oft ein großer Anteil der Fläche ist SRAM
+![Regelmäßige SRAM-Fläche, unregelmäßigere Logik, I/O-Ring. Keine Mikroskopaufnahme.](../assets/figures/01_speicherphysik/floorplan.png)
 
 ::: notes
-Bei Die-Shots fallen regelmäßige Gitterstrukturen auf — meist Cache-SRAM. Die eigentliche Logik wirkt unregelmäßiger und belegt oft weniger Fläche als die Caches.
+Ohne belegbare, passend lizenzierte Die-Aufnahme bleibt es bei diesem Floorplan. Titel bewusst nicht „Mikroskop“.
 :::
 
 ## Zusammenfassung SRAM
@@ -922,19 +839,10 @@ Ein 16-GB-Riegel ist DRAM. Maximale Dichte erfordert komplexe Controller, weil d
 
 ## 1T1C — Schema
 
-```{mermaid}
-%%| fig-width: 3.6
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  WL[Wordline] --> T1[Access-Transistor]
-  BL[Bitline] --- T1
-  T1 --- C1[Kondensator]
-  C1 --- GND[Masse]
-  style C1 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+![Access-Transistor: WL am Gate, BL als Datenpfad, Kondensator gegen eine Plate-Elektrode (hier als GND-Modell).](../assets/figures/01_speicherphysik/dram-1t1c.png)
 
 ::: notes
-Wordline öffnet den Transistor; der Kondensator speichert die Ladung gegen Masse.
+Der Kondensator hängt nicht „irgendwo an Masse“ ohne Kennzeichnung: die Gegenelektrode ist das Plate-Potential, in der Zeichnung vereinfacht nach GND geführt.
 :::
 
 ## Kondensator als Speicher
@@ -950,63 +858,49 @@ Um Kapazität bei kleinem Fußabdruck zu gewinnen, werden Kondensatoren als Grä
 
 ## Was bedeutet „dynamisch“?
 
-- Isolation ist nie perfekt — Ladung sickert ab
-- Spannung einer „1“ sinkt kontinuierlich
-- Nach ca. $64\,\mathrm{ms}$ oft kritisch für die Sense Amplifiers / Leseverstärker
-- Ohne Pflege löscht sich DRAM selbst
+- Die Spannung einer gespeicherten 1 sinkt durch Leckstrom
+- Das Refresh-Fenster ist geräte- und temperaturabhängig; 64 ms ist nur ein bekanntes Beispiel, keine Lebensdauer jedes Bits
 
 ::: notes
-Das „D“ steht für dynamisch: Die Zelle vergisst ohne periodisches Auffrischen. Metapher: Eimer mit kleinem Leck.
+Das „D“ steht für dynamisch: ohne organisiertes Auffrischen von Zeilen und Bänken geht die Ladung verloren. Nicht jede Zelle ist nach exakt 64 ms leer, und der ganze Riegel steht nicht für 64 ms still.
 :::
 
 ## Der Refresh-Zyklus
 
-- Memory Controller muss Zellen regelmäßig auffrischen
-- Typisch: innerhalb von $\approx 64\,\mathrm{ms}$ jede Zelle lesen und zurückschreiben
-- Während Refresh: RAM oft blockiert — CPU kann warten müssen
-- Energie: Refresh kostet Strom auch im Standby
+- Refresh läuft über Zeilen und Bänke, nicht als ein Schlag für den gesamten Speicher
+- Ob und wie lange Zugriffe dabei warten, ist geräteabhängig
 
 ::: notes
-Bevor die Ladung kritisch wird, liest und schreibt der Controller zurück. Das passiert dauernd im Hintergrund — deshalb verbraucht DRAM auch ohne „sichtbare“ Arbeit Energie.
+Der Controller liest eine Zeile und stellt sie wieder her, bevor das Fenster abläuft. 64 ms bleibt ein Beispiel, kein festes Gesetz.
 :::
 
 ## Refresh — Schema
 
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A["t = 0 ms\nLadung hoch"] --> B["t ≈ 30 ms"]
-  B --> C["t ≈ 60 ms\nkritisch"]
-  C --> D[REFRESH]
-  D --> A
-  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+![Spannung über der Zeit: Ladungsverlust, rechtzeitiges Auffrischen, wiederhergestellter Pegel.](../assets/figures/01_speicherphysik/dram-refresh.png)
 
 ::: notes
-Schematisch: Ladung sinkt, Refresh stellt den Pegel wieder her. Zeiten sind typische Größenordnungen, keine Messdaten.
+Die Kurve ist qualitativ. Der Knick ist ein Refresh, kein Messpunkt.
 :::
 
 ## DRAM-Lesen ist destruktiv
 
-- Lesen: restliche Ladung fließt auf die Bitline
-- Spannungsausgleich: Kondensator danach weitgehend leer
-- Destructive Read: die Information wird durchs Messen zerstört
-- Pflicht: Wert sofort zurückschreiben
+![Vier Panels: BL auf VDD/2, Charge Sharing, Verstärkung, Restore bei noch aktiver WL. Der Kondensator läuft nicht einfach leer.](../assets/figures/01_speicherphysik/dram-read-restore.png)
+
+- Charge Sharing verschiebt BL und Zelle auf einen gemeinsamen Zwischenpegel
+- Der Sense Amplifier treibt danach den vollen Pegel zurück in die Zelle
 
 ::: notes
-Wie ein Tropfen in einem großen Rohr: Nach dem Messen ist der Tropfen „zerlaufen“. Hardware muss die Zelle neu füllen.
+Panel 2 ist keine Entleerung auf 0. Panel 4 stellt den Zellenpegel wieder her, solange WL aktiv ist.
 :::
 
 ## Sense Amplifiers
 
-- Leseverstärker am Rand der Matrix
-- Vergleichen winzige Bitline-Schwankung mit Referenz
-- Kippen auf volle digitale Pegel ($0$ / $1$)
-- Nebeneffekt: oft automatisches Zurückschreiben der Ladung
+- Panels 3 und 4 der Lese-Abbildung: kleine Abweichung $\pm\Delta V$ wird zum vollen Pegel
+- Derselbe volle Pegel schreibt die Zelle zurück (Restore)
+- Refresh einer Zeile nutzt denselben Mechanismus
 
 ::: notes
-Ohne Sense Amplifier wäre DRAM unbrauchbar. Sie verstärken Millivolt-Differenzen und stellen dabei typischerweise die Zellenladung wieder her.
+Ohne Leseverstärker wäre die geteilte Ladung nicht als Bit entscheidbar. Der Restore ist Teil des Lesens, nicht ein späterer Store der CPU.
 :::
 
 ## DRAM Schreiben
@@ -1022,39 +916,29 @@ Schreiben ist der einfachere Teil: Treiber setzen den Pegel, Transistor verbinde
 
 ## Adress-Matrix und Multiplexing
 
-- Milliarden Adressen — nicht Milliarden Pins
-- Zellen in Rows und Columns (2D-Gitter)
-- 32-Bit-Adresse wird geteilt: erst Row, dann Column über dieselben Pins
+- Zellen in Zeilen und Spalten, oft mehrere Bänke
+- Die Adresse zerfällt in Bank, Row, Column und Byte-Offset — die Breiten sind nicht zwei gleiche Hälften
 
 ::: notes
-Multiplexing spart Gehäuse-Pins: Zuerst Zeile, dann Spalte — nacheinander über denselben Adressbus.
+Multiplexing spart Pins, weil Zeile und Spalte nacheinander kommen. Die Bitaufteilung steht im Speicher-Datenblatt, nicht in der CPU-Wortbreite.
 :::
 
 ## Multiplexing — Schema
 
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  A[32-Bit-Adresse] --> B[ROW-Hälfte]
-  A --> C[COLUMN-Hälfte]
-  B -->|Takt 1| D[RAM-Pins]
-  C -->|Takt 2| D
-  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+![Kleine Matrix, Zeilendecoder-Zeile markiert, Spaltenauswahl, Sense Amplifier / Row Buffer. Adressfelder nur illustrativ.](../assets/figures/01_speicherphysik/dram-matrix.png)
 
 ::: notes
-Schematische Aufteilung; konkrete Bitbreiten hängen vom Modul ab.
+Die orange Zeile ist aktiv. Der Row Buffer hält sie, die Spalte wählt daraus. Keine 16+16-Aufteilung einer 32-Bit-Adresse.
 :::
 
 ## RAS und CAS
 
-- RAS (Row Address Strobe): „jetzt kommt die Zeile“
-- CAS (Column Address Strobe): „jetzt kommt die Spalte“
-- Nacheinander senden kostet Takte — Teil der DRAM-Latenz
+- Historisch: RAS und CAS als Strobes für Zeile und Spalte
+- Moderne SDRAM-Schnittstellen nutzen Kommandos (Activate, Read, Precharge), nicht zwingend dieselben Strobes
+- Die Abbildung der vorigen Folie trennt Matrix und diese Schnittstellen-Ebene
 
 ::: notes
-RAS/CAS kennen Sie ggf. aus BIOS-Timings. Niedrigere CAS-Latenz bedeutet schnelleres Auffinden der Spalte — bei gleichen übrigen Randbedingungen.
+BIOS-„CAS Latency“ beschreibt ein Speicherkommando-Timing, nicht automatisch den klassischen RAS/CAS-Pin von 1980.
 :::
 
 ## Warum DRAM langsamer ist als SRAM
@@ -1070,13 +954,12 @@ Die Latenz folgt aus Physik und Organisation — nicht aus „Böswilligkeit“.
 
 ## SDRAM und DDR
 
-- SDRAM: Taktsignal, synchrone Zugriffe, Pipelining möglich
-- DDR: Daten bei steigender und fallender Flanke
-- Bandbreite steigt bei gleichem Takt spürbar
-- LPDDR: energieoptimierte Varianten für Mobile
+![Derselbe Takt. SDR übernimmt auf einer Flanke, DDR auf beiden. Die Schnittstellen-Bandbreite steigt, die Zeilenlatenz nicht automatisch auf die Hälfte.](../assets/figures/01_speicherphysik/sdram-ddr.png)
+
+- LPDDR ist eine energiesparende Familie derselben Zellidee
 
 ::: notes
-DDR4/DDR5 bleiben 1T1C-Zellen im Kern. „Double Data Rate“ betrifft die Schnittstelle, nicht die Zellphysik.
+Die Punkte im Diagramm sind Übernahmezeitpunkte, keine Latenzpfeile. DDR verdoppelt die Transfers pro Takt an der Schnittstelle.
 :::
 
 ## Einsatzgebiet von DRAM im SoC
@@ -1096,9 +979,9 @@ Große SoCs (z. B. Linux-fähig) brauchen DRAM. Kleine Sensor-MCUs kommen oft mi
 |--|------|------|
 | Zelle | 6T Inverter-Ring | 1T1C |
 | Datenerhalt | stabil (mit Strom) | Refresh nötig |
-| Geschwindigkeit | sehr hoch | mittel |
+| Geschwindigkeit | kurz auf SRAM-Makro-Ebene | länger für einen vollen DRAM-Zugriff |
 | Dichte | gering | sehr hoch |
-| Einsatz | Caches, Register | Hauptspeicher |
+| Einsatz | Caches; Register je nach Implementierung | Hauptspeicher |
 | Kosten / Bit | hoch | niedrig |
 
 ::: notes
@@ -1111,9 +994,9 @@ Kein „besser“ oder „schlechter“ — beide sind für ihre Ebene in der Hi
 |-------------|------|------|
 | Zellen-Architektur | 6 Transistoren | 1T + 1C |
 | Datenerhalt | stabil (Strom an) | flüchtig (Refresh) |
-| Geschwindigkeit | $< 1\,\mathrm{ns}$ (typ.) | $\approx 50$–$100\,\mathrm{ns}$ (typ.) |
+| Geschwindigkeit | Zell-/Makro-Ebene, nicht Cache-Hit | voller Zugriff inkl. Zeile/Spalte |
 | Speicherdichte | gering | extrem hoch |
-| Einsatz im SoC | L1/L2/L3, Register | Main Memory |
+| Einsatz im SoC | häufig Caches | Main Memory, oft off-chip |
 | Kosten pro Bit | hoch | niedrig |
 
 *Angaben schematisch — typische Größenordnungen.*
@@ -1145,39 +1028,30 @@ Manchmal müssen zwei Module gleichzeitig auf denselben Puffer zugreifen. Normal
 
 ## Dual-Ported RAM (DPRAM)
 
-- SRAM mit zwei unabhängigen Ports
-- Eigene Adress-/Daten-/Steuerleitungen pro Port
-- Gleichzeitig lesen/schreiben an verschiedenen Adressen möglich
-- Physik oft 8T (zusätzliche Access-Transistoren)
-- Einsatz: Shared Memory, Videopuffer, …
+- Zwei Ports mit eigener Adresse, eigenen Daten und eigener Steuerung
+- Gleichzeitig an verschiedenen Adressen möglich
+- Die Transistorzahl hängt von der konkreten Zelltopologie ab; „8T“ ist keine allgemeine Definition
 
 ::: notes
-Port A und Port B können parallel arbeiten — teurer in Fläche, aber ohne Bus-Streit bei getrennten Adressen.
+Beschreiben Sie die Ports, nicht eine feste Transistorzahl.
 :::
 
 ## DPRAM — Schema
 
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  CPU[CPU Port A] <--> DPRAM[(Dual-Ported RAM)]
-  IO[Peripherie Port B] <--> DPRAM
-  style DPRAM fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+![Port A und Port B jeweils mit Adresse, Daten und Steuerung.](../assets/figures/01_speicherphysik/dpram.png)
 
 ::: notes
-Zwei Ports, ein Speicherblock — Grundlage für nebenläufige Produzenten/Konsumenten auf dem Chip.
+Die Leitungen sind beschriftet. Ein einzelner Kasten ohne Ports würde die Lernfrage nicht beantworten.
 :::
 
 ## Kollisionsvermeidung im DPRAM
 
-- Gleichzeitiges Schreiben derselben Zelle: Ergebnis undefiniert
-- Arbitration Logic als Schiedsrichter
-- Busy-Flag: zweiter Zugriff verzögert / Stall
+- Verschiedene Adressen: beide Ports arbeiten
+- Dieselbe Adresse: Ergebnis und Arbitration sind implementierungsabhängig
+- Ein Busy-Flag oder Stall ist eine mögliche, keine universelle Lösung
 
 ::: notes
-Bei Adresskonflikt entscheidet Hardware, wer wartet — sonst Metastabilität.
+Die DPRAM-Abbildung gilt für beide Fälle. Kollisionsverhalten steht im Datenblatt der Zelle, nicht in einer allgemeinen Regel.
 :::
 
 ## FIFO-Puffer
@@ -1187,33 +1061,25 @@ Bei Adresskonflikt entscheidet Hardware, wer wartet — sonst Metastabilität.
 - Hardware: SRAM mit Write-/Read-Pointer (Ringpuffer)
 
 ::: notes
-FIFO ist die Standard-Schnittstelle zwischen unterschiedlichen Taktraten und Datenraten.
+FIFO ist die übliche Warteschlange in *einem* Taktbereich. Zwischen zwei Takten braucht es eine asynchrone FIFO mit Synchronisation, nicht nur den Ring.
 :::
 
 ## FIFO — Schema
 
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  In[Eingang] -->|Push| Q1[Byte 1] --> Q2[Byte 2] --> Q3[Byte 3]
-  Q3 -->|Pop| Out[Ausgang]
-  style Q2 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+![Ring mit Write- und Read-Pointer, belegten Einträgen, Wraparound. Empty und Full als Zählerkonvention.](../assets/figures/01_speicherphysik/fifo-ring.png)
 
 ::: notes
-Daten werden eingeschoben und in derselben Reihenfolge entnommen — ohne dass Software jede Adresse verwaltet.
+Ein gewöhnlicher Ringpuffer sitzt in einem Taktbereich. Eine asynchrone FIFO zwischen zwei Takten braucht zusätzliche Synchronisation; der Ring allein löst Clock-Domain-Crossing nicht.
 :::
 
 ## Hardware-FIFOs für I/O
 
-- Beispiel UART: Bytes kommen langsam an
-- Ohne FIFO: Interrupt pro Byte/Bit — hohe CPU-Last
-- Mit FIFO: füllen bis Watermark, dann CPU wecken
-- Grundlage für effiziente Bus-Peripherie (später Block 5)
+- Übliche UART: ohne FIFO ein Interrupt pro empfangenem Zeichen, nicht pro Bit
+- Mit FIFO: die CPU wird erst am Watermark geweckt
+- Stehen Sender und Empfänger in verschiedenen Takten, ist die FIFO asynchron und braucht Synchronisationslogik
 
 ::: notes
-FIFOs entkoppeln schnelle CPU und langsame I/O. In späteren Blöcken nutzen wir das bei seriellen Schnittstellen.
+Das Watermark steht in der Ringpuffer-Abbildung als Idee: nicht jedes Byte unterbricht. Bit-Interrupts wären ein unübliches Bit-Banging, keine Hardware-UART.
 :::
 
 ## Brückenschlag zur Software
@@ -1228,35 +1094,49 @@ Memory-Mapping verbindet C-Pointer mit der Physik. Der Compiler kennt Transistor
 
 ## Memory Map eines Mikrocontrollers
 
-Typische Aufteilung (Beispiel, schematisch):
+Schematisches Beispiel, keine Plattformadressen aus dem Repo:
 
-- `0x0000_0000`: Boot-ROM
-- `0x0800_0000`: Flash (Programm)
-- `0x2000_0000`: SRAM (Variablen)
-- `0x4000_0000`: Peripherie / MMIO
+```c
+static const uint32_t table[] = {1, 2};
+uint32_t counter = 3;
+uint32_t buffer[16];
+```
 
-Ohne Datenblatt-Memory-Map kein zuverlässiges Booten.
+![C-Objekte, ELF-Sections, Flash-LMA und RAM-VMA. Startup kopiert .data und nullt .bss.](../assets/figures/01_speicherphysik/memory-map.png)
 
 ::: notes
-Falsche Adressen führen zu Bus Faults. Die Memory Map ist Pflichtlektüre jedes MCU-Projekts.
+table liegt in .rodata im Flash. counter hat ein Initialbild im Flash (LMA) und die Laufzeitvariable im RAM (VMA). buffer liegt nur im RAM. Heap wächst im Beispiel nach oben, der Stack nach unten — das ist eine Konvention, kein Standard der ISA.
 :::
 
 ## Das Linker-Skript
 
-- `.ld`-Datei beschreibt die Memory Map für den Linker
-- `.text` → Flash; `.data` / `.bss` → SRAM
-- Ohne Skript keine korrekte Firmware-Platzierung
+Ein `MEMORY`-Block allein legt Sections nicht ab. Typische Toolchain (schematisch, GNU ld: VMA = Laufzeit, LMA = Ladeadresse):
 
 ```ld
-/* Beispiel eines simplen Linker-Skripts (Ausschnitt) */
 MEMORY {
-  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 256K
-  RAM (rwx)  : ORIGIN = 0x20000000, LENGTH = 64K
+  FLASH (rx) : ORIGIN = 0x00000000, LENGTH = 256K
+  RAM (rwx)  : ORIGIN = 0x10000000, LENGTH = 64K
+}
+SECTIONS {
+  .text : { *(.text*) } > FLASH
+  .rodata : { *(.rodata*) } > FLASH
+  .data : {
+    _data_start = .;
+    *(.data*)
+    _data_end = .;
+  } > RAM AT> FLASH
+  .bss : {
+    _bss_start = .;
+    *(.bss*)
+    _bss_end = .;
+  } > RAM
 }
 ```
 
+Startup kopiert `_data_start` aus der LMA im Flash und setzt `.bss` auf 0. Die Adressen sind Platzhalter, kein STM32- und kein SiFive-Layout.
+
 ::: notes
-Das Linker-Skript weist Abschnitte den physischen Regionen zu. So landet Code im Flash und Variablen im SRAM.
+`> RAM AT> FLASH` trennt VMA und LMA von `.data`. `.bss` hat kein Initialbild im Flash. Quelle der Begriffe: GNU ld, Basic Script Concepts.
 :::
 
 ## Ausblick Labor (Renode)
