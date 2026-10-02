@@ -45,11 +45,9 @@ Kurz-Recap aus Block 5 (Vertiefung im Übungsblatt):
 - CPU wartete oft auf die I2C-Hardware (`wait_for_ack` / Polling)
 
 ```c
-uint8_t read_sensor_x(void) {
-    i2c_send_start();
-    /* … */
-    return i2c_read_byte();  /* CPU wartet hier oft */
-}
+/* Block 5: zusammenhängender Burst, nicht ein einzelnes X-High-Byte.
+   Polling auf ACK ist bei seltenen Samples tragbar. */
+int read_accel_xyz(uint8_t out[6]);
 ```
 
 ::: notes
@@ -60,8 +58,9 @@ Für seltene Sensorwerte ist Polling akzeptabel. Bei großen, kontinuierlichen D
 
 - Big 3 beherrscht: UART, SPI, I2C
 - Externe Geräte anschließbar
-- SPI für Displays/Flash oft mit SCK im Zehner-MHz-Bereich
-- Folge: die Schnittstelle kann Megabytes/s transportieren — wenn Software nachkommt
+- SPI für Displays oft mit SCK im Zehner-MHz-Bereich
+- Ein Bit je Takt: 10 MHz ergeben höchstens 1,25 MB/s, 50 MHz höchstens 6,25 MB/s
+- DMA verkürzt Nachfüllpausen. Die Leitung wird dadurch nicht schneller
 
 ::: notes
 Schnelle Peripherie nützt wenig, wenn der Pfad RAM → Controller der Engpass ist.
@@ -69,9 +68,11 @@ Schnelle Peripherie nützt wenig, wenn der Pfad RAM → Controller der Engpass i
 
 ## Das Problem: Datenmenge
 
+![9,216 MB/s gegen 1,25 und 6,25 MB/s. DMA hebt das SCK-Limit nicht auf.](../assets/figures/06_hardware_beschleunigung_dma/budget.png)
+
 - Temperaturfühler: wenige Bytes/s — unkritisch
-- Audio: z. B. $\approx 44\,100$ Samples/s, kontinuierlich, jitterarm
-- TFT $320\times 240$, 16 Bit, 60 FPS:
+- Audio braucht Kanalzahl und Samplebreite: mono, 16 Bit, 44100 Samples/s sind 88200 Byte/s
+- TFT $320\times 240$, RGB565, 60 FPS:
 
 $$
 320 \times 240 \times 2 \times 60 = 9\,216\,000\ \mathrm{Bytes/s}
@@ -80,7 +81,7 @@ $$
 - CPU müsste millionenfach RAM lesen und SPI-Register füllen
 
 ::: notes
-Bei Grafik/Audio bindet Software-Kopieren die CPU stark — selbst bei schneller Peripherie.
+153600 Byte je Frame. Ideal etwa 8,14 FPS bei 10 MHz und 40,69 FPS bei 50 MHz. Für 60 FPS wären mindestens 73,728 MHz SCK nötig, wenn das Gerät das überhaupt erlaubt.
 :::
 
 ## Refresher: Wie die CPU kopiert
@@ -98,7 +99,7 @@ loop:
 ```
 
 ::: notes
-Jedes Byte wandert durch Register/ALU-Pfad — viele Takte nur für 1:1-Kopieren.
+Die Schleife bewegt Wörter zu vier Byte. „Jedes Byte“ wäre ein anderes Modell mit erlaubtem Byte-Zugriff und TX-Bereitschaft.
 :::
 
 ## Agenda
@@ -144,13 +145,12 @@ flowchart LR
 Ziel: Parallelität — CPU rechnet, Datenfluss läuft daneben. Spoiler: DMA.
 :::
 
-## Fragen? — Motivation
+## Aufgabe — 60 FPS
 
-- Limitierung durch `lw`/`sw` klar?
-- Warum kann SPI „schneller“ sein als Software nachfüttert?
+Warum liefert DMA bei 50-MHz-SPI mit einem Bit je Takt kein RGB565-Vollbild mit 60 FPS?
 
 ::: notes
-Als Nächstes: klassische Software-Lösungen und warum sie bei 1 MB scheitern.
+Lösung: 50 MHz tragen ideal 6,25 MB/s, das Vollbild verlangt 9,216 MB/s. Siehe Bandbreitenbild. DMA entfernt Nachfüllpausen, nicht das SCK-Limit.
 :::
 
 ## Methode 1: Polling
@@ -175,8 +175,8 @@ Klassischer Anfänger-Code: zuverlässig, aber die CPU dreht in der Warteschleif
 
 - Beispiel: SPI mit $10\,\mathrm{MHz}$-SCK → grob $\approx 0{,}8\,\mu\mathrm{s}$ pro Byte (8 Bit + Overhead je nach Mode)
 - $10^{6}$ Bytes $\Rightarrow$ Größenordnung $\approx 0{,}8\,\mathrm{s}$ Transferzeit
-- CPU-Last in der `while`-Schleife: praktisch 100 % Wartezeit
-- Keine parallele Nutzarbeit in dieser Zeit
+- Die aufrufende Schleife bleibt beschäftigt. Aktivierte Interrupts können weiterlaufen
+- $10^{6}$ Byte bei 10 MHz: mindestens 0,8 s reine Leitungszeit, ohne Zusatzpausen
 
 ::: notes
 Sekundenbruchteile sind für GHz-CPUs Ewigkeiten — Milliarden verschwendeter Takte als „Postbote“.
@@ -191,9 +191,12 @@ Sekundenbruchteile sind für GHz-CPUs Ewigkeiten — Milliarden verschwendeter T
 volatile uint32_t bytes_sent;
 
 void spi_tx_empty_isr(void) {
-    if (bytes_sent < 1000000) {
+    if (bytes_sent < 1000000u) {
         SPI_DATA_REG = bild_array[bytes_sent++];
+    } else {
+        disable_tx_empty_irq(); /* sonst feuert die Quelle weiter */
     }
+    /* bytes_sent: übergeben, nicht nachweislich auf der Leitung */
 }
 ```
 
@@ -205,7 +208,8 @@ Interrupts entlasten gegenüber Polling — bei Mikrosekunden-Raten droht trotzd
 
 Pro Interrupt typisch:
 
-- Pipeline leeren, `mepc`/`mcause` setzen
+- Kontext sichern. Ein universelles Leeren der Pipeline gibt es nicht
+- `mepc`/`mcause` setzen
 - Register retten (Stack)
 - Nutzarbeit: ein Byte kopieren
 - Register wiederherstellen, `mret`
@@ -217,6 +221,8 @@ Erinnerung Block 3: Kontextwechsel ist teuer — besonders bei einem Byte Nutzla
 :::
 
 ## Interrupt Storm
+
+![Vier CPU-Spuren, dieselbe Leitung. 100 Zyklen je Byte-IRQ reichen bei 10 MHz nicht.](../assets/figures/06_hardware_beschleunigung_dma/timelines.png)
 
 - SPI meldet „leer“ im Sub-µs- bis µs-Takt
 - Millionen ISRs/s möglich
@@ -286,9 +292,12 @@ Geräte umgehen die CPU und greifen — über den DMAC — direkt auf den Speich
 
 ## Bypass der CPU
 
+![CPU und DMAC sind Initiatoren. Zwei Arbiter: im DMAC und am Interconnect.](../assets/figures/06_hardware_beschleunigung_dma/paths.png)
+
 - Ohne DMA: RAM → CPU → UART/SPI
 - Mit DMA: RAM → DMAC → Peripherie
-- Datenpfad an der CPU vorbei; CPU-Auslastung für den Transfer nahe 0 %
+- Der Kopierpfad läuft am Registerfile vorbei. Setup, Cache und Abschluss bleiben
+- Buskonflikte können die CPU trotzdem verzögern
 
 ```{mermaid}
 %%| fig-width: 3.8
@@ -312,7 +321,7 @@ CPU erteilt den Auftrag und rechnet weiter; der Tunnel RAM–Peripherie läuft a
 - Oft mehrere Controller/Kanäle (DMA1, DMA2, …)
 
 ::: notes
-„Dumm, aber schnell“: lesen, schreiben, Zeiger erhöhen, $N$-mal — besser als jede Software-Schleife.
+Lesen, schreiben, Zeiger, Zähler. Bei kleinen Längen können Setup und Cache-Wartung die CPU-Schleife teurer machen als der Transfer selbst.
 :::
 
 ## Kampf um den Bus
@@ -340,8 +349,8 @@ Die CPU verliert das Monopol; der DMAC darf eigenständig Speicherzugriffe ausl�
 
 - Bus-Matrix / Arbiter steuert den Zugang
 - Gleichzeitiger Zugriff CPU und DMA → Priorität entscheidet
-- Oft DMA bevorzugt (Echtzeit: Audio, Display)
-- Verlierer: kurze Stall-Zyklen
+- Priorität ist eine Politik, kein Naturgesetz. Round-Robin und feste Priorität unterscheiden
+- „DMA gewinnt immer“ und „Stalls sind immer kurz“ gelten nicht allgemein
 
 ```{mermaid}
 %%| fig-width: 3.6
@@ -364,7 +373,7 @@ Echtzeit-Streams vertragen Stalls schlecht; die CPU verkraftet kurze Wartezeiten
 - Mit L1-Cache rechnet die CPU oft ohne Dauerzugriff auf den Hauptspeicherbus
 
 ::: notes
-Gegenüber Software-Kopieren vernachlässigbar — besonders bei guter Cache-Lokalität der CPU-Arbeit.
+Cache-Hits vertragen Cycle Stealing besser als eine CPU, die selbst ständig den RAM braucht.
 :::
 
 ## Transparent vs. Blocking
@@ -374,10 +383,12 @@ Gegenüber Software-Kopieren vernachlässigbar — besonders bei guter Cache-Lok
 - Immer noch weit günstiger als C-Kopierschleifen
 
 ::: notes
-Selbst harte Bursts sind Fliegengewicht gegen millionenfaches `lw`/`sw`.
+Ein Burst kann günstiger sein als eine Kopierschleife. Er ist nicht in jedem Fall billiger: Setup, Länge und Buslast entscheiden.
 :::
 
 ## Hardware-Handshake
+
+![Speicher-Burst und ein peripheriegesteuerter Zugriff haben verschiedene Breiten.](../assets/figures/06_hardware_beschleunigung_dma/handshake.png)
 
 - DMA darf Peripherie nicht überfluten
 - Synchronisation über dedizierte Signale im SoC (ohne CPU)
@@ -438,6 +449,8 @@ Auch reine Software-Pufferumzüge profitieren vom DMAC.
 :::
 
 ## DMA-Interrupts
+
+![DMA-TC und das leere Schieberegister sind zwei Zeitpunkte.](../assets/figures/06_hardware_beschleunigung_dma/lifecycle.png)
 
 - Anbindung an PLIC / Interrupt-System
 - Typisch: Transfer Complete (TC), Half Transfer (HT), Transfer Error (TE)
@@ -549,7 +562,10 @@ Ablade-Ort: nach dem Lesen folgt der Write auf die Peripherie — der Controller
 
 ## Parameter 3: Transfer Count
 
-- `COUNT`: Anzahl der Transfers (oft 16 Bit, z. B. bis $65\,535$)
+![Vier fiktive Byte-Transfers. Das UART-Ziel 0x4003000C bleibt fest.](../assets/figures/06_hardware_beschleunigung_dma/addrs.png)
+
+- `COUNT` zählt Transferelemente, nicht automatisch Bytes
+- Beispiel: höchstens 65535 Elemente. 1000000 Byte zu 8 Bit brauchen 16 Blöcke: fünfzehnmal 65535 plus 16975
 - Nach erfolgreichem Transfer: Hardware dekrementiert automatisch
 - Bei `COUNT = 0`: Kanal stoppt, typisch Transfer-Complete-Interrupt
 
@@ -570,8 +586,8 @@ Ohne Zähler würde der DMA endlos weiterlaufen. Null bedeutet: Auftrag erledigt
 
 ## Parameter 4: Data Width
 
-- Pro Transfer: 8, 16 oder 32 Bit — gesetzt im `CONTROL`-Register
-- Quelle und Ziel müssen passen (z. B. 8-Bit-Sensorregister ≠ 32-Bit-Write)
+- Pro Transfer: 8, 16 oder 32 Bit — nur wenn Quelle, Ziel und DMA-Pfad das erlauben
+- Ein `uint16_t` im C-Programm rechtfertigt keinen Halfword-Zugriff auf ein Byte-Register
 
 | C-Typ | DMA-Breite | Transfers für 32 Bit Nutzdaten |
 |-------|------------|--------------------------------|
@@ -580,7 +596,7 @@ Ohne Zähler würde der DMA endlos weiterlaufen. Null bedeutet: Auftrag erledigt
 | `uint32_t` | Word (32) | 1 (oft maximal effizient) |
 
 ::: notes
-Passende Breite spart Bus-Zyklen: 16-Bit-Sensor → Halfword-DMA, nicht byteweise.
+Die erlaubte Breite steht im Controller und im Zielregister. Ein 16-Bit-Messwert über einen Byte-Pfad bleibt zwei Byte-Transfers. Die Tabelle ist nur die Umrechnung, kein Freibrief für Halfword-MMIO.
 :::
 
 ## Address Increment Mode
@@ -672,9 +688,12 @@ Klassische Falle: CPU ändert Array nur im Cache; DMA verschickt veraltete RAM-B
 
 ## Stale Data (beide Richtungen)
 
+![TX veröffentlicht 0x22 vor dem Start. RX darf eine schmutzige Zeile nicht später zurückschreiben.](../assets/figures/06_hardware_beschleunigung_dma/cache.png)
+
 - Senden (CPU → DMA): frische Daten nur im Cache → DMA sendet alte RAM-Inhalte
 - Empfangen (DMA → CPU): frische Daten im RAM → CPU trifft veralteten Cache-Hit
-- Lösung: Software-Cache-Wartung oder uncached Regionen
+- TX: Daten vor dem DMA-Start veröffentlichen. RX: Bereich vor der Übergabe vorbereiten und nach Abschluss synchronisieren
+- Nur „danach invalidieren“ schützt nicht vor einer schmutzigen Zeile, die später zurückschreibt
 
 ::: notes
 Beide Seiten können sich „belügen“, wenn Kohärenz nicht hergestellt wird.
@@ -699,10 +718,12 @@ Wenige Takte Overhead — dafür korrekte Sichtbarkeit zwischen CPU und DMA.
 
 ## Uncached DMA-Zonen
 
-- Alternative: Speicherregion ohne Caching (oft per MPU / PMP)
-- CPU greift dort immer direkt auf RAM zu
-- Kohärenz hardwareseitig einfacher; Zugriff etwas langsamer
-- Linker platziert DMA-Puffer gezielt
+![PMP schützt Zugriffe. Cacheability kommt von der Plattform, nicht vom Linkernamen.](../assets/figures/06_hardware_beschleunigung_dma/uncached.png)
+
+- Alternative nur, wenn die Plattform einen nicht gecachten Bereich bereitstellt
+- Standard-RISC-V-PMP regelt Zugriffsrechte, nicht Cacheability. Dafür sind PMAs oder die Plattform zuständig
+- Der Linker legt `.dma_buffer` in einen Bereich, dessen Attribute schon gelten
+- Uncached ist nicht automatisch DMA-erreichbar und nicht die einzige professionelle Lösung
 
 ```text
 MEMORY {
@@ -712,17 +733,15 @@ MEMORY {
 ```
 
 ::: notes
-Professioneller Ansatz in OS/RTOS: DMA-Buffer in uncached Segment, kein manuelles Flushen vergessen.
+Kohärentes DMA, explizite Wartung und uncached Puffer sind drei systemabhängige Wege. Der Abschnittsname RAM_UNCACHED ändert die Hardware nicht.
 :::
 
-## Fragen? — Kanalkonfiguration
+## Aufgabe — Adresse und Linker
 
-- Welche vier Parameter braucht ein DMA-Kanal?
-- Warum Destination-Increment bei UART-TX aus?
-- Cache-Kohärenz: Problem und Rolle von Clean/Invalidate?
+Welche Adresse bleibt beim UART-TX fest? Macht der Name `RAM_UNCACHED` den Bereich uncached?
 
 ::: notes
-Als Nächstes: Burst vs. Single, Ringpuffer und Ping-Pong für endlose Streams.
+Das TX-Register bleibt fest, die Quelladresse steigt. Cacheability setzt die Plattform. Der Linker platziert nur. Siehe Adressspur und die drei Ebenen.
 :::
 
 ## Single-Transfer vs. Burst
@@ -737,14 +756,17 @@ Single ist höflich; Burst maximiert Bandbreite, blockiert den Bus länger.
 
 ## Warum Burst-Transfers?
 
+![Einzelzugriffe können dieselbe DRAM-Zeile treffen. 16 Aktivierungen sind keine Regel.](../assets/figures/06_hardware_beschleunigung_dma/burst.png)
+
 - On-Chip-SRAM: Burst spart vor allem wiederholte Bus-Arbitration
 - Externes DRAM (Block 1): Zeile öffnen kostet; offene Zeile → schnelle Column-Zugriffe
-- Burst: einmal „aufmachen“, viele Words hintereinander — besonders bei DRAM deutlich effizienter
+- Eine offene Zeile kann mehrere Reads bedienen, auch bei getrennten SoC-Zugriffen
+- Ein Zeilenwechsel braucht PRE und ACT. SRAM hat diese Zeilenlogik nicht
 
 | Modus | Typischer Nachteil Single | Vorteil Burst |
 |-------|---------------------------|---------------|
 | On-Chip-SRAM | 16× Arbitration | 1× Arbitration, hoher Durchsatz |
-| DRAM | zusätzlich oft 16× Row-Aktivierung | 1× öffnen, 16× lesen |
+| DRAM | Zeile kann schon offen sein | Row-Hits hängen von Abbildung und Politik ab |
 
 ::: notes
 SRAM-MCU: Burst = weniger Bus-Schiedsverfahren. DRAM-SoC: zusätzlich die Zeilenlogik aus Block 1.
@@ -812,6 +834,8 @@ Katz-und-Maus: DMA frisst, Software füllt — wo steht der DMA gerade?
 
 ## Double Buffering (Ping-Pong)
 
+![Eine Hälfte dauert ideal etwa 23,22 ms. 30 ms Nachfüllen verpasst das Fenster.](../assets/figures/06_hardware_beschleunigung_dma/pingpong.png)
+
 - Ring in zwei Hälften A und B
 - DMA liest A → CPU füllt parallel B (und umgekehrt)
 - Kein Konflikt: getrennte Bereiche
@@ -837,12 +861,19 @@ Zwei Ereignisse reichen: Halb und Voll (Complete) im Circular Mode.
 - Ein Array + zwei Flags in der ISR (Namen/Bits herstellerspezifisch)
 
 ```c
+volatile unsigned ht_count, tc_count;
+
 void dma_isr(void) {
-    if (STATUS_REG & HALF_TRANSFER_FLAG)
-        fill_first_half();
-    if (STATUS_REG & TRANSFER_COMPLETE_FLAG)
-        fill_second_half();
+    if (STATUS_REG & HALF_TRANSFER_FLAG) {
+        clear_ht(); /* Semantik laut Controller, bei W1C kein RMW */
+        ht_count++;
+    }
+    if (STATUS_REG & TRANSFER_COMPLETE_FLAG) {
+        clear_tc();
+        tc_count++;
+    }
 }
+/* Nachfüllen im Worker, nicht als lange Arbeit in der ISR */
 ```
 
 ::: notes
@@ -850,6 +881,8 @@ HT + TC = Double Buffering ohne zwei separate Hardware-Kanäle.
 :::
 
 ## Ausblick: DMA2D (2D-Kopie)
+
+![Rechteckstart 0x20004214. Acht Byte je Zeile, Quellpitch 640 Byte.](../assets/figures/06_hardware_beschleunigung_dma/twod.png)
 
 - High-End-SoCs: 2D-DMA / Grafik-Accelerator (z. B. Chrom-ART)
 - Versteht Rechtecke ($X$/$Y$), nicht nur lineare Bytes
@@ -881,17 +914,17 @@ Königsklasse: CPU schreibt die Auftragskette; DMA arbeitet sie autonom ab.
 Assistent ohne Gehirn: transportiert zuverlässig; bewertet und filtert nicht.
 :::
 
-## Fragen? — Streams und Burst
+## Aufgabe — CS und Audiofenster
 
-- Warum ist Burst (SRAM: Arbitration; DRAM: zusätzlich Row-Hits) effizienter?
-- Was leistet Circular Mode?
-- Ping-Pong mit Half-Transfer: Ablauf?
+Darf CS bei DMA-TC bereits HIGH werden? Was folgt aus 30 ms Nachfüllzeit im Audio-Beispiel?
 
 ::: notes
-Theorie Streams abgeschlossen. Als Nächstes: Labor-Ausblick — Polling vs. DMA messbar machen.
+DMA-TC garantiert nicht den Leitungsabschluss. CS folgt dem Geräte- und Controllertiming. 30 ms liegen über den idealen 23,22 ms je Hälfte: Underrun beziehungsweise Overrun. Siehe Lebenszyklus und Ping-Pong.
 :::
 
 ## Ausblick Labor: DMA in Renode
+
+![4096 Byte, 8N1, 115200 Baud: ideal etwa 355,56 ms. Das ist eine Rechnung, keine Messung.](../assets/figures/06_hardware_beschleunigung_dma/lab.png)
 
 Geplantes Szenario (Details im Übungsblatt):
 
@@ -962,10 +995,10 @@ Ohne Request vom UART startet der DMA nicht — Peripherie muss „rufen“ dür
 - COUNT = Länge; Memory-Increment an, Peripherie-Increment aus
 
 ```c
-DMA_CH1->SRC_ADDR = (uint32_t)html_string;
-DMA_CH1->DST_ADDR = (uint32_t)&UART_TX_REG;
-DMA_CH1->COUNT    = string_laenge;
-DMA_CH1->CONTROL |= (DMA_MINC_EN | DMA_DIR_M2P);
+DMA_CH1->SRC_ADDR = (uint32_t)(uintptr_t)html_string; /* fiktiv */
+DMA_CH1->DST_ADDR = (uint32_t)(uintptr_t)&UART_TX_REG;
+DMA_CH1->COUNT    = string_laenge; /* Einheit laut Controller */
+DMA_CH1->CONTROL  = DMA_MINC_EN | DMA_DIR_M2P; /* kein blindes |= */
 ```
 
 ::: notes
@@ -978,7 +1011,7 @@ Exakt die Parameter aus dem Theorieteil — Array wandert, TX-Adresse bleibt sta
 - PLIC (bzw. Interrupt-Controller) für den Kanal freischalten
 
 ```c
-DMA_CH1->CONTROL |= DMA_TCIE_EN;
+/* TCIE in demselben kontrollierten CONTROL-Wort, nicht per Altzustand. */
 enable_interrupt(DMA_CH1_IRQn);  /* Pseudocode */
 ```
 
@@ -993,8 +1026,8 @@ Ein IRQ am Ende statt eines IRQs pro Byte — Abschluss und ggf. nächster Auftr
 
 ```c
 void start_dma_transfer(void) {
-    DMA_CH1->CONTROL |= DMA_ENABLE_BIT;
-    /* main() läuft sofort weiter */
+    DMA_CH1->CONTROL = DMA_MINC_EN | DMA_DIR_M2P
+        | DMA_TCIE_EN | DMA_ENABLE_BIT;
 }
 ```
 
@@ -1005,8 +1038,9 @@ Ein Bit, und der Hintergrundtransfer läuft — Triumph der Delegation.
 ## Erwartung mit DMA
 
 - Text erscheint weiter im Monitor
-- LED blinkt ungestört (Heartbeat bleibt)
-- CPU kann parallel rechnen; DMA nutzt Cycle Stealing
+- Der Heartbeat kommt aus `main()`, nicht aus einer Timer-ISR und nicht aus Hardware-PWM
+- Die LED kann weiterlaufen und trotzdem Busstalls haben. Das ist kein Beweis für null Last
+- DMA-TC heißt: letztes Element übergeben. FIFO und Schieberegister können noch senden
 
 ::: notes
 Zielbild im Simulator: System „lebt“, während Bytes asynchron ausgehen.
@@ -1020,7 +1054,7 @@ Zielbild im Simulator: System „lebt“, während Bytes asynchron ausgehen.
 ```c
 void dma_channel1_isr(void) {
     if (DMA_STATUS_REG & TRANSFER_COMPLETE) {
-        DMA_CLEAR_REG = CLEAR_TRANSFER_COMPLETE;
+        DMA_CLEAR_REG = CLEAR_TRANSFER_COMPLETE; /* W1C: schreiben, nicht RMW */
         /* optional: nächsten Transfer starten */
     }
 }
@@ -1036,7 +1070,7 @@ Wie beim SysTick: Grund lesen, Flag löschen, zurück — Mission erfüllt.
 - DMA: spezialisierter Coprozessor für Speichertransfers
 - DMAC als Bus-Master, Cycle Stealing mit dem Arbiter
 - Kanal: SRC, DST, COUNT, Breite, Increment
-- Cache-Kohärenz: Clean/Invalidate oder uncached Regionen
+- Cache: Richtung, Besitz und Plattformsequenz. PMP ist kein Cache-Schalter
 - Circular Mode, HT/TC → Ringpuffer und Ping-Pong
 
 ::: notes
@@ -1049,6 +1083,10 @@ CPU bleibt Gehirn; DMA ist der Muskel für Massenbewegungen.
 - Nächster Block: moderne CPU-Beschleunigung (u. a. Out-of-Order)
 
 Vielen Dank — viel Erfolg im Labor.
+
+::: notes
+Quellen, keine Übernahme als RISC-V-API: RISC-V Privileged, PMA/PMP; CMO/Zicbom; Linux DMA API zu Cachelines; AN4839 nur als Cortex-M7-Beispiel; STM32F4-HAL nur als Beispiel getrennter DMA- und UART-Abschlüsse; Renode Time Framework. Adressen dieser Folie bleiben fiktiv. Kein DMA-Modell im Repository.
+:::
 
 ::: notes
 Wenn Terminal flüssig schreibt und die LED weiterblinkt, ist die Architektur verstanden. Bis zum nächsten Block!
