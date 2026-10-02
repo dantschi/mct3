@@ -280,11 +280,9 @@ flowchart LR
 <li>High/Low-Byte per Shift zu 16-Bit-Werten</li>
 <li>CPU wartete oft auf die I2C-Hardware (<code>wait_for_ack</code> / Polling)</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb1-1"><a aria-label="1"></a><span class="dt">uint8_t</span> read_sensor_x<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb1-2"><a aria-label="2"></a>    i2c_send_start<span class="op">();</span></span>
-<span id="cb1-3"><a aria-label="3"></a>    <span class="co">/* … */</span></span>
-<span id="cb1-4"><a aria-label="4"></a>    <span class="cf">return</span> i2c_read_byte<span class="op">();</span>  <span class="co">/* CPU wartet hier oft */</span></span>
-<span id="cb1-5"><a aria-label="5"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb1-1"><a aria-label="1"></a><span class="co">/* Block 5: zusammenhängender Burst, nicht ein einzelnes X-High-Byte.</span></span>
+<span id="cb1-2"><a aria-label="2"></a><span class="co">   Polling auf ACK ist bei seltenen Samples tragbar. */</span></span>
+<span id="cb1-3"><a aria-label="3"></a><span class="dt">int</span> read_accel_xyz<span class="op">(</span><span class="dt">uint8_t</span> out<span class="op">[</span><span class="dv">6</span><span class="op">]);</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p>Für seltene Sensorwerte ist Polling akzeptabel. Bei großen, kontinuierlichen Datenmengen wird Wartezeit zum Problem.</p>
 <style type="text/css">
@@ -304,8 +302,9 @@ flowchart LR
 <ul>
 <li>Big 3 beherrscht: UART, SPI, I2C</li>
 <li>Externe Geräte anschließbar</li>
-<li>SPI für Displays/Flash oft mit SCK im Zehner-MHz-Bereich</li>
-<li>Folge: die Schnittstelle kann Megabytes/s transportieren — wenn Software nachkommt</li>
+<li>SPI für Displays oft mit SCK im Zehner-MHz-Bereich</li>
+<li>Ein Bit je Takt: 10 MHz ergeben höchstens 1,25 MB/s, 50 MHz höchstens 6,25 MB/s</li>
+<li>DMA verkürzt Nachfüllpausen. Die Leitung wird dadurch nicht schneller</li>
 </ul>
 <aside class="notes">
 <p>Schnelle Peripherie nützt wenig, wenn der Pfad RAM → Controller der Engpass ist.</p>
@@ -323,10 +322,16 @@ flowchart LR
 </section>
 <section id="das-problem-datenmenge" class="slide level2">
 <h2>Das Problem: Datenmenge</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/06_hardware_beschleunigung_dma/budget.png"></p>
+<figcaption>9,216 MB/s gegen 1,25 und 6,25 MB/s. DMA hebt das SCK-Limit nicht auf.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Temperaturfühler: wenige Bytes/s — unkritisch</li>
-<li>Audio: z. B. <span class="math inline">\(\approx 44\,100\)</span> Samples/s, kontinuierlich, jitterarm</li>
-<li>TFT <span class="math inline">\(320\times 240\)</span>, 16 Bit, 60 FPS:</li>
+<li>Audio braucht Kanalzahl und Samplebreite: mono, 16 Bit, 44100 Samples/s sind 88200 Byte/s</li>
+<li>TFT <span class="math inline">\(320\times 240\)</span>, RGB565, 60 FPS:</li>
 </ul>
 <p><span class="math display">\[
 320 \times 240 \times 2 \times 60 = 9\,216\,000\ \mathrm{Bytes/s}
@@ -335,7 +340,7 @@ flowchart LR
 <li>CPU müsste millionenfach RAM lesen und SPI-Register füllen</li>
 </ul>
 <aside class="notes">
-<p>Bei Grafik/Audio bindet Software-Kopieren die CPU stark — selbst bei schneller Peripherie.</p>
+<p>153600 Byte je Frame. Ideal etwa 8,14 FPS bei 10 MHz und 40,69 FPS bei 50 MHz. Für 60 FPS wären mindestens 73,728 MHz SCK nötig, wenn das Gerät das überhaupt erlaubt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -361,7 +366,7 @@ flowchart LR
 <span id="cb2-4"><a aria-label="4"></a>    addi s1<span class="op">,</span> s1<span class="op">,</span> <span class="dv">4</span></span>
 <span id="cb2-5"><a aria-label="5"></a>    bne  s1<span class="op">,</span> s3<span class="op">,</span> loop</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Jedes Byte wandert durch Register/ALU-Pfad — viele Takte nur für 1:1-Kopieren.</p>
+<p>Die Schleife bewegt Wörter zu vier Byte. „Jedes Byte“ wäre ein anderes Modell mit erlaubtem Byte-Zugriff und TX-Bereitschaft.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -457,14 +462,11 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-motivation" class="slide level2">
-<h2>Fragen? — Motivation</h2>
-<ul>
-<li>Limitierung durch <code>lw</code>/<code>sw</code> klar?</li>
-<li>Warum kann SPI „schneller“ sein als Software nachfüttert?</li>
-</ul>
+<section id="aufgabe-60-fps" class="slide level2">
+<h2>Aufgabe — 60 FPS</h2>
+<p>Warum liefert DMA bei 50-MHz-SPI mit einem Bit je Takt kein RGB565-Vollbild mit 60 FPS?</p>
 <aside class="notes">
-<p>Als Nächstes: klassische Software-Lösungen und warum sie bei 1 MB scheitern.</p>
+<p>Lösung: 50 MHz tragen ideal 6,25 MB/s, das Vollbild verlangt 9,216 MB/s. Siehe Bandbreitenbild. DMA entfernt Nachfüllpausen, nicht das SCK-Limit.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -508,8 +510,8 @@ flowchart LR
 <ul>
 <li>Beispiel: SPI mit <span class="math inline">\(10\,\mathrm{MHz}\)</span>-SCK → grob <span class="math inline">\(\approx 0{,}8\,\mu\mathrm{s}\)</span> pro Byte (8 Bit + Overhead je nach Mode)</li>
 <li><span class="math inline">\(10^{6}\)</span> Bytes <span class="math inline">\(\Rightarrow\)</span> Größenordnung <span class="math inline">\(\approx 0{,}8\,\mathrm{s}\)</span> Transferzeit</li>
-<li>CPU-Last in der <code>while</code>-Schleife: praktisch 100 % Wartezeit</li>
-<li>Keine parallele Nutzarbeit in dieser Zeit</li>
+<li>Die aufrufende Schleife bleibt beschäftigt. Aktivierte Interrupts können weiterlaufen</li>
+<li><span class="math inline">\(10^{6}\)</span> Byte bei 10 MHz: mindestens 0,8 s reine Leitungszeit, ohne Zusatzpausen</li>
 </ul>
 <aside class="notes">
 <p>Sekundenbruchteile sind für GHz-CPUs Ewigkeiten — Milliarden verschwendeter Takte als „Postbote“.</p>
@@ -534,10 +536,13 @@ flowchart LR
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb4-1"><a aria-label="1"></a><span class="dt">volatile</span> <span class="dt">uint32_t</span> bytes_sent<span class="op">;</span></span>
 <span id="cb4-2"><a aria-label="2"></a></span>
 <span id="cb4-3"><a aria-label="3"></a><span class="dt">void</span> spi_tx_empty_isr<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb4-4"><a aria-label="4"></a>    <span class="cf">if</span> <span class="op">(</span>bytes_sent <span class="op">&lt;</span> <span class="dv">1000000</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-4"><a aria-label="4"></a>    <span class="cf">if</span> <span class="op">(</span>bytes_sent <span class="op">&lt;</span> <span class="dv">1000000</span><span class="bu">u</span><span class="op">)</span> <span class="op">{</span></span>
 <span id="cb4-5"><a aria-label="5"></a>        SPI_DATA_REG <span class="op">=</span> bild_array<span class="op">[</span>bytes_sent<span class="op">++];</span></span>
-<span id="cb4-6"><a aria-label="6"></a>    <span class="op">}</span></span>
-<span id="cb4-7"><a aria-label="7"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-6"><a aria-label="6"></a>    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb4-7"><a aria-label="7"></a>        disable_tx_empty_irq<span class="op">();</span> <span class="co">/* sonst feuert die Quelle weiter */</span></span>
+<span id="cb4-8"><a aria-label="8"></a>    <span class="op">}</span></span>
+<span id="cb4-9"><a aria-label="9"></a>    <span class="co">/* bytes_sent: übergeben, nicht nachweislich auf der Leitung */</span></span>
+<span id="cb4-10"><a aria-label="10"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p>Interrupts entlasten gegenüber Polling — bei Mikrosekunden-Raten droht trotzdem Kollaps.</p>
 <style type="text/css">
@@ -556,7 +561,8 @@ flowchart LR
 <h2>Interrupt-Overhead</h2>
 <p>Pro Interrupt typisch:</p>
 <ul>
-<li>Pipeline leeren, <code>mepc</code>/<code>mcause</code> setzen</li>
+<li>Kontext sichern. Ein universelles Leeren der Pipeline gibt es nicht</li>
+<li><code>mepc</code>/<code>mcause</code> setzen</li>
 <li>Register retten (Stack)</li>
 <li>Nutzarbeit: ein Byte kopieren</li>
 <li>Register wiederherstellen, <code>mret</code></li>
@@ -578,6 +584,12 @@ flowchart LR
 </section>
 <section id="interrupt-storm" class="slide level2">
 <h2>Interrupt Storm</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/06_hardware_beschleunigung_dma/timelines.png"></p>
+<figcaption>Vier CPU-Spuren, dieselbe Leitung. 100 Zyklen je Byte-IRQ reichen bei 10 MHz nicht.</figcaption>
+</figure>
+</div>
 <ul>
 <li>SPI meldet „leer“ im Sub-µs- bis µs-Takt</li>
 <li>Millionen ISRs/s möglich</li>
@@ -731,10 +743,17 @@ flowchart LR
 </section>
 <section id="bypass-der-cpu" class="slide level2">
 <h2>Bypass der CPU</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/06_hardware_beschleunigung_dma/paths.png"></p>
+<figcaption>CPU und DMAC sind Initiatoren. Zwei Arbiter: im DMAC und am Interconnect.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Ohne DMA: RAM → CPU → UART/SPI</li>
 <li>Mit DMA: RAM → DMAC → Peripherie</li>
-<li>Datenpfad an der CPU vorbei; CPU-Auslastung für den Transfer nahe 0 %</li>
+<li>Der Kopierpfad läuft am Registerfile vorbei. Setup, Cache und Abschluss bleiben</li>
+<li>Buskonflikte können die CPU trotzdem verzögern</li>
 </ul>
 <div class="cell" data-reveal="true" data-fig-width="3.8" data-layout-align="default">
 <div class="cell-output-display">
@@ -776,7 +795,7 @@ flowchart TD
 <li>Oft mehrere Controller/Kanäle (DMA1, DMA2, …)</li>
 </ul>
 <aside class="notes">
-<p>„Dumm, aber schnell“: lesen, schreiben, Zeiger erhöhen, <span class="math inline">\(N\)</span>-mal — besser als jede Software-Schleife.</p>
+<p>Lesen, schreiben, Zeiger, Zähler. Bei kleinen Längen können Setup und Cache-Wartung die CPU-Schleife teurer machen als der Transfer selbst.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -837,8 +856,8 @@ flowchart TD
 <ul>
 <li>Bus-Matrix / Arbiter steuert den Zugang</li>
 <li>Gleichzeitiger Zugriff CPU und DMA → Priorität entscheidet</li>
-<li>Oft DMA bevorzugt (Echtzeit: Audio, Display)</li>
-<li>Verlierer: kurze Stall-Zyklen</li>
+<li>Priorität ist eine Politik, kein Naturgesetz. Round-Robin und feste Priorität unterscheiden</li>
+<li>„DMA gewinnt immer“ und „Stalls sind immer kurz“ gelten nicht allgemein</li>
 </ul>
 <div class="cell" data-reveal="true" data-fig-width="3.6" data-layout-align="default">
 <div class="cell-output-display">
@@ -879,7 +898,7 @@ flowchart LR
 <li>Mit L1-Cache rechnet die CPU oft ohne Dauerzugriff auf den Hauptspeicherbus</li>
 </ul>
 <aside class="notes">
-<p>Gegenüber Software-Kopieren vernachlässigbar — besonders bei guter Cache-Lokalität der CPU-Arbeit.</p>
+<p>Cache-Hits vertragen Cycle Stealing besser als eine CPU, die selbst ständig den RAM braucht.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -900,7 +919,7 @@ flowchart LR
 <li>Immer noch weit günstiger als C-Kopierschleifen</li>
 </ul>
 <aside class="notes">
-<p>Selbst harte Bursts sind Fliegengewicht gegen millionenfaches <code>lw</code>/<code>sw</code>.</p>
+<p>Ein Burst kann günstiger sein als eine Kopierschleife. Er ist nicht in jedem Fall billiger: Setup, Länge und Buslast entscheiden.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -915,6 +934,12 @@ flowchart LR
 </section>
 <section id="hardware-handshake" class="slide level2">
 <h2>Hardware-Handshake</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/06_hardware_beschleunigung_dma/handshake.png"></p>
+<figcaption>Speicher-Burst und ein peripheriegesteuerter Zugriff haben verschiedene Breiten.</figcaption>
+</figure>
+</div>
 <ul>
 <li>DMA darf Peripherie nicht überfluten</li>
 <li>Synchronisation über dedizierte Signale im SoC (ohne CPU)</li>
@@ -1039,6 +1064,12 @@ flowchart LR
 </section>
 <section id="dma-interrupts" class="slide level2">
 <h2>DMA-Interrupts</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/06_hardware_beschleunigung_dma/lifecycle.png"></p>
+<figcaption>DMA-TC und das leere Schieberegister sind zwei Zeitpunkte.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Anbindung an PLIC / Interrupt-System</li>
 <li>Typisch: Transfer Complete (TC), Half Transfer (HT), Transfer Error (TE)</li>
@@ -1224,8 +1255,15 @@ flowchart LR
 </section>
 <section id="parameter-3-transfer-count" class="slide level2">
 <h2>Parameter 3: Transfer Count</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/06_hardware_beschleunigung_dma/addrs.png"></p>
+<figcaption>Vier fiktive Byte-Transfers. Das UART-Ziel 0x4003000C bleibt fest.</figcaption>
+</figure>
+</div>
 <ul>
-<li><code>COUNT</code>: Anzahl der Transfers (oft 16 Bit, z. B. bis <span class="math inline">\(65\,535\)</span>)</li>
+<li><code>COUNT</code> zählt Transferelemente, nicht automatisch Bytes</li>
+<li>Beispiel: höchstens 65535 Elemente. 1000000 Byte zu 8 Bit brauchen 16 Blöcke: fünfzehnmal 65535 plus 16975</li>
 <li>Nach erfolgreichem Transfer: Hardware dekrementiert automatisch</li>
 <li>Bei <code>COUNT = 0</code>: Kanal stoppt, typisch Transfer-Complete-Interrupt</li>
 </ul>
@@ -1264,8 +1302,8 @@ flowchart LR
 <section id="parameter-4-data-width" class="slide level2">
 <h2>Parameter 4: Data Width</h2>
 <ul>
-<li>Pro Transfer: 8, 16 oder 32 Bit — gesetzt im <code>CONTROL</code>-Register</li>
-<li>Quelle und Ziel müssen passen (z. B. 8-Bit-Sensorregister ≠ 32-Bit-Write)</li>
+<li>Pro Transfer: 8, 16 oder 32 Bit — nur wenn Quelle, Ziel und DMA-Pfad das erlauben</li>
+<li>Ein <code>uint16_t</code> im C-Programm rechtfertigt keinen Halfword-Zugriff auf ein Byte-Register</li>
 </ul>
 <table class="caption-top">
 <thead>
@@ -1294,7 +1332,7 @@ flowchart LR
 </tbody>
 </table>
 <aside class="notes">
-<p>Passende Breite spart Bus-Zyklen: 16-Bit-Sensor → Halfword-DMA, nicht byteweise.</p>
+<p>Die erlaubte Breite steht im Controller und im Zielregister. Ein 16-Bit-Messwert über einen Byte-Pfad bleibt zwei Byte-Transfers. Die Tabelle ist nur die Umrechnung, kein Freibrief für Halfword-MMIO.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1466,10 +1504,17 @@ flowchart TD
 </section>
 <section id="stale-data-beide-richtungen" class="slide level2">
 <h2>Stale Data (beide Richtungen)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/06_hardware_beschleunigung_dma/cache.png"></p>
+<figcaption>TX veröffentlicht 0x22 vor dem Start. RX darf eine schmutzige Zeile nicht später zurückschreiben.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Senden (CPU → DMA): frische Daten nur im Cache → DMA sendet alte RAM-Inhalte</li>
 <li>Empfangen (DMA → CPU): frische Daten im RAM → CPU trifft veralteten Cache-Hit</li>
-<li>Lösung: Software-Cache-Wartung oder uncached Regionen</li>
+<li>TX: Daten vor dem DMA-Start veröffentlichen. RX: Bereich vor der Übergabe vorbereiten und nach Abschluss synchronisieren</li>
+<li>Nur „danach invalidieren“ schützt nicht vor einer schmutzigen Zeile, die später zurückschreibt</li>
 </ul>
 <aside class="notes">
 <p>Beide Seiten können sich „belügen“, wenn Kohärenz nicht hergestellt wird.</p>
@@ -1512,18 +1557,24 @@ flowchart TD
 </section>
 <section id="uncached-dma-zonen" class="slide level2">
 <h2>Uncached DMA-Zonen</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/06_hardware_beschleunigung_dma/uncached.png"></p>
+<figcaption>PMP schützt Zugriffe. Cacheability kommt von der Plattform, nicht vom Linkernamen.</figcaption>
+</figure>
+</div>
 <ul>
-<li>Alternative: Speicherregion ohne Caching (oft per MPU / PMP)</li>
-<li>CPU greift dort immer direkt auf RAM zu</li>
-<li>Kohärenz hardwareseitig einfacher; Zugriff etwas langsamer</li>
-<li>Linker platziert DMA-Puffer gezielt</li>
+<li>Alternative nur, wenn die Plattform einen nicht gecachten Bereich bereitstellt</li>
+<li>Standard-RISC-V-PMP regelt Zugriffsrechte, nicht Cacheability. Dafür sind PMAs oder die Plattform zuständig</li>
+<li>Der Linker legt <code>.dma_buffer</code> in einen Bereich, dessen Attribute schon gelten</li>
+<li>Uncached ist nicht automatisch DMA-erreichbar und nicht die einzige professionelle Lösung</li>
 </ul>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode numberSource text number-lines code-with-copy"><code class="sourceCode"><span id="cb11-1"><a aria-label="1"></a>MEMORY {</span>
 <span id="cb11-2"><a aria-label="2"></a>  RAM_CACHED   : ORIGIN = 0x20000000, LENGTH = 246K</span>
 <span id="cb11-3"><a aria-label="3"></a>  RAM_UNCACHED : ORIGIN = 0x2003D800, LENGTH = 10K  /* DMA */</span>
 <span id="cb11-4"><a aria-label="4"></a>}</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Professioneller Ansatz in OS/RTOS: DMA-Buffer in uncached Segment, kein manuelles Flushen vergessen.</p>
+<p>Kohärentes DMA, explizite Wartung und uncached Puffer sind drei systemabhängige Wege. Der Abschnittsname RAM_UNCACHED ändert die Hardware nicht.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1536,15 +1587,11 @@ flowchart TD
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-kanalkonfiguration" class="slide level2">
-<h2>Fragen? — Kanalkonfiguration</h2>
-<ul>
-<li>Welche vier Parameter braucht ein DMA-Kanal?</li>
-<li>Warum Destination-Increment bei UART-TX aus?</li>
-<li>Cache-Kohärenz: Problem und Rolle von Clean/Invalidate?</li>
-</ul>
+<section id="aufgabe-adresse-und-linker" class="slide level2">
+<h2>Aufgabe — Adresse und Linker</h2>
+<p>Welche Adresse bleibt beim UART-TX fest? Macht der Name <code>RAM_UNCACHED</code> den Bereich uncached?</p>
 <aside class="notes">
-<p>Als Nächstes: Burst vs.&nbsp;Single, Ringpuffer und Ping-Pong für endlose Streams.</p>
+<p>Das TX-Register bleibt fest, die Quelladresse steigt. Cacheability setzt die Plattform. Der Linker platziert nur. Siehe Adressspur und die drei Ebenen.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1580,12 +1627,24 @@ flowchart TD
 </section>
 <section id="warum-burst-transfers" class="slide level2">
 <h2>Warum Burst-Transfers?</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/06_hardware_beschleunigung_dma/burst.png"></p>
+<figcaption>Einzelzugriffe können dieselbe DRAM-Zeile treffen. 16 Aktivierungen sind keine Regel.</figcaption>
+</figure>
+</div>
 <ul>
 <li>On-Chip-SRAM: Burst spart vor allem wiederholte Bus-Arbitration</li>
 <li>Externes DRAM (Block 1): Zeile öffnen kostet; offene Zeile → schnelle Column-Zugriffe</li>
-<li>Burst: einmal „aufmachen“, viele Words hintereinander — besonders bei DRAM deutlich effizienter</li>
+<li>Eine offene Zeile kann mehrere Reads bedienen, auch bei getrennten SoC-Zugriffen</li>
+<li>Ein Zeilenwechsel braucht PRE und ACT. SRAM hat diese Zeilenlogik nicht</li>
 </ul>
-<table class="caption-top">
+<table class="caption-top" style="width:100%;">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 55%">
+<col style="width: 30%">
+</colgroup>
 <thead>
 <tr class="header">
 <th>Modus</th>
@@ -1601,8 +1660,8 @@ flowchart TD
 </tr>
 <tr class="even">
 <td>DRAM</td>
-<td>zusätzlich oft 16× Row-Aktivierung</td>
-<td>1× öffnen, 16× lesen</td>
+<td>Zeile kann schon offen sein</td>
+<td>Row-Hits hängen von Abbildung und Politik ab</td>
 </tr>
 </tbody>
 </table>
@@ -1740,6 +1799,12 @@ flowchart LR
 </section>
 <section id="double-buffering-ping-pong" class="slide level2">
 <h2>Double Buffering (Ping-Pong)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/06_hardware_beschleunigung_dma/pingpong.png"></p>
+<figcaption>Eine Hälfte dauert ideal etwa 23,22 ms. 30 ms Nachfüllen verpasst das Fenster.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Ring in zwei Hälften A und B</li>
 <li>DMA liest A → CPU füllt parallel B (und umgekehrt)</li>
@@ -1787,12 +1852,19 @@ flowchart LR
 <li>TC (<code>COUNT = 0</code>): zweite Hälfte nachfüllen (bei Circular: Wrap)</li>
 <li>Ein Array + zwei Flags in der ISR (Namen/Bits herstellerspezifisch)</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb12-1"><a aria-label="1"></a><span class="dt">void</span> dma_isr<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb12-2"><a aria-label="2"></a>    <span class="cf">if</span> <span class="op">(</span>STATUS_REG <span class="op">&amp;</span> HALF_TRANSFER_FLAG<span class="op">)</span></span>
-<span id="cb12-3"><a aria-label="3"></a>        fill_first_half<span class="op">();</span></span>
-<span id="cb12-4"><a aria-label="4"></a>    <span class="cf">if</span> <span class="op">(</span>STATUS_REG <span class="op">&amp;</span> TRANSFER_COMPLETE_FLAG<span class="op">)</span></span>
-<span id="cb12-5"><a aria-label="5"></a>        fill_second_half<span class="op">();</span></span>
-<span id="cb12-6"><a aria-label="6"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb12-1"><a aria-label="1"></a><span class="dt">volatile</span> <span class="dt">unsigned</span> ht_count<span class="op">,</span> tc_count<span class="op">;</span></span>
+<span id="cb12-2"><a aria-label="2"></a></span>
+<span id="cb12-3"><a aria-label="3"></a><span class="dt">void</span> dma_isr<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-4"><a aria-label="4"></a>    <span class="cf">if</span> <span class="op">(</span>STATUS_REG <span class="op">&amp;</span> HALF_TRANSFER_FLAG<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-5"><a aria-label="5"></a>        clear_ht<span class="op">();</span> <span class="co">/* Semantik laut Controller, bei W1C kein RMW */</span></span>
+<span id="cb12-6"><a aria-label="6"></a>        ht_count<span class="op">++;</span></span>
+<span id="cb12-7"><a aria-label="7"></a>    <span class="op">}</span></span>
+<span id="cb12-8"><a aria-label="8"></a>    <span class="cf">if</span> <span class="op">(</span>STATUS_REG <span class="op">&amp;</span> TRANSFER_COMPLETE_FLAG<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-9"><a aria-label="9"></a>        clear_tc<span class="op">();</span></span>
+<span id="cb12-10"><a aria-label="10"></a>        tc_count<span class="op">++;</span></span>
+<span id="cb12-11"><a aria-label="11"></a>    <span class="op">}</span></span>
+<span id="cb12-12"><a aria-label="12"></a><span class="op">}</span></span>
+<span id="cb12-13"><a aria-label="13"></a><span class="co">/* Nachfüllen im Worker, nicht als lange Arbeit in der ISR */</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p>HT + TC = Double Buffering ohne zwei separate Hardware-Kanäle.</p>
 <style type="text/css">
@@ -1809,6 +1881,12 @@ flowchart LR
 </section>
 <section id="ausblick-dma2d-2d-kopie" class="slide level2">
 <h2>Ausblick: DMA2D (2D-Kopie)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/06_hardware_beschleunigung_dma/twod.png"></p>
+<figcaption>Rechteckstart 0x20004214. Acht Byte je Zeile, Quellpitch 640 Byte.</figcaption>
+</figure>
+</div>
 <ul>
 <li>High-End-SoCs: 2D-DMA / Grafik-Accelerator (z. B. Chrom-ART)</li>
 <li>Versteht Rechtecke (<span class="math inline">\(X\)</span>/<span class="math inline">\(Y\)</span>), nicht nur lineare Bytes</li>
@@ -1872,15 +1950,11 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-streams-und-burst" class="slide level2">
-<h2>Fragen? — Streams und Burst</h2>
-<ul>
-<li>Warum ist Burst (SRAM: Arbitration; DRAM: zusätzlich Row-Hits) effizienter?</li>
-<li>Was leistet Circular Mode?</li>
-<li>Ping-Pong mit Half-Transfer: Ablauf?</li>
-</ul>
+<section id="aufgabe-cs-und-audiofenster" class="slide level2">
+<h2>Aufgabe — CS und Audiofenster</h2>
+<p>Darf CS bei DMA-TC bereits HIGH werden? Was folgt aus 30 ms Nachfüllzeit im Audio-Beispiel?</p>
 <aside class="notes">
-<p>Theorie Streams abgeschlossen. Als Nächstes: Labor-Ausblick — Polling vs.&nbsp;DMA messbar machen.</p>
+<p>DMA-TC garantiert nicht den Leitungsabschluss. CS folgt dem Geräte- und Controllertiming. 30 ms liegen über den idealen 23,22 ms je Hälfte: Underrun beziehungsweise Overrun. Siehe Lebenszyklus und Ping-Pong.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1895,6 +1969,12 @@ flowchart LR
 </section>
 <section id="ausblick-labor-dma-in-renode" class="slide level2">
 <h2>Ausblick Labor: DMA in Renode</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/06_hardware_beschleunigung_dma/lab.png"></p>
+<figcaption>4096 Byte, 8N1, 115200 Baud: ideal etwa 355,56 ms. Das ist eine Rechnung, keine Messung.</figcaption>
+</figure>
+</div>
 <p>Geplantes Szenario (Details im Übungsblatt):</p>
 <ul>
 <li>Langer String (z. B. HTML-Header) über UART</li>
@@ -2012,10 +2092,10 @@ flowchart LR
 <li>SRC = String im SRAM, DST = UART-TX-Register (fest)</li>
 <li>COUNT = Länge; Memory-Increment an, Peripherie-Increment aus</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb15-1"><a aria-label="1"></a>DMA_CH1<span class="op">-&gt;</span>SRC_ADDR <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)</span>html_string<span class="op">;</span></span>
-<span id="cb15-2"><a aria-label="2"></a>DMA_CH1<span class="op">-&gt;</span>DST_ADDR <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)&amp;</span>UART_TX_REG<span class="op">;</span></span>
-<span id="cb15-3"><a aria-label="3"></a>DMA_CH1<span class="op">-&gt;</span>COUNT    <span class="op">=</span> string_laenge<span class="op">;</span></span>
-<span id="cb15-4"><a aria-label="4"></a>DMA_CH1<span class="op">-&gt;</span>CONTROL <span class="op">|=</span> <span class="op">(</span>DMA_MINC_EN <span class="op">|</span> DMA_DIR_M2P<span class="op">);</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb15"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb15-1"><a aria-label="1"></a>DMA_CH1<span class="op">-&gt;</span>SRC_ADDR <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)(</span><span class="dt">uintptr_t</span><span class="op">)</span>html_string<span class="op">;</span> <span class="co">/* fiktiv */</span></span>
+<span id="cb15-2"><a aria-label="2"></a>DMA_CH1<span class="op">-&gt;</span>DST_ADDR <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)(</span><span class="dt">uintptr_t</span><span class="op">)&amp;</span>UART_TX_REG<span class="op">;</span></span>
+<span id="cb15-3"><a aria-label="3"></a>DMA_CH1<span class="op">-&gt;</span>COUNT    <span class="op">=</span> string_laenge<span class="op">;</span> <span class="co">/* Einheit laut Controller */</span></span>
+<span id="cb15-4"><a aria-label="4"></a>DMA_CH1<span class="op">-&gt;</span>CONTROL  <span class="op">=</span> DMA_MINC_EN <span class="op">|</span> DMA_DIR_M2P<span class="op">;</span> <span class="co">/* kein blindes |= */</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p>Exakt die Parameter aus dem Theorieteil — Array wandert, TX-Adresse bleibt starr.</p>
 <style type="text/css">
@@ -2036,7 +2116,7 @@ flowchart LR
 <li>Transfer-Complete-Enable im DMA</li>
 <li>PLIC (bzw. Interrupt-Controller) für den Kanal freischalten</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb16-1"><a aria-label="1"></a>DMA_CH1<span class="op">-&gt;</span>CONTROL <span class="op">|=</span> DMA_TCIE_EN<span class="op">;</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb16"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb16-1"><a aria-label="1"></a><span class="co">/* TCIE in demselben kontrollierten CONTROL-Wort, nicht per Altzustand. */</span></span>
 <span id="cb16-2"><a aria-label="2"></a>enable_interrupt<span class="op">(</span>DMA_CH1_IRQn<span class="op">);</span>  <span class="co">/* Pseudocode */</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p>Ein IRQ am Ende statt eines IRQs pro Byte — Abschluss und ggf. nächster Auftrag.</p>
@@ -2059,8 +2139,8 @@ flowchart LR
 <li>C-Funktion kehrt sofort zurück — CPU ist frei</li>
 </ul>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb17"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb17-1"><a aria-label="1"></a><span class="dt">void</span> start_dma_transfer<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb17-2"><a aria-label="2"></a>    DMA_CH1<span class="op">-&gt;</span>CONTROL <span class="op">|=</span> DMA_ENABLE_BIT<span class="op">;</span></span>
-<span id="cb17-3"><a aria-label="3"></a>    <span class="co">/* main() läuft sofort weiter */</span></span>
+<span id="cb17-2"><a aria-label="2"></a>    DMA_CH1<span class="op">-&gt;</span>CONTROL <span class="op">=</span> DMA_MINC_EN <span class="op">|</span> DMA_DIR_M2P</span>
+<span id="cb17-3"><a aria-label="3"></a>        <span class="op">|</span> DMA_TCIE_EN <span class="op">|</span> DMA_ENABLE_BIT<span class="op">;</span></span>
 <span id="cb17-4"><a aria-label="4"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p>Ein Bit, und der Hintergrundtransfer läuft — Triumph der Delegation.</p>
@@ -2080,8 +2160,9 @@ flowchart LR
 <h2>Erwartung mit DMA</h2>
 <ul>
 <li>Text erscheint weiter im Monitor</li>
-<li>LED blinkt ungestört (Heartbeat bleibt)</li>
-<li>CPU kann parallel rechnen; DMA nutzt Cycle Stealing</li>
+<li>Der Heartbeat kommt aus <code>main()</code>, nicht aus einer Timer-ISR und nicht aus Hardware-PWM</li>
+<li>Die LED kann weiterlaufen und trotzdem Busstalls haben. Das ist kein Beweis für null Last</li>
+<li>DMA-TC heißt: letztes Element übergeben. FIFO und Schieberegister können noch senden</li>
 </ul>
 <aside class="notes">
 <p>Zielbild im Simulator: System „lebt“, während Bytes asynchron ausgehen.</p>
@@ -2105,7 +2186,7 @@ flowchart LR
 </ul>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb18"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb18-1"><a aria-label="1"></a><span class="dt">void</span> dma_channel1_isr<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
 <span id="cb18-2"><a aria-label="2"></a>    <span class="cf">if</span> <span class="op">(</span>DMA_STATUS_REG <span class="op">&amp;</span> TRANSFER_COMPLETE<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb18-3"><a aria-label="3"></a>        DMA_CLEAR_REG <span class="op">=</span> CLEAR_TRANSFER_COMPLETE<span class="op">;</span></span>
+<span id="cb18-3"><a aria-label="3"></a>        DMA_CLEAR_REG <span class="op">=</span> CLEAR_TRANSFER_COMPLETE<span class="op">;</span> <span class="co">/* W1C: schreiben, nicht RMW */</span></span>
 <span id="cb18-4"><a aria-label="4"></a>        <span class="co">/* optional: nächsten Transfer starten */</span></span>
 <span id="cb18-5"><a aria-label="5"></a>    <span class="op">}</span></span>
 <span id="cb18-6"><a aria-label="6"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
@@ -2130,7 +2211,7 @@ flowchart LR
 <li>DMA: spezialisierter Coprozessor für Speichertransfers</li>
 <li>DMAC als Bus-Master, Cycle Stealing mit dem Arbiter</li>
 <li>Kanal: SRC, DST, COUNT, Breite, Increment</li>
-<li>Cache-Kohärenz: Clean/Invalidate oder uncached Regionen</li>
+<li>Cache: Richtung, Besitz und Plattformsequenz. PMP ist kein Cache-Schalter</li>
 <li>Circular Mode, HT/TC → Ringpuffer und Ping-Pong</li>
 </ul>
 <aside class="notes">
@@ -2154,6 +2235,19 @@ flowchart LR
 <li>Nächster Block: moderne CPU-Beschleunigung (u. a. Out-of-Order)</li>
 </ul>
 <p>Vielen Dank — viel Erfolg im Labor.</p>
+<aside class="notes">
+<p>Quellen, keine Übernahme als RISC-V-API: RISC-V Privileged, PMA/PMP; CMO/Zicbom; Linux DMA API zu Cachelines; AN4839 nur als Cortex-M7-Beispiel; STM32F4-HAL nur als Beispiel getrennter DMA- und UART-Abschlüsse; Renode Time Framework. Adressen dieser Folie bleiben fiktiv. Kein DMA-Modell im Repository.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
 <aside class="notes">
 <p>Wenn Terminal flüssig schreibt und die LED weiterblinkt, ist die Architektur verstanden. Bis zum nächsten Block!</p>
 <style type="text/css">

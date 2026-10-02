@@ -3672,28 +3672,28 @@
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#anknüpfung-i2c-labor",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Anknüpfung: I2C-Labor",
-    "text": "Anknüpfung: I2C-Labor\nKurz-Recap aus Block 5 (Vertiefung im Übungsblatt):\n\nIMU per I2C: Start, Adresse, R/W, ACK/NACK, Stop\nHigh/Low-Byte per Shift zu 16-Bit-Werten\nCPU wartete oft auf die I2C-Hardware (wait_for_ack / Polling)\n\nuint8_t read_sensor_x(void) {\n    i2c_send_start();\n    /* … */\n    return i2c_read_byte();  /* CPU wartet hier oft */\n}\n\nFür seltene Sensorwerte ist Polling akzeptabel. Bei großen, kontinuierlichen Datenmengen wird Wartezeit zum Problem."
+    "text": "Anknüpfung: I2C-Labor\nKurz-Recap aus Block 5 (Vertiefung im Übungsblatt):\n\nIMU per I2C: Start, Adresse, R/W, ACK/NACK, Stop\nHigh/Low-Byte per Shift zu 16-Bit-Werten\nCPU wartete oft auf die I2C-Hardware (wait_for_ack / Polling)\n\n/* Block 5: zusammenhängender Burst, nicht ein einzelnes X-High-Byte.\n   Polling auf ACK ist bei seltenen Samples tragbar. */\nint read_accel_xyz(uint8_t out[6]);\n\nFür seltene Sensorwerte ist Polling akzeptabel. Bei großen, kontinuierlichen Datenmengen wird Wartezeit zum Problem."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#schnelle-schnittstellen-langsames-füttern",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#schnelle-schnittstellen-langsames-füttern",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Schnelle Schnittstellen, langsames Füttern",
-    "text": "Schnelle Schnittstellen, langsames Füttern\n\nBig 3 beherrscht: UART, SPI, I2C\nExterne Geräte anschließbar\nSPI für Displays/Flash oft mit SCK im Zehner-MHz-Bereich\nFolge: die Schnittstelle kann Megabytes/s transportieren — wenn Software nachkommt\n\n\nSchnelle Peripherie nützt wenig, wenn der Pfad RAM → Controller der Engpass ist."
+    "text": "Schnelle Schnittstellen, langsames Füttern\n\nBig 3 beherrscht: UART, SPI, I2C\nExterne Geräte anschließbar\nSPI für Displays oft mit SCK im Zehner-MHz-Bereich\nEin Bit je Takt: 10 MHz ergeben höchstens 1,25 MB/s, 50 MHz höchstens 6,25 MB/s\nDMA verkürzt Nachfüllpausen. Die Leitung wird dadurch nicht schneller\n\n\nSchnelle Peripherie nützt wenig, wenn der Pfad RAM → Controller der Engpass ist."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#das-problem-datenmenge",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#das-problem-datenmenge",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Das Problem: Datenmenge",
-    "text": "Das Problem: Datenmenge\n\nTemperaturfühler: wenige Bytes/s — unkritisch\nAudio: z. B. \\(\\approx 44\\,100\\) Samples/s, kontinuierlich, jitterarm\nTFT \\(320\\times 240\\), 16 Bit, 60 FPS:\n\n\\[\n320 \\times 240 \\times 2 \\times 60 = 9\\,216\\,000\\ \\mathrm{Bytes/s}\n\\]\n\nCPU müsste millionenfach RAM lesen und SPI-Register füllen\n\n\nBei Grafik/Audio bindet Software-Kopieren die CPU stark — selbst bei schneller Peripherie."
+    "text": "Das Problem: Datenmenge\n\n\n\n9,216 MB/s gegen 1,25 und 6,25 MB/s. DMA hebt das SCK-Limit nicht auf.\n\n\n\nTemperaturfühler: wenige Bytes/s — unkritisch\nAudio braucht Kanalzahl und Samplebreite: mono, 16 Bit, 44100 Samples/s sind 88200 Byte/s\nTFT \\(320\\times 240\\), RGB565, 60 FPS:\n\n\\[\n320 \\times 240 \\times 2 \\times 60 = 9\\,216\\,000\\ \\mathrm{Bytes/s}\n\\]\n\nCPU müsste millionenfach RAM lesen und SPI-Register füllen\n\n\n153600 Byte je Frame. Ideal etwa 8,14 FPS bei 10 MHz und 40,69 FPS bei 50 MHz. Für 60 FPS wären mindestens 73,728 MHz SCK nötig, wenn das Gerät das überhaupt erlaubt."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#refresher-wie-die-cpu-kopiert",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#refresher-wie-die-cpu-kopiert",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Refresher: Wie die CPU kopiert",
-    "text": "Refresher: Wie die CPU kopiert\n\nMCT1: Speicherzugriff über Load/Store\nlw: RAM → Register; sw: Register → MMIO (z. B. SPI-TX)\nKein „direkt von RAM nach SPI“ in einem Befehl\n\nloop:\n    lw   t0, 0(s1)     /* RAM lesen */\n    sw   t0, 0(s2)     /* Peripherie schreiben */\n    addi s1, s1, 4\n    bne  s1, s3, loop\n\nJedes Byte wandert durch Register/ALU-Pfad — viele Takte nur für 1:1-Kopieren."
+    "text": "Refresher: Wie die CPU kopiert\n\nMCT1: Speicherzugriff über Load/Store\nlw: RAM → Register; sw: Register → MMIO (z. B. SPI-TX)\nKein „direkt von RAM nach SPI“ in einem Befehl\n\nloop:\n    lw   t0, 0(s1)     /* RAM lesen */\n    sw   t0, 0(s2)     /* Peripherie schreiben */\n    addi s1, s1, 4\n    bne  s1, s3, loop\n\nDie Schleife bewegt Wörter zu vier Byte. „Jedes Byte“ wäre ein anderes Modell mit erlaubtem Byte-Zugriff und TX-Bereitschaft."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#agenda",
@@ -3717,11 +3717,11 @@
     "text": "Die Leitfrage des Tages\n\n1 MB Array im SRAM (z. B. Bild) → SPI → Display\nParallel: CPU führt schwere Berechnung aus (z. B. Edge-AI)\nWie fließen die Bytes RAM → Peripherie, ohne die CPU-Rechnung zu stoppen?\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  RAM[(SRAM)] -.-&gt;|Tunnel?| SPI[SPI]\n  CPU[CPU] --&gt;|weiterrechnen| KI[Berechnung]\n  style SPI fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nZiel: Parallelität — CPU rechnet, Datenfluss läuft daneben. Spoiler: DMA."
   },
   {
-    "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#fragen-motivation",
-    "href": "vorlesungen/06_hardware_beschleunigung_dma.html#fragen-motivation",
+    "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#aufgabe-60-fps",
+    "href": "vorlesungen/06_hardware_beschleunigung_dma.html#aufgabe-60-fps",
     "title": "06 · Hardware-Beschleunigung (DMA)",
-    "section": "Fragen? — Motivation",
-    "text": "Fragen? — Motivation\n\nLimitierung durch lw/sw klar?\nWarum kann SPI „schneller“ sein als Software nachfüttert?\n\n\nAls Nächstes: klassische Software-Lösungen und warum sie bei 1 MB scheitern."
+    "section": "Aufgabe — 60 FPS",
+    "text": "Aufgabe — 60 FPS\nWarum liefert DMA bei 50-MHz-SPI mit einem Bit je Takt kein RGB565-Vollbild mit 60 FPS?\n\nLösung: 50 MHz tragen ideal 6,25 MB/s, das Vollbild verlangt 9,216 MB/s. Siehe Bandbreitenbild. DMA entfernt Nachfüllpausen, nicht das SCK-Limit."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#methode-1-polling",
@@ -3735,28 +3735,28 @@
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#die-polling-falle",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Die Polling-Falle",
-    "text": "Die Polling-Falle\n\nBeispiel: SPI mit \\(10\\,\\mathrm{MHz}\\)-SCK → grob \\(\\approx 0{,}8\\,\\mu\\mathrm{s}\\) pro Byte (8 Bit + Overhead je nach Mode)\n\\(10^{6}\\) Bytes \\(\\Rightarrow\\) Größenordnung \\(\\approx 0{,}8\\,\\mathrm{s}\\) Transferzeit\nCPU-Last in der while-Schleife: praktisch 100 % Wartezeit\nKeine parallele Nutzarbeit in dieser Zeit\n\n\nSekundenbruchteile sind für GHz-CPUs Ewigkeiten — Milliarden verschwendeter Takte als „Postbote“."
+    "text": "Die Polling-Falle\n\nBeispiel: SPI mit \\(10\\,\\mathrm{MHz}\\)-SCK → grob \\(\\approx 0{,}8\\,\\mu\\mathrm{s}\\) pro Byte (8 Bit + Overhead je nach Mode)\n\\(10^{6}\\) Bytes \\(\\Rightarrow\\) Größenordnung \\(\\approx 0{,}8\\,\\mathrm{s}\\) Transferzeit\nDie aufrufende Schleife bleibt beschäftigt. Aktivierte Interrupts können weiterlaufen\n\\(10^{6}\\) Byte bei 10 MHz: mindestens 0,8 s reine Leitungszeit, ohne Zusatzpausen\n\n\nSekundenbruchteile sind für GHz-CPUs Ewigkeiten — Milliarden verschwendeter Takte als „Postbote“."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#methode-2-interrupt-versand",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#methode-2-interrupt-versand",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Methode 2: Interrupt-Versand",
-    "text": "Methode 2: Interrupt-Versand\n\nSPI löst bei TX-leer Interrupt aus (über PLIC)\nISR schreibt ein Byte; CPU rechnet dazwischen weiter\n\nvolatile uint32_t bytes_sent;\n\nvoid spi_tx_empty_isr(void) {\n    if (bytes_sent &lt; 1000000) {\n        SPI_DATA_REG = bild_array[bytes_sent++];\n    }\n}\n\nInterrupts entlasten gegenüber Polling — bei Mikrosekunden-Raten droht trotzdem Kollaps."
+    "text": "Methode 2: Interrupt-Versand\n\nSPI löst bei TX-leer Interrupt aus (über PLIC)\nISR schreibt ein Byte; CPU rechnet dazwischen weiter\n\nvolatile uint32_t bytes_sent;\n\nvoid spi_tx_empty_isr(void) {\n    if (bytes_sent &lt; 1000000u) {\n        SPI_DATA_REG = bild_array[bytes_sent++];\n    } else {\n        disable_tx_empty_irq(); /* sonst feuert die Quelle weiter */\n    }\n    /* bytes_sent: übergeben, nicht nachweislich auf der Leitung */\n}\n\nInterrupts entlasten gegenüber Polling — bei Mikrosekunden-Raten droht trotzdem Kollaps."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#interrupt-overhead",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#interrupt-overhead",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Interrupt-Overhead",
-    "text": "Interrupt-Overhead\nPro Interrupt typisch:\n\nPipeline leeren, mepc/mcause setzen\nRegister retten (Stack)\nNutzarbeit: ein Byte kopieren\nRegister wiederherstellen, mret\n\nOft Dutzende Takte Overhead für wenige Nutz-Takte.\n\nErinnerung Block 3: Kontextwechsel ist teuer — besonders bei einem Byte Nutzlast."
+    "text": "Interrupt-Overhead\nPro Interrupt typisch:\n\nKontext sichern. Ein universelles Leeren der Pipeline gibt es nicht\nmepc/mcause setzen\nRegister retten (Stack)\nNutzarbeit: ein Byte kopieren\nRegister wiederherstellen, mret\n\nOft Dutzende Takte Overhead für wenige Nutz-Takte.\n\nErinnerung Block 3: Kontextwechsel ist teuer — besonders bei einem Byte Nutzlast."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#interrupt-storm",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#interrupt-storm",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Interrupt Storm",
-    "text": "Interrupt Storm\n\nSPI meldet „leer“ im Sub-µs- bis µs-Takt\nMillionen ISRs/s möglich\nCPU: Zeit geht in Push/Pop statt Nutzarbeit\n\n\n\n\nPhase\nWas passiert\n\n\n\n\nkurz\nKI/Main\n\n\nlang\nISR-Overhead\n\n\nkurz\nKI/Main\n\n\nlang\nISR-Overhead\n\n\n\n\nInterrupts passen zu seltenen Ereignissen (Taste, Tick) — nicht zu Dauerfeuer im Mikrosekunden-Takt."
+    "text": "Interrupt Storm\n\n\n\nVier CPU-Spuren, dieselbe Leitung. 100 Zyklen je Byte-IRQ reichen bei 10 MHz nicht.\n\n\n\nSPI meldet „leer“ im Sub-µs- bis µs-Takt\nMillionen ISRs/s möglich\nCPU: Zeit geht in Push/Pop statt Nutzarbeit\n\n\n\n\nPhase\nWas passiert\n\n\n\n\nkurz\nKI/Main\n\n\nlang\nISR-Overhead\n\n\nkurz\nKI/Main\n\n\nlang\nISR-Overhead\n\n\n\n\nInterrupts passen zu seltenen Ereignissen (Taste, Tick) — nicht zu Dauerfeuer im Mikrosekunden-Takt."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#cpu-als-postbote",
@@ -3798,14 +3798,14 @@
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#bypass-der-cpu",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Bypass der CPU",
-    "text": "Bypass der CPU\n\nOhne DMA: RAM → CPU → UART/SPI\nMit DMA: RAM → DMAC → Peripherie\nDatenpfad an der CPU vorbei; CPU-Auslastung für den Transfer nahe 0 %\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart TD\n  RAM[(SRAM)] &lt;--&gt; DMAC[DMA-Controller]\n  DMAC &lt;--&gt; SPI[SPI]\n  CPU[CPU] -.-&gt;|Auftrag| DMAC\n  style DMAC fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nCPU erteilt den Auftrag und rechnet weiter; der Tunnel RAM–Peripherie läuft autonom."
+    "text": "Bypass der CPU\n\n\n\nCPU und DMAC sind Initiatoren. Zwei Arbiter: im DMAC und am Interconnect.\n\n\n\nOhne DMA: RAM → CPU → UART/SPI\nMit DMA: RAM → DMAC → Peripherie\nDer Kopierpfad läuft am Registerfile vorbei. Setup, Cache und Abschluss bleiben\nBuskonflikte können die CPU trotzdem verzögern\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart TD\n  RAM[(SRAM)] &lt;--&gt; DMAC[DMA-Controller]\n  DMAC &lt;--&gt; SPI[SPI]\n  CPU[CPU] -.-&gt;|Auftrag| DMAC\n  style DMAC fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nCPU erteilt den Auftrag und rechnet weiter; der Tunnel RAM–Peripherie läuft autonom."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#der-dma-controller-dmac",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#der-dma-controller-dmac",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Der DMA-Controller (DMAC)",
-    "text": "Der DMA-Controller (DMAC)\n\nEigenes Silizium-Modul auf dem SoC\nKeine allgemeine ALU — spezialisiert auf Adressen und Transfers\nMerkt sich u. a. Quelle, Ziel, Restlänge\nOft mehrere Controller/Kanäle (DMA1, DMA2, …)\n\n\n„Dumm, aber schnell“: lesen, schreiben, Zeiger erhöhen, \\(N\\)-mal — besser als jede Software-Schleife."
+    "text": "Der DMA-Controller (DMAC)\n\nEigenes Silizium-Modul auf dem SoC\nKeine allgemeine ALU — spezialisiert auf Adressen und Transfers\nMerkt sich u. a. Quelle, Ziel, Restlänge\nOft mehrere Controller/Kanäle (DMA1, DMA2, …)\n\n\nLesen, schreiben, Zeiger, Zähler. Bei kleinen Längen können Setup und Cache-Wartung die CPU-Schleife teurer machen als der Transfer selbst."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#kampf-um-den-bus",
@@ -3826,28 +3826,28 @@
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#bus-arbitration",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Bus-Arbitration",
-    "text": "Bus-Arbitration\n\nBus-Matrix / Arbiter steuert den Zugang\nGleichzeitiger Zugriff CPU und DMA → Priorität entscheidet\nOft DMA bevorzugt (Echtzeit: Audio, Display)\nVerlierer: kurze Stall-Zyklen\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  CPU[CPU] --&gt; A{Arbiter}\n  DMA[DMA] --&gt; A\n  A --&gt; RAM[(SRAM)]\n  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nEchtzeit-Streams vertragen Stalls schlecht; die CPU verkraftet kurze Wartezeiten besser."
+    "text": "Bus-Arbitration\n\nBus-Matrix / Arbiter steuert den Zugang\nGleichzeitiger Zugriff CPU und DMA → Priorität entscheidet\nPriorität ist eine Politik, kein Naturgesetz. Round-Robin und feste Priorität unterscheiden\n„DMA gewinnt immer“ und „Stalls sind immer kurz“ gelten nicht allgemein\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  CPU[CPU] --&gt; A{Arbiter}\n  DMA[DMA] --&gt; A\n  A --&gt; RAM[(SRAM)]\n  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nEchtzeit-Streams vertragen Stalls schlecht; die CPU verkraftet kurze Wartezeiten besser."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#cycle-stealing",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#cycle-stealing",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Cycle Stealing",
-    "text": "Cycle Stealing\n\nDMA „klaut“ gelegentlich Bus-Zyklen\nKein ISR-Overhead pro Byte → Störung oft gering\nMit L1-Cache rechnet die CPU oft ohne Dauerzugriff auf den Hauptspeicherbus\n\n\nGegenüber Software-Kopieren vernachlässigbar — besonders bei guter Cache-Lokalität der CPU-Arbeit."
+    "text": "Cycle Stealing\n\nDMA „klaut“ gelegentlich Bus-Zyklen\nKein ISR-Overhead pro Byte → Störung oft gering\nMit L1-Cache rechnet die CPU oft ohne Dauerzugriff auf den Hauptspeicherbus\n\n\nCache-Hits vertragen Cycle Stealing besser als eine CPU, die selbst ständig den RAM braucht."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#transparent-vs.-blocking",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#transparent-vs.-blocking",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Transparent vs. Blocking",
-    "text": "Transparent vs. Blocking\n\nTransparent: DMA nutzt Bus, wenn die CPU ihn ohnehin nicht braucht\nBlocking / Burst: DMA belegt den Bus länger — CPU stottert kurz\nImmer noch weit günstiger als C-Kopierschleifen\n\n\nSelbst harte Bursts sind Fliegengewicht gegen millionenfaches lw/sw."
+    "text": "Transparent vs. Blocking\n\nTransparent: DMA nutzt Bus, wenn die CPU ihn ohnehin nicht braucht\nBlocking / Burst: DMA belegt den Bus länger — CPU stottert kurz\nImmer noch weit günstiger als C-Kopierschleifen\n\n\nEin Burst kann günstiger sein als eine Kopierschleife. Er ist nicht in jedem Fall billiger: Setup, Länge und Buslast entscheiden."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#hardware-handshake",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#hardware-handshake",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Hardware-Handshake",
-    "text": "Hardware-Handshake\n\nDMA darf Peripherie nicht überfluten\nSynchronisation über dedizierte Signale im SoC (ohne CPU)\n\n\nWie Staffelübergabe: erst anfordern, dann liefern."
+    "text": "Hardware-Handshake\n\n\n\nSpeicher-Burst und ein peripheriegesteuerter Zugriff haben verschiedene Breiten.\n\n\n\nDMA darf Peripherie nicht überfluten\nSynchronisation über dedizierte Signale im SoC (ohne CPU)\n\n\nWie Staffelübergabe: erst anfordern, dann liefern."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#request-acknowledge-handshake",
@@ -3882,7 +3882,7 @@
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#dma-interrupts",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "DMA-Interrupts",
-    "text": "DMA-Interrupts\n\nAnbindung an PLIC / Interrupt-System\nTypisch: Transfer Complete (TC), Half Transfer (HT), Transfer Error (TE)\nEin Interrupt nach \\(N\\) Bytes statt \\(N\\) Interrupts\n\n\nHT ist Basis für Ping-Pong: eine Hälfte füllen/lesen, während die andere transferiert."
+    "text": "DMA-Interrupts\n\n\n\nDMA-TC und das leere Schieberegister sind zwei Zeitpunkte.\n\n\n\nAnbindung an PLIC / Interrupt-System\nTypisch: Transfer Complete (TC), Half Transfer (HT), Transfer Error (TE)\nEin Interrupt nach \\(N\\) Bytes statt \\(N\\) Interrupts\n\n\nHT ist Basis für Ping-Pong: eine Hälfte füllen/lesen, während die andere transferiert."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#fragen-dma-grundlagen",
@@ -3931,14 +3931,14 @@
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#parameter-3-transfer-count",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Parameter 3: Transfer Count",
-    "text": "Parameter 3: Transfer Count\n\nCOUNT: Anzahl der Transfers (oft 16 Bit, z. B. bis \\(65\\,535\\))\nNach erfolgreichem Transfer: Hardware dekrementiert automatisch\nBei COUNT = 0: Kanal stoppt, typisch Transfer-Complete-Interrupt\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[COUNT = 1000] --&gt; B[Transfer]\n  B --&gt; C[COUNT = 999]\n  C --&gt; D[COUNT = 0]\n  D --&gt;|STOP| E[IRQ an CPU]\n  style E fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nOhne Zähler würde der DMA endlos weiterlaufen. Null bedeutet: Auftrag erledigt, CPU benachrichtigen."
+    "text": "Parameter 3: Transfer Count\n\n\n\nVier fiktive Byte-Transfers. Das UART-Ziel 0x4003000C bleibt fest.\n\n\n\nCOUNT zählt Transferelemente, nicht automatisch Bytes\nBeispiel: höchstens 65535 Elemente. 1000000 Byte zu 8 Bit brauchen 16 Blöcke: fünfzehnmal 65535 plus 16975\nNach erfolgreichem Transfer: Hardware dekrementiert automatisch\nBei COUNT = 0: Kanal stoppt, typisch Transfer-Complete-Interrupt\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[COUNT = 1000] --&gt; B[Transfer]\n  B --&gt; C[COUNT = 999]\n  C --&gt; D[COUNT = 0]\n  D --&gt;|STOP| E[IRQ an CPU]\n  style E fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nOhne Zähler würde der DMA endlos weiterlaufen. Null bedeutet: Auftrag erledigt, CPU benachrichtigen."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#parameter-4-data-width",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#parameter-4-data-width",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Parameter 4: Data Width",
-    "text": "Parameter 4: Data Width\n\nPro Transfer: 8, 16 oder 32 Bit — gesetzt im CONTROL-Register\nQuelle und Ziel müssen passen (z. B. 8-Bit-Sensorregister ≠ 32-Bit-Write)\n\n\n\n\nC-Typ\nDMA-Breite\nTransfers für 32 Bit Nutzdaten\n\n\n\n\nuint8_t\nByte (8)\n4\n\n\nuint16_t\nHalfword (16)\n2\n\n\nuint32_t\nWord (32)\n1 (oft maximal effizient)\n\n\n\n\nPassende Breite spart Bus-Zyklen: 16-Bit-Sensor → Halfword-DMA, nicht byteweise."
+    "text": "Parameter 4: Data Width\n\nPro Transfer: 8, 16 oder 32 Bit — nur wenn Quelle, Ziel und DMA-Pfad das erlauben\nEin uint16_t im C-Programm rechtfertigt keinen Halfword-Zugriff auf ein Byte-Register\n\n\n\n\nC-Typ\nDMA-Breite\nTransfers für 32 Bit Nutzdaten\n\n\n\n\nuint8_t\nByte (8)\n4\n\n\nuint16_t\nHalfword (16)\n2\n\n\nuint32_t\nWord (32)\n1 (oft maximal effizient)\n\n\n\n\nDie erlaubte Breite steht im Controller und im Zielregister. Ein 16-Bit-Messwert über einen Byte-Pfad bleibt zwei Byte-Transfers. Die Tabelle ist nur die Umrechnung, kein Freibrief für Halfword-MMIO."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#address-increment-mode",
@@ -3980,7 +3980,7 @@
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#stale-data-beide-richtungen",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Stale Data (beide Richtungen)",
-    "text": "Stale Data (beide Richtungen)\n\nSenden (CPU → DMA): frische Daten nur im Cache → DMA sendet alte RAM-Inhalte\nEmpfangen (DMA → CPU): frische Daten im RAM → CPU trifft veralteten Cache-Hit\nLösung: Software-Cache-Wartung oder uncached Regionen\n\n\nBeide Seiten können sich „belügen“, wenn Kohärenz nicht hergestellt wird."
+    "text": "Stale Data (beide Richtungen)\n\n\n\nTX veröffentlicht 0x22 vor dem Start. RX darf eine schmutzige Zeile nicht später zurückschreiben.\n\n\n\nSenden (CPU → DMA): frische Daten nur im Cache → DMA sendet alte RAM-Inhalte\nEmpfangen (DMA → CPU): frische Daten im RAM → CPU trifft veralteten Cache-Hit\nTX: Daten vor dem DMA-Start veröffentlichen. RX: Bereich vor der Übergabe vorbereiten und nach Abschluss synchronisieren\nNur „danach invalidieren“ schützt nicht vor einer schmutzigen Zeile, die später zurückschreibt\n\n\nBeide Seiten können sich „belügen“, wenn Kohärenz nicht hergestellt wird."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#cache-clean-invalidate",
@@ -3994,14 +3994,14 @@
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#uncached-dma-zonen",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Uncached DMA-Zonen",
-    "text": "Uncached DMA-Zonen\n\nAlternative: Speicherregion ohne Caching (oft per MPU / PMP)\nCPU greift dort immer direkt auf RAM zu\nKohärenz hardwareseitig einfacher; Zugriff etwas langsamer\nLinker platziert DMA-Puffer gezielt\n\nMEMORY {\n  RAM_CACHED   : ORIGIN = 0x20000000, LENGTH = 246K\n  RAM_UNCACHED : ORIGIN = 0x2003D800, LENGTH = 10K  /* DMA */\n}\n\nProfessioneller Ansatz in OS/RTOS: DMA-Buffer in uncached Segment, kein manuelles Flushen vergessen."
+    "text": "Uncached DMA-Zonen\n\n\n\nPMP schützt Zugriffe. Cacheability kommt von der Plattform, nicht vom Linkernamen.\n\n\n\nAlternative nur, wenn die Plattform einen nicht gecachten Bereich bereitstellt\nStandard-RISC-V-PMP regelt Zugriffsrechte, nicht Cacheability. Dafür sind PMAs oder die Plattform zuständig\nDer Linker legt .dma_buffer in einen Bereich, dessen Attribute schon gelten\nUncached ist nicht automatisch DMA-erreichbar und nicht die einzige professionelle Lösung\n\nMEMORY {\n  RAM_CACHED   : ORIGIN = 0x20000000, LENGTH = 246K\n  RAM_UNCACHED : ORIGIN = 0x2003D800, LENGTH = 10K  /* DMA */\n}\n\nKohärentes DMA, explizite Wartung und uncached Puffer sind drei systemabhängige Wege. Der Abschnittsname RAM_UNCACHED ändert die Hardware nicht."
   },
   {
-    "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#fragen-kanalkonfiguration",
-    "href": "vorlesungen/06_hardware_beschleunigung_dma.html#fragen-kanalkonfiguration",
+    "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#aufgabe-adresse-und-linker",
+    "href": "vorlesungen/06_hardware_beschleunigung_dma.html#aufgabe-adresse-und-linker",
     "title": "06 · Hardware-Beschleunigung (DMA)",
-    "section": "Fragen? — Kanalkonfiguration",
-    "text": "Fragen? — Kanalkonfiguration\n\nWelche vier Parameter braucht ein DMA-Kanal?\nWarum Destination-Increment bei UART-TX aus?\nCache-Kohärenz: Problem und Rolle von Clean/Invalidate?\n\n\nAls Nächstes: Burst vs. Single, Ringpuffer und Ping-Pong für endlose Streams."
+    "section": "Aufgabe — Adresse und Linker",
+    "text": "Aufgabe — Adresse und Linker\nWelche Adresse bleibt beim UART-TX fest? Macht der Name RAM_UNCACHED den Bereich uncached?\n\nDas TX-Register bleibt fest, die Quelladresse steigt. Cacheability setzt die Plattform. Der Linker platziert nur. Siehe Adressspur und die drei Ebenen."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#single-transfer-vs.-burst",
@@ -4015,7 +4015,7 @@
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#warum-burst-transfers",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Warum Burst-Transfers?",
-    "text": "Warum Burst-Transfers?\n\nOn-Chip-SRAM: Burst spart vor allem wiederholte Bus-Arbitration\nExternes DRAM (Block 1): Zeile öffnen kostet; offene Zeile → schnelle Column-Zugriffe\nBurst: einmal „aufmachen“, viele Words hintereinander — besonders bei DRAM deutlich effizienter\n\n\n\n\nModus\nTypischer Nachteil Single\nVorteil Burst\n\n\n\n\nOn-Chip-SRAM\n16× Arbitration\n1× Arbitration, hoher Durchsatz\n\n\nDRAM\nzusätzlich oft 16× Row-Aktivierung\n1× öffnen, 16× lesen\n\n\n\n\nSRAM-MCU: Burst = weniger Bus-Schiedsverfahren. DRAM-SoC: zusätzlich die Zeilenlogik aus Block 1."
+    "text": "Warum Burst-Transfers?\n\n\n\nEinzelzugriffe können dieselbe DRAM-Zeile treffen. 16 Aktivierungen sind keine Regel.\n\n\n\nOn-Chip-SRAM: Burst spart vor allem wiederholte Bus-Arbitration\nExternes DRAM (Block 1): Zeile öffnen kostet; offene Zeile → schnelle Column-Zugriffe\nEine offene Zeile kann mehrere Reads bedienen, auch bei getrennten SoC-Zugriffen\nEin Zeilenwechsel braucht PRE und ACT. SRAM hat diese Zeilenlogik nicht\n\n\n\n\n\n\n\n\n\nModus\nTypischer Nachteil Single\nVorteil Burst\n\n\n\n\nOn-Chip-SRAM\n16× Arbitration\n1× Arbitration, hoher Durchsatz\n\n\nDRAM\nZeile kann schon offen sein\nRow-Hits hängen von Abbildung und Politik ab\n\n\n\n\nSRAM-MCU: Burst = weniger Bus-Schiedsverfahren. DRAM-SoC: zusätzlich die Zeilenlogik aus Block 1."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#fifos-im-dmac",
@@ -4050,7 +4050,7 @@
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#double-buffering-ping-pong",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Double Buffering (Ping-Pong)",
-    "text": "Double Buffering (Ping-Pong)\n\nRing in zwei Hälften A und B\nDMA liest A → CPU füllt parallel B (und umgekehrt)\nKein Konflikt: getrennte Bereiche\n\n\nZwei Eimer: einer wird geleert, der andere gefüllt — stabile Multimedia-Wiedergabe."
+    "text": "Double Buffering (Ping-Pong)\n\n\n\nEine Hälfte dauert ideal etwa 23,22 ms. 30 ms Nachfüllen verpasst das Fenster.\n\n\n\nRing in zwei Hälften A und B\nDMA liest A → CPU füllt parallel B (und umgekehrt)\nKein Konflikt: getrennte Bereiche\n\n\nZwei Eimer: einer wird geleert, der andere gefüllt — stabile Multimedia-Wiedergabe."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#ping-pong-interrupt-logik",
@@ -4064,14 +4064,14 @@
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#half-transfer-interrupt-ht",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Half-Transfer-Interrupt (HT)",
-    "text": "Half-Transfer-Interrupt (HT)\n\nBei vielen Controllern: HT bei exakt 50 % von COUNT → erste Hälfte nachfüllen\nTC (COUNT = 0): zweite Hälfte nachfüllen (bei Circular: Wrap)\nEin Array + zwei Flags in der ISR (Namen/Bits herstellerspezifisch)\n\nvoid dma_isr(void) {\n    if (STATUS_REG & HALF_TRANSFER_FLAG)\n        fill_first_half();\n    if (STATUS_REG & TRANSFER_COMPLETE_FLAG)\n        fill_second_half();\n}\n\nHT + TC = Double Buffering ohne zwei separate Hardware-Kanäle."
+    "text": "Half-Transfer-Interrupt (HT)\n\nBei vielen Controllern: HT bei exakt 50 % von COUNT → erste Hälfte nachfüllen\nTC (COUNT = 0): zweite Hälfte nachfüllen (bei Circular: Wrap)\nEin Array + zwei Flags in der ISR (Namen/Bits herstellerspezifisch)\n\nvolatile unsigned ht_count, tc_count;\n\nvoid dma_isr(void) {\n    if (STATUS_REG & HALF_TRANSFER_FLAG) {\n        clear_ht(); /* Semantik laut Controller, bei W1C kein RMW */\n        ht_count++;\n    }\n    if (STATUS_REG & TRANSFER_COMPLETE_FLAG) {\n        clear_tc();\n        tc_count++;\n    }\n}\n/* Nachfüllen im Worker, nicht als lange Arbeit in der ISR */\n\nHT + TC = Double Buffering ohne zwei separate Hardware-Kanäle."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#ausblick-dma2d-2d-kopie",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#ausblick-dma2d-2d-kopie",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Ausblick: DMA2D (2D-Kopie)",
-    "text": "Ausblick: DMA2D (2D-Kopie)\n\nHigh-End-SoCs: 2D-DMA / Grafik-Accelerator (z. B. Chrom-ART)\nVersteht Rechtecke (\\(X\\)/\\(Y\\)), nicht nur lineare Bytes\nZeilenoffsets am Ende jeder Zeile — Ausschnitte aus Framebuffer-Layouts\n\n\nFür GUIs: Button aus Hintergrundbild kopieren, ohne CPU-Pixelschleifen."
+    "text": "Ausblick: DMA2D (2D-Kopie)\n\n\n\nRechteckstart 0x20004214. Acht Byte je Zeile, Quellpitch 640 Byte.\n\n\n\nHigh-End-SoCs: 2D-DMA / Grafik-Accelerator (z. B. Chrom-ART)\nVersteht Rechtecke (\\(X\\)/\\(Y\\)), nicht nur lineare Bytes\nZeilenoffsets am Ende jeder Zeile — Ausschnitte aus Framebuffer-Layouts\n\n\nFür GUIs: Button aus Hintergrundbild kopieren, ohne CPU-Pixelschleifen."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#scatter-gather-verkettete-listen",
@@ -4088,18 +4088,18 @@
     "text": "Grenzen von DMA\n\nVerschiebt Bytes — keine allgemeine Logik\nKein if auf Nutzdaten, keine Berechnung pro Byte\nKein Protokollverständnis (z. B. I2C-ACK): nur Reaktion auf DREQ/Handshake\nFür Entscheidungen bleibt die CPU zuständig\n\n\nAssistent ohne Gehirn: transportiert zuverlässig; bewertet und filtert nicht."
   },
   {
-    "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#fragen-streams-und-burst",
-    "href": "vorlesungen/06_hardware_beschleunigung_dma.html#fragen-streams-und-burst",
+    "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#aufgabe-cs-und-audiofenster",
+    "href": "vorlesungen/06_hardware_beschleunigung_dma.html#aufgabe-cs-und-audiofenster",
     "title": "06 · Hardware-Beschleunigung (DMA)",
-    "section": "Fragen? — Streams und Burst",
-    "text": "Fragen? — Streams und Burst\n\nWarum ist Burst (SRAM: Arbitration; DRAM: zusätzlich Row-Hits) effizienter?\nWas leistet Circular Mode?\nPing-Pong mit Half-Transfer: Ablauf?\n\n\nTheorie Streams abgeschlossen. Als Nächstes: Labor-Ausblick — Polling vs. DMA messbar machen."
+    "section": "Aufgabe — CS und Audiofenster",
+    "text": "Aufgabe — CS und Audiofenster\nDarf CS bei DMA-TC bereits HIGH werden? Was folgt aus 30 ms Nachfüllzeit im Audio-Beispiel?\n\nDMA-TC garantiert nicht den Leitungsabschluss. CS folgt dem Geräte- und Controllertiming. 30 ms liegen über den idealen 23,22 ms je Hälfte: Underrun beziehungsweise Overrun. Siehe Lebenszyklus und Ping-Pong."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#ausblick-labor-dma-in-renode",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#ausblick-labor-dma-in-renode",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Ausblick Labor: DMA in Renode",
-    "text": "Ausblick Labor: DMA in Renode\nGeplantes Szenario (Details im Übungsblatt):\n\nLanger String (z. B. HTML-Header) über UART\nRunde 1: Polling — CPU blockiert sichtbar\nRunde 2: DMA-Kanal — CPU rechnet/blinkt weiter, Text läuft im Hintergrund\n\n\nDieselben Dämonen wie in der Theorie: erst blockierend, dann asynchron entlastet."
+    "text": "Ausblick Labor: DMA in Renode\n\n\n\n4096 Byte, 8N1, 115200 Baud: ideal etwa 355,56 ms. Das ist eine Rechnung, keine Messung.\n\n\nGeplantes Szenario (Details im Übungsblatt):\n\nLanger String (z. B. HTML-Header) über UART\nRunde 1: Polling — CPU blockiert sichtbar\nRunde 2: DMA-Kanal — CPU rechnet/blinkt weiter, Text läuft im Hintergrund\n\n\nDieselben Dämonen wie in der Theorie: erst blockierend, dann asynchron entlastet."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#messung-1-polling-blockierend",
@@ -4134,49 +4134,49 @@
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#schritt-2-kanal-konfigurieren",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Schritt 2: Kanal konfigurieren",
-    "text": "Schritt 2: Kanal konfigurieren\n\nSRC = String im SRAM, DST = UART-TX-Register (fest)\nCOUNT = Länge; Memory-Increment an, Peripherie-Increment aus\n\nDMA_CH1-&gt;SRC_ADDR = (uint32_t)html_string;\nDMA_CH1-&gt;DST_ADDR = (uint32_t)&UART_TX_REG;\nDMA_CH1-&gt;COUNT    = string_laenge;\nDMA_CH1-&gt;CONTROL |= (DMA_MINC_EN | DMA_DIR_M2P);\n\nExakt die Parameter aus dem Theorieteil — Array wandert, TX-Adresse bleibt starr."
+    "text": "Schritt 2: Kanal konfigurieren\n\nSRC = String im SRAM, DST = UART-TX-Register (fest)\nCOUNT = Länge; Memory-Increment an, Peripherie-Increment aus\n\nDMA_CH1-&gt;SRC_ADDR = (uint32_t)(uintptr_t)html_string; /* fiktiv */\nDMA_CH1-&gt;DST_ADDR = (uint32_t)(uintptr_t)&UART_TX_REG;\nDMA_CH1-&gt;COUNT    = string_laenge; /* Einheit laut Controller */\nDMA_CH1-&gt;CONTROL  = DMA_MINC_EN | DMA_DIR_M2P; /* kein blindes |= */\n\nExakt die Parameter aus dem Theorieteil — Array wandert, TX-Adresse bleibt starr."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#schritt-3-interrupts-aktivieren",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#schritt-3-interrupts-aktivieren",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Schritt 3: Interrupts aktivieren",
-    "text": "Schritt 3: Interrupts aktivieren\n\nTransfer-Complete-Enable im DMA\nPLIC (bzw. Interrupt-Controller) für den Kanal freischalten\n\nDMA_CH1-&gt;CONTROL |= DMA_TCIE_EN;\nenable_interrupt(DMA_CH1_IRQn);  /* Pseudocode */\n\nEin IRQ am Ende statt eines IRQs pro Byte — Abschluss und ggf. nächster Auftrag."
+    "text": "Schritt 3: Interrupts aktivieren\n\nTransfer-Complete-Enable im DMA\nPLIC (bzw. Interrupt-Controller) für den Kanal freischalten\n\n/* TCIE in demselben kontrollierten CONTROL-Wort, nicht per Altzustand. */\nenable_interrupt(DMA_CH1_IRQn);  /* Pseudocode */\n\nEin IRQ am Ende statt eines IRQs pro Byte — Abschluss und ggf. nächster Auftrag."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#schritt-4-enable-startschuss",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#schritt-4-enable-startschuss",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Schritt 4: Enable (Startschuss)",
-    "text": "Schritt 4: Enable (Startschuss)\n\nENABLE-Bit setzen → Transfer startet hardwareseitig\nC-Funktion kehrt sofort zurück — CPU ist frei\n\nvoid start_dma_transfer(void) {\n    DMA_CH1-&gt;CONTROL |= DMA_ENABLE_BIT;\n    /* main() läuft sofort weiter */\n}\n\nEin Bit, und der Hintergrundtransfer läuft — Triumph der Delegation."
+    "text": "Schritt 4: Enable (Startschuss)\n\nENABLE-Bit setzen → Transfer startet hardwareseitig\nC-Funktion kehrt sofort zurück — CPU ist frei\n\nvoid start_dma_transfer(void) {\n    DMA_CH1-&gt;CONTROL = DMA_MINC_EN | DMA_DIR_M2P\n        | DMA_TCIE_EN | DMA_ENABLE_BIT;\n}\n\nEin Bit, und der Hintergrundtransfer läuft — Triumph der Delegation."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#erwartung-mit-dma",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#erwartung-mit-dma",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Erwartung mit DMA",
-    "text": "Erwartung mit DMA\n\nText erscheint weiter im Monitor\nLED blinkt ungestört (Heartbeat bleibt)\nCPU kann parallel rechnen; DMA nutzt Cycle Stealing\n\n\nZielbild im Simulator: System „lebt“, während Bytes asynchron ausgehen."
+    "text": "Erwartung mit DMA\n\nText erscheint weiter im Monitor\nDer Heartbeat kommt aus main(), nicht aus einer Timer-ISR und nicht aus Hardware-PWM\nDie LED kann weiterlaufen und trotzdem Busstalls haben. Das ist kein Beweis für null Last\nDMA-TC heißt: letztes Element übergeben. FIFO und Schieberegister können noch senden\n\n\nZielbild im Simulator: System „lebt“, während Bytes asynchron ausgehen."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#interrupt-handling-am-ende",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#interrupt-handling-am-ende",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Interrupt-Handling am Ende",
-    "text": "Interrupt-Handling am Ende\n\nCOUNT = 0 → Transfer Complete\nIn der ISR Status quittieren (Flag clear), sonst erneutes Feuern\n\nvoid dma_channel1_isr(void) {\n    if (DMA_STATUS_REG & TRANSFER_COMPLETE) {\n        DMA_CLEAR_REG = CLEAR_TRANSFER_COMPLETE;\n        /* optional: nächsten Transfer starten */\n    }\n}\n\nWie beim SysTick: Grund lesen, Flag löschen, zurück — Mission erfüllt."
+    "text": "Interrupt-Handling am Ende\n\nCOUNT = 0 → Transfer Complete\nIn der ISR Status quittieren (Flag clear), sonst erneutes Feuern\n\nvoid dma_channel1_isr(void) {\n    if (DMA_STATUS_REG & TRANSFER_COMPLETE) {\n        DMA_CLEAR_REG = CLEAR_TRANSFER_COMPLETE; /* W1C: schreiben, nicht RMW */\n        /* optional: nächsten Transfer starten */\n    }\n}\n\nWie beim SysTick: Grund lesen, Flag löschen, zurück — Mission erfüllt."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#zusammenfassung-block-6",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#zusammenfassung-block-6",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Zusammenfassung Block 6",
-    "text": "Zusammenfassung Block 6\n\nPolling blockiert; Interrupt-Stürme kosten Overhead\nDMA: spezialisierter Coprozessor für Speichertransfers\nDMAC als Bus-Master, Cycle Stealing mit dem Arbiter\nKanal: SRC, DST, COUNT, Breite, Increment\nCache-Kohärenz: Clean/Invalidate oder uncached Regionen\nCircular Mode, HT/TC → Ringpuffer und Ping-Pong\n\n\nCPU bleibt Gehirn; DMA ist der Muskel für Massenbewegungen."
+    "text": "Zusammenfassung Block 6\n\nPolling blockiert; Interrupt-Stürme kosten Overhead\nDMA: spezialisierter Coprozessor für Speichertransfers\nDMAC als Bus-Master, Cycle Stealing mit dem Arbiter\nKanal: SRC, DST, COUNT, Breite, Increment\nCache: Richtung, Besitz und Plattformsequenz. PMP ist kein Cache-Schalter\nCircular Mode, HT/TC → Ringpuffer und Ping-Pong\n\n\nCPU bleibt Gehirn; DMA ist der Muskel für Massenbewegungen."
   },
   {
     "objectID": "vorlesungen/06_hardware_beschleunigung_dma.html#ausblick-und-abschluss",
     "href": "vorlesungen/06_hardware_beschleunigung_dma.html#ausblick-und-abschluss",
     "title": "06 · Hardware-Beschleunigung (DMA)",
     "section": "Ausblick und Abschluss",
-    "text": "Ausblick und Abschluss\n\nÜbungsblatt: Polling vs. DMA in Renode nachvollziehen\nNächster Block: moderne CPU-Beschleunigung (u. a. Out-of-Order)\n\nVielen Dank — viel Erfolg im Labor.\n\nWenn Terminal flüssig schreibt und die LED weiterblinkt, ist die Architektur verstanden. Bis zum nächsten Block!"
+    "text": "Ausblick und Abschluss\n\nÜbungsblatt: Polling vs. DMA in Renode nachvollziehen\nNächster Block: moderne CPU-Beschleunigung (u. a. Out-of-Order)\n\nVielen Dank — viel Erfolg im Labor.\n\nQuellen, keine Übernahme als RISC-V-API: RISC-V Privileged, PMA/PMP; CMO/Zicbom; Linux DMA API zu Cachelines; AN4839 nur als Cortex-M7-Beispiel; STM32F4-HAL nur als Beispiel getrennter DMA- und UART-Abschlüsse; Renode Time Framework. Adressen dieser Folie bleiben fiktiv. Kein DMA-Modell im Repository.\n\n\nWenn Terminal flüssig schreibt und die LED weiterblinkt, ist die Architektur verstanden. Bis zum nächsten Block!"
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#willkommen-zu-block-8",
