@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360">
+<rect width="1200" height="360" fill="#fff"/>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>
+<text x="16" y="22" font-size="16" font-weight="600" fill="#1D1D1F" text-anchor="start">Dieselbe 2x2-Matmul. Lokaler Speicher fasst A und B, 8 Elemente.</text>
+<rect x="16" y="48" width="520" height="140" fill="#fff" stroke="#1565C0" stroke-width="1.4"/>
+<text x="28" y="74" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">Naiv, kein Halten</text>
+<text x="28" y="102" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">8 Produkte, jedes A und B neu</text>
+<text x="28" y="128" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">16 Float32-Loads = 64 Byte</text>
+<rect x="580" y="48" width="560" height="140" fill="#fff" stroke="#1B5E20" stroke-width="1.4"/>
+<text x="592" y="74" font-size="15" font-weight="600" fill="#1B5E20" text-anchor="start">Ein Tile, alles lokal</text>
+<text x="592" y="102" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">A und B einmal laden: 8 Floats</text>
+<text x="592" y="128" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">32 Byte extern, Produkte aus dem Tile</text>
+<text x="16" y="220" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Gewichte, Aktivierungen und Teilsummen getrennt zaehlen.</text>
+<text x="16" y="248" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">Zwischenaktivierungen koennen mehr Speicher brauchen als die Gewichte.</text>
+<text x="16" y="276" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Systolische Weitergabe hilft lokal. Den externen Verkehr beseitigt sie nicht.</text>
+<text x="16" y="310" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">Annahme: Element bleibt im Tile, kein Write-Allocate, Output-Bytes zunaechst getrennt.</text>
+<text x="16" y="338" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">CPU und GPU koennen dasselbe Blocking. Das Array ist eine Hardwareform davon.</text>
+</svg>

@@ -171,35 +171,27 @@ void setup_and_run_ai() {
 ::: {.content-visible when-profile="solution"}
 **Musterlösung Aufgabe 2.2**
 
-```cpp
-#include "tensorflow/lite/micro/all_ops_resolver.h"
-#include "tensorflow/lite/micro/micro_interpreter.h"
+Im Repository liegt kein TFLM-Stand und kein Modell. Der folgende Schnitt folgt dem Konstruktor ohne `ErrorReporter` und prüft Rückgaben. 10 KiB sind keine gemessene Arena. 128 einzelne Sensorwerte sind keine 3-Achsen-Serie. Die Klassen beschreiben eine Aktivität, keinen Schrittzähler.
 
-const int kTensorArenaSize = 10 * 1024;
-uint8_t tensor_arena[kTensorArenaSize];
+```cpp
+const int kTensorArenaSize = 10 * 1024; /* nicht gemessen */
+alignas(16) uint8_t tensor_arena[kTensorArenaSize];
 
 void setup_and_run_ai() {
-    const tflite::Model *model = tflite::GetModel(step_model_tflite);
-
+    const tflite::Model *model = tflite::GetModel(model_data);
+    if (model->version() != TFLITE_SCHEMA_VERSION) return;
     tflite::MicroInterpreter interpreter(
-        model, resolver, tensor_arena, kTensorArenaSize, error_reporter);
-
-    interpreter.AllocateTensors();
-
-    while (1) {
-        for (int i = 0; i < 128; i++)
-            input->data.f[i] = read_i2c_sensor();
-
-        interpreter.Invoke();
-
-        float score_laufen = output->data.f[2];
-        if (score_laufen > 0.8f)
-            printf("Nutzer laeuft!\n");
-    }
+        model, resolver, tensor_arena, kTensorArenaSize);
+    if (interpreter.AllocateTensors() != kTfLiteOk) return;
+    if (input->type != kTfLiteInt8) return;
+    /* Fenster, Achsen und scale aus dem Modell, nicht 128 Floats. */
+    if (interpreter.Invoke() != kTfLiteOk) return;
+    int8_t logit = output->data.int8[2];
+    (void)logit; /* kein Schwellenwert 0,8 ohne Outputsemantik */
 }
 ```
 
-(Hinweis: In realem TFLM-Code holt man `input`/`output` typisch über `interpreter.input(0)` / `output(0)` nach `AllocateTensors()` — hier didaktisch vereinfacht. Bei Int8-Modellen: `data.int8` statt `data.f`, plus De-/Quantisierung.)
+`labs/src/lab08_dense.c` prüft nur das Dense- und Quantisierungsbeispiel auf dem Host.
 :::
 
 ### Aufgabe 2.3: System-Auswirkungen in Renode
@@ -218,6 +210,6 @@ Sie führen das Programm in Renode auf einem RISC-V-SoC *ohne* NPU/RVV aus.
 ::: {.content-visible when-profile="solution"}
 **Musterlösung Aufgabe 2.3**
 
-1. `Invoke()` blockiert die CPU für sehr viele Takte (hunderttausende bis Millionen) — die Allzweck-CPU rechnet MACs mühsam über `lw`/`mul`/`sw`; die Memory Wall wird spürbar (träge Simulation/Terminal).
-2. Währenddessen fehlen Zyklen für System-Ticks, Busse, Sensorik. Für anspruchsvolle Edge-KI braucht es daher oft einen Beschleuniger (NPU/Vektor) als Co-Prozessor.
+1. Ohne ein im Repository vorhandenes Modell und ohne validiertes Timingmodell gibt es keine gemessene Invoke-Zeit. Eine funktionale Emulation wäre kein Beweis für die Memory Wall oder eine NPU.
+2. Ob ein Beschleuniger nötig ist, hängt von Datentyp, Auslastung und Transferkosten ab. Eine NPU entsteht nicht dadurch, dass der Chip eine besitzt.
 :::
