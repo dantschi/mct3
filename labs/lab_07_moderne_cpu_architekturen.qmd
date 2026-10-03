@@ -63,9 +63,9 @@ Out-of-Order-(OoO-)CPUs lösen falsche Abhängigkeiten und führen Befehle async
 ::: {.content-visible when-profile="solution"}
 **Musterlösung Aufgabe 1.2**
 
-1. Intern gibt es einen großen Pool physischer Register; die 32 RISC-V-Architektur-Register werden dynamisch darauf abgebildet. Für den Schreibvorgang von Befehl 3 erhält `t0` ein *neues* physisches Register (z. B. `t0` → `P11`), während Befehl 2 weiter aus dem alten Mapping (`P10`) liest. Schreibziele sind physisch getrennt → WAR verschwindet; beide können im selben Issue-Takt auf zwei ALUs laufen.
+1. Intern gibt es physische Register; die 32 RISC-V-Integernamen werden darauf abgebildet. `x0` bleibt fest 0. Befehl 2 liest die alte Version von `t0`. Befehl 3 erhält ein neues physisches Ziel. Die WAR-Kante entfällt dadurch. Ein gemeinsames Issue braucht zusätzlich freie Ports.
 
-2. OoO führt aus, sobald Operanden bereit sind — spätere Befehle können fertig sein, während frühere noch auf RAM warten. Ein Interrupt mittendrin träfe einen inkonsistenten Zustand. Der ROB hält Ergebnisse spekulativ und *committet* streng in Programmreihenfolge in Architektur-Register/RAM — nach außen erscheint eine sequentielle CPU.
+2. Jüngere Befehle können fertig sein, während ein älterer Load noch fehlt. Eine synchrone Exception an einem älteren Befehl darf dessen normalen Effekt nicht committen; jüngere Effekte werden verworfen. Ein Interrupt ist kein fehlerhafter Befehl, sondern wird an einer zulässigen Grenze angenommen. Im PRF-Modell stehen Werte in physischen Registern. Der ROB verfolgt die Ordnung. In-order-Retire macht den Architekturzustand sichtbar und ordnet den Speicher für andere Kerne nicht automatisch nach RVWMO.
 :::
 
 {{< pagebreak >}}
@@ -152,9 +152,9 @@ Gegeben die tatsächliche Sprungsequenz: **T, T, NT, NT, T**.
 ::: {.content-visible when-profile="solution"}
 **Musterlösung Aufgabe 2.3**
 
-1. Rollback verwirft spekulative Register-Updates und unterbindet spekulative Stores in den RAM. Spekulativ geladene Daten hinterlassen aber Spuren in den **Cache-Lines** (z. B. L1) — die bleiben.
+1. Rollback verwirft spekulative Architektureffekte und stellt das gültige Mapping wieder her. Er löscht nicht jede Cache-Spur. Bei Spectre-v1 bleibt die Bounds-Prüfung architektonisch korrekt; der vorhergesagte Pfad läuft nur transient.
 
-2. Der Angreifer zwingt die CPU spekulativ zu einem Array-Zugriff, dessen Index von einem „Geheimnis“ abhängt. Nach dem Rollback misst er die Zugriffszeit auf seine Array-Elemente: der schnelle Hit verrät die Position und damit das Geheimnis.
+2. Das Geheimnis muss die Adresse eines folgenden Zugriffs beeinflussen. Nach dem Squash misst der Angreifer Zugriffszeiten. Ein schneller Hit ist ein verrauschtes Indiz, kein Beweis. KPTI trifft vor allem den ursprünglichen Meltdown-Mechanismus und ist keine universelle Spectre-Lösung.
 :::
 
 {{< pagebreak >}}
@@ -191,12 +191,11 @@ Dokumentieren Sie Ihre Beobachtungen in wenigen Sätzen.
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 3.1** (exemplarisch; Details je nach Godbolt-/GCC-Version)
+**Musterlösung Aufgabe 3.1**
 
-**`-O1`:** Die Schleife bleibt nah am C-Original: typisch `lw` für `a[i]`/`b[i]`, dann zeitnah `add`, dann `sw`; viele Branches, da jedes Element eine Iteration ist.
+Godbolt zeigt die Übersetzung, keine OoO-Zyklen. `-O3` garantiert weder Unrolling noch eine kürzere Laufzeit. Beobachten Sie die tatsächlich erzeugten `lw`/`add`/`bne` und notieren Sie Compiler, Version und Flags.
 
-**`-O3`:**
+Eine Reduktion bleibt eine RAW-Kette, bis der Compiler sie unter erlaubter Semantik aufteilt. Weniger Assemblerzeilen sind keine Laufzeit. Renode ohne Pipeline-Modell und Ripes mit einem skalaren Modell belegen kein Desktop-IPC.
 
-- *Scheduling:* Oft mehrere `lw` für unterschiedliche Indizes vor dem ersten `add` — Wartezeit auf den ersten Load wird mit dem nächsten Load gefüllt (weniger Load-Use-Stalls).
-- *Unrolling:* Mehrere Index-Schritte (z. B. 4 oder 8) pro Schleifenkörper → weniger Kontroll-Overhead (`addi`/`bne`). Weniger Branches → selteneres Flush-Risiko für die Prediction.
+Die Datei `labs/src/lab07_ilp.c` hält zwei funktional gleiche Reduktionen. Ein Host-GCC-Lauf prüft nur die Ergebnisgleichheit, nicht RISC-V-Scheduling.
 :::

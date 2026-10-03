@@ -35,7 +35,7 @@ Caches und DMA haben externe Engpässe entschärft. Zurück zum Prozessorkern: W
 Kurz-Recap aus Block 6 (Vertiefung im Übungsblatt):
 
 - DMA kopiert Arrays autonom; Polling blockiert die CPU stark
-- Mit DMA bleibt die Hauptschleife (z. B. LED) oft reaktionsfähig
+- Ein Heartbeat aus `main()` kann weiterlaufen. Das beweist keine Last von null
 - Bus-Mastering und Cycle Stealing: DMA teilt sich den Bus mit der CPU
 - Folge: weniger ALU-Zeit für stupides Kopieren — mehr Zeit für echte Berechnung
 
@@ -43,7 +43,7 @@ Kurz-Recap aus Block 6 (Vertiefung im Übungsblatt):
 /* Konzept — Adressen/Bits fiktiv bzw. Datenblatt */
 DMA_CH1->SRC_ADDR = (uint32_t)text_array;
 DMA_CH1->DST_ADDR = (uint32_t)&UART_TX;
-DMA_CH1->CONTROL |= DMA_ENABLE;  /* CPU kehrt sofort zurück */
+DMA_CH1->CONTROL = DMA_ENABLE;  /* fiktiv, kein blindes |= */
 ```
 
 ::: notes
@@ -63,6 +63,8 @@ Alles außerhalb des L1 blenden wir didaktisch aus — Takte, Gatter, Instruktio
 
 ## Refresher MCT1: 5-Stufen-Pipeline
 
+![Fünf ALU-Befehle, neun Takte, CPI 1,8. Ein Stall ohne Forwarding macht zehn Takte.](../assets/figures/07_moderne_cpu_architekturen/pipe.png)
+
 Klassische RISC-Pipeline (Harris/Harris):
 
 | Stufe | Name | Aufgabe |
@@ -73,7 +75,7 @@ Klassische RISC-Pipeline (Harris/Harris):
 | MEM | Memory | Datenspeicher |
 | WB | Write Back | Ergebnis ins Registerfile |
 
-Idealfall nach Füllen: ein abgeschlossener Befehl pro Takt.
+Nach dem Füllen strebt der Durchsatz gegen ein Retire je Takt. Fünf Befehle brauchen im Modell ohne Stall $N+k-1 = 9$ Takte, mittleres CPI $= 1{,}8$.
 
 ::: notes
 Stand MCT1: Fließband mit fünf Stufen — Grundlage für alles Weitere heute.
@@ -81,17 +83,18 @@ Stand MCT1: Fließband mit fünf Stufen — Grundlage für alles Weitere heute.
 
 ## Metriken: IPC und CPI
 
-- IPC (Instructions Per Cycle): abgeschlossene Befehle pro Takt (höher besser)
-- CPI (Cycles Per Instruction): Takte pro Befehl im Mittel (niedriger besser)
-- Kehrwerte: $\mathrm{CPI} = 1/\mathrm{IPC}$
-- Laufzeit:
+- IPC: retired ISA-Instruktionen pro Core-Takt im betrachteten Fenster
+- Execution-Completion und Retire können in verschiedenen Takten liegen
+- Micro-Ops sind keine ISA-IPC
+- CPI = Takte / retired Instruktionen. CPI und IPC sind nur dann Kehrwerte
+- Laufzeit bei konstanter Frequenz $f$ im selben Fenster:
 
 $$
-T = N_{\mathrm{Instr}} \times \mathrm{CPI} \times T_{\mathrm{Takt}}
+T = N \times \mathrm{CPI} / f
 $$
 
 ::: notes
-Drei Hebel: weniger Befehle, kürzerer Takt, bessere Architektur (kleineres CPI).
+Ein Compiler kann N ändern. Höheres IPC allein verkürzt die Laufzeit nicht. Mittelwerte verschiedener Läufe nicht ungewichtet invertieren. Kurze Sequenzen enthalten Füllung und Leerung.
 :::
 
 ## Limit der skalaren Pipeline
@@ -108,9 +111,9 @@ Mauer der MCT1-Architektur: IPC höchstens 1 im Ideal — oft darunter.
 ## Die Taktraten-Mauer (Power Wall)
 
 - Idee der 2000er: Frequenz massiv erhöhen (GHz-Wettrennen)
-- Dynamische Verlustleistung und Leckströme begrenzen den sinnvollen Takt
-- Typisch: Desktop-/Mobile-Kerne oft im Bereich weniger GHz — nicht „unendlich“
-- CPI/IPC verbessern, statt nur höher zu takten
+- Vereinfacht $P_{dyn} \approx \alpha C V^{2} f$. Leckleistung ist davon getrennt
+- Keine feste Frequenzgrenze aus dieser Formel. Breitere Kerne brauchen mehr Ports, Scheduler und Bypass
+- CPI verbessern ist ein Weg, kein kostenloser Ersatz für Takt
 
 ::: notes
 Pentium-4-Ära: Hoffnung auf extrem hohe GHz — Physik und Kühlung setzen Grenzen.
@@ -118,20 +121,14 @@ Pentium-4-Ära: Hoffnung auf extrem hohe GHz — Physik und Kühlung setzen Gren
 
 ## Die Leitfrage des Tages
 
+![Skalar 4/5 = 0,8. Zweifach 4/3 ≈ 1,33. Ein Doppeltakt ist nicht das mittlere IPC.](../assets/figures/07_moderne_cpu_architekturen/width.png)
+
 - Taktfrequenz: physikalisch begrenzt
 - Skalare Pipeline: Ideal $\mathrm{CPI} = 1$ (mit Stalls oft $> 1$)
-- Wie erreicht man $\mathrm{CPI} < 1$ (mehrere Completions pro Takt) bei gleichem Takt?
+- Wie kann der Kern langfristig mehr als eine ISA-Instruktion je Takt retiren?
 - Antwort: Parallelität *innerhalb* des Kerns (ILP ausnutzen)
 
-```{mermaid}
-%%| fig-width: 3.4
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  A[Befehl 1] --> C[Completion in Takt 1]
-  B[Befehl 2] --> C
-  C --> D[IPC = 2, CPI = 0.5]
-  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+Das Zeitdiagramm oben ersetzt die Ein-Takt-Skizze. IPC wird über das ganze Fenster gerechnet.
 
 ::: notes
 Nicht schneller takten — breiter und smarter schedulen.
@@ -180,6 +177,8 @@ Viele Programme haben unabhängige Teilrechnungen — das ist der Hebel für IPC
 
 ## Datenabhängigkeiten: RAW
 
+![I1–I3: RAW bleibt, WAR und WAW sind Namenskonflikte auf t0.](../assets/figures/07_moderne_cpu_architekturen/deps.png)
+
 - True Dependency / Read-After-Write (RAW): Befehl 2 braucht Ergebnis von Befehl 1
 
 ```asm
@@ -187,7 +186,8 @@ add t0, t1, t2   # schreibt t0
 sub t3, t0, t4   # liest t0 — muss warten
 ```
 
-- Keine Parallelität dieser beiden im selben EX-Schritt — ILP dieses Paares = 1 (rein sequentiell)
+- Dieses Paar hat ILP 1. Das ist keine Aussage über das ganze Programm
+- Forwarding verkürzt die Wartezeit und hebt die RAW-Kante nicht auf
 
 ::: notes
 Bekannt aus MCT1: echte Datenabhängigkeit — Hardware kann Mathematik nicht „wegoptimieren“.
@@ -206,7 +206,8 @@ Beide Ansätze ergänzen sich; High-End-Kerne verlassen sich stark auf Hardware-
 ## Superskalare Architekturen
 
 - Skalar: typisch ein Issue pro Takt
-- Superskalar: Multiple Issue — mehrere Befehle starten (nahezu) im selben Takt die Execute-Phase
+- Superskalar: Multiple Issue. Das ist noch nicht Out-of-Order
+- Fetch-Bytes, Decode, Issue, Ports und Retire-Breite sind verschiedene Größen
 - Pipeline wird „breiter“: mehrspurige Autobahn statt einspurigem Fließband
 
 ::: notes
@@ -215,31 +216,18 @@ Erster Schritt zu CPI < 1: Execution Units und Issue-Breite vervielfachen.
 
 ## Mehrere Execution Units
 
-Beispiel Issue-Width $\approx 3$:
+![Fetch, Decode, Issue, zwei ALU, eine LSU, Retire 2. Der Engpass ist hier das Retire.](../assets/figures/07_moderne_cpu_architekturen/frontend.png)
 
-- ALU 1, ALU 2 (Integer/Logik)
-- Load/Store-Unit
-
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  ID[Decode] -->|1| ALU1[ALU 1]
-  ID -->|2| ALU2[ALU 2]
-  ID -->|3| LSU[Load/Store]
-  ALU1 --> WB[Write Back]
-  ALU2 --> WB
-  LSU --> WB
-  style ID fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+- Zwei Integer-ALU und eine LSU sind das vereinfachte Modell aus der Abbildung
+- Ein pipelinierter Multiplizierer trennt Latenz und Initiationsintervall
 
 ::: notes
-Drei unabhängige Befehle → drei Units → im Ideal drei Completions; CPI kann unter 1 sinken.
+Drei Units reichen nicht für IPC 3. Im Bild begrenzt die Retire-Breite 2 den nachhaltigen Durchsatz, wenn alles andere passt.
 :::
 
 ## Multi-Issue Fetch und Decode
 
-- Fetch holt mehrere Instruktionen pro Takt aus dem I-Cache (z. B. 16 Byte)
+- Fetch holt zum Beispiel 16 Byte. Mit der C-Erweiterung ist das keine feste Instruktionszahl
 - Decode prüft Abhängigkeiten *zwischen* den Kandidaten und verteilt auf Units
 - Aufwand der Abhängigkeitsprüfung wächst stark mit der Issue-Width
 
@@ -259,14 +247,17 @@ Breit, aber starr: ein Stau vorne blockiert freie Units hinten.
 
 ## Problem: Cache-Miss in-order
 
+![Dieselben vier Befehle: in-order 7 Takte, OoO 6 Takte. Der Miss bleibt, Retire wartet.](../assets/figures/07_moderne_cpu_architekturen/ooo.png)
+
 ```asm
 lw  t0, 0(s1)    # Miss → viele Wartezyklen
 add t1, t0, t2   # RAW auf t0 → muss warten
 sub t4, t5, t6   # unabhängig — trotzdem oft blockiert
 ```
 
-- In-Order: unabhängiger `sub` wartet hinter dem Stau
-- Units stehen ungenutzt — IPC bricht ein
+- Lehrannahme hier: der In-Order-Kern gibt hinter dem wartenden Load nichts weiter aus
+- Reale In-Order-Kerne dürfen davon abweichen
+- Der Miss bleibt auch bei OoO bestehen. Unabhängige Befehle können ihn nur überlappen
 
 ::: notes
 Cache-Misses sind Gift für strikte Programmreihenfolge trotz freier ALUs.
@@ -306,29 +297,27 @@ Wieder Register-Recycling: mathematisch unabhängig, architektonisch verkoppelt.
 
 ## Engpass: 32 ISA-Register
 
-- RISC-V: 32 Architektur-Register `x0`–`x31`
-- Compiler muss Register stark wiederverwenden → viele WAW/WAR
-- Künstliche Konflikte drosseln ausnutzbares ILP
+- RV32I und RV64I: 32 Integerregister `x0`–`x31`. `x0` ist fest 0
+- Das sind Architektur-Namen, keine physischen Kisten. RV32E hat ein anderes Registerprofil
+- Wiederverwendung erzeugt WAR/WAW. Erweiterungen bringen weitere Registerdateien
 
 ::: notes
-ISA-Register sind die sichtbare Schnittstelle — zu wenige physische „Kisten“ für aggressives Scheduling.
+Zu wenige Namen erzeugen falsche Abhängigkeiten. Wie viele physische Register ein Kern hat, steht nicht in der ISA.
 :::
 
-## Fragen? — ILP und Superskalarität
+## Aufgabe — RAW und Breite
 
-- Wie hebt Superskalarität die IPC?
-- Warum stoppt ein Cache-Miss eine In-Order-Pipeline oft global?
-- RAW vs. WAW/WAR?
+Warum bleibt die Kante von I1 nach I2 bestehen, obwohl I3 und I4 unabhängig sind? Warum folgt aus zwei ALU nicht IPC 2?
 
 ::: notes
-Als Nächstes: Out-of-Order — Staus umfahren, falsche Abhängigkeiten per Renaming auflösen.
+I2 liest t0, das I1 erst liefert. Das ist RAW. I3 und I4 können den Miss nur überlappen. Die Retire-Breite und der älteste unfertige Befehl begrenzen den Durchsatz. Siehe Abhängigkeitsbild und das OoO-Zeitdiagramm.
 :::
 
 ## Out-of-Order Execution (OoO)
 
 - Dynamisches Scheduling: blockierte Befehle „parken“
 - Unabhängige spätere Befehle dürfen vorgezogen werden
-- Ausführung asynchron, sobald Operanden bereit sind — nicht strikt nach Programmzeile
+- Issue in datenabhängiger, dynamisch gewählter Reihenfolge. Der Kern bleibt getaktet
 
 ::: notes
 Modern: nicht mehr nur „nächster PC“ — freie Units mit bereiten Operanden füttern.
@@ -337,8 +326,8 @@ Modern: nicht mehr nur „nächster PC“ — freie Units mit bereiten Operanden
 ## Datenfluss-Maschine
 
 - Instruktion „feuert“, wenn Operanden da sind — nicht nur wenn der PC sie erreicht
-- Cache-Miss blockiert vor allem *abhängige* Nachfolger
-- Unabhängiger Code kann am Stau vorbeilaufen
+- Der Miss blockiert die Nutzer des Load. Unabhängige Befehle können vorbeilaufen, bis Issue-Queue oder ROB voll sind
+- „Nur Abhängige warten“ gilt nicht ohne diese Grenzen
 
 ::: notes
 Paradigmenwechsel: vom starren Befehlszeiger zum datengetriebenen Issue.
@@ -379,15 +368,17 @@ Vorne geordnet lesen, Mitte ausnutzen, hinten Ordnung für Software/OS wiederher
 
 ## Register Renaming
 
-- OoO-Kerne: großer Pool physischer Register (Größenordnung: oft $> 100$)
-- Architektur-Register (`x0`–`x31`) sind Namen / Mapping
-- Jeder Befehl mit Zielregister bekommt typisch ein neues freies physisches Ziel
+- Die ISA-Namen werden auf eine größere physische Datei abgebildet. Eine Zahl über 100 ist kein allgemeines Minimum
+- Jeder Befehl mit Ziel außer der festen Null bekommt typisch ein neues physisches Register
+- Befehle ohne Ziel und `x0` sind Ausnahmen
 
 ::: notes
 Genialer Trick: WAW/WAR verschwinden, weil Schreibziele physisch getrennt werden.
 :::
 
 ## Renaming am Beispiel (WAW)
+
+![A schreibt P10, B liest P10, C schreibt P11. E/F zeigen das WAR-Muster.](../assets/figures/07_moderne_cpu_architekturen/rename.png)
 
 ```asm
 add t0, t1, t2
@@ -399,7 +390,7 @@ Hardware (schematisch):
 - `add` → schreibt `P10` (Mapping `t0` → `P10`)
 - `sub` → schreibt `P11` (neues Mapping `t0` → `P11`)
 
-Kein gemeinsames physisches Ziel → paralleles Issue möglich.
+Getrennte Ziele erlauben unabhängige Ausführung. Zwei belegte ALU-Ports können das Issue trotzdem verhindern.
 
 ::: notes
 Namen werden recycelt, physische Kisten sind frisch — ILP gerettet.
@@ -408,8 +399,8 @@ Namen werden recycelt, physische Kisten sind frisch — ILP gerettet.
 ## Reservation Stations
 
 - Nach Renaming: Befehle in Reservation Stations / Issue Queue
-- Puffer vor den Units (oft viele Dutzend bis $> 100$ Einträge)
-- Warten auf Operanden (physische Register / Tag-Match am Datenbus)
+- Klassisch Reservation Stations, alternativ eine gemeinsame Issue Queue. Ein einzelner Common Data Bus ist nur das Lehrbild
+- Operand bereit reicht nicht: Unit, Port und Auswahlregel müssen passen
 
 ::: notes
 Wartehalle: Bordkarte = physische Register; Abflug = Operanden komplett.
@@ -437,18 +428,12 @@ Betriebssysteme erwarten präzise, geordnete Architektursicht — nicht Zwischen
 
 ## Reorder Buffer (ROB)
 
-- ALU-/Load-Ergebnisse nicht sofort final sichtbar schreiben
-- Zuerst in den ROB (Ringpuffer), sortiert nach ursprünglicher Programmordnung
+![Werte stehen in der PRF. Der ROB merkt sich Ordnung, Ready und Exceptions.](../assets/figures/07_moderne_cpu_architekturen/rob.png)
 
-```{mermaid}
-%%| fig-width: 3.6
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  ALU1 -->|Befehl 5 fertig| ROB[(ROB)]
-  ALU2 -->|Befehl 2 fertig| ROB
-  LSU -->|Befehl 1 fertig| ROB
-  style ROB fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+- In diesem PRF-Modell schreibt die ALU in ein physisches Register, nicht in den ROB
+- Der ROB führt Reihenfolge, Completion, Exception und Zielmetadaten. Ein result-holding ROB wäre ein anderes, hier nicht verwendetes Modell
+
+Das PRF-Bild ersetzt den Ergebniszylinder. Fertige jüngere Befehle stehen in physischen Registern, bis der Head retiriert.
 
 ::: notes
 Netz mit doppeltem Boden: rechnen darf chaotisch sein — sichtbar werden geordnet.
@@ -456,10 +441,12 @@ Netz mit doppeltem Boden: rechnen darf chaotisch sein — sichtbar werden geordn
 
 ## In-Order Commit (Retire)
 
-- Commit nur am ältesten noch nicht retired Befehl
-- Erst dann: finales Update der Architektur-Register / Stores
-- Spätere fertige Einträge warten im ROB, bis die Vorgänger committed sind
-- Nach außen: scheinbar sequentielle CPU
+![Store-Queue, Commit und Drain sind drei Schritte. Aliase kann Renaming nicht lösen.](../assets/figures/07_moderne_cpu_architekturen/lsu.png)
+
+- Retire nur am ältesten noch nicht retired Befehl, bis zur Retire-Breite
+- Dadurch wird der Architektur-Registerzustand sichtbar. Ein Store darf danach noch im Puffer stehen
+- Andere Beobachter sehen Speicher nach RVWMO, nicht automatisch in dieser Retire-Reihenfolge
+- Spätere fertige Einträge warten, auch wenn ihre PRF-Werte schon stehen
 
 ::: notes
 Programmierer und OS sehen geordnete Semantik — trotz OoO im Back-End.
@@ -467,13 +454,12 @@ Programmierer und OS sehen geordnete Semantik — trotz OoO im Back-End.
 
 ## Exceptions und ROB
 
-- Commit stoppt am fehlerhaften / unterbrochenen Befehl
-- Jüngere ROB-Einträge verwerfen (Squash)
-- Architekturzustand entspricht dem Stand vor dem Commit dieses Befehls
-- Danach: Trap / ISR — spekulative Arbeit war unsichtbar
+- Synchrone Exception: ältere Instruktionen dürfen committen. Die fehlerhafte Instruktion committet ihren normalen Effekt nicht. Jüngere Effekte werden verworfen
+- Ein asynchroner Interrupt hat keinen fehlerhaften Befehl. Er wird an einer zulässigen präzisen Grenze angenommen
+- Recovery stellt das gültige Mapping wieder her
 
 ::: notes
-Eleganz: Zukunftsberechnungen verwerfen, ohne RAM-Inkonsistenzen zu hinterlassen.
+Der Architekturzustand wird präzise. Ein verworfener Store ist nicht dasselbe wie ein unsichtbarer Cache-Seiteneffekt.
 :::
 
 ## Grenzen von OoO
@@ -500,19 +486,17 @@ Königsklasse für Desktop/Phone — für Knopfzellen-Sensoren oft ungeeignet.
 Anatomie eines High-End-Kerns in einem Satz: geordnet rein, parallel rechnen, geordnet raus.
 :::
 
-## Fragen? — Out-of-Order
+## Aufgabe — Version und Exception
 
-- Ziel des Register Renamings?
-- Rolle der Reservation Stations?
-- Warum ist der ROB für Interrupts/Exceptions unverzichtbar?
+Welche physische Version liest Befehl B? Was bleibt architektonisch gültig, wenn I2 eine synchrone Exception auslöst, nachdem nur I1 retiriert wurde?
 
 ::: notes
-Fortsetzung: Branch Prediction — Sprünge, die selbst OoO-Kerne teuer treffen können.
+B liest P10, nicht P11. Nach Retire von I1 ist t0 = 10. I2 committet nicht, I3 und I4 werden verworfen. Ein Interrupt ist davon getrennt: er hat keinen fehlerhaften Befehl. Siehe Rename-Tabelle und ROB-Bild.
 :::
 
 ## Control Hazards
 
-- Datenabhängigkeiten: u. a. per Renaming entschärft
+- WAR und WAW kann Renaming entfernen. RAW bleibt. Kontrollfluss ist ein eigener Engpass
 - Neuer Engpass: Kontrollfluss (`beq` und andere Branches)
 - Beim Fetch des Branch: welcher nächste PC — Fall-through oder Target?
 - Entscheidung oft erst nach dem Vergleich in EX (oder später in tiefen Pipelines)
@@ -534,21 +518,24 @@ Tiefe Pipelines erhöhen die Branch Penalty: falsch geraten heißt viele Arbeits
 
 ## Misprediction: Zahlenbeispiel
 
+![CPI 1,30 heißt 30 Prozent längere Laufzeit und etwa 23,1 Prozent weniger Durchsatz.](../assets/figures/07_moderne_cpu_architekturen/cpi.png)
+
 - $20\,\%$ der Befehle sind Branches
 - Misprediction-Rate $10\,\%$, Penalty $15$ Takte
 - Basis-CPI $= 1$ (ideale Pipeline ohne andere Stalls)
 - CPI-Aufschlag: $0{,}20 \times 0{,}10 \times 15 = 0{,}30$
-- Effektives CPI $\approx 1{,}30$ → ca. $23\,\%$ langsamer als ideal
+- Effektives CPI $= 1{,}30$: bei gleichem $N$ und $f$ ist die Laufzeit 30 Prozent länger
+- Der Durchsatz sinkt auf $1/1{,}30 \approx 0{,}769$, also rund 23,1 Prozent
 
 ::: notes
-Klausurtypisch: Branch-Anteil $\times$ Fehlrate $\times$ Penalty aufs CPI aufschlagen. $1{,}30/1 = 1{,}30$ Takte pro Befehl $\Rightarrow$ Durchsatz $1/1{,}30 \approx 0{,}77$ — rund $23\,\%$ langsamer.
+Modell ohne Überlappung: Anteil mal Fehlrate mal Penalty. 1,30 CPI bedeutet 30 Prozent mehr Laufzeit und etwa 23 Prozent weniger Durchsatz. Nicht 23 Prozent länger.
 :::
 
 ## Branch Prediction
 
 - Nicht warten — spekulativ den wahrscheinlichen Weg füllen
 - Vorhersage typisch schon beim Fetch
-- Treffer: praktisch keine Branch-Latenz
+- Ein Treffer vermeidet den Flush, ist aber nicht automatisch kostenlos
 - Fehlprognose: Flush / Misprediction Penalty
 - Ziel: hohe Accuracy (in der Praxis oft deutlich über 90 %)
 
@@ -581,6 +568,8 @@ Maschinenlernen auf unterster Ebene: pro Sprungstelle Historie im Silizium.
 
 ## Branch History Table (BHT)
 
+![Richtung in der BHT, Ziel im BTB. 0x04 und 0x24 aliasen. gshare: 0101 XOR 0011 = 0110.](../assets/figures/07_moderne_cpu_architekturen/bpred.png)
+
 - Kleiner schneller Speicher (oft SRAM) für Predictions
 - Index: typisch untere PC-Bits der Branch-Adresse
 - Parallel zum Fetch: Eintrag liefert Taken/Not-Taken-Historie
@@ -602,6 +591,8 @@ Zu reaktiv: ein Abbruch überschreibt die „Schleifen-Meinung“ zu aggressiv.
 
 ## 2-Bit saturierender Zähler
 
+![Vollständiger Automat. Ab Zustand 11 kostet TTTT N genau einen Miss je Durchlauf.](../assets/figures/07_moderne_cpu_architekturen/pred.png)
+
 Industrie-Standard: Zustände $00$–$11$
 
 | Code | Bedeutung | Vorhersage |
@@ -611,23 +602,10 @@ Industrie-Standard: Zustände $00$–$11$
 | $10$ | Weakly Taken | Taken |
 | $11$ | Strongly Taken | Taken |
 
-Taken: $+1$ (Sättigung bei $11$); Not Taken: $-1$ (Sättigung bei $00$).
-
-```{mermaid}
-%%| fig-width: 4.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  S00["00 Strong NT"] -->|Taken| S01["01 Weak NT"]
-  S01 -->|Taken| S10["10 Weak T"]
-  S10 -->|Taken| S11["11 Strong T"]
-  S11 -->|Not-Taken| S10
-  S10 -->|Not-Taken| S01
-  S01 -->|Not-Taken| S00
-  style S11 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+Taken: $+1$ (Sättigung bei $11$); Not Taken: $-1$ (Sättigung bei $00$). Die Selbstschleifen an $00$ und $11$ stehen im Diagramm.
 
 ::: notes
-State Machine mit Schwelle in der Mitte: $10$/$11$ → Taken, sonst Not Taken.
+Start im schwachen Not-Taken $01$, erstes Ergebnis Taken: Vorhersage Not Taken, Folgezustand $10$. Ab stark Taken kostet die Folge T T T T N einen Miss. Der unvollständige Kettengraph ohne Sättigungsschleifen gilt nicht mehr.
 :::
 
 ## Hysterese des 2-Bit-Zählers
@@ -635,7 +613,7 @@ State Machine mit Schwelle in der Mitte: $10$/$11$ → Taken, sonst Not Taken.
 - Lange Schleife → oft $11$ (Strongly Taken)
 - Einmaliges Ende: $11 \rightarrow 10$ — Vorhersage bleibt Taken
 - Nächster Schleifeneintritt: oft sofort korrekt; Zähler steigt wieder
-- Meinungswechsel erst nach zwei widersprechenden Ergebnissen in Folge
+- Aus einem starken Zustand braucht der Wechsel zwei widersprechende Ergebnisse. Aus einem schwachen Zustand genügt eines
 
 ::: notes
 Trägheit spart Fehlprognosen bei typischen Schleifenabbrüchen.
@@ -656,7 +634,7 @@ GPS-Gedächtnis: nicht nur links/rechts, sondern die Zielkoordinaten ohne Wartez
 
 - Branches korrelieren oft im C-Kontrollfluss
 - Global History Register (GHR): Bitmuster der letzten $N$ Outcomes
-- Indexierung der Prediction-Tabellen mit lokaler + globaler Historie
+- gshare ist ein konkretes Modell: PC-Index XOR globale Historie. Das ist nicht automatisch lokale plus globale Historie
 - Erkennt Muster über einzelne Sprungstellen hinweg
 
 ::: notes
@@ -665,27 +643,25 @@ Nicht nur „dieser `beq`“, sondern „was tat das Programm kurz davor?“.
 
 ## Fortgeschrittene Prädiktoren
 
-- High-End-Kerne: deutlich komplexere Modelle (u. a. Perceptron-ähnlich)
+- TAGE und Perceptron-Prädiktoren sind veröffentlichte Beispiele, nicht die Angabe jedes Kerns
 - Lernen von Gewichtungen aus der Historie in Hardware
 - Praxis: sehr hohe Accuracy bei vielen Workloads — selten, aber teuer bei Misses
 
 ::: notes
-Kein ChatGPT im Kern — spezialisierte, winzige Lernhardware für Sprungmuster.
+Die Analogie zum Lernen bleibt im festen Hardware-Modell. Das ist keine allgemeine KI.
 :::
 
-## Fragen? — Branch Prediction
+## Aufgabe — CPI und schwacher Zustand
 
-- Warum sind Misses bei tiefen Pipelines teuer?
-- Wie hilft der 2-Bit-Zähler bei verschachtelten Schleifen?
-- Rolle des BTB?
+Was bedeuten CPI 1,30 für Laufzeit und Durchsatz? Der 2-Bit-Zähler steht auf 01, das nächste Ergebnis ist T. Welche Vorhersage gilt?
 
 ::: notes
-Als Nächstes: Spekulation = Prediction × OoO — und warum Caches Seitenkanäle öffnen können.
+Laufzeitfaktor 1,30, also 30 Prozent länger. Durchsatzfaktor etwa 0,769, also rund 23 Prozent weniger Durchsatz. Zustand 01 sagt Not Taken voraus und geht nach T auf 10. Siehe CPI-Bild und den Automaten.
 :::
 
 ## Spekulative Ausführung
 
-- Kombination: Branch Prediction + Out-of-Order
+- Spekulativer Fetch braucht kein OoO. Im High-Performance-Modell kommen Prediction und OoO zusammen
 - Predictor sagt z. B. „Taken“ → spekulativer Pfad wird gestartet (Issue)
 - ALUs rechnen und laden bereits — bevor der Branch architektonisch bestätigt ist
 
@@ -726,15 +702,17 @@ Zwei verwandte, aber unterschiedliche Klassen: Privilege-Bypass (Meltdown) vs. B
 
 ## Seitenkanal über den Cache
 
+![Die Prüfung bleibt korrekt. Der transiente Probe-Zugriff kann die Cache-Spur hinterlassen.](../assets/figures/07_moderne_cpu_architekturen/spectre.png)
+
 Prinzip (Spectre-artig, stark vereinfacht):
 
-1. Predictor wird so beeinflusst, dass eine Bounds-Prüfung fehlgeht
-2. Spekulativ: Zugriff außerhalb des erlaubten Index
-3. Geheimnis beeinflusst Folgezugriffe (Cache-Zustand)
-4. Rollback löscht Register — Cache-Zustand bleibt messbar
+1. Die Bounds-Prüfung bleibt architektonisch korrekt
+2. Der vorhergesagte Pfad läuft transient, bevor die Prüfung wirkt
+3. Das Geheimnis steuert die Adresse eines folgenden Probe-Zugriffs
+4. Squash verwirft den Architekturzustand. Die Cache-Spur kann bleiben
 
 ::: notes
-Kein „Passwort im Register behalten“ — das Timing des Caches verrät Indizes.
+Ein schneller Hit ist ein verrauschtes Indiz, kein automatischer Beweis und keine Messung aus dieser Vorlesung.
 :::
 
 ## Timing als Orakel
@@ -750,10 +728,10 @@ Stoppuhr statt direktem Leserecht — Architektur verbietet, Mikroarchitektur le
 
 ## Mitigationen
 
-- Software: härtere Isolation (z. B. KPTI) — oft mit Leistungskosten
-- Microcode / Fences: Spekulation an kritischen Stellen einschränken
-- Neuere Generationen: strengere Isolation spekulativer Cache-Effekte in Hardware
-- Trade-off: Sicherheit vs. IPC
+- KPTI zielt vor allem auf den ursprünglichen Meltdown-Mechanismus
+- Passendes Bounds-Masking oder eine geeignete Barriere kann bestimmte Spectre-v1-Fälle treffen. Nicht jede Fence ist auf jeder ISA eine Spekulationsbarriere
+- Neuere Hardware mindert einzelne Wege und macht nicht jeden Cache-Effekt unsichtbar
+- Spectre ist damit nicht vollständig gelöst
 
 ::: notes
 Patches und Fences kosten Performance; langfristig hilft Silizium-Design.
@@ -771,9 +749,9 @@ Kein direkter ROB-Zugriff — aber Maschinencode so formen, dass die Pipeline �
 
 ## Was `-O3` typisch tut
 
-- `-O0`: zeilennahe Übersetzung — gut debugbar, schlecht für Pipelines
-- `-O3`: globale Analyse, Umsortierung, aggressivere Transformationen
-- Fokus: Latenz verstecken, Branches reduzieren, ILP freilegen
+- `-O0` ist zum Debuggen gedacht und keine garantierte Zeile-für-Zeile-Übersetzung
+- `-O2` und `-O3` erlauben mehr Analysen. `-O3` garantiert weder Unrolling noch weniger Branches noch kürzere Laufzeit
+- Ob eine Schleife ausgerollt wird, hängt von Compiler, Version, `-march` und dem Code ab
 
 ::: notes
 Derselbe Algorithmus, anderer Assembler — Laufzeit kann stark differieren.
@@ -813,9 +791,10 @@ Röntgenblick für Embedded- und Performance-Entwicklung.
 
 Geplant (Details im Übungsblatt):
 
-- Target z. B. `rv32gc` in Godbolt
-- Umschalten `-O1` / `-O3`: Unrolling und Scheduling sichtbar machen
-- Optional: Zyklusmessung in Renode/Ripes — Laufzeit/CPI-Effekt belegen
+- Godbolt zeigt die Übersetzung, kein OoO-Timing
+- Ein Ripes-Vergleich gilt nur für das dort gewählte Pipeline-Modell, nicht für eine Desktop-OoO-CPU
+- Renode ohne validiertes Mikroarchitekturmodell belegt keine Stall-, Branch- oder OoO-Zahlen
+- Flags, Compilerversion und ABI gehören zur Beobachtung. Siehe Übungsblatt
 
 ::: notes
 Sehen (Assembler) und messen (Zyklen) — derselbe C-Algorithmus, andere Pipeline-Last.
@@ -851,6 +830,10 @@ Vom Addierer zum spekulativen Kern — Konzepte von Grund auf aufgebaut.
 - Optional: Zyklusvergleich in der Simulation
 
 Vielen Dank — viel Erfolg beim Experimentieren.
+
+::: notes
+Quellen, Stand der Vorlesung: RISC-V ISA und RVWMO; BOOM-Pipeline, ROB und LSU als dokumentiertes OoO-Beispiel, nicht als Laborplattform; GCC Optimize-Options; Spectre- und Meltdown-Paper; Ripes und Renode nur in den dort genannten Grenzen. Adressen und Breiten dieser Folien sind das Lehrmodell.
+:::
 
 ::: notes
 Wer Assembler-Optimierungen lesen kann, programmiert näher an der Hardware. Viel Erfolg!
