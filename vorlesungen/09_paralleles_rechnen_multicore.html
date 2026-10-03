@@ -275,11 +275,11 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 <ul>
 <li>TFLM-Inferenz auf dem RISC-V-Kern</li>
 <li>Matrix-Last blockiert die General-Purpose-CPU lange</li>
-<li>Ohne RVV/NPU: Memory Wall spürbar</li>
-<li>DLP vs.&nbsp;ILP: Spezialist vs.&nbsp;Alleskönner</li>
+<li>Eine funktionale Simulation hat keine Memory Wall gemessen</li>
+<li>TLP und DLP schließen sich nicht aus</li>
 </ul>
 <aside class="notes">
-<p>Heute wieder Alleskönner-Kerne: OS und gemischte Tasks brauchen TLP, nicht nur Matrizen.</p>
+<p>OS-Tasks sind ein TLP-Beispiel. Auch Datenarbeit kann Threads nutzen. Matrizen können zusätzlich DLP verwenden.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -320,7 +320,7 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 <li>Zwei (oder mehr) Kerne auf einem Chip statt „doppelt so schneller“ Einzelkern</li>
 <li>TLP: unabhängige Threads/Tasks parallel</li>
 <li>Beispiel: UI/Media auf Kern 0, Hintergrundarbeit auf Kern 1</li>
-<li>Oft bessere Energieeffizienz als ein extrem hoch getakteter Kern</li>
+<li>Mehr Kerne sparen nicht stets Energie und beschleunigen einen einzelnen Thread nicht</li>
 </ul>
 <aside class="notes">
 <p>Zweiter Arbeiter statt einen zu überhitzen — aber Kommunikation wird zum Problem.</p>
@@ -338,11 +338,17 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 </section>
 <section id="symmetric-multiprocessing-smp" class="slide level2">
 <h2>Symmetric Multiprocessing (SMP)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/09_paralleles_rechnen_multicore/smp.png"></p>
+<figcaption>Zwei gleiche Kerne, private L1, beispielhaftes L2. Migration ist nicht automatisch.</figcaption>
+</figure>
+</div>
 <ul>
-<li>SMP: alle Kerne gleichartig (symmetrisch)</li>
-<li>Gemeinsamer Zugriff auf RAM und Peripherie</li>
-<li>OS (Linux, FreeRTOS, …) kann Tasks migrieren</li>
-<li>big.LITTLE u. Ä. hier ausgeblendet — Fokus SMP</li>
+<li>Lehr-SMP: gleiche Kerne, ein Betriebssystem, gemeinsamer Speicherzugriff</li>
+<li>Private L1 und ein geteiltes L2 sind ein Beispiel, keine Definition</li>
+<li>Migration hängt von Scheduler, Port und Affinity ab. Nicht jedes FreeRTOS ist SMP</li>
+<li>AMP und heterogene Kerne bleiben abgegrenzt</li>
 </ul>
 <aside class="notes">
 <p>Klassisches PC-/Phone-Modell: gleichberechtigte Kerne, Scheduler verteilt.</p>
@@ -421,13 +427,20 @@ flowchart TD
 </section>
 <section id="kohärenzverlust-stale-data" class="slide level2">
 <h2>Kohärenzverlust (Stale Data)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/09_paralleles_rechnen_multicore/three.png"></p>
+<figcaption>Write-Through ohne Invalidation lässt die fremde Kopie stehen. MESI, RMW und Ordnung lösen Verschiedenes.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Private Write-Back-Caches können unterschiedliche Sichten auf dieselbe Adresse erzeugen</li>
 <li>Kohärenz (pro Adresse): alle Kerne sehen eine einheitliche Reihenfolge der Writes</li>
-<li>Ohne Hardware-Kohärenz: OS-Flags, Queues, Sync unbrauchbar</li>
+<li>Kohärenz ordnet Writes einer Adresse. Sie macht weder <code>i++</code> atomar noch ein Daten-plus-Flag korrekt</li>
+<li>Non-cacheable Speicher und Ownership bleiben möglich, besonders in AMP</li>
 </ul>
 <aside class="notes">
-<p>Kohärenz <span class="math inline">\(\neq\)</span> volle Speicher-Konsistenz für Mehrwort-Operationen — dafür später Atomics/Locks.</p>
+<p>Konsistenz beschreibt Beobachtungsreihenfolgen mehrerer Zugriffe. Atomizität schützt eine Operation vor Teilbeobachtung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -443,13 +456,12 @@ flowchart TD
 <section id="warum-software-flush-scheitert" class="slide level2">
 <h2>Warum Software-Flush scheitert</h2>
 <ul>
-<li>Bei DMA: gezielte Cache-Maintenance vor/nach seltenen Transfers</li>
-<li>Bei Multicore: tausende Shared-Variablen pro ms (Queues, Locks, …)</li>
-<li>Manuelles Spülen nach jedem Write zerstört den Multicore-Gewinn</li>
-<li>Braucht unsichtbare, schnelle Hardware-Kohärenz</li>
+<li>Für cachebares SMP-Sharing ist manuelles Spülen nach jedem Write unpraktikabel</li>
+<li>DMA-Maintenance ist nicht per Definition selten</li>
+<li>Hardware-Kohärenz kann für die Anwendung unsichtbar sein und kostet trotzdem Traffic</li>
 </ul>
 <aside class="notes">
-<p>Write-Through überall wäre korrekt, aber Bus und Energie würden kollabieren.</p>
+<p>Write-Through aktualisiert den unteren Speicher und invalidiert allein keine fremde Cache-Kopie.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -486,7 +498,7 @@ flowchart TD
 <section id="mesi-protokoll" class="slide level2">
 <h2>MESI-Protokoll</h2>
 <ul>
-<li>State Machine pro Cache-Line (typisch 64 Byte)</li>
+<li>Zustandsautomat je Cache-Line. 64 Byte sind hier nur ein Beispiel</li>
 <li>Zustände: Modified (M), Exclusive (E), Shared (S), Invalid (I)</li>
 <li>Basis vieler kohärenter Multicore-Designs (Varianten: MOESI, …)</li>
 </ul>
@@ -506,6 +518,12 @@ flowchart TD
 </section>
 <section id="mesi-zustandsübersicht" class="slide level2">
 <h2>MESI: Zustandsübersicht</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/09_paralleles_rechnen_multicore/mesi.png"></p>
+<figcaption>Lokale Ereignisse und Fremdtransaktionen getrennt. S bedeutet teilbar, nicht zwingend mehrere Kopien.</figcaption>
+</figure>
+</div>
 <div class="cell" data-reveal="true" data-fig-width="4.2" data-layout-align="default">
 <div class="cell-output-display">
 <div>
@@ -545,8 +563,8 @@ stateDiagram-v2
 <section id="zustand-m-modified" class="slide level2">
 <h2>Zustand M (Modified)</h2>
 <ul>
-<li>Line lokal geändert — RAM veraltet</li>
-<li>Exklusiv: keine andere gültige Kopie</li>
+<li>Line lokal geändert. Der untere Stand kann noch alt sein</li>
+<li>Exklusiv: kein anderer gültiger Besitzer im Modell</li>
 <li>Klassischer Write-Back-„Boss“-Zustand</li>
 </ul>
 <aside class="notes">
@@ -566,7 +584,7 @@ stateDiagram-v2
 <section id="zustand-e-exclusive" class="slide level2">
 <h2>Zustand E (Exclusive)</h2>
 <ul>
-<li>Sauber: Cache = RAM</li>
+<li>Sauber: Übereinstimmung mit dem kohärenten unteren Stand</li>
 <li>Exklusiv: niemand sonst hat die Line</li>
 <li>Write → oft still zu M, ohne Broadcast</li>
 </ul>
@@ -587,7 +605,7 @@ stateDiagram-v2
 <section id="zustand-s-shared" class="slide level2">
 <h2>Zustand S (Shared)</h2>
 <ul>
-<li>Sauber, aber mehrere Kerne haben Kopien</li>
+<li>Sauber und teilbar. Es müssen nicht nachweislich mehrere Kopien existieren</li>
 <li>Gut für paralleles Lesen</li>
 <li>Vor lokalem Write: andere Kopien invalidieren</li>
 </ul>
@@ -609,7 +627,7 @@ stateDiagram-v2
 <h2>Zustand I (Invalid)</h2>
 <ul>
 <li>Nach Reset oder Invalidate</li>
-<li>Inhalt unbrauchbar → Miss beim Zugriff</li>
+<li>Lokal ungültig. Die Bits müssen nicht gelöscht sein. Ein Hit auf I ist verboten</li>
 <li>Daten müssen neu geholt werden</li>
 </ul>
 <aside class="notes">
@@ -651,11 +669,17 @@ stateDiagram-v2
 </section>
 <section id="mesi-write-auf-shared" class="slide level2">
 <h2>MESI: Write auf Shared</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/09_paralleles_rechnen_multicore/own.png"></p>
+<figcaption>Erst Ownership und Bestätigung, dann der Write. Ein Broadcast allein ist noch kein Abschluss.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Core 0 und 1: <code>x</code> in S</li>
 <li>Core 0: <code>x = 5</code></li>
-<li>Vor Write: Invalidate-Broadcast</li>
-<li>Dann lokal schreiben, Zustand → M</li>
+<li>Erst Ownership und die nötigen Invalidates abschließen</li>
+<li>Danach im Modell schreiben und nach M gehen. Der Broadcast allein ist nicht der Abschluss</li>
 </ul>
 <aside class="notes">
 <p>Geteilte Ressource nie heimlich ändern.</p>
@@ -693,6 +717,12 @@ stateDiagram-v2
 </section>
 <section id="mesi-beispiel-zustandsfolge" class="slide level2">
 <h2>MESI-Beispiel: Zustandsfolge</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/09_paralleles_rechnen_multicore/trace.png"></p>
+<figcaption>Nach dem Write ist Core0 M mit 5 und der RAM noch 0. Der nächste Read liefert 5.</figcaption>
+</figure>
+</div>
 <p>Zwei Kerne, Variable <code>x</code>, Start beide Invalid:</p>
 <table class="caption-top">
 <thead>
@@ -731,8 +761,8 @@ stateDiagram-v2
 </tbody>
 </table>
 <ul>
-<li>Schritt 3: Invalidate-Broadcast, dann lokal M</li>
-<li>Schritt 4: Owner-Supply (Intervention) oder Memory-Pfad → beide S</li>
+<li>Nach dem Write kann der RAM noch 0 enthalten, während Core0 M den Wert 5 hält</li>
+<li>Der folgende Read erhält 5. Beide Lines werden S, der untere Stand wird 5</li>
 </ul>
 <aside class="notes">
 <p>Typische Klausurfrage: Tabelle ausfüllen. Üben Sie die Sequenz Read-Miss → Shared → Write → Invalidate → erneutes Lesen.</p>
@@ -771,14 +801,21 @@ stateDiagram-v2
 </section>
 <section id="false-sharing" class="slide level2">
 <h2>False Sharing</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/09_paralleles_rechnen_multicore/false.png"></p>
+<figcaption>temp1 bei +0 und temp2 bei +4 teilen die 64-Byte-Line ab 0x20001000.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Core 0: <code>temp1</code>, Core 1: <code>temp2</code> — logisch unabhängig</li>
 <li>Liegen in derselben Cache-Line → Write invalidiert den Partner</li>
 <li>Ping-Pong trotz verschiedener Variablen</li>
-<li>Abhilfe: Alignment / Padding auf getrennte Lines</li>
+<li>Padding trennt nur bei passender Basis, Objektgröße und echter Line</li>
+<li>Es kostet Speicher und kann die Lokalität verschlechtern. Ein Simulator ohne Kohärenzzeit misst das nicht</li>
 </ul>
 <aside class="notes">
-<p>Hardware kennt 64-Byte-Blöcke, keine C-Namen.</p>
+<p>64 Byte sind die angenommene Line, keine universelle Größe. True Sharing wäre der gemeinsame Zähler.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -791,15 +828,11 @@ stateDiagram-v2
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-kohärenz" class="slide level2">
-<h2>Fragen? — Kohärenz</h2>
-<ul>
-<li>Warum Bus Snooping?</li>
-<li>Exclusive vs.&nbsp;Modified?</li>
-<li>Warum erzeugt Write auf Shared Bus-Verkehr?</li>
-</ul>
+<section id="aufgabe-mesi-zeile" class="slide level2">
+<h2>Aufgabe — MESI-Zeile</h2>
+<p>Core0 hat nach seinem Write den Zustand M und den Wert 5. Welchen Wert hat der RAM in diesem Modell noch, und was sieht Core1 beim folgenden Read?</p>
 <aside class="notes">
-<p>Als Nächstes: Race Conditions — MESI lügt nicht, versteht aber kein <code>i++</code>.</p>
+<p>Der RAM kann noch 0 sein. Core1 erhält 5, beide werden S, der untere Stand wird 5. S heißt nicht, dass vorher mehrere Kopien nachgewiesen wurden. Siehe die Zustandsfolge.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -835,7 +868,7 @@ stateDiagram-v2
 </section>
 <section id="anatomie-von-i" class="slide level2">
 <h2>Anatomie von <code>i++</code></h2>
-<p>In C wirkt atomar — in Assembler typisch RMW:</p>
+<p>Eine Quelltextoperation, keine Atomizität. Das typische RMW lautet:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb1-1"><a aria-label="1"></a>lw   t0<span class="op">,</span> <span class="dv">0</span><span class="op">(</span>s1<span class="op">)</span>   <span class="op">#</span> Read</span>
 <span id="cb1-2"><a aria-label="2"></a>addi t0<span class="op">,</span> t0<span class="op">,</span> <span class="dv">1</span>   <span class="op">#</span> Modify</span>
 <span id="cb1-3"><a aria-label="3"></a>sw   t0<span class="op">,</span> <span class="dv">0</span><span class="op">(</span>s1<span class="op">)</span>   <span class="op">#</span> Write</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
@@ -843,7 +876,7 @@ stateDiagram-v2
 <li>Drei Schritte — können sich zwischen Kernen überlappen</li>
 </ul>
 <aside class="notes">
-<p>CPU addiert nicht „im RAM“ — immer Register-Umweg.</p>
+<p>Dieses Interleaving motiviert das Problem. Ein konkurrierendes normales C-int ist ein Data Race und in C11 undefiniert, nicht nur manchmal 1.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -858,13 +891,19 @@ stateDiagram-v2
 </section>
 <section id="race-condition" class="slide level2">
 <h2>Race Condition</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/09_paralleles_rechnen_multicore/race.png"></p>
+<figcaption>Beide schreiben 1. MESI verbreitet die Writes, der Endwert bleibt 1.</figcaption>
+</figure>
+</div>
 <ol type="1">
 <li>Core 0 liest 0</li>
 <li>Core 1 liest 0 (Shared)</li>
 <li>Core 0 schreibt 1</li>
 <li>Core 1 schreibt ebenfalls 1 (seine lokale Rechnung)</li>
 </ol>
-<p>Ergebnis oft 1 statt 2 — ein Update verloren.</p>
+<p>Im Hardwarebild endet der Speicher bei 1. Das ist keine garantierte Semantik des fehlerhaften C-Programms.</p>
 <aside class="notes">
 <p>Wettlauf: beide rechnen auf demselben Startwert.</p>
 <style type="text/css">
@@ -901,15 +940,15 @@ stateDiagram-v2
           display:block!important;
       }</style></aside>
 </section>
-<section id="warum-software-locks-scheitern" class="slide level2">
-<h2>Warum Software-Locks scheitern</h2>
+<section id="warum-diese-check-then-set-schleife-scheitert" class="slide level2">
+<h2>Warum diese Check-then-Set-Schleife scheitert</h2>
 <ul>
-<li><code>lock == 0</code> lesen und <code>lock = 1</code> setzen: zwei Ops</li>
-<li>Beide Kerne sehen „frei“ → beide betreten den kritischen Abschnitt</li>
-<li>Race auf dem Lock selbst — braucht Hardware-Atomics</li>
+<li>Prüfen und Setzen sind zwei Operationen. <code>volatile</code> ändert das nicht</li>
+<li>Beide können frei sehen und eintreten</li>
+<li>Korrekte Software-Locks nutzen atomare Primitive und Ordnung, sie sind nicht unmöglich</li>
 </ul>
 <aside class="notes">
-<p>Problem nur verschoben — Silizium muss RMW unteilbar machen.</p>
+<p>Rein algorithmische Verfahren bleiben eine angenommene, fortgeschrittene Alternative.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -925,10 +964,9 @@ stateDiagram-v2
 <section id="risc-v-a-extension" class="slide level2">
 <h2>RISC-V A-Extension</h2>
 <ul>
-<li>Atomic Instructions: unteilbares RMW für eine Adresse zwischen Harts (gemäß Spezifikation)</li>
-<li>Grundlage für Multicore-OS und sichere Shared-Zähler</li>
-<li>Zwei Familien: LR/SC und AMO</li>
-<li>Hinweis: paralleles DMA auf dieselbe Adresse bleibt Software-Risiko</li>
+<li>A oder Zalrsc/Zaamo, ausgerichtet, nur in unterstützten Regionen</li>
+<li>LR/SC und AMO gelten für eine Adresse in ihrer Domäne, nicht für den ganzen Bus</li>
+<li>DMA gehört nur dazu, wenn die Reservationsdomäne das festlegt</li>
 </ul>
 <aside class="notes">
 <p>Ohne Atomics kein korrektes Multicore-OS auf Shared Memory. DMA braucht eigene Sync-Disziplin.</p>
@@ -947,9 +985,9 @@ stateDiagram-v2
 <section id="lrsc" class="slide level2">
 <h2>LR/SC</h2>
 <ul>
-<li><code>lr.w</code>: lesen + Reservation/Monitor auf Adresse</li>
-<li><code>sc.w</code>: schreiben nur, wenn Reservation noch gültig</li>
-<li>Sonst: Store fehlgeschlagen → Software wiederholt</li>
+<li><code>lr.w</code> liest und setzt eine Reservation auf eine implementierungsabhängige Granule</li>
+<li><code>sc.w</code> schreibt bei Erfolg und liefert 0. Bei Fehlschlag kein Store und ein Wert ungleich 0</li>
+<li>Die Reservation ist kein gehaltenes Mutex</li>
 </ul>
 <aside class="notes">
 <p>Überwachungszaun um die Adresse zwischen Load und Store.</p>
@@ -987,6 +1025,12 @@ stateDiagram-v2
 </section>
 <section id="lrsc-fehlschlag" class="slide level2">
 <h2>LR/SC: Fehlschlag</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/09_paralleles_rechnen_multicore/lrsc.png"></p>
+<figcaption>SC-Erfolg ist 0. Der zweite SC schreibt nicht. Ein Fehlschlag ohne fremden Store ist zulässig.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Beide: <code>lr.w</code> nahezu gleichzeitig</li>
 <li>Core 0: <code>sc.w</code> ok</li>
@@ -1009,21 +1053,27 @@ stateDiagram-v2
 </section>
 <section id="lrsc-spinlock-in-assembler" class="slide level2">
 <h2>LR/SC: Spinlock in Assembler</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/09_paralleles_rechnen_multicore/lock.png"></p>
+<figcaption>Acquire mit lr.w.aq, Release mit fence rw,w vor dem Store. Kein Flush als Ersatz.</figcaption>
+</figure>
+</div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb3-1"><a aria-label="1"></a><span class="fu">acquire:</span></span>
-<span id="cb3-2"><a aria-label="2"></a>  lr<span class="op">.</span>w   t0<span class="op">,</span> <span class="op">(</span>a0<span class="op">)</span>      <span class="op">/*</span> Lock<span class="op">-</span>Adresse in a0 <span class="op">*/</span></span>
-<span id="cb3-3"><a aria-label="3"></a>  bnez   t0<span class="op">,</span> acquire   <span class="op">/*</span> belegt<span class="op">?</span> erneut versuchen <span class="op">*/</span></span>
-<span id="cb3-4"><a aria-label="4"></a>  li     t1<span class="op">,</span> <span class="dv">1</span></span>
-<span id="cb3-5"><a aria-label="5"></a>  sc<span class="op">.</span>w   t2<span class="op">,</span> t1<span class="op">,</span> <span class="op">(</span>a0<span class="op">)</span>  <span class="op">/*</span> t2<span class="op">=</span><span class="dv">0</span> bei Erfolg <span class="op">*/</span></span>
-<span id="cb3-6"><a aria-label="6"></a>  bnez   t2<span class="op">,</span> acquire   <span class="op">/*</span> Reservation gebrochen → Retry <span class="op">*/</span></span>
-<span id="cb3-7"><a aria-label="7"></a>  /* kritischer Abschnitt <span class="op">*/</span></span>
-<span id="cb3-8"><a aria-label="8"></a><span class="fu">release:</span></span>
-<span id="cb3-9"><a aria-label="9"></a>  sw     zero<span class="op">,</span> <span class="dv">0</span><span class="op">(</span>a0<span class="op">)</span>   <span class="op">/*</span> Lock freigeben <span class="op">*/</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-2"><a aria-label="2"></a>  lr<span class="op">.</span>w<span class="op">.</span>aq t0<span class="op">,</span> <span class="op">(</span>a0<span class="op">)</span></span>
+<span id="cb3-3"><a aria-label="3"></a>  bnez    t0<span class="op">,</span> acquire</span>
+<span id="cb3-4"><a aria-label="4"></a>  li      t1<span class="op">,</span> <span class="dv">1</span></span>
+<span id="cb3-5"><a aria-label="5"></a>  sc<span class="op">.</span>w    t2<span class="op">,</span> t1<span class="op">,</span> <span class="op">(</span>a0<span class="op">)</span></span>
+<span id="cb3-6"><a aria-label="6"></a>  bnez    t2<span class="op">,</span> acquire</span>
+<span id="cb3-7"><a aria-label="7"></a><span class="fu">release:</span></span>
+<span id="cb3-8"><a aria-label="8"></a>  fence <span class="dt">rw</span><span class="op">,</span> w</span>
+<span id="cb3-9"><a aria-label="9"></a>  sw    zero<span class="op">,</span> <span class="dv">0</span><span class="op">(</span>a0<span class="op">)</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li><code>sc.w</code> liefert Status in <code>t2</code>: 0 = Erfolg, sonst Fehlschlag</li>
-<li>Typisches Muster für Mutex/Spinlock auf RISC-V ohne AMO</li>
+<li>Erfolg von <code>sc.w</code> ist 0. Die Sequenz ist Lehrannahme für gewöhnlichen Speicher und hier nicht assembliert</li>
+<li>Im kritischen Abschnitt nicht schlafen und keine blockierende Arbeit ausführen</li>
 </ul>
 <aside class="notes">
-<p>Genau diese Retry-Schleife erwartet die Klausur: LR, Test, SC, bei Fehler zurück. Release oft als einfacher Store (ggf. mit <code>fence</code>).</p>
+<p>Ohne die Release-Fence publiziert der Store das Schloss, nicht zuverlässig die vorherigen Daten. Ein ISR-Spin auf dasselbe Schloss kann sich selbst blockieren.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1038,12 +1088,15 @@ stateDiagram-v2
 </section>
 <section id="amo-befehle" class="slide level2">
 <h2>AMO-Befehle</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/09_paralleles_rechnen_multicore/atomic.png"></p>
+<figcaption>amoadd.w von 10 um 3 liefert alt 10 und neu 13. Zwei Inkremente enden bei 2.</figcaption>
+</figure>
+</div>
 <ul>
-<li><ol start="26" type="a">
-<li>B. <code>amoadd.w</code>: Add am Speicherpfad</li>
-</ol></li>
-<li>RMW in Hardware „hinter der Tür“</li>
-<li>Adresse kurz für andere Zugriffe geschützt</li>
+<li><code>amoadd.w</code> auf den Wert 10 mit Addend 3: Rückgabe 10, Speicher 13</li>
+<li>Das ist kein globaler Bus-Lock. Ohne aq/rl fehlt die zusätzliche Ordnung</li>
 </ul>
 <aside class="notes">
 <p>Ein Befehl statt explizitem LR/SC-Loop für einfache Ops.</p>
@@ -1065,11 +1118,13 @@ stateDiagram-v2
 <span id="cb4-2"><a aria-label="2"></a></span>
 <span id="cb4-3"><a aria-label="3"></a><span class="kw">_Atomic</span> <span class="dt">int</span> zaehler <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
 <span id="cb4-4"><a aria-label="4"></a></span>
-<span id="cb4-5"><a aria-label="5"></a><span class="dt">void</span> isr_oder_core1<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb4-6"><a aria-label="6"></a>    atomic_fetch_add<span class="op">(&amp;</span>zaehler<span class="op">,</span> <span class="dv">1</span><span class="op">);</span></span>
+<span id="cb4-5"><a aria-label="5"></a><span class="dt">void</span> hart_increment<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-6"><a aria-label="6"></a>    atomic_fetch_add<span class="op">(&amp;</span>zaehler<span class="op">,</span> <span class="dv">1</span><span class="op">);</span> <span class="co">/* seq_cst */</span></span>
 <span id="cb4-7"><a aria-label="7"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li>Compiler erzeugt LR/SC oder AMO — kein Inline-Asm nötig</li>
+<li>Der Compiler kann AMO, LR/SC oder einen Library-Fallback erzeugen</li>
+<li><code>atomic_fetch_add</code> ist standardmäßig sequentially consistent und macht nicht das ganze Programm seriell</li>
+<li>Ein blockierender Fallback gehört nicht in eine ISR</li>
 </ul>
 <aside class="notes">
 <p>Modernes C trifft RISC-V-A — Brücke Software/Hardware.</p>
@@ -1087,6 +1142,12 @@ stateDiagram-v2
 </section>
 <section id="deadlocks" class="slide level2">
 <h2>Deadlocks</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/09_paralleles_rechnen_multicore/dead.png"></p>
+<figcaption>A-dann-B vermeidet den Zyklus. Timeout gibt keinen konsistenten Zustand zurück.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Locks gegen Races — Risiko: zirkuläres Warten</li>
 <li>Core 0 hält A, will B; Core 1 hält B, will A</li>
@@ -1106,15 +1167,11 @@ stateDiagram-v2
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-race-conditions" class="slide level2">
-<h2>Fragen? — Race Conditions</h2>
-<ul>
-<li>Race bei <code>zaehler++</code>?</li>
-<li>Warum reicht normales <code>int lock</code> nicht?</li>
-<li>Wie sichert LR/SC den Zugriff?</li>
-</ul>
+<section id="aufgabe-schloss-und-isr" class="slide level2">
+<h2>Aufgabe — Schloss und ISR</h2>
+<p>Warum genügt <code>volatile</code> nicht für das Check-then-Set? Was passiert, wenn die ISR auf das Schloss spinnt, das der unterbrochene Kontext hält?</p>
 <aside class="notes">
-<p>Kohärenz = Wahrheit; Atomics = unteilbare Updates. Als Nächstes: Amdahl und Semesterfazit.</p>
+<p><code>volatile</code> erzwingt Zugriffe und schafft keine Atomizität und keine Ordnung. Die ISR und der unterbrochene Kontext warten aufeinander: Selbstdeadlock. Muster: Acquire mit <code>lr.w.aq</code>, Erfolgscode 0, Release mit <code>fence rw,w</code> vor dem Store.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1155,14 +1212,20 @@ S(N) = \frac{1}{s + \frac{p}{N}}
 </section>
 <section id="amdahl-zahlenbeispiel" class="slide level2">
 <h2>Amdahl: Zahlenbeispiel</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/09_paralleles_rechnen_multicore/amdahl.png"></p>
+<figcaption>S(4)=2,5 und S(100)=4,8077. Das liegt nahe an 5, die Effizienz ist etwa 4,8 Prozent.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Programm: 80 % parallel, 20 % seriell (<span class="math inline">\(s = 0{,}2\)</span>)</li>
 <li>4 Kerne: <span class="math inline">\(S(4) = 1 / (0{,}2 + 0{,}8/4) = 1 / 0{,}4 = 2{,}5\)</span></li>
-<li>100 Kerne: <span class="math inline">\(S(100) \approx 1 / (0{,}2 + 0{,}008) \approx 4{,}8\)</span></li>
-<li>Trotz 100 Kernen weit unter 5× — der serielle Rest dominiert</li>
+<li>100 Kerne: <span class="math inline">\(S(100) = 1/0{,}208 \approx 4{,}8077\)</span>, nahe an der Grenze 5</li>
+<li>Die Effizienz <span class="math inline">\(S(100)/100\)</span> ist nur etwa 4,8 Prozent. Overhead ist in dieser Rechnung noch 0</li>
 </ul>
 <aside class="notes">
-<p>Klausurtypisch: Einsetzen und interpretieren. Optimierung des seriellen Pfads lohnt oft mehr als „noch ein Kern“.</p>
+<p>Feste Arbeit, ideale Balance, kein o(N). Eine größere Aufgabe ist eine andere Frage. 4,8 ist nicht weit unter 5.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1179,11 +1242,9 @@ S(N) = \frac{1}{s + \frac{p}{N}}
 <h2>Unser fertiges SoC (Rückblick)</h2>
 <p>Dual-Core-Idee mit Bausteinen aus MCT3:</p>
 <ul>
-<li>Kerne: Pipeline/OoO-Konzepte, Atomics</li>
-<li>Speicher: L1 (MESI), Hierarchie, Execute-in-Place aus Flash</li>
-<li>Zeit/IRQ: CLINT, PLIC, Timer/PWM, WDT</li>
-<li>Busse: UART, SPI, I2C</li>
-<li>Offload: DMA; optional Edge-AI-Pfad</li>
+<li>Konzept, nicht das Laborgerät: OoO, MESI und SMP sind hier nicht als vorhandenes Target belegt</li>
+<li>Behandelt: Caches, CLINT/PLIC als RISC-V-Beispiel, UART/SPI/I2C, DMA, Timer</li>
+<li>Optional und nicht im Repository nachgewiesen: RVV, NPU, kohärentes SMP</li>
 </ul>
 <aside class="notes">
 <p>Vom Addierer zum überblickbaren Microcontroller-SoC.</p>
@@ -1211,7 +1272,7 @@ S(N) = \frac{1}{s + \frac{p}{N}}
 <tbody>
 <tr class="odd">
 <td>Memory Wall</td>
-<td>Caches, DLP (Vektoren/NPUs)</td>
+<td>Lokalität, Tiling, Bandbreite, nicht nur DLP</td>
 </tr>
 <tr class="even">
 <td>Control Hazards</td>
@@ -1263,9 +1324,9 @@ S(N) = \frac{1}{s + \frac{p}{N}}
 <section id="infos-zur-klausur" class="slide level2">
 <h2>Infos zur Klausur</h2>
 <ul>
-<li>Schriftlich, Dauer laut Modulbeschreibung / Ankündigung</li>
-<li>Hilfsmittel: nicht programmierbarer Taschenrechner; keine Skripte</li>
-<li>Fokus: Konzepte, kleine Rechnungen (z. B. AMAT), Skizzen, C-Ausschnitte</li>
+<li>Dauer und Hilfsmittel nur aus der autorisierten Ankündigung. Hier nichts Neues festlegen</li>
+<li>Unbestätigte Formalia vor der Klausur prüfen</li>
+<li>Fokus der Vorlesung: Konzepte, kleine Rechnungen, Skizzen, kurze C-Ausschnitte</li>
 </ul>
 <aside class="notes">
 <p>Problemlösung vor Auswendiglernen von Datenblatt-Adressen.</p>
@@ -1419,6 +1480,19 @@ S(N) = \frac{1}{s + \frac{p}{N}}
 <li>Labor-Finale: Probeaufgaben, Renode, offene Fragen</li>
 </ul>
 <p>Vielen Dank für Ihre Mitarbeit im Semester!</p>
+<aside class="notes">
+<p>Quellen: RISC-V A-Extension und RVWMO, C11-Atomics, Kernel-Hinweis zu False Sharing. Kein kohärenter Multicore-Simulator und keine RISC-V-Toolchain wurden für Zeit oder Assemblat verwendet.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
 <aside class="notes">
 <p>Freude, Sie durch die SoC-Ebenen begleitet zu haben — viel Erfolg in der Klausur.</p>
 <style type="text/css">

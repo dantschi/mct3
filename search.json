@@ -18,7 +18,7 @@
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#anknüpfung-edge-ai-labor",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Anknüpfung: Edge-AI-Labor",
-    "text": "Anknüpfung: Edge-AI-Labor\nKurz-Recap aus Block 8 (Vertiefung im Übungsblatt):\n\nTFLM-Inferenz auf dem RISC-V-Kern\nMatrix-Last blockiert die General-Purpose-CPU lange\nOhne RVV/NPU: Memory Wall spürbar\nDLP vs. ILP: Spezialist vs. Alleskönner\n\n\nHeute wieder Alleskönner-Kerne: OS und gemischte Tasks brauchen TLP, nicht nur Matrizen."
+    "text": "Anknüpfung: Edge-AI-Labor\nKurz-Recap aus Block 8 (Vertiefung im Übungsblatt):\n\nTFLM-Inferenz auf dem RISC-V-Kern\nMatrix-Last blockiert die General-Purpose-CPU lange\nEine funktionale Simulation hat keine Memory Wall gemessen\nTLP und DLP schließen sich nicht aus\n\n\nOS-Tasks sind ein TLP-Beispiel. Auch Datenarbeit kann Threads nutzen. Matrizen können zusätzlich DLP verwenden."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#erinnerung-taktraten-mauer",
@@ -32,14 +32,14 @@
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#multi-core-thread-level-parallelism",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Multi-Core: Thread-Level Parallelism",
-    "text": "Multi-Core: Thread-Level Parallelism\n\nZwei (oder mehr) Kerne auf einem Chip statt „doppelt so schneller“ Einzelkern\nTLP: unabhängige Threads/Tasks parallel\nBeispiel: UI/Media auf Kern 0, Hintergrundarbeit auf Kern 1\nOft bessere Energieeffizienz als ein extrem hoch getakteter Kern\n\n\nZweiter Arbeiter statt einen zu überhitzen — aber Kommunikation wird zum Problem."
+    "text": "Multi-Core: Thread-Level Parallelism\n\nZwei (oder mehr) Kerne auf einem Chip statt „doppelt so schneller“ Einzelkern\nTLP: unabhängige Threads/Tasks parallel\nBeispiel: UI/Media auf Kern 0, Hintergrundarbeit auf Kern 1\nMehr Kerne sparen nicht stets Energie und beschleunigen einen einzelnen Thread nicht\n\n\nZweiter Arbeiter statt einen zu überhitzen — aber Kommunikation wird zum Problem."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#symmetric-multiprocessing-smp",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#symmetric-multiprocessing-smp",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Symmetric Multiprocessing (SMP)",
-    "text": "Symmetric Multiprocessing (SMP)\n\nSMP: alle Kerne gleichartig (symmetrisch)\nGemeinsamer Zugriff auf RAM und Peripherie\nOS (Linux, FreeRTOS, …) kann Tasks migrieren\nbig.LITTLE u. Ä. hier ausgeblendet — Fokus SMP\n\n\nKlassisches PC-/Phone-Modell: gleichberechtigte Kerne, Scheduler verteilt."
+    "text": "Symmetric Multiprocessing (SMP)\n\n\n\nZwei gleiche Kerne, private L1, beispielhaftes L2. Migration ist nicht automatisch.\n\n\n\nLehr-SMP: gleiche Kerne, ein Betriebssystem, gemeinsamer Speicherzugriff\nPrivate L1 und ein geteiltes L2 sind ein Beispiel, keine Definition\nMigration hängt von Scheduler, Port und Affinity ab. Nicht jedes FreeRTOS ist SMP\nAMP und heterogene Kerne bleiben abgegrenzt\n\n\nKlassisches PC-/Phone-Modell: gleichberechtigte Kerne, Scheduler verteilt."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#architektur-eines-smp-soc",
@@ -60,14 +60,14 @@
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#kohärenzverlust-stale-data",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Kohärenzverlust (Stale Data)",
-    "text": "Kohärenzverlust (Stale Data)\n\nPrivate Write-Back-Caches können unterschiedliche Sichten auf dieselbe Adresse erzeugen\nKohärenz (pro Adresse): alle Kerne sehen eine einheitliche Reihenfolge der Writes\nOhne Hardware-Kohärenz: OS-Flags, Queues, Sync unbrauchbar\n\n\nKohärenz \\(\\neq\\) volle Speicher-Konsistenz für Mehrwort-Operationen — dafür später Atomics/Locks."
+    "text": "Kohärenzverlust (Stale Data)\n\n\n\nWrite-Through ohne Invalidation lässt die fremde Kopie stehen. MESI, RMW und Ordnung lösen Verschiedenes.\n\n\n\nPrivate Write-Back-Caches können unterschiedliche Sichten auf dieselbe Adresse erzeugen\nKohärenz (pro Adresse): alle Kerne sehen eine einheitliche Reihenfolge der Writes\nKohärenz ordnet Writes einer Adresse. Sie macht weder i++ atomar noch ein Daten-plus-Flag korrekt\nNon-cacheable Speicher und Ownership bleiben möglich, besonders in AMP\n\n\nKonsistenz beschreibt Beobachtungsreihenfolgen mehrerer Zugriffe. Atomizität schützt eine Operation vor Teilbeobachtung."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#warum-software-flush-scheitert",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#warum-software-flush-scheitert",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Warum Software-Flush scheitert",
-    "text": "Warum Software-Flush scheitert\n\nBei DMA: gezielte Cache-Maintenance vor/nach seltenen Transfers\nBei Multicore: tausende Shared-Variablen pro ms (Queues, Locks, …)\nManuelles Spülen nach jedem Write zerstört den Multicore-Gewinn\nBraucht unsichtbare, schnelle Hardware-Kohärenz\n\n\nWrite-Through überall wäre korrekt, aber Bus und Energie würden kollabieren."
+    "text": "Warum Software-Flush scheitert\n\nFür cachebares SMP-Sharing ist manuelles Spülen nach jedem Write unpraktikabel\nDMA-Maintenance ist nicht per Definition selten\nHardware-Kohärenz kann für die Anwendung unsichtbar sein und kostet trotzdem Traffic\n\n\nWrite-Through aktualisiert den unteren Speicher und invalidiert allein keine fremde Cache-Kopie."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#bus-snooping",
@@ -81,42 +81,42 @@
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#mesi-protokoll",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "MESI-Protokoll",
-    "text": "MESI-Protokoll\n\nState Machine pro Cache-Line (typisch 64 Byte)\nZustände: Modified (M), Exclusive (E), Shared (S), Invalid (I)\nBasis vieler kohärenter Multicore-Designs (Varianten: MOESI, …)\n\n\nKonzept der vier Buchstaben zählt — nicht jede Transitionstabelle auswendig."
+    "text": "MESI-Protokoll\n\nZustandsautomat je Cache-Line. 64 Byte sind hier nur ein Beispiel\nZustände: Modified (M), Exclusive (E), Shared (S), Invalid (I)\nBasis vieler kohärenter Multicore-Designs (Varianten: MOESI, …)\n\n\nKonzept der vier Buchstaben zählt — nicht jede Transitionstabelle auswendig."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#mesi-zustandsübersicht",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#mesi-zustandsübersicht",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "MESI: Zustandsübersicht",
-    "text": "MESI: Zustandsübersicht\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nstateDiagram-v2\n  [*] --&gt; I\n  I --&gt; E: Read Miss (allein)\n  I --&gt; S: Read Miss (geteilt)\n  E --&gt; S: Fremd-Read\n  E --&gt; M: lokaler Write\n  S --&gt; M: Write + Invalidate\n  S --&gt; I: Invalidate empfangen\n  M --&gt; S: Fremd-Read (Intervention)\n  M --&gt; I: Fremd-Write / Flush\n\n\n\n\n\n\n\nDie Pfeile sind die klausurrelevanten Übergänge. Merken Sie sich besonders: Write auf Shared braucht Invalidate; Read-Miss auf Modified liefert der Owner."
+    "text": "MESI: Zustandsübersicht\n\n\n\nLokale Ereignisse und Fremdtransaktionen getrennt. S bedeutet teilbar, nicht zwingend mehrere Kopien.\n\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nstateDiagram-v2\n  [*] --&gt; I\n  I --&gt; E: Read Miss (allein)\n  I --&gt; S: Read Miss (geteilt)\n  E --&gt; S: Fremd-Read\n  E --&gt; M: lokaler Write\n  S --&gt; M: Write + Invalidate\n  S --&gt; I: Invalidate empfangen\n  M --&gt; S: Fremd-Read (Intervention)\n  M --&gt; I: Fremd-Write / Flush\n\n\n\n\n\n\n\nDie Pfeile sind die klausurrelevanten Übergänge. Merken Sie sich besonders: Write auf Shared braucht Invalidate; Read-Miss auf Modified liefert der Owner."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#zustand-m-modified",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#zustand-m-modified",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Zustand M (Modified)",
-    "text": "Zustand M (Modified)\n\nLine lokal geändert — RAM veraltet\nExklusiv: keine andere gültige Kopie\nKlassischer Write-Back-„Boss“-Zustand\n\n\nMonopol auf die Wahrheit dieser Adresse."
+    "text": "Zustand M (Modified)\n\nLine lokal geändert. Der untere Stand kann noch alt sein\nExklusiv: kein anderer gültiger Besitzer im Modell\nKlassischer Write-Back-„Boss“-Zustand\n\n\nMonopol auf die Wahrheit dieser Adresse."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#zustand-e-exclusive",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#zustand-e-exclusive",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Zustand E (Exclusive)",
-    "text": "Zustand E (Exclusive)\n\nSauber: Cache = RAM\nExklusiv: niemand sonst hat die Line\nWrite → oft still zu M, ohne Broadcast\n\n\nSauber und allein — Schreiben ohne Netzwerk-Meeting."
+    "text": "Zustand E (Exclusive)\n\nSauber: Übereinstimmung mit dem kohärenten unteren Stand\nExklusiv: niemand sonst hat die Line\nWrite → oft still zu M, ohne Broadcast\n\n\nSauber und allein — Schreiben ohne Netzwerk-Meeting."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#zustand-s-shared",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#zustand-s-shared",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Zustand S (Shared)",
-    "text": "Zustand S (Shared)\n\nSauber, aber mehrere Kerne haben Kopien\nGut für paralleles Lesen\nVor lokalem Write: andere Kopien invalidieren\n\n\nRead-only-Sharing effizient — Write braucht Kohärenzaktion."
+    "text": "Zustand S (Shared)\n\nSauber und teilbar. Es müssen nicht nachweislich mehrere Kopien existieren\nGut für paralleles Lesen\nVor lokalem Write: andere Kopien invalidieren\n\n\nRead-only-Sharing effizient — Write braucht Kohärenzaktion."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#zustand-i-invalid",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#zustand-i-invalid",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Zustand I (Invalid)",
-    "text": "Zustand I (Invalid)\n\nNach Reset oder Invalidate\nInhalt unbrauchbar → Miss beim Zugriff\nDaten müssen neu geholt werden\n\n\nLeerer Eimer — nicht verwenden."
+    "text": "Zustand I (Invalid)\n\nNach Reset oder Invalidate\nLokal ungültig. Die Bits müssen nicht gelöscht sein. Ein Hit auf I ist verboten\nDaten müssen neu geholt werden\n\n\nLeerer Eimer — nicht verwenden."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#mesi-read-miss",
@@ -130,7 +130,7 @@
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#mesi-write-auf-shared",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "MESI: Write auf Shared",
-    "text": "MESI: Write auf Shared\n\nCore 0 und 1: x in S\nCore 0: x = 5\nVor Write: Invalidate-Broadcast\nDann lokal schreiben, Zustand → M\n\n\nGeteilte Ressource nie heimlich ändern."
+    "text": "MESI: Write auf Shared\n\n\n\nErst Ownership und Bestätigung, dann der Write. Ein Broadcast allein ist noch kein Abschluss.\n\n\n\nCore 0 und 1: x in S\nCore 0: x = 5\nErst Ownership und die nötigen Invalidates abschließen\nDanach im Modell schreiben und nach M gehen. Der Broadcast allein ist nicht der Abschluss\n\n\nGeteilte Ressource nie heimlich ändern."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#reaktion-invalidate",
@@ -144,7 +144,7 @@
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#mesi-beispiel-zustandsfolge",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "MESI-Beispiel: Zustandsfolge",
-    "text": "MESI-Beispiel: Zustandsfolge\nZwei Kerne, Variable x, Start beide Invalid:\n\n\n\nSchritt\nAktion\nCore 0\nCore 1\n\n\n\n\n1\nCore 0 liest x\nE\nI\n\n\n2\nCore 1 liest x\nS\nS\n\n\n3\nCore 0 schreibt x=5\nM\nI\n\n\n4\nCore 1 liest x\nS\nS\n\n\n\n\nSchritt 3: Invalidate-Broadcast, dann lokal M\nSchritt 4: Owner-Supply (Intervention) oder Memory-Pfad → beide S\n\n\nTypische Klausurfrage: Tabelle ausfüllen. Üben Sie die Sequenz Read-Miss → Shared → Write → Invalidate → erneutes Lesen."
+    "text": "MESI-Beispiel: Zustandsfolge\n\n\n\nNach dem Write ist Core0 M mit 5 und der RAM noch 0. Der nächste Read liefert 5.\n\n\nZwei Kerne, Variable x, Start beide Invalid:\n\n\n\nSchritt\nAktion\nCore 0\nCore 1\n\n\n\n\n1\nCore 0 liest x\nE\nI\n\n\n2\nCore 1 liest x\nS\nS\n\n\n3\nCore 0 schreibt x=5\nM\nI\n\n\n4\nCore 1 liest x\nS\nS\n\n\n\n\nNach dem Write kann der RAM noch 0 enthalten, während Core0 M den Wert 5 hält\nDer folgende Read erhält 5. Beide Lines werden S, der untere Stand wird 5\n\n\nTypische Klausurfrage: Tabelle ausfüllen. Üben Sie die Sequenz Read-Miss → Shared → Write → Invalidate → erneutes Lesen."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#overhead-von-mesi",
@@ -158,14 +158,14 @@
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#false-sharing",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "False Sharing",
-    "text": "False Sharing\n\nCore 0: temp1, Core 1: temp2 — logisch unabhängig\nLiegen in derselben Cache-Line → Write invalidiert den Partner\nPing-Pong trotz verschiedener Variablen\nAbhilfe: Alignment / Padding auf getrennte Lines\n\n\nHardware kennt 64-Byte-Blöcke, keine C-Namen."
+    "text": "False Sharing\n\n\n\ntemp1 bei +0 und temp2 bei +4 teilen die 64-Byte-Line ab 0x20001000.\n\n\n\nCore 0: temp1, Core 1: temp2 — logisch unabhängig\nLiegen in derselben Cache-Line → Write invalidiert den Partner\nPing-Pong trotz verschiedener Variablen\nPadding trennt nur bei passender Basis, Objektgröße und echter Line\nEs kostet Speicher und kann die Lokalität verschlechtern. Ein Simulator ohne Kohärenzzeit misst das nicht\n\n\n64 Byte sind die angenommene Line, keine universelle Größe. True Sharing wäre der gemeinsame Zähler."
   },
   {
-    "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#fragen-kohärenz",
-    "href": "vorlesungen/09_paralleles_rechnen_multicore.html#fragen-kohärenz",
+    "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#aufgabe-mesi-zeile",
+    "href": "vorlesungen/09_paralleles_rechnen_multicore.html#aufgabe-mesi-zeile",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
-    "section": "Fragen? — Kohärenz",
-    "text": "Fragen? — Kohärenz\n\nWarum Bus Snooping?\nExclusive vs. Modified?\nWarum erzeugt Write auf Shared Bus-Verkehr?\n\n\nAls Nächstes: Race Conditions — MESI lügt nicht, versteht aber kein i++."
+    "section": "Aufgabe — MESI-Zeile",
+    "text": "Aufgabe — MESI-Zeile\nCore0 hat nach seinem Write den Zustand M und den Wert 5. Welchen Wert hat der RAM in diesem Modell noch, und was sieht Core1 beim folgenden Read?\n\nDer RAM kann noch 0 sein. Core1 erhält 5, beide werden S, der untere Stand wird 5. S heißt nicht, dass vorher mehrere Kopien nachgewiesen wurden. Siehe die Zustandsfolge."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#software-gemeinsamer-zähler",
@@ -179,14 +179,14 @@
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#anatomie-von-i",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Anatomie von i++",
-    "text": "Anatomie von i++\nIn C wirkt atomar — in Assembler typisch RMW:\nlw   t0, 0(s1)   # Read\naddi t0, t0, 1   # Modify\nsw   t0, 0(s1)   # Write\n\nDrei Schritte — können sich zwischen Kernen überlappen\n\n\nCPU addiert nicht „im RAM“ — immer Register-Umweg."
+    "text": "Anatomie von i++\nEine Quelltextoperation, keine Atomizität. Das typische RMW lautet:\nlw   t0, 0(s1)   # Read\naddi t0, t0, 1   # Modify\nsw   t0, 0(s1)   # Write\n\nDrei Schritte — können sich zwischen Kernen überlappen\n\n\nDieses Interleaving motiviert das Problem. Ein konkurrierendes normales C-int ist ein Data Race und in C11 undefiniert, nicht nur manchmal 1."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#race-condition",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#race-condition",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Race Condition",
-    "text": "Race Condition\n\nCore 0 liest 0\nCore 1 liest 0 (Shared)\nCore 0 schreibt 1\nCore 1 schreibt ebenfalls 1 (seine lokale Rechnung)\n\nErgebnis oft 1 statt 2 — ein Update verloren.\n\nWettlauf: beide rechnen auf demselben Startwert."
+    "text": "Race Condition\n\n\n\nBeide schreiben 1. MESI verbreitet die Writes, der Endwert bleibt 1.\n\n\n\nCore 0 liest 0\nCore 1 liest 0 (Shared)\nCore 0 schreibt 1\nCore 1 schreibt ebenfalls 1 (seine lokale Rechnung)\n\nIm Hardwarebild endet der Speicher bei 1. Das ist keine garantierte Semantik des fehlerhaften C-Programms.\n\nWettlauf: beide rechnen auf demselben Startwert."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#naive-software-locks",
@@ -196,25 +196,25 @@
     "text": "Naive Software-Locks\n/* ohne volatile: Compiler darf den Spin-Loop wegoptimieren */\nwhile (lock == 1) { }\nlock = 1;\nzaehler++;\nlock = 0;\nIdee: Mutual Exclusion — aber Check und Set sind getrennt.\n\nSchloss-Metapher stimmt logisch — atomar nicht. volatile verhindert Compiler-Optimierung des Spins, macht Check+Set aber nicht atomar."
   },
   {
-    "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#warum-software-locks-scheitern",
-    "href": "vorlesungen/09_paralleles_rechnen_multicore.html#warum-software-locks-scheitern",
+    "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#warum-diese-check-then-set-schleife-scheitert",
+    "href": "vorlesungen/09_paralleles_rechnen_multicore.html#warum-diese-check-then-set-schleife-scheitert",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
-    "section": "Warum Software-Locks scheitern",
-    "text": "Warum Software-Locks scheitern\n\nlock == 0 lesen und lock = 1 setzen: zwei Ops\nBeide Kerne sehen „frei“ → beide betreten den kritischen Abschnitt\nRace auf dem Lock selbst — braucht Hardware-Atomics\n\n\nProblem nur verschoben — Silizium muss RMW unteilbar machen."
+    "section": "Warum diese Check-then-Set-Schleife scheitert",
+    "text": "Warum diese Check-then-Set-Schleife scheitert\n\nPrüfen und Setzen sind zwei Operationen. volatile ändert das nicht\nBeide können frei sehen und eintreten\nKorrekte Software-Locks nutzen atomare Primitive und Ordnung, sie sind nicht unmöglich\n\n\nRein algorithmische Verfahren bleiben eine angenommene, fortgeschrittene Alternative."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#risc-v-a-extension",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#risc-v-a-extension",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "RISC-V A-Extension",
-    "text": "RISC-V A-Extension\n\nAtomic Instructions: unteilbares RMW für eine Adresse zwischen Harts (gemäß Spezifikation)\nGrundlage für Multicore-OS und sichere Shared-Zähler\nZwei Familien: LR/SC und AMO\nHinweis: paralleles DMA auf dieselbe Adresse bleibt Software-Risiko\n\n\nOhne Atomics kein korrektes Multicore-OS auf Shared Memory. DMA braucht eigene Sync-Disziplin."
+    "text": "RISC-V A-Extension\n\nA oder Zalrsc/Zaamo, ausgerichtet, nur in unterstützten Regionen\nLR/SC und AMO gelten für eine Adresse in ihrer Domäne, nicht für den ganzen Bus\nDMA gehört nur dazu, wenn die Reservationsdomäne das festlegt\n\n\nOhne Atomics kein korrektes Multicore-OS auf Shared Memory. DMA braucht eigene Sync-Disziplin."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#lrsc",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#lrsc",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "LR/SC",
-    "text": "LR/SC\n\nlr.w: lesen + Reservation/Monitor auf Adresse\nsc.w: schreiben nur, wenn Reservation noch gültig\nSonst: Store fehlgeschlagen → Software wiederholt\n\n\nÜberwachungszaun um die Adresse zwischen Load und Store."
+    "text": "LR/SC\n\nlr.w liest und setzt eine Reservation auf eine implementierungsabhängige Granule\nsc.w schreibt bei Erfolg und liefert 0. Bei Fehlschlag kein Store und ein Wert ungleich 0\nDie Reservation ist kein gehaltenes Mutex\n\n\nÜberwachungszaun um die Adresse zwischen Load und Store."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#lrsc-erfolg",
@@ -228,42 +228,42 @@
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#lrsc-fehlschlag",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "LR/SC: Fehlschlag",
-    "text": "LR/SC: Fehlschlag\n\nBeide: lr.w nahezu gleichzeitig\nCore 0: sc.w ok\nCore 1: sc.w scheitert (Reservation gebrochen / Kohärenz)\nSoftware von Core 1 wiederholt die Schleife\n\n\nZweiter Kern prallt ab — Zustand bleibt konsistent."
+    "text": "LR/SC: Fehlschlag\n\n\n\nSC-Erfolg ist 0. Der zweite SC schreibt nicht. Ein Fehlschlag ohne fremden Store ist zulässig.\n\n\n\nBeide: lr.w nahezu gleichzeitig\nCore 0: sc.w ok\nCore 1: sc.w scheitert (Reservation gebrochen / Kohärenz)\nSoftware von Core 1 wiederholt die Schleife\n\n\nZweiter Kern prallt ab — Zustand bleibt konsistent."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#lrsc-spinlock-in-assembler",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#lrsc-spinlock-in-assembler",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "LR/SC: Spinlock in Assembler",
-    "text": "LR/SC: Spinlock in Assembler\nacquire:\n  lr.w   t0, (a0)      /* Lock-Adresse in a0 */\n  bnez   t0, acquire   /* belegt? erneut versuchen */\n  li     t1, 1\n  sc.w   t2, t1, (a0)  /* t2=0 bei Erfolg */\n  bnez   t2, acquire   /* Reservation gebrochen → Retry */\n  /* kritischer Abschnitt */\nrelease:\n  sw     zero, 0(a0)   /* Lock freigeben */\n\nsc.w liefert Status in t2: 0 = Erfolg, sonst Fehlschlag\nTypisches Muster für Mutex/Spinlock auf RISC-V ohne AMO\n\n\nGenau diese Retry-Schleife erwartet die Klausur: LR, Test, SC, bei Fehler zurück. Release oft als einfacher Store (ggf. mit fence)."
+    "text": "LR/SC: Spinlock in Assembler\n\n\n\nAcquire mit lr.w.aq, Release mit fence rw,w vor dem Store. Kein Flush als Ersatz.\n\n\nacquire:\n  lr.w.aq t0, (a0)\n  bnez    t0, acquire\n  li      t1, 1\n  sc.w    t2, t1, (a0)\n  bnez    t2, acquire\nrelease:\n  fence rw, w\n  sw    zero, 0(a0)\n\nErfolg von sc.w ist 0. Die Sequenz ist Lehrannahme für gewöhnlichen Speicher und hier nicht assembliert\nIm kritischen Abschnitt nicht schlafen und keine blockierende Arbeit ausführen\n\n\nOhne die Release-Fence publiziert der Store das Schloss, nicht zuverlässig die vorherigen Daten. Ein ISR-Spin auf dasselbe Schloss kann sich selbst blockieren."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#amo-befehle",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#amo-befehle",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "AMO-Befehle",
-    "text": "AMO-Befehle\n\n\nB. amoadd.w: Add am Speicherpfad\n\nRMW in Hardware „hinter der Tür“\nAdresse kurz für andere Zugriffe geschützt\n\n\nEin Befehl statt explizitem LR/SC-Loop für einfache Ops."
+    "text": "AMO-Befehle\n\n\n\namoadd.w von 10 um 3 liefert alt 10 und neu 13. Zwei Inkremente enden bei 2.\n\n\n\namoadd.w auf den Wert 10 mit Addend 3: Rückgabe 10, Speicher 13\nDas ist kein globaler Bus-Lock. Ohne aq/rl fehlt die zusätzliche Ordnung\n\n\nEin Befehl statt explizitem LR/SC-Loop für einfache Ops."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#c11-stdatomic.h",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#c11-stdatomic.h",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "C11: <stdatomic.h>",
-    "text": "C11: &lt;stdatomic.h&gt;\n#include &lt;stdatomic.h&gt;\n\n_Atomic int zaehler = 0;\n\nvoid isr_oder_core1(void) {\n    atomic_fetch_add(&zaehler, 1);\n}\n\nCompiler erzeugt LR/SC oder AMO — kein Inline-Asm nötig\n\n\nModernes C trifft RISC-V-A — Brücke Software/Hardware."
+    "text": "C11: &lt;stdatomic.h&gt;\n#include &lt;stdatomic.h&gt;\n\n_Atomic int zaehler = 0;\n\nvoid hart_increment(void) {\n    atomic_fetch_add(&zaehler, 1); /* seq_cst */\n}\n\nDer Compiler kann AMO, LR/SC oder einen Library-Fallback erzeugen\natomic_fetch_add ist standardmäßig sequentially consistent und macht nicht das ganze Programm seriell\nEin blockierender Fallback gehört nicht in eine ISR\n\n\nModernes C trifft RISC-V-A — Brücke Software/Hardware."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#deadlocks",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#deadlocks",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Deadlocks",
-    "text": "Deadlocks\n\nLocks gegen Races — Risiko: zirkuläres Warten\nCore 0 hält A, will B; Core 1 hält B, will A\nHardware rettet nicht — Reihenfolge der Lock-Hierarchie in Software\n\n\nAtomics schützen Daten, nicht vor schlechter Lock-Ordnung."
+    "text": "Deadlocks\n\n\n\nA-dann-B vermeidet den Zyklus. Timeout gibt keinen konsistenten Zustand zurück.\n\n\n\nLocks gegen Races — Risiko: zirkuläres Warten\nCore 0 hält A, will B; Core 1 hält B, will A\nHardware rettet nicht — Reihenfolge der Lock-Hierarchie in Software\n\n\nAtomics schützen Daten, nicht vor schlechter Lock-Ordnung."
   },
   {
-    "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#fragen-race-conditions",
-    "href": "vorlesungen/09_paralleles_rechnen_multicore.html#fragen-race-conditions",
+    "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#aufgabe-schloss-und-isr",
+    "href": "vorlesungen/09_paralleles_rechnen_multicore.html#aufgabe-schloss-und-isr",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
-    "section": "Fragen? — Race Conditions",
-    "text": "Fragen? — Race Conditions\n\nRace bei zaehler++?\nWarum reicht normales int lock nicht?\nWie sichert LR/SC den Zugriff?\n\n\nKohärenz = Wahrheit; Atomics = unteilbare Updates. Als Nächstes: Amdahl und Semesterfazit."
+    "section": "Aufgabe — Schloss und ISR",
+    "text": "Aufgabe — Schloss und ISR\nWarum genügt volatile nicht für das Check-then-Set? Was passiert, wenn die ISR auf das Schloss spinnt, das der unterbrochene Kontext hält?\n\nvolatile erzwingt Zugriffe und schafft keine Atomizität und keine Ordnung. Die ISR und der unterbrochene Kontext warten aufeinander: Selbstdeadlock. Muster: Acquire mit lr.w.aq, Erfolgscode 0, Release mit fence rw,w vor dem Store."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#amdahls-gesetz",
@@ -277,21 +277,21 @@
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#amdahl-zahlenbeispiel",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Amdahl: Zahlenbeispiel",
-    "text": "Amdahl: Zahlenbeispiel\n\nProgramm: 80 % parallel, 20 % seriell (\\(s = 0{,}2\\))\n4 Kerne: \\(S(4) = 1 / (0{,}2 + 0{,}8/4) = 1 / 0{,}4 = 2{,}5\\)\n100 Kerne: \\(S(100) \\approx 1 / (0{,}2 + 0{,}008) \\approx 4{,}8\\)\nTrotz 100 Kernen weit unter 5× — der serielle Rest dominiert\n\n\nKlausurtypisch: Einsetzen und interpretieren. Optimierung des seriellen Pfads lohnt oft mehr als „noch ein Kern“."
+    "text": "Amdahl: Zahlenbeispiel\n\n\n\nS(4)=2,5 und S(100)=4,8077. Das liegt nahe an 5, die Effizienz ist etwa 4,8 Prozent.\n\n\n\nProgramm: 80 % parallel, 20 % seriell (\\(s = 0{,}2\\))\n4 Kerne: \\(S(4) = 1 / (0{,}2 + 0{,}8/4) = 1 / 0{,}4 = 2{,}5\\)\n100 Kerne: \\(S(100) = 1/0{,}208 \\approx 4{,}8077\\), nahe an der Grenze 5\nDie Effizienz \\(S(100)/100\\) ist nur etwa 4,8 Prozent. Overhead ist in dieser Rechnung noch 0\n\n\nFeste Arbeit, ideale Balance, kein o(N). Eine größere Aufgabe ist eine andere Frage. 4,8 ist nicht weit unter 5."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#unser-fertiges-soc-rückblick",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#unser-fertiges-soc-rückblick",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Unser fertiges SoC (Rückblick)",
-    "text": "Unser fertiges SoC (Rückblick)\nDual-Core-Idee mit Bausteinen aus MCT3:\n\nKerne: Pipeline/OoO-Konzepte, Atomics\nSpeicher: L1 (MESI), Hierarchie, Execute-in-Place aus Flash\nZeit/IRQ: CLINT, PLIC, Timer/PWM, WDT\nBusse: UART, SPI, I2C\nOffload: DMA; optional Edge-AI-Pfad\n\n\nVom Addierer zum überblickbaren Microcontroller-SoC."
+    "text": "Unser fertiges SoC (Rückblick)\nDual-Core-Idee mit Bausteinen aus MCT3:\n\nKonzept, nicht das Laborgerät: OoO, MESI und SMP sind hier nicht als vorhandenes Target belegt\nBehandelt: Caches, CLINT/PLIC als RISC-V-Beispiel, UART/SPI/I2C, DMA, Timer\nOptional und nicht im Repository nachgewiesen: RVV, NPU, kohärentes SMP\n\n\nVom Addierer zum überblickbaren Microcontroller-SoC."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#drei-flaschenhälse-lösungen",
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#drei-flaschenhälse-lösungen",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Drei Flaschenhälse — Lösungen",
-    "text": "Drei Flaschenhälse — Lösungen\n\n\n\nFeind\nLösungspfad\n\n\n\n\nMemory Wall\nCaches, DLP (Vektoren/NPUs)\n\n\nControl Hazards\nPrediction, Unrolling, Scheduling\n\n\nCPU blockiert durch I/O\nInterrupts, DMA\n\n\n\n\nOptimierung heißt: welchen der drei Feinde treffe ich?"
+    "text": "Drei Flaschenhälse — Lösungen\n\n\n\nFeind\nLösungspfad\n\n\n\n\nMemory Wall\nLokalität, Tiling, Bandbreite, nicht nur DLP\n\n\nControl Hazards\nPrediction, Unrolling, Scheduling\n\n\nCPU blockiert durch I/O\nInterrupts, DMA\n\n\n\n\nOptimierung heißt: welchen der drei Feinde treffe ich?"
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#c-code-vs.-hardware",
@@ -305,7 +305,7 @@
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#infos-zur-klausur",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Infos zur Klausur",
-    "text": "Infos zur Klausur\n\nSchriftlich, Dauer laut Modulbeschreibung / Ankündigung\nHilfsmittel: nicht programmierbarer Taschenrechner; keine Skripte\nFokus: Konzepte, kleine Rechnungen (z. B. AMAT), Skizzen, C-Ausschnitte\n\n\nProblemlösung vor Auswendiglernen von Datenblatt-Adressen."
+    "text": "Infos zur Klausur\n\nDauer und Hilfsmittel nur aus der autorisierten Ankündigung. Hier nichts Neues festlegen\nUnbestätigte Formalia vor der Klausur prüfen\nFokus der Vorlesung: Konzepte, kleine Rechnungen, Skizzen, kurze C-Ausschnitte\n\n\nProblemlösung vor Auswendiglernen von Datenblatt-Adressen."
   },
   {
     "objectID": "vorlesungen/09_paralleles_rechnen_multicore.html#klausurfokus-speicher",
@@ -354,7 +354,7 @@
     "href": "vorlesungen/09_paralleles_rechnen_multicore.html#abschluss-und-ausblick",
     "title": "09 · Paralleles Rechnen (Multicore) & Finale",
     "section": "Abschluss und Ausblick",
-    "text": "Abschluss und Ausblick\n\nTheorie MCT3 abgeschlossen\nLabor-Finale: Probeaufgaben, Renode, offene Fragen\n\nVielen Dank für Ihre Mitarbeit im Semester!\n\nFreude, Sie durch die SoC-Ebenen begleitet zu haben — viel Erfolg in der Klausur."
+    "text": "Abschluss und Ausblick\n\nTheorie MCT3 abgeschlossen\nLabor-Finale: Probeaufgaben, Renode, offene Fragen\n\nVielen Dank für Ihre Mitarbeit im Semester!\n\nQuellen: RISC-V A-Extension und RVWMO, C11-Atomics, Kernel-Hinweis zu False Sharing. Kein kohärenter Multicore-Simulator und keine RISC-V-Toolchain wurden für Zeit oder Assemblat verwendet.\n\n\nFreude, Sie durch die SoC-Ebenen begleitet zu haben — viel Erfolg in der Klausur."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#willkommen-zu-block-7",
