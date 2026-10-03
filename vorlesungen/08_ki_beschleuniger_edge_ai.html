@@ -260,10 +260,10 @@ flowchart LR
 <h2>Anknüpfung: Compiler-Labor</h2>
 <p>Kurz-Recap aus Block 7 (Vertiefung im Übungsblatt):</p>
 <ul>
-<li>Godbolt: <code>-O3</code> zerlegt und umordnet C-Code</li>
-<li>Instruction Scheduling füllt Load-Use-Lücken</li>
-<li>Loop Unrolling reduziert Branches</li>
-<li>Lektion: Hardware mag vorhersagbaren, linearen Code</li>
+<li>Godbolt zeigt die Übersetzung, kein OoO-Timing</li>
+<li><code>-O3</code> garantiert weder Unrolling noch kürzere Laufzeit</li>
+<li>Scheduling und Unrolling sind mögliche, keine sicheren Folgen</li>
+<li>Eine MAC-Kette bleibt RAW. Mehrere Akkumulatoren können unabhängig sein</li>
 </ul>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb1-1"><a aria-label="1"></a><span class="co">/* Konzept: Unrolling von for (i = 0; i &lt; 4; i++) a[i] = 0; */</span></span>
 <span id="cb1-2"><a aria-label="2"></a>a<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
@@ -287,10 +287,9 @@ flowchart LR
 <section id="grenze-der-general-purpose-cpu" class="slide level2">
 <h2>Grenze der General-Purpose-CPU</h2>
 <ul>
-<li>ILP: wenige Issues parallel — skaliert nicht beliebig mit mehr ALUs</li>
-<li>Mehr Breite → überproportional (nahezu quadratisch) teureres Renaming/ROB/Decode</li>
-<li>Große Chipfläche oft für Caches und Kontrolllogik, nicht nur für Arithmetik</li>
-<li>Für reine Massen-Mathematik oft ineffizient</li>
+<li>Mehr Issue-Breite verteuert Scheduler, Ports und Bypass. Quadratisch gilt nicht pauschal für ROB, Renaming und Decode zusammen</li>
+<li>OoO kann Loads überlappen. Es hebt eine einzelne Akkumulatorkette nicht auf</li>
+<li>DLP ergänzt ILP. SIMD ist eine Umsetzung, keine Definition von DLP</li>
 </ul>
 <aside class="notes">
 <p>Schweizer Taschenmesser vs.&nbsp;Motorsäge: Excel und OS brauchen Flexibilität; Milliarden MACs brauchen Durchsatz.</p>
@@ -309,7 +308,7 @@ flowchart LR
 <section id="neuer-workload-edge-ai" class="slide level2">
 <h2>Neuer Workload: Edge AI</h2>
 <ul>
-<li>Edge AI: Inferenz neuronaler Netze auf dem Endgerät (MCU, Wearable, Sensor)</li>
+<li>Edge AI umfasst Endgerät und Gateway. Nicht jede lokale Inferenz braucht eine NPU</li>
 <li>Beispiele: Schrittzählung, Wake-Word, Vibrationsdiagnose an Maschinen</li>
 <li>Dauerbetrieb auf knappen Ressourcen (Energie, SRAM, Flash)</li>
 </ul>
@@ -329,11 +328,17 @@ flowchart LR
 </section>
 <section id="cloud-ai-vs.-edge-ai" class="slide level2">
 <h2>Cloud AI vs.&nbsp;Edge AI</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/edge.png"></p>
+<figcaption>Lokal und Cloud sind Optionen. Funk ist nicht immer die teurere Seite.</figcaption>
+</figure>
+</div>
 <p>Warum nicht alles in die Cloud?</p>
 <ol type="1">
 <li>Latenz — sicherheitskritische Reaktionen dulden keine Funkwartezeit</li>
 <li>Privacy — Audio/Video sollen oft lokal bleiben</li>
-<li>Energie — Funk (WLAN/LTE) kostet oft deutlich mehr als lokale Rechnung</li>
+<li>Energie und Verfügbarkeit sind Anforderungen. Funk ist nicht immer teurer als lokale Rechnung</li>
 </ol>
 <div class="cell" data-reveal="true" data-fig-width="3.6" data-layout-align="default">
 <div class="cell-output-display">
@@ -352,7 +357,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>Drei Treiber: Zeit, Datenschutz, Batterie — Edge wird architektonisch zwingend.</p>
+<p>Lokal bleiben garantiert weder Datenschutz noch sicheren Betrieb. Cloud und Edge sind Entwurfsoptionen.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -415,7 +420,7 @@ flowchart LR
 <h2>Die Leitfrage des Tages</h2>
 <ul>
 <li>Kleines Netz: z. B. <span class="math inline">\(10^{6}\)</span> Gewichte — Inferenz verrechnet sie mit Aktivierungen</li>
-<li>Jeder RAM-Zugriff kostet viele Takte</li>
+<li>SRAM, Cache-Hit, Flash und DRAM haben verschiedene Kosten. Nicht jeder Zugriff ist ein DRAM-Miss</li>
 <li>Wie rechnet man Millionen MACs/s auf knapper Energie, ohne am Speicher zu ersticken?</li>
 </ul>
 <div class="cell" data-reveal="true" data-fig-width="3.2" data-layout-align="default">
@@ -448,15 +453,11 @@ flowchart TD
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-motivation-edge-ai" class="slide level2">
-<h2>Fragen? — Motivation Edge AI</h2>
-<ul>
-<li>Warum skaliert ILP für reine Massenrechnung nicht beliebig?</li>
-<li>Drei Treiber für Edge statt Cloud?</li>
-<li>Alleskönner-CPU vs.&nbsp;Domänen-Spezialist klar?</li>
-</ul>
+<section id="aufgabe-sechs-macs" class="slide level2">
+<h2>Aufgabe — Sechs MACs</h2>
+<p>Warum sind sechs Gewichte hier sechs MACs, bei einer Faltung aber nicht? Was ist y0?</p>
 <aside class="notes">
-<p>Als Nächstes: Was ein KNN auf Hardware-Ebene wirklich ist — Arrays und MACs.</p>
+<p>Jedes Gewicht wird einmal mit einem Input multipliziert. y0 ist 14. Eine Faltung verwendet Gewichte mehrfach, deshalb übersteigt die MAC-Zahl die Parameterzahl. Siehe die Dense-Abbildung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -493,6 +494,12 @@ flowchart TD
 </section>
 <section id="mathematik-matrix-dot-product" class="slide level2">
 <h2>Mathematik: Matrix / Dot Product</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/dense.png"></p>
+<figcaption>y0 = 14 und y1 = 9. Sechs MACs, acht Parameter, 14 arithmetische Operationen.</figcaption>
+</figure>
+</div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb2-1"><a aria-label="1"></a><span class="dt">float</span> sum <span class="op">=</span> <span class="fl">0.0</span><span class="bu">f</span><span class="op">;</span></span>
 <span id="cb2-2"><a aria-label="2"></a><span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> N<span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
 <span id="cb2-3"><a aria-label="3"></a>    sum <span class="op">+=</span> input<span class="op">[</span>i<span class="op">]</span> <span class="op">*</span> weights<span class="op">[</span>i<span class="op">];</span></span>
@@ -545,8 +552,8 @@ flowchart TD
 <span id="cb3-4"><a aria-label="4"></a><span class="bu">mul</span> t2<span class="op">,</span> t0<span class="op">,</span> t1</span>
 <span id="cb3-5"><a aria-label="5"></a><span class="bu">add</span> t3<span class="op">,</span> t3<span class="op">,</span> t2   <span class="op">#</span> a <span class="op">+=</span> w<span class="op">*</span>x</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li>Zwei Speicherzugriffe für zwei Arithmetik-Ops</li>
-<li>Geringe Arithmetic Intensity — Speicher dominiert</li>
+<li><code>mul</code>/<code>add</code> sind hier Ganzzahl, die C-Schleife darüber ist Float. Das ist eine Analogie, keine Float-ISA</li>
+<li>Zwei Loads und zwei Ops gelten nur ohne Wiederverwendung und ohne FMA</li>
 </ul>
 <aside class="notes">
 <p>Ohne Wiederverwendung der Daten verhungert die ALU am Bus.</p>
@@ -564,14 +571,20 @@ flowchart TD
 </section>
 <section id="arithmetic-intensity-zahlenbeispiel" class="slide level2">
 <h2>Arithmetic Intensity: Zahlenbeispiel</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/roofline.png"></p>
+<figcaption>Knick bei 1 Op/Byte. Naiv 0,25, mit Wiederverwendung 0,5. Lehrwerte, keine Messung.</figcaption>
+</figure>
+</div>
 <ul>
 <li><span class="math inline">\(\mathrm{AI} = \mathrm{Ops}/\mathrm{Bytes}\)</span></li>
-<li>Naive MAC-Schleife: <span class="math inline">\(2\)</span> Ops (Mul+Add), lädt <span class="math inline">\(2\times\)</span> Float32 <span class="math inline">\(= 8\)</span> Byte → <span class="math inline">\(\mathrm{AI} = 0{,}25\)</span> Ops/Byte</li>
-<li>Systolic Array / Weight-Stationary: Gewichte bleiben in der Zelle → deutlich höhere AI</li>
-<li>Roofline-Idee: niedrige AI → Memory-bound; hohe AI → Compute-bound</li>
+<li>Grenze dieses Beispiels: DRAM zum On-Chip-Speicher. Output und Bias zählen hier noch nicht</li>
+<li><span class="math inline">\(2\)</span> Ops und <span class="math inline">\(8\)</span> Byte ergeben <span class="math inline">\(0{,}25\)</span> Ops/Byte. Das ist nicht allgemein „unter 1 = memory-bound“</li>
+<li>Erreichbar ist <span class="math inline">\(\min(P_{peak}, Bandbreite \times AI)\)</span>. Der Knick liegt bei <span class="math inline">\(P_{peak}/Bandbreite\)</span></li>
 </ul>
 <aside class="notes">
-<p>Faustformel der Memory Wall: unter <span class="math inline">\(\approx 1\)</span> Ops/Byte oft speichergebunden. Wiederverwendung (Stationary Weights) hebt die AI — erst dann lohnen hohe TOPS.</p>
+<p>Im Lehrmodell mit 8 Ops/Takt und 8 Byte/Takt liegt der Knick bei 1 Op/Byte. Andere Maschinen haben einen anderen Knick.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -586,10 +599,16 @@ flowchart TD
 </section>
 <section id="datenproblem-gewichte" class="slide level2">
 <h2>Datenproblem: Gewichte</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/tile.png"></p>
+<figcaption>Dieselbe 2×2-Rechnung: 64 Byte naiv, 32 Byte aus einem Tile.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Modelle wie ResNet-50: Millionen Parameter — Megabyte-Bereich</li>
 <li>L1 oft nur Dutzende KiB → Matrizen passen nicht</li>
-<li>Capacity Misses: fast jeder Zugriff geht Richtung DRAM/Flash</li>
+<li>Ein Streaming-Datensatz erzeugt nicht bei jedem Skalarzugriff einen Capacity Miss. Cachezeilen und Prefetch bündeln Zugriffe</li>
 </ul>
 <aside class="notes">
 <p>Block-2-Caches helfen bei Lokalität — bei einmaligem Durchlauf riesiger Matrizen kaum.</p>
@@ -649,10 +668,9 @@ flowchart TD
 <section id="rechenbeispiel-106-macs" class="slide level2">
 <h2>Rechenbeispiel: <span class="math inline">\(10^{6}\)</span> MACs</h2>
 <ul>
-<li><span class="math inline">\(10^{6}\)</span> Gewichte <span class="math inline">\(\Rightarrow\)</span> Größenordnung <span class="math inline">\(10^{6}\)</span> MACs</li>
-<li>Dazu typisch <span class="math inline">\(10^{6}\)</span> Loads für Inputs + <span class="math inline">\(10^{6}\)</span> für Weights</li>
-<li><span class="math inline">\(\Rightarrow\)</span> Millionen Speicherzugriffe — Latenz summiert sich</li>
-<li>Für Echtzeit-Video oft zu langsam ohne Spezialisierung</li>
+<li><span class="math inline">\(10^{6}\)</span> Gewichte sind nur dann <span class="math inline">\(10^{6}\)</span> MACs, wenn jedes Gewicht genau einmal multipliziert wird</li>
+<li>Eine Faltung nutzt Gewichte mehrfach. Sequenz, Bild und Batch ändern den Aufwand</li>
+<li>Einzelne Miss-Latenzen darf man nicht zu einer Summe addieren, wenn Zugriffe überlappen</li>
 </ul>
 <aside class="notes">
 <p>Selbst mit Prefetch bleibt der Von-Neumann-Pfad der Engpass.</p>
@@ -673,8 +691,8 @@ flowchart TD
 <ul>
 <li>OoO/Predictor: stark bei unregelmäßigem Kontrollfluss</li>
 <li>MAC-Schleife: linear, hoch vorhersagbar</li>
-<li>Branch Predictor und komplexe Stations: Overhead ohne Nutzen</li>
-<li>Unabhängige Gewichte — aber Speicher, nicht Decode, limitiert</li>
+<li>Der Predictor ist bei einer festen Schleife nicht wertlos, aber selten der Engpass</li>
+<li>Unabhängige Akkumulatoren kann OoO ausführen. Die Speichergrenze bleibt, wenn die Arithmetic Intensity niedrig ist</li>
 </ul>
 <aside class="notes">
 <p>Ironie: Cleverness aus Block 7 ist für diesen Workload oft Verschwendung.</p>
@@ -797,6 +815,12 @@ flowchart TD
 </section>
 <section id="simd-prinzip" class="slide level2">
 <h2>SIMD-Prinzip</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/simd.png"></p>
+<figcaption>Vier 8-Bit-Lanes addieren getrennt. Ein Int8-Produkt braucht einen breiteren Akkumulator.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Skalar (SISD): <code>add</code> → eine Addition</li>
 <li>SIMD: ein Befehl → mehrere parallele Adds auf Daten-Lanes</li>
@@ -1113,16 +1137,23 @@ flowchart LR
 <h2><code>vsetvli</code> / hardware-agnostisch</h2>
 <ul>
 <li>Software: „Array mit <span class="math inline">\(N\)</span> Elementen“</li>
-<li>Hardware antwortet mit nutzbarer Chunk-Größe (<span class="math inline">\(\mathrm{VL} \le \mathrm{VLEN}/\mathrm{SEW}\)</span>)</li>
+<li>Bei LMUL <span class="math inline">\(= 1\)</span> ist <span class="math inline">\(\mathrm{VLMAX} = \mathrm{VLEN}/\mathrm{SEW}\)</span>. Allgemein <span class="math inline">\(\mathrm{VLMAX} = \mathrm{LMUL}\times\mathrm{VLEN}/\mathrm{SEW}\)</span></li>
+<li><code>vsetvli</code> liefert nicht immer <span class="math inline">\(\min(AVL, VLMAX)\)</span></li>
 <li>Schleife läuft in Hardware-Schritten durch das Array</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb4-1"><a aria-label="1"></a># Pseudocode <span class="op">/</span> Konzept — Details in der RVV<span class="op">-</span>Spezifikation</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb4-1"><a aria-label="1"></a># RVV <span class="fl">1.0</span><span class="op">,</span> LMUL<span class="op">=</span><span class="dv">1</span><span class="op">,</span> e32<span class="op">,</span> ta<span class="op">,</span> ma<span class="op">.</span> Nicht in diesem Repo assembliert<span class="op">.</span></span>
 <span id="cb4-2"><a aria-label="2"></a><span class="fu">loop:</span></span>
-<span id="cb4-3"><a aria-label="3"></a>    vsetvli t0<span class="op">,</span> a0<span class="op">,</span> e32   <span class="op">#</span> wie viele e32<span class="op">-</span>Elemente<span class="op">?</span></span>
+<span id="cb4-3"><a aria-label="3"></a>    vsetvli t0<span class="op">,</span> a0<span class="op">,</span> e32<span class="op">,</span> m1<span class="op">,</span> ta<span class="op">,</span> ma</span>
 <span id="cb4-4"><a aria-label="4"></a>    vle32<span class="op">.</span>v v1<span class="op">,</span> <span class="op">(</span>a1<span class="op">)</span></span>
 <span id="cb4-5"><a aria-label="5"></a>    vle32<span class="op">.</span>v v2<span class="op">,</span> <span class="op">(</span>a2<span class="op">)</span></span>
 <span id="cb4-6"><a aria-label="6"></a>    vadd<span class="op">.</span>vv v3<span class="op">,</span> v1<span class="op">,</span> v2</span>
-<span id="cb4-7"><a aria-label="7"></a>    # Pointer<span class="op">/</span>Count aktualisieren<span class="op">,</span> wiederholen</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-7"><a aria-label="7"></a>    vse32<span class="op">.</span>v v3<span class="op">,</span> <span class="op">(</span>a3<span class="op">)</span></span>
+<span id="cb4-8"><a aria-label="8"></a>    slli t1<span class="op">,</span> t0<span class="op">,</span> <span class="dv">2</span></span>
+<span id="cb4-9"><a aria-label="9"></a>    <span class="bu">add</span> a1<span class="op">,</span> a1<span class="op">,</span> t1</span>
+<span id="cb4-10"><a aria-label="10"></a>    <span class="bu">add</span> a2<span class="op">,</span> a2<span class="op">,</span> t1</span>
+<span id="cb4-11"><a aria-label="11"></a>    <span class="bu">add</span> a3<span class="op">,</span> a3<span class="op">,</span> t1</span>
+<span id="cb4-12"><a aria-label="12"></a>    <span class="bu">sub</span> a0<span class="op">,</span> a0<span class="op">,</span> t0</span>
+<span id="cb4-13"><a aria-label="13"></a>    bnez a0<span class="op">,</span> loop</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p>Laufzeit-Abfrage der Kapazität — Schrittweite passt sich dem Silizium an.</p>
 <style type="text/css">
@@ -1139,6 +1170,12 @@ flowchart LR
 </section>
 <section id="ein-binary-viele-mathrmvlen" class="slide level2">
 <h2>Ein Binary, viele <span class="math inline">\(\mathrm{VLEN}\)</span></h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/rvv.png"></p>
+<figcaption>128 Bit: 250 Schritte zu VL 4. 1024 Bit: 31 Schritte zu VL 32 plus VL 8.</figcaption>
+</figure>
+</div>
 <p>Beispiel: 1000 Elemente, <code>vadd.vv</code> (schematisch)</p>
 <table class="caption-top" style="width:100%;">
 <colgroup>
@@ -1164,15 +1201,15 @@ flowchart LR
 </tr>
 <tr class="even">
 <td>Server</td>
-<td>breit (z. B. 1024 Bit)</td>
+<td>1024 Bit, LMUL 1</td>
+<td>32, zuletzt 8</td>
 <td>32</td>
-<td><span class="math inline">\(\approx 32\)</span></td>
 </tr>
 </tbody>
 </table>
 <p>Gleiche RVV-Schleifenidee skaliert mit <span class="math inline">\(\mathrm{VLEN}\)</span> — ohne feste Packed-SIMD-Breite im Quelltext.</p>
 <aside class="notes">
-<p>Voraussetzung: RVV-fähiges Binary; die Strip-Mining-Schleife nutzt die jeweilige Hardwarebreite.</p>
+<p>1000/32 ist nicht teilbar: 31 mal VL 32 und einmal VL 8. Ein Binary braucht ISA, ABI und einen Kern mit RVV.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1190,10 +1227,10 @@ flowchart LR
 <ul>
 <li>Ein Vektorbefehl → viele Elemente parallel</li>
 <li>Skalar: dutzende Loads/Adds/Branches aus dem I-Cache</li>
-<li>RVV: Front-End (Fetch/Decode) deutlich weniger belastet — DLP statt Instruktionsstrom</li>
+<li>Weniger Fetch kann Energie sparen und garantiert keinen geringeren Gesamtverbrauch</li>
 </ul>
 <aside class="notes">
-<p>Strom sparend: Kontrolllogik pausiert, Vektor-ALUs arbeiten.</p>
+<p>Speicher- und Registerverkehr bleiben in der Energiebilanz. Chaining ist Mikroarchitektur, nicht die ISA.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1229,9 +1266,15 @@ flowchart LR
 </section>
 <section id="chaining" class="slide level2">
 <h2>Chaining</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/chain.png"></p>
+<figcaption>Mul-Latenz 2, Add-Latenz 1, eine Lane. Chaining ist keine RVV-Garantie.</figcaption>
+</figure>
+</div>
 <ul>
 <li>MAC: Mul dann Add — Zwischenergebnis sonst zurück ins Registerfile</li>
-<li>Chaining: Mul-Pipeline speist Add-Pipeline direkt (Forwarding)</li>
+<li>Chaining ist eine Option des Kerns. Eine FMA ist eine andere Instruktion mit einer Rundung</li>
 <li>Weniger Registerverkehr, höherer Durchsatz</li>
 </ul>
 <aside class="notes">
@@ -1313,15 +1356,11 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-rvv" class="slide level2">
-<h2>Fragen? — RVV</h2>
-<ul>
-<li>RVV vs.&nbsp;Packed SIMD?</li>
-<li>Warum macht <code>vsetvli</code> Code zukunftssicherer?</li>
-<li>Wie senken Vektoren den Energieverbrauch?</li>
-</ul>
+<section id="aufgabe-rest-8" class="slide level2">
+<h2>Aufgabe — Rest 8</h2>
+<p>VLMAX ist 32, AVL ist 1000. Wie viele Iterationen und welches letzte VL entstehen, wenn der Rest klein genug für ein VL bleibt?</p>
 <aside class="notes">
-<p>Als Nächstes: NPUs und Systolic Arrays — Datenfluss ohne Register-Pendeln.</p>
+<p>31 mal 32 und einmal 8. Zusammen 32 Iterationen und 1000 Elemente. VL ist nicht in jedem AVL-Bereich min(AVL, VLMAX). Siehe die RVV-Abbildung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1536,11 +1575,18 @@ flowchart TD
 </section>
 <section id="datenfluss-füllt-das-array" class="slide level2">
 <h2>Datenfluss füllt das Array</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/array.png"></p>
+<figcaption>C00 fertig in Takt 2, C01 und C10 in Takt 3, C11 in Takt 4.</figcaption>
+</figure>
+</div>
 <p><span class="math inline">\(2\times 2\)</span>-Idee (schematisch):</p>
 <ul>
 <li>Takt 1: erste Paare treffen sich, Summen starten</li>
 <li>Takt 2: Wellen wandern, neue Werte am Rand</li>
-<li>Takt 3+: fertige Teilresultate am Ausgang — nach Füllphase oft ein Resultatstrom pro Takt</li>
+<li>Im 2×2-Output-Stationary-Beispiel enden die vier Summen in den Takten 2, 3, 3 und 4</li>
+<li>Das ist kein Ergebnis je Takt ab Takt 3. Readout der lokalen Summen kommt danach</li>
 </ul>
 <aside class="notes">
 <p>Wie Instruction-Pipeline: erst füllen, dann kontinuierlicher Ausstoß.</p>
@@ -1558,6 +1604,12 @@ flowchart TD
 </section>
 <section id="weight-stationary" class="slide level2">
 <h2>Weight-Stationary</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/stationary.png"></p>
+<figcaption>Output-Stationary hält C. Weight-Stationary hält das Gewicht und muss es trotzdem laden.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Gewichte während einer Inferenz oft konstant</li>
 <li>Variante: Weights in Zellen „parken“, nur Activations durchschieben</li>
@@ -1579,10 +1631,16 @@ flowchart TD
 </section>
 <section id="beispiel-google-tpu-v1" class="slide level2">
 <h2>Beispiel: Google TPU v1</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/tops.png"></p>
+<figcaption>91,75 TOPS Peak bei zwei Ops je MAC. Ein 2×2-Tile nutzt 4 von 16 gedachten Zellen.</figcaption>
+</figure>
+</div>
 <ul>
-<li>Herzstück: Systolic Array <span class="math inline">\(256\times 256\)</span> MAC-Zellen (<span class="math inline">\(\approx 65\,536\)</span> Units)</li>
-<li>Bei <span class="math inline">\(\approx 700\,\mathrm{MHz}\)</span>: Größenordnung viele TOPS (Zählweise oft Mul+Add getrennt)</li>
-<li>Deutlich bessere TOPS/Watt als damalige General-Purpose-/GPU-Alternativen für diesen Workload</li>
+<li><span class="math inline">\(256\times 256 = 65\,536\)</span> Int8-MACs. Bei 700 MHz sind das 45,8752 TMAC/s</li>
+<li>Mit zwei Ops je MAC: 91,7504 TOPS, in der Originalarbeit oft 92 TOPS. Das ist Peak, kein End-to-End</li>
+<li>TPU v1 ist ein Datacenter-Baustein, kein Milliwatt-Edge-Teil</li>
 </ul>
 <aside class="notes">
 <p>Weckruf: fast nur Multiplikator-Gitter — Domäne statt Alleskönner. Marketing-TOPS von der Zählkonvention abhängig.</p>
@@ -1662,15 +1720,11 @@ flowchart TD
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-systolic-arrays" class="slide level2">
-<h2>Fragen? — Systolic Arrays</h2>
-<ul>
-<li>Warum bricht das Array den Von-Neumann-Flaschenhals weitgehend?</li>
-<li>Vorteil Weight-Stationary?</li>
-<li>Warum untauglich für klassischen C-Kontrollfluss?</li>
-</ul>
+<section id="aufgabe-takt-4" class="slide level2">
+<h2>Aufgabe — Takt 4</h2>
+<p>Wann ist C11 im 2×2-Output-Stationary-Beispiel fertig? Ist 92 TOPS eine End-to-End-Leistung?</p>
 <aside class="notes">
-<p>Als Nächstes: TensorFlow Lite Micro — Cloud-Modell in Bare-Metal-C.</p>
+<p>C11 wird in Takt 4 zu 50. 91,75 TOPS sind der Peak aus 65536 MACs, 700 MHz und zwei Ops je MAC. Siehe Array- und TOPS-Abbildung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1709,7 +1763,7 @@ flowchart TD
 <ul>
 <li>Kleine C++-Runtime für MCUs (ohne OS, ohne <code>malloc</code>)</li>
 <li>Nimmt kompaktes Modell, interpretiert Layer (Conv2D, Dense, …)</li>
-<li>Rechnet auf CPU — oder leitet an NPU/DSP weiter, falls vorhanden</li>
+<li>Rechnet mit Firmware-Kerneln. Eine NPU braucht ein passendes Backend, nicht nur das Silizium</li>
 </ul>
 <aside class="notes">
 <p>Feste Arena im SRAM — kein dynamisches Heap-Wachstum.</p>
@@ -1727,6 +1781,12 @@ flowchart TD
 </section>
 <section id="workflow-embedded-ai" class="slide level2">
 <h2>Workflow Embedded AI</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/flow.png"></p>
+<figcaption>Das C-Array sind Modelldaten. Invoke läuft über Kernel, nicht als Modell-Maschinencode.</figcaption>
+</figure>
+</div>
 <ol type="1">
 <li>Trainieren (Cloud / Python)</li>
 <li>Konvertieren → <code>.tflite</code></li>
@@ -1750,10 +1810,16 @@ flowchart TD
 </section>
 <section id="quantisierung" class="slide level2">
 <h2>Quantisierung</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/quant.png"></p>
+<figcaption>1,24 wird 12 und zurück 1,2. 20 wird auf 127 begrenzt. Flash und SRAM bleiben getrennt.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Float32: 4 Byte/Gewicht, teuer ohne FPU</li>
-<li>Int8-Quantisierung: Modell oft <span class="math inline">\(\approx 75\,\%\)</span> kleiner</li>
-<li>Integer-ALUs schneller/sparsam; Accuracy-Verlust meist gering (aufgabenabhängig)</li>
+<li>Reine Float32-Gewichte werden als Int8 um 75 Prozent kleiner. Bias, Aktivierungen und Arena nicht automatisch</li>
+<li>Integer ist nicht auf jeder CPU schneller. Den Accuracy-Verlust messen, nicht annehmen</li>
 </ul>
 <aside class="notes">
 <p>Netze sind robust gegen Quantisierungsrauschen — oft akzeptabler Trade-off.</p>
@@ -1773,8 +1839,8 @@ flowchart TD
 <h2>Pruning</h2>
 <ul>
 <li>Viele Gewichte nahe null nach dem Training</li>
-<li>Pruning (Training/Toolchain) setzt unwichtige Verbindungen hart auf 0 → Sparse</li>
-<li>Weniger effektive MACs / Speicherzugriffe (wenn Runtime Sparse nutzt)</li>
+<li>Pruning braucht eine sparsityfähige Darstellung und einen passenden Kernel</li>
+<li>Flash-Ersparnis und weniger ausgeführte MACs sind zwei verschiedene Folgen</li>
 </ul>
 <aside class="notes">
 <p>Tote Äste entfernen — näher an der Memory Wall vorbei. Oft im Trainingsgraphen, nicht im C-Compiler.</p>
@@ -1796,7 +1862,7 @@ flowchart TD
 <ul>
 <li>Kleines quantisiertes Modell (<span class="math inline">\(&lt; 20\,\mathrm{KB}\)</span>)</li>
 <li>Eingabe: 3-Achsen-Beschleunigung (Anknüpfung I2C, Block 5)</li>
-<li>Klassen z. B.: Stehen / Gehen / Laufen</li>
+<li>Klassen Stehen, Gehen, Laufen sind eine Aktivitätserkennung, noch kein Schrittzähler</li>
 <li>Simulation: Renode mit virtuellen Sensordaten</li>
 </ul>
 <aside class="notes">
@@ -1822,7 +1888,7 @@ flowchart TD
 <span id="cb5-5"><a aria-label="5"></a>    <span class="co">/* … weitere Bytes … */</span></span>
 <span id="cb5-6"><a aria-label="6"></a><span class="op">};</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Kein Python-Paket — Execute-in-Place aus Flash möglich.</p>
+<p>Die Bytes sind Modelldaten. Kernel in der Firmware führen Operatoren aus. Flash-Lesen ist möglich, wenn Plattform und Kernel das erlauben.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1840,11 +1906,12 @@ flowchart TD
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource cpp number-lines code-with-copy"><code class="sourceCode cpp"><span id="cb6-1"><a aria-label="1"></a><span class="at">const</span> <span class="dt">int</span> kTensorArenaSize <span class="op">=</span> <span class="dv">10</span> <span class="op">*</span> <span class="dv">1024</span><span class="op">;</span></span>
 <span id="cb6-2"><a aria-label="2"></a><span class="dt">uint8_t</span> tensor_arena<span class="op">[</span>kTensorArenaSize<span class="op">];</span></span>
 <span id="cb6-3"><a aria-label="3"></a></span>
-<span id="cb6-4"><a aria-label="4"></a><span class="co">/* ältere TFLM-API; aktuelle Versionen ohne ErrorReporter */</span></span>
-<span id="cb6-5"><a aria-label="5"></a>tflite<span class="op">::</span>MicroInterpreter interpreter<span class="op">(</span></span>
-<span id="cb6-6"><a aria-label="6"></a>    model<span class="op">,</span> resolver<span class="op">,</span> tensor_arena<span class="op">,</span></span>
-<span id="cb6-7"><a aria-label="7"></a>    kTensorArenaSize<span class="op">,</span> error_reporter<span class="op">);</span></span>
-<span id="cb6-8"><a aria-label="8"></a>interpreter<span class="op">.</span>AllocateTensors<span class="op">();</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-4"><a aria-label="4"></a><span class="co">/* Lehrschnitt, hier nicht übersetzt. Kein TFLM-Tree im Repository.</span></span>
+<span id="cb6-5"><a aria-label="5"></a><span class="co">   Konstruktor ohne ErrorReporter, Rückgaben prüfen. */</span></span>
+<span id="cb6-6"><a aria-label="6"></a><span class="cf">if</span> <span class="op">(</span>model<span class="op">-&gt;</span>version<span class="op">()</span> <span class="op">!=</span> TFLITE_SCHEMA_VERSION<span class="op">)</span> <span class="op">{</span> <span class="co">/* Abbruch */</span> <span class="op">}</span></span>
+<span id="cb6-7"><a aria-label="7"></a>tflite<span class="op">::</span>MicroInterpreter interpreter<span class="op">(</span></span>
+<span id="cb6-8"><a aria-label="8"></a>    model<span class="op">,</span> resolver<span class="op">,</span> tensor_arena<span class="op">,</span> kTensorArenaSize<span class="op">);</span></span>
+<span id="cb6-9"><a aria-label="9"></a><span class="cf">if</span> <span class="op">(</span>interpreter<span class="op">.</span>AllocateTensors<span class="op">()</span> <span class="op">!=</span> kTfLiteOk<span class="op">)</span> <span class="op">{</span> <span class="co">/* Arena */</span> <span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li>Statischer SRAM-Block — keine Heap-Leaks</li>
 <li>Zu kleine Arena → klarer Fehler bei Allokation</li>
@@ -1865,15 +1932,13 @@ flowchart TD
 </section>
 <section id="inferenz-zyklus" class="slide level2">
 <h2>Inferenz-Zyklus</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource cpp number-lines code-with-copy"><code class="sourceCode cpp"><span id="cb7-1"><a aria-label="1"></a><span class="cf">while</span> <span class="op">(</span><span class="dv">1</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb7-2"><a aria-label="2"></a>    <span class="co">/* hier vereinfachend Float-Modell; quantisiert: data.int8 */</span></span>
-<span id="cb7-3"><a aria-label="3"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> <span class="dv">128</span><span class="op">;</span> i<span class="op">++)</span></span>
-<span id="cb7-4"><a aria-label="4"></a>        input<span class="op">-&gt;</span>data<span class="op">.</span>f<span class="op">[</span>i<span class="op">]</span> <span class="op">=</span> read_i2c_sensor<span class="op">();</span></span>
-<span id="cb7-5"><a aria-label="5"></a>    interpreter<span class="op">.</span>Invoke<span class="op">();</span></span>
-<span id="cb7-6"><a aria-label="6"></a>    <span class="dt">float</span> score_laufen <span class="op">=</span> output<span class="op">-&gt;</span>data<span class="op">.</span>f<span class="op">[</span><span class="dv">2</span><span class="op">];</span></span>
-<span id="cb7-7"><a aria-label="7"></a>    <span class="cf">if</span> <span class="op">(</span>score_laufen <span class="op">&gt;</span> <span class="fl">0.8</span><span class="bu">f</span><span class="op">)</span></span>
-<span id="cb7-8"><a aria-label="8"></a>        printf<span class="op">(</span><span class="st">"Nutzer laeuft!</span><span class="sc">\n</span><span class="st">"</span><span class="op">);</span></span>
-<span id="cb7-9"><a aria-label="9"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource cpp number-lines code-with-copy"><code class="sourceCode cpp"><span id="cb7-1"><a aria-label="1"></a><span class="co">/* Int8-Lehrschnitt. 128 ist kein definiertes 3-Achsen-Fenster. */</span></span>
+<span id="cb7-2"><a aria-label="2"></a><span class="cf">if</span> <span class="op">(</span>input<span class="op">-&gt;</span>type <span class="op">!=</span> kTfLiteInt8<span class="op">)</span> <span class="op">{</span> <span class="co">/* Typfehler */</span> <span class="op">}</span></span>
+<span id="cb7-3"><a aria-label="3"></a><span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> input<span class="op">-&gt;</span>bytes<span class="op">;</span> i<span class="op">++)</span></span>
+<span id="cb7-4"><a aria-label="4"></a>    input<span class="op">-&gt;</span>data<span class="op">.</span>int8<span class="op">[</span>i<span class="op">]</span> <span class="op">=</span> quantize<span class="op">(</span>sample<span class="op">[</span>i<span class="op">]);</span></span>
+<span id="cb7-5"><a aria-label="5"></a><span class="cf">if</span> <span class="op">(</span>interpreter<span class="op">.</span>Invoke<span class="op">()</span> <span class="op">!=</span> kTfLiteOk<span class="op">)</span> <span class="op">{</span> <span class="co">/* Invoke-Fehler */</span> <span class="op">}</span></span>
+<span id="cb7-6"><a aria-label="6"></a><span class="dt">int8_t</span> logit <span class="op">=</span> output<span class="op">-&gt;</span>data<span class="op">.</span>int8<span class="op">[</span><span class="dv">2</span><span class="op">];</span></span>
+<span id="cb7-7"><a aria-label="7"></a><span class="co">/* logit ist kein kalibrierter Score und 0,8 keine Schwelle */</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li>Rohdaten → Tensor → <code>Invoke()</code> → Scores</li>
 </ul>
@@ -1916,7 +1981,7 @@ flowchart TD
 <h2>Erwartung: CPU ohne NPU</h2>
 <ul>
 <li>Simulation oft RV32IM ohne RVV/NPU → <code>Invoke()</code> teuer</li>
-<li>Zyklen vor/nach messen — Memory Wall spürbar</li>
+<li>Eine funktionale Simulation belegt weder die Memory Wall noch eine NPU-Beschleunigung</li>
 <li>Motiviert, warum SoCs NPUs neben die CPU setzen</li>
 </ul>
 <aside class="notes">
@@ -1963,6 +2028,19 @@ flowchart TD
 <li>Sensorpipeline aus Block 5 mit Inferenz verbinden</li>
 </ul>
 <p>Vielen Dank — viel Erfolg beim Experimentieren.</p>
+<aside class="notes">
+<p>Quellen: RISC-V Vector 1.0, TPU-Paper Jouppi et al.&nbsp;2017, TFLM und die Int8-Spezifikation von LiteRT. Im Repository liegen kein TFLM-Tree, kein trainiertes Modell und keine <code>.repl</code>.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
 <aside class="notes">
 <p>Wenn das Array plötzlich „Gehen“ erkennt, schließt sich der Kreis von Bus bis NPU-Idee.</p>
 <style type="text/css">

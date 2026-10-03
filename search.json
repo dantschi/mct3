@@ -4190,28 +4190,28 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#anknüpfung-compiler-labor",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Anknüpfung: Compiler-Labor",
-    "text": "Anknüpfung: Compiler-Labor\nKurz-Recap aus Block 7 (Vertiefung im Übungsblatt):\n\nGodbolt: -O3 zerlegt und umordnet C-Code\nInstruction Scheduling füllt Load-Use-Lücken\nLoop Unrolling reduziert Branches\nLektion: Hardware mag vorhersagbaren, linearen Code\n\n/* Konzept: Unrolling von for (i = 0; i &lt; 4; i++) a[i] = 0; */\na[0] = 0;\na[1] = 0;\na[2] = 0;\na[3] = 0;\n\nNeuronale Netze: lange, vorhersagbare Schleifen — ideal für DLP, teuer für OoO-Overhead."
+    "text": "Anknüpfung: Compiler-Labor\nKurz-Recap aus Block 7 (Vertiefung im Übungsblatt):\n\nGodbolt zeigt die Übersetzung, kein OoO-Timing\n-O3 garantiert weder Unrolling noch kürzere Laufzeit\nScheduling und Unrolling sind mögliche, keine sicheren Folgen\nEine MAC-Kette bleibt RAW. Mehrere Akkumulatoren können unabhängig sein\n\n/* Konzept: Unrolling von for (i = 0; i &lt; 4; i++) a[i] = 0; */\na[0] = 0;\na[1] = 0;\na[2] = 0;\na[3] = 0;\n\nNeuronale Netze: lange, vorhersagbare Schleifen — ideal für DLP, teuer für OoO-Overhead."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#grenze-der-general-purpose-cpu",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#grenze-der-general-purpose-cpu",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Grenze der General-Purpose-CPU",
-    "text": "Grenze der General-Purpose-CPU\n\nILP: wenige Issues parallel — skaliert nicht beliebig mit mehr ALUs\nMehr Breite → überproportional (nahezu quadratisch) teureres Renaming/ROB/Decode\nGroße Chipfläche oft für Caches und Kontrolllogik, nicht nur für Arithmetik\nFür reine Massen-Mathematik oft ineffizient\n\n\nSchweizer Taschenmesser vs. Motorsäge: Excel und OS brauchen Flexibilität; Milliarden MACs brauchen Durchsatz."
+    "text": "Grenze der General-Purpose-CPU\n\nMehr Issue-Breite verteuert Scheduler, Ports und Bypass. Quadratisch gilt nicht pauschal für ROB, Renaming und Decode zusammen\nOoO kann Loads überlappen. Es hebt eine einzelne Akkumulatorkette nicht auf\nDLP ergänzt ILP. SIMD ist eine Umsetzung, keine Definition von DLP\n\n\nSchweizer Taschenmesser vs. Motorsäge: Excel und OS brauchen Flexibilität; Milliarden MACs brauchen Durchsatz."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#neuer-workload-edge-ai",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#neuer-workload-edge-ai",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Neuer Workload: Edge AI",
-    "text": "Neuer Workload: Edge AI\n\nEdge AI: Inferenz neuronaler Netze auf dem Endgerät (MCU, Wearable, Sensor)\nBeispiele: Schrittzählung, Wake-Word, Vibrationsdiagnose an Maschinen\nDauerbetrieb auf knappen Ressourcen (Energie, SRAM, Flash)\n\n\nKI verlässt Serverfarmen — trifft auf Knopfzelle und Milliwatt-Budgets."
+    "text": "Neuer Workload: Edge AI\n\nEdge AI umfasst Endgerät und Gateway. Nicht jede lokale Inferenz braucht eine NPU\nBeispiele: Schrittzählung, Wake-Word, Vibrationsdiagnose an Maschinen\nDauerbetrieb auf knappen Ressourcen (Energie, SRAM, Flash)\n\n\nKI verlässt Serverfarmen — trifft auf Knopfzelle und Milliwatt-Budgets."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#cloud-ai-vs.-edge-ai",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#cloud-ai-vs.-edge-ai",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Cloud AI vs. Edge AI",
-    "text": "Cloud AI vs. Edge AI\nWarum nicht alles in die Cloud?\n\nLatenz — sicherheitskritische Reaktionen dulden keine Funkwartezeit\nPrivacy — Audio/Video sollen oft lokal bleiben\nEnergie — Funk (WLAN/LTE) kostet oft deutlich mehr als lokale Rechnung\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[Sensordaten] --&gt;|lokal| B[Edge-NPU]\n  A -.-&gt;|Funk| C[Cloud]\n  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nDrei Treiber: Zeit, Datenschutz, Batterie — Edge wird architektonisch zwingend."
+    "text": "Cloud AI vs. Edge AI\n\n\n\nLokal und Cloud sind Optionen. Funk ist nicht immer die teurere Seite.\n\n\nWarum nicht alles in die Cloud?\n\nLatenz — sicherheitskritische Reaktionen dulden keine Funkwartezeit\nPrivacy — Audio/Video sollen oft lokal bleiben\nEnergie und Verfügbarkeit sind Anforderungen. Funk ist nicht immer teurer als lokale Rechnung\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[Sensordaten] --&gt;|lokal| B[Edge-NPU]\n  A -.-&gt;|Funk| C[Cloud]\n  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nLokal bleiben garantiert weder Datenschutz noch sicheren Betrieb. Cloud und Edge sind Entwurfsoptionen."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#agenda",
@@ -4232,14 +4232,14 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#die-leitfrage-des-tages",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Die Leitfrage des Tages",
-    "text": "Die Leitfrage des Tages\n\nKleines Netz: z. B. \\(10^{6}\\) Gewichte — Inferenz verrechnet sie mit Aktivierungen\nJeder RAM-Zugriff kostet viele Takte\nWie rechnet man Millionen MACs/s auf knapper Energie, ohne am Speicher zu ersticken?\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart TD\n  A[RAM: Gewichte] --&gt;|Flaschenhals| B[ALU]\n  B --&gt; C[Ergebnis]\n  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nZentrale Spannung: Datenvolumen vs. Speicherlatenz/Energie auf dem Edge-SoC."
+    "text": "Die Leitfrage des Tages\n\nKleines Netz: z. B. \\(10^{6}\\) Gewichte — Inferenz verrechnet sie mit Aktivierungen\nSRAM, Cache-Hit, Flash und DRAM haben verschiedene Kosten. Nicht jeder Zugriff ist ein DRAM-Miss\nWie rechnet man Millionen MACs/s auf knapper Energie, ohne am Speicher zu ersticken?\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart TD\n  A[RAM: Gewichte] --&gt;|Flaschenhals| B[ALU]\n  B --&gt; C[Ergebnis]\n  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nZentrale Spannung: Datenvolumen vs. Speicherlatenz/Energie auf dem Edge-SoC."
   },
   {
-    "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#fragen-motivation-edge-ai",
-    "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#fragen-motivation-edge-ai",
+    "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#aufgabe-sechs-macs",
+    "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#aufgabe-sechs-macs",
     "title": "08 · KI-Beschleuniger & Edge AI",
-    "section": "Fragen? — Motivation Edge AI",
-    "text": "Fragen? — Motivation Edge AI\n\nWarum skaliert ILP für reine Massenrechnung nicht beliebig?\nDrei Treiber für Edge statt Cloud?\nAlleskönner-CPU vs. Domänen-Spezialist klar?\n\n\nAls Nächstes: Was ein KNN auf Hardware-Ebene wirklich ist — Arrays und MACs."
+    "section": "Aufgabe — Sechs MACs",
+    "text": "Aufgabe — Sechs MACs\nWarum sind sechs Gewichte hier sechs MACs, bei einer Faltung aber nicht? Was ist y0?\n\nJedes Gewicht wird einmal mit einem Input multipliziert. y0 ist 14. Eine Faltung verwendet Gewichte mehrfach, deshalb übersteigt die MAC-Zahl die Parameterzahl. Siehe die Dense-Abbildung."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#neuronale-netze-auf-hardware-ebene",
@@ -4253,7 +4253,7 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#mathematik-matrix-dot-product",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Mathematik: Matrix / Dot Product",
-    "text": "Mathematik: Matrix / Dot Product\nfloat sum = 0.0f;\nfor (int i = 0; i &lt; N; i++) {\n    sum += input[i] * weights[i];\n}\n\nKein Kontrollfluss-Chaos: vorhersagbarer Datenstrom\nPro Iteration: zwei Loads + Mul + Add\n\n\nSimpler Code — brutal für den Speicherbus."
+    "text": "Mathematik: Matrix / Dot Product\n\n\n\ny0 = 14 und y1 = 9. Sechs MACs, acht Parameter, 14 arithmetische Operationen.\n\n\nfloat sum = 0.0f;\nfor (int i = 0; i &lt; N; i++) {\n    sum += input[i] * weights[i];\n}\n\nKein Kontrollfluss-Chaos: vorhersagbarer Datenstrom\nPro Iteration: zwei Loads + Mul + Add\n\n\nSimpler Code — brutal für den Speicherbus."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#mac-operation",
@@ -4267,21 +4267,21 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#anatomie-einer-mac-auf-risc-v",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Anatomie einer MAC auf RISC-V",
-    "text": "Anatomie einer MAC auf RISC-V\nVereinfachte Befehlsfolge:\n# Konzept — RV32IM (mul); Adressen schematisch\nlw  t0, 0(s1)    # x\nlw  t1, 0(s2)    # w\nmul t2, t0, t1\nadd t3, t3, t2   # a += w*x\n\nZwei Speicherzugriffe für zwei Arithmetik-Ops\nGeringe Arithmetic Intensity — Speicher dominiert\n\n\nOhne Wiederverwendung der Daten verhungert die ALU am Bus."
+    "text": "Anatomie einer MAC auf RISC-V\nVereinfachte Befehlsfolge:\n# Konzept — RV32IM (mul); Adressen schematisch\nlw  t0, 0(s1)    # x\nlw  t1, 0(s2)    # w\nmul t2, t0, t1\nadd t3, t3, t2   # a += w*x\n\nmul/add sind hier Ganzzahl, die C-Schleife darüber ist Float. Das ist eine Analogie, keine Float-ISA\nZwei Loads und zwei Ops gelten nur ohne Wiederverwendung und ohne FMA\n\n\nOhne Wiederverwendung der Daten verhungert die ALU am Bus."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#arithmetic-intensity-zahlenbeispiel",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#arithmetic-intensity-zahlenbeispiel",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Arithmetic Intensity: Zahlenbeispiel",
-    "text": "Arithmetic Intensity: Zahlenbeispiel\n\n\\(\\mathrm{AI} = \\mathrm{Ops}/\\mathrm{Bytes}\\)\nNaive MAC-Schleife: \\(2\\) Ops (Mul+Add), lädt \\(2\\times\\) Float32 \\(= 8\\) Byte → \\(\\mathrm{AI} = 0{,}25\\) Ops/Byte\nSystolic Array / Weight-Stationary: Gewichte bleiben in der Zelle → deutlich höhere AI\nRoofline-Idee: niedrige AI → Memory-bound; hohe AI → Compute-bound\n\n\nFaustformel der Memory Wall: unter \\(\\approx 1\\) Ops/Byte oft speichergebunden. Wiederverwendung (Stationary Weights) hebt die AI — erst dann lohnen hohe TOPS."
+    "text": "Arithmetic Intensity: Zahlenbeispiel\n\n\n\nKnick bei 1 Op/Byte. Naiv 0,25, mit Wiederverwendung 0,5. Lehrwerte, keine Messung.\n\n\n\n\\(\\mathrm{AI} = \\mathrm{Ops}/\\mathrm{Bytes}\\)\nGrenze dieses Beispiels: DRAM zum On-Chip-Speicher. Output und Bias zählen hier noch nicht\n\\(2\\) Ops und \\(8\\) Byte ergeben \\(0{,}25\\) Ops/Byte. Das ist nicht allgemein „unter 1 = memory-bound“\nErreichbar ist \\(\\min(P_{peak}, Bandbreite \\times AI)\\). Der Knick liegt bei \\(P_{peak}/Bandbreite\\)\n\n\nIm Lehrmodell mit 8 Ops/Takt und 8 Byte/Takt liegt der Knick bei 1 Op/Byte. Andere Maschinen haben einen anderen Knick."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#datenproblem-gewichte",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#datenproblem-gewichte",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Datenproblem: Gewichte",
-    "text": "Datenproblem: Gewichte\n\nModelle wie ResNet-50: Millionen Parameter — Megabyte-Bereich\nL1 oft nur Dutzende KiB → Matrizen passen nicht\nCapacity Misses: fast jeder Zugriff geht Richtung DRAM/Flash\n\n\nBlock-2-Caches helfen bei Lokalität — bei einmaligem Durchlauf riesiger Matrizen kaum."
+    "text": "Datenproblem: Gewichte\n\n\n\nDieselbe 2×2-Rechnung: 64 Byte naiv, 32 Byte aus einem Tile.\n\n\n\nModelle wie ResNet-50: Millionen Parameter — Megabyte-Bereich\nL1 oft nur Dutzende KiB → Matrizen passen nicht\nEin Streaming-Datensatz erzeugt nicht bei jedem Skalarzugriff einen Capacity Miss. Cachezeilen und Prefetch bündeln Zugriffe\n\n\nBlock-2-Caches helfen bei Lokalität — bei einmaligem Durchlauf riesiger Matrizen kaum."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#memory-wall-bei-ki",
@@ -4295,14 +4295,14 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#rechenbeispiel-106-macs",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Rechenbeispiel: \\(10^{6}\\) MACs",
-    "text": "Rechenbeispiel: \\(10^{6}\\) MACs\n\n\\(10^{6}\\) Gewichte \\(\\Rightarrow\\) Größenordnung \\(10^{6}\\) MACs\nDazu typisch \\(10^{6}\\) Loads für Inputs + \\(10^{6}\\) für Weights\n\\(\\Rightarrow\\) Millionen Speicherzugriffe — Latenz summiert sich\nFür Echtzeit-Video oft zu langsam ohne Spezialisierung\n\n\nSelbst mit Prefetch bleibt der Von-Neumann-Pfad der Engpass."
+    "text": "Rechenbeispiel: \\(10^{6}\\) MACs\n\n\\(10^{6}\\) Gewichte sind nur dann \\(10^{6}\\) MACs, wenn jedes Gewicht genau einmal multipliziert wird\nEine Faltung nutzt Gewichte mehrfach. Sequenz, Bild und Batch ändern den Aufwand\nEinzelne Miss-Latenzen darf man nicht zu einer Summe addieren, wenn Zugriffe überlappen\n\n\nSelbst mit Prefetch bleibt der Von-Neumann-Pfad der Engpass."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#warum-ooo-hier-wenig-hilft",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#warum-ooo-hier-wenig-hilft",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Warum OoO hier wenig hilft",
-    "text": "Warum OoO hier wenig hilft\n\nOoO/Predictor: stark bei unregelmäßigem Kontrollfluss\nMAC-Schleife: linear, hoch vorhersagbar\nBranch Predictor und komplexe Stations: Overhead ohne Nutzen\nUnabhängige Gewichte — aber Speicher, nicht Decode, limitiert\n\n\nIronie: Cleverness aus Block 7 ist für diesen Workload oft Verschwendung."
+    "text": "Warum OoO hier wenig hilft\n\nOoO/Predictor: stark bei unregelmäßigem Kontrollfluss\nMAC-Schleife: linear, hoch vorhersagbar\nDer Predictor ist bei einer festen Schleife nicht wertlos, aber selten der Engpass\nUnabhängige Akkumulatoren kann OoO ausführen. Die Speichergrenze bleibt, wenn die Arithmetic Intensity niedrig ist\n\n\nIronie: Cleverness aus Block 7 ist für diesen Workload oft Verschwendung."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#fazit-cpu-vs.-ki-last",
@@ -4344,7 +4344,7 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#simd-prinzip",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "SIMD-Prinzip",
-    "text": "SIMD-Prinzip\n\nSkalar (SISD): add → eine Addition\nSIMD: ein Befehl → mehrere parallele Adds auf Daten-Lanes\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[SIMD Add] --&gt; B{Verteiler}\n  B --&gt; A1[ALU1]\n  B --&gt; A2[ALU2]\n  B --&gt; A3[ALU3]\n  B --&gt; A4[ALU4]\n  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nFetch/Decode einmal — Execution-Width multipliziert."
+    "text": "SIMD-Prinzip\n\n\n\nVier 8-Bit-Lanes addieren getrennt. Ein Int8-Produkt braucht einen breiteren Akkumulator.\n\n\n\nSkalar (SISD): add → eine Addition\nSIMD: ein Befehl → mehrere parallele Adds auf Daten-Lanes\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  A[SIMD Add] --&gt; B{Verteiler}\n  B --&gt; A1[ALU1]\n  B --&gt; A2[ALU2]\n  B --&gt; A3[ALU3]\n  B --&gt; A4[ALU4]\n  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nFetch/Decode einmal — Execution-Width multipliziert."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#packed-simd",
@@ -4442,21 +4442,21 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#vsetvli-hardware-agnostisch",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "vsetvli / hardware-agnostisch",
-    "text": "vsetvli / hardware-agnostisch\n\nSoftware: „Array mit \\(N\\) Elementen“\nHardware antwortet mit nutzbarer Chunk-Größe (\\(\\mathrm{VL} \\le \\mathrm{VLEN}/\\mathrm{SEW}\\))\nSchleife läuft in Hardware-Schritten durch das Array\n\n# Pseudocode / Konzept — Details in der RVV-Spezifikation\nloop:\n    vsetvli t0, a0, e32   # wie viele e32-Elemente?\n    vle32.v v1, (a1)\n    vle32.v v2, (a2)\n    vadd.vv v3, v1, v2\n    # Pointer/Count aktualisieren, wiederholen\n\nLaufzeit-Abfrage der Kapazität — Schrittweite passt sich dem Silizium an."
+    "text": "vsetvli / hardware-agnostisch\n\nSoftware: „Array mit \\(N\\) Elementen“\nBei LMUL \\(= 1\\) ist \\(\\mathrm{VLMAX} = \\mathrm{VLEN}/\\mathrm{SEW}\\). Allgemein \\(\\mathrm{VLMAX} = \\mathrm{LMUL}\\times\\mathrm{VLEN}/\\mathrm{SEW}\\)\nvsetvli liefert nicht immer \\(\\min(AVL, VLMAX)\\)\nSchleife läuft in Hardware-Schritten durch das Array\n\n# RVV 1.0, LMUL=1, e32, ta, ma. Nicht in diesem Repo assembliert.\nloop:\n    vsetvli t0, a0, e32, m1, ta, ma\n    vle32.v v1, (a1)\n    vle32.v v2, (a2)\n    vadd.vv v3, v1, v2\n    vse32.v v3, (a3)\n    slli t1, t0, 2\n    add a1, a1, t1\n    add a2, a2, t1\n    add a3, a3, t1\n    sub a0, a0, t0\n    bnez a0, loop\n\nLaufzeit-Abfrage der Kapazität — Schrittweite passt sich dem Silizium an."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#ein-binary-viele-mathrmvlen",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#ein-binary-viele-mathrmvlen",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Ein Binary, viele \\(\\mathrm{VLEN}\\)",
-    "text": "Ein Binary, viele \\(\\mathrm{VLEN}\\)\nBeispiel: 1000 Elemente, vadd.vv (schematisch)\n\n\n\n\n\n\n\n\n\nPlattform\nBreite (schematisch)\n\\(\\mathrm{VL}\\) (e32)\nSchleifenläufe\n\n\n\n\nEdge\nschmal (z. B. 128 Bit)\n4\n250\n\n\nServer\nbreit (z. B. 1024 Bit)\n32\n\\(\\approx 32\\)\n\n\n\nGleiche RVV-Schleifenidee skaliert mit \\(\\mathrm{VLEN}\\) — ohne feste Packed-SIMD-Breite im Quelltext.\n\nVoraussetzung: RVV-fähiges Binary; die Strip-Mining-Schleife nutzt die jeweilige Hardwarebreite."
+    "text": "Ein Binary, viele \\(\\mathrm{VLEN}\\)\n\n\n\n128 Bit: 250 Schritte zu VL 4. 1024 Bit: 31 Schritte zu VL 32 plus VL 8.\n\n\nBeispiel: 1000 Elemente, vadd.vv (schematisch)\n\n\n\n\n\n\n\n\n\nPlattform\nBreite (schematisch)\n\\(\\mathrm{VL}\\) (e32)\nSchleifenläufe\n\n\n\n\nEdge\nschmal (z. B. 128 Bit)\n4\n250\n\n\nServer\n1024 Bit, LMUL 1\n32, zuletzt 8\n32\n\n\n\nGleiche RVV-Schleifenidee skaliert mit \\(\\mathrm{VLEN}\\) — ohne feste Packed-SIMD-Breite im Quelltext.\n\n1000/32 ist nicht teilbar: 31 mal VL 32 und einmal VL 8. Ein Binary braucht ISA, ABI und einen Kern mit RVV."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#energie-weniger-instruction-fetch",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#energie-weniger-instruction-fetch",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Energie: weniger Instruction Fetch",
-    "text": "Energie: weniger Instruction Fetch\n\nEin Vektorbefehl → viele Elemente parallel\nSkalar: dutzende Loads/Adds/Branches aus dem I-Cache\nRVV: Front-End (Fetch/Decode) deutlich weniger belastet — DLP statt Instruktionsstrom\n\n\nStrom sparend: Kontrolllogik pausiert, Vektor-ALUs arbeiten."
+    "text": "Energie: weniger Instruction Fetch\n\nEin Vektorbefehl → viele Elemente parallel\nSkalar: dutzende Loads/Adds/Branches aus dem I-Cache\nWeniger Fetch kann Energie sparen und garantiert keinen geringeren Gesamtverbrauch\n\n\nSpeicher- und Registerverkehr bleiben in der Energiebilanz. Chaining ist Mikroarchitektur, nicht die ISA."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#vector-loadstore",
@@ -4470,7 +4470,7 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#chaining",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Chaining",
-    "text": "Chaining\n\nMAC: Mul dann Add — Zwischenergebnis sonst zurück ins Registerfile\nChaining: Mul-Pipeline speist Add-Pipeline direkt (Forwarding)\nWeniger Registerverkehr, höherer Durchsatz\n\n\nPipelining im Rechenwerk: Zwischenergebnisse fließen weiter, ohne zu „parken“."
+    "text": "Chaining\n\n\n\nMul-Latenz 2, Add-Latenz 1, eine Lane. Chaining ist keine RVV-Garantie.\n\n\n\nMAC: Mul dann Add — Zwischenergebnis sonst zurück ins Registerfile\nChaining ist eine Option des Kerns. Eine FMA ist eine andere Instruktion mit einer Rundung\nWeniger Registerverkehr, höherer Durchsatz\n\n\nPipelining im Rechenwerk: Zwischenergebnisse fließen weiter, ohne zu „parken“."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#rvv-und-tinyml",
@@ -4494,11 +4494,11 @@
     "text": "Kurzfazit RVV\n\nEin Befehl, lange Arrays\n\\(\\mathrm{VLEN}\\)/\\(\\mathrm{VL}\\) abstrahiert Hardwarebreite\nBinary skaliert von Edge bis Server\nWeniger Front-End-Last (DLP)\nLoads und Chaining senken interne Wartezeiten\n\n\nElegante DLP-Integration in eine Allzweck-ISA."
   },
   {
-    "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#fragen-rvv",
-    "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#fragen-rvv",
+    "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#aufgabe-rest-8",
+    "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#aufgabe-rest-8",
     "title": "08 · KI-Beschleuniger & Edge AI",
-    "section": "Fragen? — RVV",
-    "text": "Fragen? — RVV\n\nRVV vs. Packed SIMD?\nWarum macht vsetvli Code zukunftssicherer?\nWie senken Vektoren den Energieverbrauch?\n\n\nAls Nächstes: NPUs und Systolic Arrays — Datenfluss ohne Register-Pendeln."
+    "section": "Aufgabe — Rest 8",
+    "text": "Aufgabe — Rest 8\nVLMAX ist 32, AVL ist 1000. Wie viele Iterationen und welches letzte VL entstehen, wenn der Rest klein genug für ein VL bleibt?\n\n31 mal 32 und einmal 8. Zusammen 32 Iterationen und 1000 Elemente. VL ist nicht in jedem AVL-Bereich min(AVL, VLMAX). Siehe die RVV-Abbildung."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#was-ist-eine-npu",
@@ -4554,21 +4554,21 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#datenfluss-füllt-das-array",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Datenfluss füllt das Array",
-    "text": "Datenfluss füllt das Array\n\\(2\\times 2\\)-Idee (schematisch):\n\nTakt 1: erste Paare treffen sich, Summen starten\nTakt 2: Wellen wandern, neue Werte am Rand\nTakt 3+: fertige Teilresultate am Ausgang — nach Füllphase oft ein Resultatstrom pro Takt\n\n\nWie Instruction-Pipeline: erst füllen, dann kontinuierlicher Ausstoß."
+    "text": "Datenfluss füllt das Array\n\n\n\nC00 fertig in Takt 2, C01 und C10 in Takt 3, C11 in Takt 4.\n\n\n\\(2\\times 2\\)-Idee (schematisch):\n\nTakt 1: erste Paare treffen sich, Summen starten\nTakt 2: Wellen wandern, neue Werte am Rand\nIm 2×2-Output-Stationary-Beispiel enden die vier Summen in den Takten 2, 3, 3 und 4\nDas ist kein Ergebnis je Takt ab Takt 3. Readout der lokalen Summen kommt danach\n\n\nWie Instruction-Pipeline: erst füllen, dann kontinuierlicher Ausstoß."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#weight-stationary",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#weight-stationary",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Weight-Stationary",
-    "text": "Weight-Stationary\n\nGewichte während einer Inferenz oft konstant\nVariante: Weights in Zellen „parken“, nur Activations durchschieben\nWeniger Bewegungen der großen Konstanten-Matrizen\n\n\nKonstanten einmal setzen — dynamische Inputs fluten das Gitter."
+    "text": "Weight-Stationary\n\n\n\nOutput-Stationary hält C. Weight-Stationary hält das Gewicht und muss es trotzdem laden.\n\n\n\nGewichte während einer Inferenz oft konstant\nVariante: Weights in Zellen „parken“, nur Activations durchschieben\nWeniger Bewegungen der großen Konstanten-Matrizen\n\n\nKonstanten einmal setzen — dynamische Inputs fluten das Gitter."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#beispiel-google-tpu-v1",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#beispiel-google-tpu-v1",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Beispiel: Google TPU v1",
-    "text": "Beispiel: Google TPU v1\n\nHerzstück: Systolic Array \\(256\\times 256\\) MAC-Zellen (\\(\\approx 65\\,536\\) Units)\nBei \\(\\approx 700\\,\\mathrm{MHz}\\): Größenordnung viele TOPS (Zählweise oft Mul+Add getrennt)\nDeutlich bessere TOPS/Watt als damalige General-Purpose-/GPU-Alternativen für diesen Workload\n\n\nWeckruf: fast nur Multiplikator-Gitter — Domäne statt Alleskönner. Marketing-TOPS von der Zählkonvention abhängig."
+    "text": "Beispiel: Google TPU v1\n\n\n\n91,75 TOPS Peak bei zwei Ops je MAC. Ein 2×2-Tile nutzt 4 von 16 gedachten Zellen.\n\n\n\n\\(256\\times 256 = 65\\,536\\) Int8-MACs. Bei 700 MHz sind das 45,8752 TMAC/s\nMit zwei Ops je MAC: 91,7504 TOPS, in der Originalarbeit oft 92 TOPS. Das ist Peak, kein End-to-End\nTPU v1 ist ein Datacenter-Baustein, kein Milliwatt-Edge-Teil\n\n\nWeckruf: fast nur Multiplikator-Gitter — Domäne statt Alleskönner. Marketing-TOPS von der Zählkonvention abhängig."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#npus-am-edge",
@@ -4592,11 +4592,11 @@
     "text": "Kurzfazit NPU\n\nSystolic Arrays: lokale Weitergabe statt Von-Neumann-Pendeln\nWellenartiger Datenfluss, hohe Wiederverwendung\nWeight-Stationary spart Bewegungen\nHohe TOPS/Watt — nur für Matrix-Domäne\n\n\nHardware verstanden — als Nächstes Software-Brücke zum MCU."
   },
   {
-    "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#fragen-systolic-arrays",
-    "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#fragen-systolic-arrays",
+    "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#aufgabe-takt-4",
+    "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#aufgabe-takt-4",
     "title": "08 · KI-Beschleuniger & Edge AI",
-    "section": "Fragen? — Systolic Arrays",
-    "text": "Fragen? — Systolic Arrays\n\nWarum bricht das Array den Von-Neumann-Flaschenhals weitgehend?\nVorteil Weight-Stationary?\nWarum untauglich für klassischen C-Kontrollfluss?\n\n\nAls Nächstes: TensorFlow Lite Micro — Cloud-Modell in Bare-Metal-C."
+    "section": "Aufgabe — Takt 4",
+    "text": "Aufgabe — Takt 4\nWann ist C11 im 2×2-Output-Stationary-Beispiel fertig? Ist 92 TOPS eine End-to-End-Leistung?\n\nC11 wird in Takt 4 zu 50. 91,75 TOPS sind der Peak aus 65536 MACs, 700 MHz und zwei Ops je MAC. Siehe Array- und TOPS-Abbildung."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#edge-ai-software-das-problem",
@@ -4610,56 +4610,56 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#tensorflow-lite-for-microcontrollers-tflm",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "TensorFlow Lite for Microcontrollers (TFLM)",
-    "text": "TensorFlow Lite for Microcontrollers (TFLM)\n\nKleine C++-Runtime für MCUs (ohne OS, ohne malloc)\nNimmt kompaktes Modell, interpretiert Layer (Conv2D, Dense, …)\nRechnet auf CPU — oder leitet an NPU/DSP weiter, falls vorhanden\n\n\nFeste Arena im SRAM — kein dynamisches Heap-Wachstum."
+    "text": "TensorFlow Lite for Microcontrollers (TFLM)\n\nKleine C++-Runtime für MCUs (ohne OS, ohne malloc)\nNimmt kompaktes Modell, interpretiert Layer (Conv2D, Dense, …)\nRechnet mit Firmware-Kerneln. Eine NPU braucht ein passendes Backend, nicht nur das Silizium\n\n\nFeste Arena im SRAM — kein dynamisches Heap-Wachstum."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#workflow-embedded-ai",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#workflow-embedded-ai",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Workflow Embedded AI",
-    "text": "Workflow Embedded AI\n\nTrainieren (Cloud / Python)\nKonvertieren → .tflite\nExport als C-Byte-Array (xxd o. Ä.)\nLinken in Flash (.rodata)\nFirmware: Invoke() / Interpreter\n\n\nLaboridee: fertiges Modell als Hex-Array in die Firmware schweißen."
+    "text": "Workflow Embedded AI\n\n\n\nDas C-Array sind Modelldaten. Invoke läuft über Kernel, nicht als Modell-Maschinencode.\n\n\n\nTrainieren (Cloud / Python)\nKonvertieren → .tflite\nExport als C-Byte-Array (xxd o. Ä.)\nLinken in Flash (.rodata)\nFirmware: Invoke() / Interpreter\n\n\nLaboridee: fertiges Modell als Hex-Array in die Firmware schweißen."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#quantisierung",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#quantisierung",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Quantisierung",
-    "text": "Quantisierung\n\nFloat32: 4 Byte/Gewicht, teuer ohne FPU\nInt8-Quantisierung: Modell oft \\(\\approx 75\\,\\%\\) kleiner\nInteger-ALUs schneller/sparsam; Accuracy-Verlust meist gering (aufgabenabhängig)\n\n\nNetze sind robust gegen Quantisierungsrauschen — oft akzeptabler Trade-off."
+    "text": "Quantisierung\n\n\n\n1,24 wird 12 und zurück 1,2. 20 wird auf 127 begrenzt. Flash und SRAM bleiben getrennt.\n\n\n\nFloat32: 4 Byte/Gewicht, teuer ohne FPU\nReine Float32-Gewichte werden als Int8 um 75 Prozent kleiner. Bias, Aktivierungen und Arena nicht automatisch\nInteger ist nicht auf jeder CPU schneller. Den Accuracy-Verlust messen, nicht annehmen\n\n\nNetze sind robust gegen Quantisierungsrauschen — oft akzeptabler Trade-off."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#pruning",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#pruning",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Pruning",
-    "text": "Pruning\n\nViele Gewichte nahe null nach dem Training\nPruning (Training/Toolchain) setzt unwichtige Verbindungen hart auf 0 → Sparse\nWeniger effektive MACs / Speicherzugriffe (wenn Runtime Sparse nutzt)\n\n\nTote Äste entfernen — näher an der Memory Wall vorbei. Oft im Trainingsgraphen, nicht im C-Compiler."
+    "text": "Pruning\n\nViele Gewichte nahe null nach dem Training\nPruning braucht eine sparsityfähige Darstellung und einen passenden Kernel\nFlash-Ersparnis und weniger ausgeführte MACs sind zwei verschiedene Folgen\n\n\nTote Äste entfernen — näher an der Memory Wall vorbei. Oft im Trainingsgraphen, nicht im C-Compiler."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#laborausblick-ki-schrittzähler",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#laborausblick-ki-schrittzähler",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Laborausblick: KI-Schrittzähler",
-    "text": "Laborausblick: KI-Schrittzähler\nGeplant (Details im Übungsblatt):\n\nKleines quantisiertes Modell (\\(&lt; 20\\,\\mathrm{KB}\\))\nEingabe: 3-Achsen-Beschleunigung (Anknüpfung I2C, Block 5)\nKlassen z. B.: Stehen / Gehen / Laufen\nSimulation: Renode mit virtuellen Sensordaten\n\n\nPipeline: Sensor → TFLM → Klasse — Busse + Edge AI zusammen."
+    "text": "Laborausblick: KI-Schrittzähler\nGeplant (Details im Übungsblatt):\n\nKleines quantisiertes Modell (\\(&lt; 20\\,\\mathrm{KB}\\))\nEingabe: 3-Achsen-Beschleunigung (Anknüpfung I2C, Block 5)\nKlassen Stehen, Gehen, Laufen sind eine Aktivitätserkennung, noch kein Schrittzähler\nSimulation: Renode mit virtuellen Sensordaten\n\n\nPipeline: Sensor → TFLM → Klasse — Busse + Edge AI zusammen."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#modell-als-c-array",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#modell-als-c-array",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Modell als C-Array",
-    "text": "Modell als C-Array\n/* Intelligenz als .rodata im Flash */\nconst unsigned char step_model_tflite[]\n    __attribute__((aligned(4))) = {\n    0x1c, 0x00, 0x00, 0x00, 0x54, 0x46, 0x4c, 0x33,\n    /* … weitere Bytes … */\n};\n\nKein Python-Paket — Execute-in-Place aus Flash möglich."
+    "text": "Modell als C-Array\n/* Intelligenz als .rodata im Flash */\nconst unsigned char step_model_tflite[]\n    __attribute__((aligned(4))) = {\n    0x1c, 0x00, 0x00, 0x00, 0x54, 0x46, 0x4c, 0x33,\n    /* … weitere Bytes … */\n};\n\nDie Bytes sind Modelldaten. Kernel in der Firmware führen Operatoren aus. Flash-Lesen ist möglich, wenn Plattform und Kernel das erlauben."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#tensor-arena",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#tensor-arena",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Tensor Arena",
-    "text": "Tensor Arena\nconst int kTensorArenaSize = 10 * 1024;\nuint8_t tensor_arena[kTensorArenaSize];\n\n/* ältere TFLM-API; aktuelle Versionen ohne ErrorReporter */\ntflite::MicroInterpreter interpreter(\n    model, resolver, tensor_arena,\n    kTensorArenaSize, error_reporter);\ninterpreter.AllocateTensors();\n\nStatischer SRAM-Block — keine Heap-Leaks\nZu kleine Arena → klarer Fehler bei Allokation\n\n\nSicherheit durch feste Grenzen statt stiller Stack-Korruption."
+    "text": "Tensor Arena\nconst int kTensorArenaSize = 10 * 1024;\nuint8_t tensor_arena[kTensorArenaSize];\n\n/* Lehrschnitt, hier nicht übersetzt. Kein TFLM-Tree im Repository.\n   Konstruktor ohne ErrorReporter, Rückgaben prüfen. */\nif (model-&gt;version() != TFLITE_SCHEMA_VERSION) { /* Abbruch */ }\ntflite::MicroInterpreter interpreter(\n    model, resolver, tensor_arena, kTensorArenaSize);\nif (interpreter.AllocateTensors() != kTfLiteOk) { /* Arena */ }\n\nStatischer SRAM-Block — keine Heap-Leaks\nZu kleine Arena → klarer Fehler bei Allokation\n\n\nSicherheit durch feste Grenzen statt stiller Stack-Korruption."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#inferenz-zyklus",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#inferenz-zyklus",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Inferenz-Zyklus",
-    "text": "Inferenz-Zyklus\nwhile (1) {\n    /* hier vereinfachend Float-Modell; quantisiert: data.int8 */\n    for (int i = 0; i &lt; 128; i++)\n        input-&gt;data.f[i] = read_i2c_sensor();\n    interpreter.Invoke();\n    float score_laufen = output-&gt;data.f[2];\n    if (score_laufen &gt; 0.8f)\n        printf(\"Nutzer laeuft!\\n\");\n}\n\nRohdaten → Tensor → Invoke() → Scores\n\n\nWeniger handgeschriebene Filter — schwarze Kiste mit Wahrscheinlichkeiten."
+    "text": "Inferenz-Zyklus\n/* Int8-Lehrschnitt. 128 ist kein definiertes 3-Achsen-Fenster. */\nif (input-&gt;type != kTfLiteInt8) { /* Typfehler */ }\nfor (int i = 0; i &lt; input-&gt;bytes; i++)\n    input-&gt;data.int8[i] = quantize(sample[i]);\nif (interpreter.Invoke() != kTfLiteOk) { /* Invoke-Fehler */ }\nint8_t logit = output-&gt;data.int8[2];\n/* logit ist kein kalibrierter Score und 0,8 keine Schwelle */\n\nRohdaten → Tensor → Invoke() → Scores\n\n\nWeniger handgeschriebene Filter — schwarze Kiste mit Wahrscheinlichkeiten."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#renode-virtuelle-stimuli",
@@ -4673,7 +4673,7 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#erwartung-cpu-ohne-npu",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Erwartung: CPU ohne NPU",
-    "text": "Erwartung: CPU ohne NPU\n\nSimulation oft RV32IM ohne RVV/NPU → Invoke() teuer\nZyklen vor/nach messen — Memory Wall spürbar\nMotiviert, warum SoCs NPUs neben die CPU setzen\n\n\nAbsichtlich „falsche“ Architektur — Flaschenhals im Terminal erleben."
+    "text": "Erwartung: CPU ohne NPU\n\nSimulation oft RV32IM ohne RVV/NPU → Invoke() teuer\nEine funktionale Simulation belegt weder die Memory Wall noch eine NPU-Beschleunigung\nMotiviert, warum SoCs NPUs neben die CPU setzen\n\n\nAbsichtlich „falsche“ Architektur — Flaschenhals im Terminal erleben."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#zusammenfassung-block-8",
@@ -4687,6 +4687,6 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#ausblick-und-abschluss",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Ausblick und Abschluss",
-    "text": "Ausblick und Abschluss\n\nÜbungsblatt: TFLM / Renode-Schrittklassifikation\nSensorpipeline aus Block 5 mit Inferenz verbinden\n\nVielen Dank — viel Erfolg beim Experimentieren.\n\nWenn das Array plötzlich „Gehen“ erkennt, schließt sich der Kreis von Bus bis NPU-Idee."
+    "text": "Ausblick und Abschluss\n\nÜbungsblatt: TFLM / Renode-Schrittklassifikation\nSensorpipeline aus Block 5 mit Inferenz verbinden\n\nVielen Dank — viel Erfolg beim Experimentieren.\n\nQuellen: RISC-V Vector 1.0, TPU-Paper Jouppi et al. 2017, TFLM und die Int8-Spezifikation von LiteRT. Im Repository liegen kein TFLM-Tree, kein trainiertes Modell und keine .repl.\n\n\nWenn das Array plötzlich „Gehen“ erkennt, schließt sich der Kreis von Bus bis NPU-Idee."
   }
 ]
