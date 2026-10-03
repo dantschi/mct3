@@ -259,12 +259,12 @@ Im Labor müssen Sie $f_{\mathrm{cnt}}$ aus Datenblatt-Takt und Prescaler berech
 
 - Wo endet das Zählen? → Auto-Reload / Period Register (ARR)
 - Absolute Obergrenze des Zählers
-- Erreicht `CNT` den ARR-Wert: Hardware setzt typisch auf 0 zurück
-- Dieser Rücksetzzyklus definiert die Periode des Timers
-- Achtung Datenblatt: Periode oft $ARR$ oder $ARR + 1$ Ticks
+- Erreicht `CNT` den Wert ARR, ist das noch ein voller Tick
+- Der nächste Zählschritt setzt auf 0. Die Periode ist ARR+1
+- Im Kernmodell: PSC+1, Vergleich `CNT < CCR`, Active-High
 
 ::: notes
-ARR ist das Limit. Ob die Periode $ARR$ oder $ARR+1$ Zählschritte hat, steht im Datenblatt (Hersteller unterscheiden sich) — vor Duty-Cycle-Rechnungen immer nachschlagen.
+ARR bleibt ein vollständiges Intervall. Andere Timer, die beim Erreichen sofort zurücksetzen, sind ein anderes Modell.
 :::
 
 ## Zähl-Modus: Up-Counting
@@ -325,7 +325,7 @@ PSC drosselt, ARR begrenzt. Als Nächstes: daraus eine „analoge“ Welt — PW
 
 ## Die analoge Illusion
 
-- Zurück zur Leitfrage: 50 % Motorleistung mit binärem Pin?
+- Zurück zur Leitfrage: 50 Prozent aktive Zeit an einem binären Pin?
 - Trick: Pin sehr schnell ein- und ausschalten
 - Beispiel: 1 kHz, je Hälfte der Periode HIGH/LOW
 - Motor und Auge sind zu träge, um dem Stottern zu folgen
@@ -371,7 +371,7 @@ $$
 \mathrm{Duty\ Cycle} = \frac{t_{\mathrm{HIGH}}}{T}
 $$
 
-- Prozentsatz der Energie, die wir einbringen
+- Anteil der aktiven Zeit im gewählten PWM-Modell
 - Periode/Frequenz konstant; wir ändern den Duty Cycle
 
 ::: notes
@@ -917,25 +917,33 @@ void set_led_brightness(uint8_t percent) {
 Typische HAL-Schicht: `set_led_brightness(50)` statt roher Registerarithmetik in jedem Aufrufer.
 :::
 
-## Fading in der Main-Schleife
+## Fading alle 10 ms
 
 ```c
-int main(void) {
-    init_pwm();
-    int brightness = 0;
-    while (1) {
-        set_led_brightness(brightness);
-        brightness = (brightness + 1) % 101; /* Sprung 100 auf 0 */
-        /* Deadline aus Block 3, kein blockierendes Warten als Gesundheitsbeweis */
+#define FADE_TICKS 100000u /* 10 ms bei 10 MHz */
+
+static uint64_t next_fade;
+static int brightness;
+static int dir = 1;
+
+void fade_poll(uint64_t now) {
+    if ((int64_t)(now - next_fade) < 0)
+        return;
+    next_fade += FADE_TICKS;
+    set_led_brightness((uint8_t)brightness);
+    brightness += dir;
+    if (brightness >= 100 || brightness <= 0)
+        dir = -dir;
+    if (step_done)
         wdt_feed();
-    }
 }
 ```
 
-- Die Rampe springt von 100 auf 0. Ein Feed beweist nur, dass diese Schleife noch laeuft.
+- Die Helligkeit steigt und fällt. Es gibt keinen Sprung von 100 auf 0.
+- Der Feed hängt an `step_done`, nicht daran, dass die Zeile erreicht wurde.
 
 ::: notes
-Sauberer: Wartezeiten über SysTick statt busy `delay`. Wichtig bleibt: Feed nur hier, nicht in der ISR.
+Sauberer Takt kommt aus dem absoluten Tick von Block 3. Der Watchdog wird nur nach abgeschlossener Arbeit gefüttert, nicht in der Timer-ISR.
 :::
 
 ## Den Crash provozieren

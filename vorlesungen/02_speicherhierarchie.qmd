@@ -261,7 +261,7 @@ lw t1, 4(a0)    # 0x1004, räumlich
 - Hardware: nie nur ein Byte — immer ein ganzer Block (Cache Line)
 
 ::: notes
-Die zweite Säule ist die räumliche Lokalität. Die Wette der Hardware lautet hier: Wenn die CPU die Adresse 1000 liest, wird sie als Nächstes sehr wahrscheinlich die Adresse 1004 lesen. Um Zeit zu sparen, bringt der Cache beim Besuch im DRAM nicht nur das angefragte Byte mit, sondern packt gleich die nächsten 64 Bytes mit ein. Das ist ein Geniestreich!
+Die zweite Säule ist die räumliche Lokalität. Die Wette der Hardware lautet hier: Wenn die CPU die Adresse 1000 liest, wird sie als Nächstes sehr wahrscheinlich die Adresse 1004 lesen. Um Zeit zu sparen, lädt ein Miss die gesamte Line, ausgerichtet auf die Blockgrenze. Das ist nicht „die nächsten 64 Bytes ab der angefragten Adresse“. Die Quelle ist die nächste zuständige Ebene, nicht automatisch DRAM.
 :::
 
 ## Räumliche Lokalität im C-Code
@@ -358,7 +358,7 @@ Cache Hit (Treffer):
 - Ein L1-Miss kann in L2 treffen; erst ein Miss der letzten Cache-Ebene geht zum DRAM
 
 ::: notes
-Das sind die wichtigsten Vokabeln des heutigen Tages. Ein Cache Hit ist ein Treffer, ein Erfolg. Die Pipeline rennt weiter. Ein Cache Miss ist ein Fehlschlag. Der Cache muss zugeben, dass er das gesuchte Datum nicht hat. Jetzt friert die CPU ein und wir müssen auf den lahmen Hauptspeicher warten.
+Ein Cache Miss heißt: die Line fehlt in dieser Ebene. Die einfache Pipeline aus MCT1 wartet dann. Eine OoO-CPU kann andere Befehle überlappen. Das ist kein Einfrieren jeder Implementierung.
 :::
 
 ## Hit Rate und Miss Rate
@@ -427,7 +427,8 @@ Dieselbe Zahl folgt aus $1 + 0{,}05\cdot 100$. Eine optionale Vertiefung wäre e
 - Räumliche Lokalität $\Rightarrow$ keine Einzelbyte-Verwaltung
 - Verwaltungseinheit: Cache Block / Cache Line
 - Typisch 32 oder 64 Bytes zusammenhängender Speicher
-- Ein Miss lädt immer die gesamte Line aus dem DRAM
+- Ein Miss beschafft die ganze, an der Blockgrenze ausgerichtete Line aus der nächsten zuständigen Ebene
+- Ein L1-Miss kann in L2 treffen. DRAM ist nicht jede Quelle
 
 ![Adresse 1000 liegt in der Line 960–1023, Offset 40. Nicht 1000–1063.](../assets/figures/02_speicherhierarchie/line-bounds.png)
 
@@ -699,7 +700,7 @@ Tag 0x2468, Index 345, Offset 56. Die Folge trifft zweimal Set 64 mit verschiede
 - Vorteil: kein Thrashing — A und B können nebeneinander leben
 
 ::: notes
-Um Thrashing zu stoppen, geben wir die starren Parkplätze auf. Fully Associative heißt absolute Freiheit. Ein Block aus dem RAM darf in jede beliebige Zeile des Caches geschrieben werden. Dadurch können Variable A und Variable B aus unserem C-Beispiel friedlich nebeneinander im Cache leben, auch wenn ihre Adressen eigentlich kollidieren würden.
+Vollassoziativität beseitigt die Indexkonflikte dieses Beispiels. Capacity Misses und Thrashing durch ein zu großes Working Set bleiben möglich.
 :::
 
 ## Das Such-Problem bei Fully Associative
@@ -764,7 +765,7 @@ Willkommen beim Industriestandard. Fast jeder Prozessor in Ihrem Handy oder Lapt
 | Set 1 | … | … | … | … |
 
 ::: notes
-Das ist der Sweetspot. Wenn wir einen 4-Way Set-Associative Cache bauen, brauchen wir nur vier Komparatoren. Das ist billig und kalt. Wenn unser C-Programm jetzt Variable A und B abfragt, die denselben Index haben, legen wir A in Way 0 und B in Way 1 des selben Sets. Das Thrashing-Problem ist gelöst.
+Das löst die Indexkollision von A und B. Es beseitigt nicht jedes Thrashing.
 :::
 
 ## Praxis: 2-Way und 4-Way

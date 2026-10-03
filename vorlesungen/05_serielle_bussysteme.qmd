@@ -1027,21 +1027,39 @@ Prescaler allein ist keine universelle I2C-Formel. SCL-High, SCL-Low, Filter und
 Ablauf: START → Adresse+W → Reg → Daten → STOP
 
 ```c
+enum {
+    I2C_OK = 0,
+    I2C_NACK = 1,
+    I2C_TIMEOUT = 2,
+    I2C_ARB_LOST = 3,
+    I2C_BUS_ERR = 4
+};
+
+static int i2c_fail(int st) {
+    if (st != I2C_ARB_LOST && i2c_owns_bus())
+        i2c_send_stop();
+    return st;
+}
+
 int sensor_wakeup(void) {
+    int st;
     i2c_send_start();
-    i2c_send_byte(0xD0u);          /* 0x68 << 1 | Write */
-    if (!wait_for_ack_timeout()) return -1;
-    i2c_send_byte(0x6Bu);          /* PWR_MGMT_1 */
-    if (!wait_for_ack_timeout()) return -1;
-    i2c_send_byte(0x00u);          /* Sleep aus, Lehrwert */
-    if (!wait_for_ack_timeout()) return -1;
+    i2c_send_byte(0xD0u);
+    st = wait_phase();
+    if (st != I2C_OK) return i2c_fail(st);
+    i2c_send_byte(0x6Bu);
+    st = wait_phase();
+    if (st != I2C_OK) return i2c_fail(st);
+    i2c_send_byte(0x00u);
+    st = wait_phase();
+    if (st != I2C_OK) return i2c_fail(st);
     i2c_send_stop();
-    return 0;
+    return I2C_OK;
 }
 ```
 
 ::: notes
-Ein NACK oder ein abgelaufenes Zeitlimit beendet die Funktion. `wait_for_ack()` ohne Timeout darf bei fehlendem Sensor nicht hängen bleiben. STOP nur, solange dieser Controller den Bus besitzt.
+Ein NACK, ein Timeout, ein Arbitration-Verlust und ein Busfehler sind verschiedene Statuswerte. `wait_phase` begrenzt Start, Byte, Empfang, Stretching und Stop. STOP nur, solange dieser Controller den Bus besitzt.
 :::
 
 ## C: Read mit Repeated Start
@@ -1051,21 +1069,27 @@ Ein NACK oder ein abgelaufenes Zeitlimit beendet die Funktion. `wait_for_ack()` 
 Zuerst Registerzeiger setzen (Write), dann Repeated START und Read:
 
 ```c
-/* Timeout. Fehlercode bleibt getrennt von den Bytes. */
 int read_accel_xyz(uint8_t out[6]) {
+    int st;
     i2c_send_start();
-    i2c_send_byte(0xD0u);          /* 0x68 << 1 | Write */
-    if (!wait_for_ack_timeout()) return -1;
+    i2c_send_byte(0xD0u);
+    st = wait_phase();
+    if (st != I2C_OK) return i2c_fail(st);
     i2c_send_byte(0x3Bu);
-    if (!wait_for_ack_timeout()) return -1;
-    i2c_send_start();              /* Repeated Start */
-    i2c_send_byte(0xD1u);          /* Read */
-    if (!wait_for_ack_timeout()) return -1;
-    for (int i = 0; i < 5; i++)
-        out[i] = i2c_read_byte_ack();
-    out[5] = i2c_read_byte_nack(); /* normaler Abschluss */
+    st = wait_phase();
+    if (st != I2C_OK) return i2c_fail(st);
+    i2c_send_start();
+    i2c_send_byte(0xD1u);
+    st = wait_phase();
+    if (st != I2C_OK) return i2c_fail(st);
+    for (int i = 0; i < 5; i++) {
+        st = i2c_read_ack(&out[i]);
+        if (st != I2C_OK) return i2c_fail(st);
+    }
+    st = i2c_read_nack(&out[5]);
+    if (st != I2C_OK) return i2c_fail(st);
     i2c_send_stop();
-    return 0;
+    return I2C_OK;
 }
 ```
 
@@ -1123,16 +1147,20 @@ Laboridee: eingespeiste Vektoren müssen nach korrektem I2C-Read in Ihrer Ausgab
 - In C zusammensetzen:
 
 ```c
-uint8_t b[6];
-if (read_accel_xyz(b) != 0) {
-    /* Timeout, NACK oder Busfehler. 0x00 wäre ein gültiger Messwert. */
+int16_t decode_x(const uint8_t b[6], int st, int *ok) {
+    uint16_t ux;
+    if (st != I2C_OK) {
+        *ok = 0;
+        return 0;
+    }
+    ux = (uint16_t)(((uint16_t)b[0] << 8) | b[1]);
+    *ok = 1;
+    return (int16_t)ux; /* 0x1000 -> 4096 */
 }
-uint16_t ux = (uint16_t)(((uint16_t)b[0] << 8) | b[1]);
-int16_t x = (int16_t)ux;   /* 0x1000 -> 4096 */
 ```
 
 ::: notes
-Häufiger Fehler: Bytes vertauscht oder Vorzeichen falsch interpretiert.
+Häufiger Fehler: den Puffer trotz Fehlerstatus dekodieren. High-Byte liegt bei `b[0]`. Der Cast auf `int16_t` übernimmt das Zweierkomplement, nachdem die Bytes unsigned zusammengesetzt wurden. `0x00` bis `0xFF` bleiben gültige Messbytes.
 :::
 
 ## Polling vs. Interrupt

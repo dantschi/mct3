@@ -628,15 +628,25 @@ Schematisch: Zähler gegen Zielwert — bei Erreichen Interrupt.
 - Pflicht in der ISR: neuen Zukunftswert nach `mtimecmp` schreiben
 
 ```c
+static uint64_t next_deadline;
+
 void timer_isr(void) {
     uint64_t now = read_mtime();
-    write_mtimecmp(now + INTERVAL);  /* neu scharf schalten */
-    /* eigentliche Arbeit ... */
+    unsigned steps = 0u;
+    do {
+        next_deadline += TICKS_PER_MS;
+        steps++;
+    } while ((int64_t)(next_deadline - now) <= 0
+             && steps < 4u);
+    if ((int64_t)(next_deadline - now) <= 0)
+        next_deadline = now + TICKS_PER_MS; /* Rest überspringen */
+    write_mtimecmp(next_deadline);
+    uptime_ms++; /* ein Eintritt, kein Zählen jedes verpassten Ticks */
 }
 ```
 
 ::: notes
-Häufiger Anfängerfehler: LED toggeln und zurückkehren, ohne mtimecmp zu aktualisieren — dann feuert der Alarm sofort wieder. Besser `mtimecmp += INTERVAL` statt `now + INTERVAL`, um Drift durch ISR-Latenz zu vermeiden.
+`now + INTERVAL` wäre das relative Modell und verschiebt die Phase um die ISR-Latenz. Hier gilt der absolute Merker. Höchstens vier Nachholschritte, danach wird der Rest übersprungen. Das Pending-Bit zählt nicht mehrere Perioden.
 :::
 
 ## Konzept: Der System-Tick
@@ -671,20 +681,16 @@ Jeder Interrupt kostet Pipeline- und Registeraufwand. Bei 1 µs-Ticks bleibt kau
 - Umrechnung in Software nötig
 - Beispiel: Quarz $10\,\mathrm{MHz}$ $\Rightarrow$ $10^{7}$ Takte/s
 - Pro ms: $10^{7}/1000 = 10^{4}$ Takte
-- Nächster Alarm: `mtimecmp = mtime + 10000`
+- Nächster Alarm im absoluten Modell: `next_deadline`, nicht `now + 10000`
+- `now + 10000` bleibt nur das relative Gegenbeispiel und driftet
 
 ```c
-#define TIMER_FREQ   10000000  /* 10 MHz */
-#define TICKS_PER_MS (TIMER_FREQ / 1000)
-
-void timer_isr(void) {
-    uint64_t now = read_mtime();
-    write_mtimecmp(now + TICKS_PER_MS);
-}
+#define TIMER_FREQ   10000000u
+#define TICKS_PER_MS (TIMER_FREQ / 1000u)
 ```
 
 ::: notes
-Im Datenblatt steht die Timer-Frequenz. Daraus berechnen Sie Ticks pro Millisekunde und programmieren `mtimecmp` entsprechend — das ist typische Labor-Mathematik.
+Bei 10 MHz sind 10000 Takte eine Millisekunde. Die ISR oben schreibt den absoluten Termin. Ein relativer Addend auf `now` verschiebt jede folgende Periode um die Latenz.
 :::
 
 ## Software-Interrupts im CLINT
@@ -746,8 +752,8 @@ static void write_mtimecmp(uint64_t v) {
 
 void init_system_tick(void) {
     /* Stack und mtvec müssen schon stehen */
-    uint64_t now = read_mtime();
-    write_mtimecmp(now + 10000u);  /* 10 MHz, 1 ms */
+    next_deadline = read_mtime() + 10000u; /* erster Termin */
+    write_mtimecmp(next_deadline);
     set_csr(mie, (1u << 7));       /* MTIE */
     set_csr(mstatus, MSTATUS_MIE);
 }
@@ -867,17 +873,22 @@ Ohne Handshake weiß die Software nicht, wer gewonnen hat — und der PLIC kann 
 ![Claim löscht PLIC-Pending, nicht die Ursache im UART. ID 0 nicht abschließen.](../assets/figures/03_interrupts_timer/claim.png)
 
 ```c
-void external_interrupt_handler(void) {
-    uint32_t id = *(volatile uint32_t *)PLIC_CLAIM_REG;
-    my_isr_functions[id]();
+#define PLIC_MAX_ID 3u
+
+uint32_t plic_claim(void) {
+    return *(volatile uint32_t *)PLIC_CLAIM_REG;
+}
+
+void plic_complete(uint32_t id) {
+    *(volatile uint32_t *)PLIC_CLAIM_REG = id;
 }
 ```
 
-- MMIO-Read auf Claim-Register → Gewinner-ID
-- Danach direkter Sprung (z. B. Funktionszeiger-Array)
+- Ein Claim kann 0 liefern: kein Interrupt
+- ID 0 nicht abschließen und keinen Handler aufrufen
 
 ::: notes
-Ein Read ersetzt die lange Abfragekette: ID lesen, passende ISR aufrufen.
+Der folgende vollständige Handler prüft den Bereich, bevor ein Funktionszeiger benutzt wird.
 :::
 
 ## Atomares Lesen und Löschen
@@ -894,15 +905,20 @@ Atomarität verhindert Race Conditions, wenn mehrere Kerne gleichzeitig claimen.
 
 ```c
 void external_interrupt_handler(void) {
-    uint32_t id = *(volatile uint32_t *)PLIC_CLAIM_REG;
-    my_isr_functions[id]();                 /* Treiberarbeit */
-    *(volatile uint32_t *)PLIC_CLAIM_REG = id;  /* Complete */
+    uint32_t id = plic_claim();
+    if (id == 0u)
+        return;
+    if (id > PLIC_MAX_ID || handlers[id] == 0) {
+        plic_complete(id); /* einmal, keine Schleife */
+        return;
+    }
+    handlers[id]();      /* Ursache im Gerät quittieren */
+    plic_complete(id);   /* nur diese gültige ID */
 }
 ```
 
-- Während Claimed: dieselbe Quelle blockiert; andere dürfen pending werden
-- ID zurückschreiben → Kanal wieder freigeben
-- Danach `mret` in den unterbrochenen Kontext
+- Eine Quelle je Eintritt. Weitere Pending-Quellen kommen mit dem nächsten External Interrupt.
+- Unbekannte IDs werden abgeschlossen, damit der PLIC nicht hängen bleibt.
 
 ::: notes
 Ohne Complete bleibt die Quelle oft dauerhaft blockiert. Claim und Complete teilen sich typischerweise dieselbe Registeradresse (Read vs. Write).

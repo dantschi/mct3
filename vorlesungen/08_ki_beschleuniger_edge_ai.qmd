@@ -504,12 +504,12 @@ Beispiel: 1000 Elemente, `vadd.vv` (schematisch)
 | Plattform | Breite (schematisch) | $\mathrm{VL}$ (e32) | Schleifenläufe |
 |-----------|----------------------|---------------------|----------------|
 | Edge | schmal (z. B. 128 Bit) | 4 | 250 |
-| Server | 1024 Bit, LMUL 1 | 32, zuletzt 8 | 32 |
+| Server | 1024 Bit, LMUL 1 | 32, dann 20+20 oder 32+8 | 32 |
 
 Gleiche RVV-Schleifenidee skaliert mit $\mathrm{VLEN}$ — ohne feste Packed-SIMD-Breite im Quelltext.
 
 ::: notes
-1000/32 ist nicht teilbar: 31 mal VL 32 und einmal VL 8. Ein Binary braucht ISA, ABI und einen Kern mit RVV.
+1000 Elemente und VLMAX 32: nach 30 vollen Schritten ist AVL 40. Dann erlaubt die Spezifikation jede VL von 20 bis 32. Diese Folie zeigt zwei zulässige Reste, 20+20 und 32+8. Der Zeiger folgt immer dem zurückgegebenen VL.
 :::
 
 ## Energie: weniger Instruction Fetch
@@ -576,12 +576,12 @@ Wenn Matrizen absurd wachsen, reicht „Vektor + Register“ nicht mehr.
 Elegante DLP-Integration in eine Allzweck-ISA.
 :::
 
-## Aufgabe — Rest 8
+## Aufgabe — AVL 40
 
-VLMAX ist 32, AVL ist 1000. Wie viele Iterationen und welches letzte VL entstehen, wenn der Rest klein genug für ein VL bleibt?
+VLMAX ist 32. Nach 30 Schritten mit VL 32 bleiben 40 Elemente. Welche letzten VL-Werte sind zulässig, und wie viele Iterationen ergeben 1000 Elemente?
 
 ::: notes
-31 mal 32 und einmal 8. Zusammen 32 Iterationen und 1000 Elemente. VL ist nicht in jedem AVL-Bereich min(AVL, VLMAX). Siehe die RVV-Abbildung.
+Zulässig sind zum Beispiel 20 und 20 oder 32 und 8. Beide Folgen haben insgesamt 32 Iterationen. `vsetvli` allein legt die letzte Länge nicht fest. Der Zeiger rückt um das tatsächlich zurückgegebene VL mal 4 Byte vor.
 :::
 
 ## Was ist eine NPU?
@@ -685,7 +685,7 @@ $2\times 2$-Idee (schematisch):
 - Das ist kein Ergebnis je Takt ab Takt 3. Readout der lokalen Summen kommt danach
 
 ::: notes
-Wie Instruction-Pipeline: erst füllen, dann kontinuierlicher Ausstoß.
+Die vier lokalen Summen sind nach Takt 4 fertig. Der Readout ist ein eigener Schritt. Ein kontinuierlicher Strom bräuchte einen extra definierten Tile-Takt.
 :::
 
 ## Weight-Stationary
@@ -823,7 +823,7 @@ Pipeline: Sensor → TFLM → Klasse — Busse + Edge AI zusammen.
 ## Modell als C-Array
 
 ```c
-/* Intelligenz als .rodata im Flash */
+/* Platzhalter, kein gültiges Modell und keine Lizenzdatei. */
 const unsigned char step_model_tflite[]
     __attribute__((aligned(4))) = {
     0x1c, 0x00, 0x00, 0x00, 0x54, 0x46, 0x4c, 0x33,
@@ -838,15 +838,20 @@ Die Bytes sind Modelldaten. Kernel in der Firmware führen Operatoren aus. Flash
 ## Tensor Arena
 
 ```cpp
-const int kTensorArenaSize = 10 * 1024;
-uint8_t tensor_arena[kTensorArenaSize];
+alignas(16) static uint8_t tensor_arena[1024];
+/* 1024 Byte sind eine Lehrannahme, kein gemessenes Budget. */
 
-/* Lehrschnitt, hier nicht übersetzt. Kein TFLM-Tree im Repository.
-   Konstruktor ohne ErrorReporter, Rückgaben prüfen. */
-if (model->version() != TFLITE_SCHEMA_VERSION) { /* Abbruch */ }
-tflite::MicroInterpreter interpreter(
-    model, resolver, tensor_arena, kTensorArenaSize);
-if (interpreter.AllocateTensors() != kTfLiteOk) { /* Arena */ }
+static int setup_interpreter(void) {
+    if (model == 0)
+        return -1;
+    if (model->version() != TFLITE_SCHEMA_VERSION)
+        return -2;
+    tflite::MicroInterpreter ip(
+        model, resolver, tensor_arena, 1024);
+    if (ip.AllocateTensors() != kTfLiteOk)
+        return -3;
+    return 0;
+}
 ```
 
 - Statischer SRAM-Block — keine Heap-Leaks
@@ -859,16 +864,28 @@ Sicherheit durch feste Grenzen statt stiller Stack-Korruption.
 ## Inferenz-Zyklus
 
 ```cpp
-/* Int8-Lehrschnitt. 128 ist kein definiertes 3-Achsen-Fenster. */
-if (input->type != kTfLiteInt8) { /* Typfehler */ }
-for (int i = 0; i < input->bytes; i++)
-    input->data.int8[i] = quantize(sample[i]);
-if (interpreter.Invoke() != kTfLiteOk) { /* Invoke-Fehler */ }
-int8_t logit = output->data.int8[2];
-/* logit ist kein kalibrierter Score und 0,8 keine Schwelle */
+static int run_window(void) {
+    TfLiteTensor *in = interpreter.input(0);
+    TfLiteTensor *out = interpreter.output(0);
+    if (in == 0 || out == 0)
+        return -4;
+    if (in->type != kTfLiteInt8)
+        return -5;
+    if (in->bytes != (int)sizeof(sample))
+        return -6;
+    if (out->type != kTfLiteInt8 || out->bytes < 3)
+        return -7;
+    for (int i = 0; i < in->bytes; i++)
+        in->data.int8[i] = quantize(sample[i], in);
+    if (interpreter.Invoke() != kTfLiteOk)
+        return -8;
+    return out->data.int8[2]; /* Logit, keine Wahrscheinlichkeit */
+}
 ```
 
-- Rohdaten → Tensor → `Invoke()` → Scores
+- `sample` hat dieselbe Länge wie der bestätigte Int8-Input.
+- Index 2 wird nur gelesen, wenn mindestens drei Ausgabebytes existieren.
+- Es gibt im Repository kein gültiges Modell und keinen gepinnten TFLM-Commit.
 
 ::: notes
 Weniger handgeschriebene Filter — schwarze Kiste mit Wahrscheinlichkeiten.
