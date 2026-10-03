@@ -368,7 +368,7 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#anknüpfung-dma-labor",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Anknüpfung: DMA-Labor",
-    "text": "Anknüpfung: DMA-Labor\nKurz-Recap aus Block 6 (Vertiefung im Übungsblatt):\n\nDMA kopiert Arrays autonom; Polling blockiert die CPU stark\nMit DMA bleibt die Hauptschleife (z. B. LED) oft reaktionsfähig\nBus-Mastering und Cycle Stealing: DMA teilt sich den Bus mit der CPU\nFolge: weniger ALU-Zeit für stupides Kopieren — mehr Zeit für echte Berechnung\n\n/* Konzept — Adressen/Bits fiktiv bzw. Datenblatt */\nDMA_CH1-&gt;SRC_ADDR = (uint32_t)text_array;\nDMA_CH1-&gt;DST_ADDR = (uint32_t)&UART_TX;\nDMA_CH1-&gt;CONTROL |= DMA_ENABLE;  /* CPU kehrt sofort zurück */\n\nDMA befreit von Kopierarbeit. Als Nächstes: Wie schnell rechnet die CPU selbst auf Befehlsebene?"
+    "text": "Anknüpfung: DMA-Labor\nKurz-Recap aus Block 6 (Vertiefung im Übungsblatt):\n\nDMA kopiert Arrays autonom; Polling blockiert die CPU stark\nEin Heartbeat aus main() kann weiterlaufen. Das beweist keine Last von null\nBus-Mastering und Cycle Stealing: DMA teilt sich den Bus mit der CPU\nFolge: weniger ALU-Zeit für stupides Kopieren — mehr Zeit für echte Berechnung\n\n/* Konzept — Adressen/Bits fiktiv bzw. Datenblatt */\nDMA_CH1-&gt;SRC_ADDR = (uint32_t)text_array;\nDMA_CH1-&gt;DST_ADDR = (uint32_t)&UART_TX;\nDMA_CH1-&gt;CONTROL = DMA_ENABLE;  /* fiktiv, kein blindes |= */\n\nDMA befreit von Kopierarbeit. Als Nächstes: Wie schnell rechnet die CPU selbst auf Befehlsebene?"
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#zurück-in-die-cpu",
@@ -382,14 +382,14 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#refresher-mct1-5-stufen-pipeline",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Refresher MCT1: 5-Stufen-Pipeline",
-    "text": "Refresher MCT1: 5-Stufen-Pipeline\nKlassische RISC-Pipeline (Harris/Harris):\n\n\n\nStufe\nName\nAufgabe\n\n\n\n\nIF\nInstruction Fetch\nBefehl holen\n\n\nID\nDecode\nDekodieren, Register lesen\n\n\nEX\nExecute\nALU\n\n\nMEM\nMemory\nDatenspeicher\n\n\nWB\nWrite Back\nErgebnis ins Registerfile\n\n\n\nIdealfall nach Füllen: ein abgeschlossener Befehl pro Takt.\n\nStand MCT1: Fließband mit fünf Stufen — Grundlage für alles Weitere heute."
+    "text": "Refresher MCT1: 5-Stufen-Pipeline\n\n\n\nFünf ALU-Befehle, neun Takte, CPI 1,8. Ein Stall ohne Forwarding macht zehn Takte.\n\n\nKlassische RISC-Pipeline (Harris/Harris):\n\n\n\nStufe\nName\nAufgabe\n\n\n\n\nIF\nInstruction Fetch\nBefehl holen\n\n\nID\nDecode\nDekodieren, Register lesen\n\n\nEX\nExecute\nALU\n\n\nMEM\nMemory\nDatenspeicher\n\n\nWB\nWrite Back\nErgebnis ins Registerfile\n\n\n\nNach dem Füllen strebt der Durchsatz gegen ein Retire je Takt. Fünf Befehle brauchen im Modell ohne Stall \\(N+k-1 = 9\\) Takte, mittleres CPI \\(= 1{,}8\\).\n\nStand MCT1: Fließband mit fünf Stufen — Grundlage für alles Weitere heute."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#metriken-ipc-und-cpi",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#metriken-ipc-und-cpi",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Metriken: IPC und CPI",
-    "text": "Metriken: IPC und CPI\n\nIPC (Instructions Per Cycle): abgeschlossene Befehle pro Takt (höher besser)\nCPI (Cycles Per Instruction): Takte pro Befehl im Mittel (niedriger besser)\nKehrwerte: \\(\\mathrm{CPI} = 1/\\mathrm{IPC}\\)\nLaufzeit:\n\n\\[\nT = N_{\\mathrm{Instr}} \\times \\mathrm{CPI} \\times T_{\\mathrm{Takt}}\n\\]\n\nDrei Hebel: weniger Befehle, kürzerer Takt, bessere Architektur (kleineres CPI)."
+    "text": "Metriken: IPC und CPI\n\nIPC: retired ISA-Instruktionen pro Core-Takt im betrachteten Fenster\nExecution-Completion und Retire können in verschiedenen Takten liegen\nMicro-Ops sind keine ISA-IPC\nCPI = Takte / retired Instruktionen. CPI und IPC sind nur dann Kehrwerte\nLaufzeit bei konstanter Frequenz \\(f\\) im selben Fenster:\n\n\\[\nT = N \\times \\mathrm{CPI} / f\n\\]\n\nEin Compiler kann N ändern. Höheres IPC allein verkürzt die Laufzeit nicht. Mittelwerte verschiedener Läufe nicht ungewichtet invertieren. Kurze Sequenzen enthalten Füllung und Leerung."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#limit-der-skalaren-pipeline",
@@ -403,14 +403,14 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#die-taktraten-mauer-power-wall",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Die Taktraten-Mauer (Power Wall)",
-    "text": "Die Taktraten-Mauer (Power Wall)\n\nIdee der 2000er: Frequenz massiv erhöhen (GHz-Wettrennen)\nDynamische Verlustleistung und Leckströme begrenzen den sinnvollen Takt\nTypisch: Desktop-/Mobile-Kerne oft im Bereich weniger GHz — nicht „unendlich“\nCPI/IPC verbessern, statt nur höher zu takten\n\n\nPentium-4-Ära: Hoffnung auf extrem hohe GHz — Physik und Kühlung setzen Grenzen."
+    "text": "Die Taktraten-Mauer (Power Wall)\n\nIdee der 2000er: Frequenz massiv erhöhen (GHz-Wettrennen)\nVereinfacht \\(P_{dyn} \\approx \\alpha C V^{2} f\\). Leckleistung ist davon getrennt\nKeine feste Frequenzgrenze aus dieser Formel. Breitere Kerne brauchen mehr Ports, Scheduler und Bypass\nCPI verbessern ist ein Weg, kein kostenloser Ersatz für Takt\n\n\nPentium-4-Ära: Hoffnung auf extrem hohe GHz — Physik und Kühlung setzen Grenzen."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#die-leitfrage-des-tages",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#die-leitfrage-des-tages",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Die Leitfrage des Tages",
-    "text": "Die Leitfrage des Tages\n\nTaktfrequenz: physikalisch begrenzt\nSkalare Pipeline: Ideal \\(\\mathrm{CPI} = 1\\) (mit Stalls oft \\(&gt; 1\\))\nWie erreicht man \\(\\mathrm{CPI} &lt; 1\\) (mehrere Completions pro Takt) bei gleichem Takt?\nAntwort: Parallelität innerhalb des Kerns (ILP ausnutzen)\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart TD\n  A[Befehl 1] --&gt; C[Completion in Takt 1]\n  B[Befehl 2] --&gt; C\n  C --&gt; D[IPC = 2, CPI = 0.5]\n  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nNicht schneller takten — breiter und smarter schedulen."
+    "text": "Die Leitfrage des Tages\n\n\n\nSkalar 4/5 = 0,8. Zweifach 4/3 ≈ 1,33. Ein Doppeltakt ist nicht das mittlere IPC.\n\n\n\nTaktfrequenz: physikalisch begrenzt\nSkalare Pipeline: Ideal \\(\\mathrm{CPI} = 1\\) (mit Stalls oft \\(&gt; 1\\))\nWie kann der Kern langfristig mehr als eine ISA-Instruktion je Takt retiren?\nAntwort: Parallelität innerhalb des Kerns (ILP ausnutzen)\n\nDas Zeitdiagramm oben ersetzt die Ein-Takt-Skizze. IPC wird über das ganze Fenster gerechnet.\n\nNicht schneller takten — breiter und smarter schedulen."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#agenda",
@@ -438,7 +438,7 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#datenabhängigkeiten-raw",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Datenabhängigkeiten: RAW",
-    "text": "Datenabhängigkeiten: RAW\n\nTrue Dependency / Read-After-Write (RAW): Befehl 2 braucht Ergebnis von Befehl 1\n\nadd t0, t1, t2   # schreibt t0\nsub t3, t0, t4   # liest t0 — muss warten\n\nKeine Parallelität dieser beiden im selben EX-Schritt — ILP dieses Paares = 1 (rein sequentiell)\n\n\nBekannt aus MCT1: echte Datenabhängigkeit — Hardware kann Mathematik nicht „wegoptimieren“."
+    "text": "Datenabhängigkeiten: RAW\n\n\n\nI1–I3: RAW bleibt, WAR und WAW sind Namenskonflikte auf t0.\n\n\n\nTrue Dependency / Read-After-Write (RAW): Befehl 2 braucht Ergebnis von Befehl 1\n\nadd t0, t1, t2   # schreibt t0\nsub t3, t0, t4   # liest t0 — muss warten\n\nDieses Paar hat ILP 1. Das ist keine Aussage über das ganze Programm\nForwarding verkürzt die Wartezeit und hebt die RAW-Kante nicht auf\n\n\nBekannt aus MCT1: echte Datenabhängigkeit — Hardware kann Mathematik nicht „wegoptimieren“."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#statisches-vs.-dynamisches-scheduling",
@@ -452,21 +452,21 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#superskalare-architekturen",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Superskalare Architekturen",
-    "text": "Superskalare Architekturen\n\nSkalar: typisch ein Issue pro Takt\nSuperskalar: Multiple Issue — mehrere Befehle starten (nahezu) im selben Takt die Execute-Phase\nPipeline wird „breiter“: mehrspurige Autobahn statt einspurigem Fließband\n\n\nErster Schritt zu CPI &lt; 1: Execution Units und Issue-Breite vervielfachen."
+    "text": "Superskalare Architekturen\n\nSkalar: typisch ein Issue pro Takt\nSuperskalar: Multiple Issue. Das ist noch nicht Out-of-Order\nFetch-Bytes, Decode, Issue, Ports und Retire-Breite sind verschiedene Größen\nPipeline wird „breiter“: mehrspurige Autobahn statt einspurigem Fließband\n\n\nErster Schritt zu CPI &lt; 1: Execution Units und Issue-Breite vervielfachen."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#mehrere-execution-units",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#mehrere-execution-units",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Mehrere Execution Units",
-    "text": "Mehrere Execution Units\nBeispiel Issue-Width \\(\\approx 3\\):\n\nALU 1, ALU 2 (Integer/Logik)\nLoad/Store-Unit\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  ID[Decode] --&gt;|1| ALU1[ALU 1]\n  ID --&gt;|2| ALU2[ALU 2]\n  ID --&gt;|3| LSU[Load/Store]\n  ALU1 --&gt; WB[Write Back]\n  ALU2 --&gt; WB\n  LSU --&gt; WB\n  style ID fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nDrei unabhängige Befehle → drei Units → im Ideal drei Completions; CPI kann unter 1 sinken."
+    "text": "Mehrere Execution Units\n\n\n\nFetch, Decode, Issue, zwei ALU, eine LSU, Retire 2. Der Engpass ist hier das Retire.\n\n\n\nZwei Integer-ALU und eine LSU sind das vereinfachte Modell aus der Abbildung\nEin pipelinierter Multiplizierer trennt Latenz und Initiationsintervall\n\n\nDrei Units reichen nicht für IPC 3. Im Bild begrenzt die Retire-Breite 2 den nachhaltigen Durchsatz, wenn alles andere passt."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#multi-issue-fetch-und-decode",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#multi-issue-fetch-und-decode",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Multi-Issue Fetch und Decode",
-    "text": "Multi-Issue Fetch und Decode\n\nFetch holt mehrere Instruktionen pro Takt aus dem I-Cache (z. B. 16 Byte)\nDecode prüft Abhängigkeiten zwischen den Kandidaten und verteilt auf Units\nAufwand der Abhängigkeitsprüfung wächst stark mit der Issue-Width\n\n\nBreites Back-End nützt wenig ohne breites Front-End — Decode wird oft zum Flaschenhals."
+    "text": "Multi-Issue Fetch und Decode\n\nFetch holt zum Beispiel 16 Byte. Mit der C-Erweiterung ist das keine feste Instruktionszahl\nDecode prüft Abhängigkeiten zwischen den Kandidaten und verteilt auf Units\nAufwand der Abhängigkeitsprüfung wächst stark mit der Issue-Width\n\n\nBreites Back-End nützt wenig ohne breites Front-End — Decode wird oft zum Flaschenhals."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#in-order-superskalar",
@@ -480,7 +480,7 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#problem-cache-miss-in-order",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Problem: Cache-Miss in-order",
-    "text": "Problem: Cache-Miss in-order\nlw  t0, 0(s1)    # Miss → viele Wartezyklen\nadd t1, t0, t2   # RAW auf t0 → muss warten\nsub t4, t5, t6   # unabhängig — trotzdem oft blockiert\n\nIn-Order: unabhängiger sub wartet hinter dem Stau\nUnits stehen ungenutzt — IPC bricht ein\n\n\nCache-Misses sind Gift für strikte Programmreihenfolge trotz freier ALUs."
+    "text": "Problem: Cache-Miss in-order\n\n\n\nDieselben vier Befehle: in-order 7 Takte, OoO 6 Takte. Der Miss bleibt, Retire wartet.\n\n\nlw  t0, 0(s1)    # Miss → viele Wartezyklen\nadd t1, t0, t2   # RAW auf t0 → muss warten\nsub t4, t5, t6   # unabhängig — trotzdem oft blockiert\n\nLehrannahme hier: der In-Order-Kern gibt hinter dem wartenden Load nichts weiter aus\nReale In-Order-Kerne dürfen davon abweichen\nDer Miss bleibt auch bei OoO bestehen. Unabhängige Befehle können ihn nur überlappen\n\n\nCache-Misses sind Gift für strikte Programmreihenfolge trotz freier ALUs."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#falsche-abhängigkeit-waw",
@@ -501,28 +501,28 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#engpass-32-isa-register",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Engpass: 32 ISA-Register",
-    "text": "Engpass: 32 ISA-Register\n\nRISC-V: 32 Architektur-Register x0–x31\nCompiler muss Register stark wiederverwenden → viele WAW/WAR\nKünstliche Konflikte drosseln ausnutzbares ILP\n\n\nISA-Register sind die sichtbare Schnittstelle — zu wenige physische „Kisten“ für aggressives Scheduling."
+    "text": "Engpass: 32 ISA-Register\n\nRV32I und RV64I: 32 Integerregister x0–x31. x0 ist fest 0\nDas sind Architektur-Namen, keine physischen Kisten. RV32E hat ein anderes Registerprofil\nWiederverwendung erzeugt WAR/WAW. Erweiterungen bringen weitere Registerdateien\n\n\nZu wenige Namen erzeugen falsche Abhängigkeiten. Wie viele physische Register ein Kern hat, steht nicht in der ISA."
   },
   {
-    "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#fragen-ilp-und-superskalarität",
-    "href": "vorlesungen/07_moderne_cpu_architekturen.html#fragen-ilp-und-superskalarität",
+    "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#aufgabe-raw-und-breite",
+    "href": "vorlesungen/07_moderne_cpu_architekturen.html#aufgabe-raw-und-breite",
     "title": "07 · Moderne CPU-Architekturen",
-    "section": "Fragen? — ILP und Superskalarität",
-    "text": "Fragen? — ILP und Superskalarität\n\nWie hebt Superskalarität die IPC?\nWarum stoppt ein Cache-Miss eine In-Order-Pipeline oft global?\nRAW vs. WAW/WAR?\n\n\nAls Nächstes: Out-of-Order — Staus umfahren, falsche Abhängigkeiten per Renaming auflösen."
+    "section": "Aufgabe — RAW und Breite",
+    "text": "Aufgabe — RAW und Breite\nWarum bleibt die Kante von I1 nach I2 bestehen, obwohl I3 und I4 unabhängig sind? Warum folgt aus zwei ALU nicht IPC 2?\n\nI2 liest t0, das I1 erst liefert. Das ist RAW. I3 und I4 können den Miss nur überlappen. Die Retire-Breite und der älteste unfertige Befehl begrenzen den Durchsatz. Siehe Abhängigkeitsbild und das OoO-Zeitdiagramm."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#out-of-order-execution-ooo",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#out-of-order-execution-ooo",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Out-of-Order Execution (OoO)",
-    "text": "Out-of-Order Execution (OoO)\n\nDynamisches Scheduling: blockierte Befehle „parken“\nUnabhängige spätere Befehle dürfen vorgezogen werden\nAusführung asynchron, sobald Operanden bereit sind — nicht strikt nach Programmzeile\n\n\nModern: nicht mehr nur „nächster PC“ — freie Units mit bereiten Operanden füttern."
+    "text": "Out-of-Order Execution (OoO)\n\nDynamisches Scheduling: blockierte Befehle „parken“\nUnabhängige spätere Befehle dürfen vorgezogen werden\nIssue in datenabhängiger, dynamisch gewählter Reihenfolge. Der Kern bleibt getaktet\n\n\nModern: nicht mehr nur „nächster PC“ — freie Units mit bereiten Operanden füttern."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#datenfluss-maschine",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#datenfluss-maschine",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Datenfluss-Maschine",
-    "text": "Datenfluss-Maschine\n\nInstruktion „feuert“, wenn Operanden da sind — nicht nur wenn der PC sie erreicht\nCache-Miss blockiert vor allem abhängige Nachfolger\nUnabhängiger Code kann am Stau vorbeilaufen\n\n\nParadigmenwechsel: vom starren Befehlszeiger zum datengetriebenen Issue."
+    "text": "Datenfluss-Maschine\n\nInstruktion „feuert“, wenn Operanden da sind — nicht nur wenn der PC sie erreicht\nDer Miss blockiert die Nutzer des Load. Unabhängige Befehle können vorbeilaufen, bis Issue-Queue oder ROB voll sind\n„Nur Abhängige warten“ gilt nicht ohne diese Grenzen\n\n\nParadigmenwechsel: vom starren Befehlszeiger zum datengetriebenen Issue."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#drei-phasen-der-ooo-pipeline",
@@ -543,21 +543,21 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#register-renaming",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Register Renaming",
-    "text": "Register Renaming\n\nOoO-Kerne: großer Pool physischer Register (Größenordnung: oft \\(&gt; 100\\))\nArchitektur-Register (x0–x31) sind Namen / Mapping\nJeder Befehl mit Zielregister bekommt typisch ein neues freies physisches Ziel\n\n\nGenialer Trick: WAW/WAR verschwinden, weil Schreibziele physisch getrennt werden."
+    "text": "Register Renaming\n\nDie ISA-Namen werden auf eine größere physische Datei abgebildet. Eine Zahl über 100 ist kein allgemeines Minimum\nJeder Befehl mit Ziel außer der festen Null bekommt typisch ein neues physisches Register\nBefehle ohne Ziel und x0 sind Ausnahmen\n\n\nGenialer Trick: WAW/WAR verschwinden, weil Schreibziele physisch getrennt werden."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#renaming-am-beispiel-waw",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#renaming-am-beispiel-waw",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Renaming am Beispiel (WAW)",
-    "text": "Renaming am Beispiel (WAW)\nadd t0, t1, t2\nsub t0, t4, t5\nHardware (schematisch):\n\nadd → schreibt P10 (Mapping t0 → P10)\nsub → schreibt P11 (neues Mapping t0 → P11)\n\nKein gemeinsames physisches Ziel → paralleles Issue möglich.\n\nNamen werden recycelt, physische Kisten sind frisch — ILP gerettet."
+    "text": "Renaming am Beispiel (WAW)\n\n\n\nA schreibt P10, B liest P10, C schreibt P11. E/F zeigen das WAR-Muster.\n\n\nadd t0, t1, t2\nsub t0, t4, t5\nHardware (schematisch):\n\nadd → schreibt P10 (Mapping t0 → P10)\nsub → schreibt P11 (neues Mapping t0 → P11)\n\nGetrennte Ziele erlauben unabhängige Ausführung. Zwei belegte ALU-Ports können das Issue trotzdem verhindern.\n\nNamen werden recycelt, physische Kisten sind frisch — ILP gerettet."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#reservation-stations",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#reservation-stations",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Reservation Stations",
-    "text": "Reservation Stations\n\nNach Renaming: Befehle in Reservation Stations / Issue Queue\nPuffer vor den Units (oft viele Dutzend bis \\(&gt; 100\\) Einträge)\nWarten auf Operanden (physische Register / Tag-Match am Datenbus)\n\n\nWartehalle: Bordkarte = physische Register; Abflug = Operanden komplett."
+    "text": "Reservation Stations\n\nNach Renaming: Befehle in Reservation Stations / Issue Queue\nKlassisch Reservation Stations, alternativ eine gemeinsame Issue Queue. Ein einzelner Common Data Bus ist nur das Lehrbild\nOperand bereit reicht nicht: Unit, Port und Auswahlregel müssen passen\n\n\nWartehalle: Bordkarte = physische Register; Abflug = Operanden komplett."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#out-of-order-issue",
@@ -578,21 +578,21 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#reorder-buffer-rob",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Reorder Buffer (ROB)",
-    "text": "Reorder Buffer (ROB)\n\nALU-/Load-Ergebnisse nicht sofort final sichtbar schreiben\nZuerst in den ROB (Ringpuffer), sortiert nach ursprünglicher Programmordnung\n\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  ALU1 --&gt;|Befehl 5 fertig| ROB[(ROB)]\n  ALU2 --&gt;|Befehl 2 fertig| ROB\n  LSU --&gt;|Befehl 1 fertig| ROB\n  style ROB fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nNetz mit doppeltem Boden: rechnen darf chaotisch sein — sichtbar werden geordnet."
+    "text": "Reorder Buffer (ROB)\n\n\n\nWerte stehen in der PRF. Der ROB merkt sich Ordnung, Ready und Exceptions.\n\n\n\nIn diesem PRF-Modell schreibt die ALU in ein physisches Register, nicht in den ROB\nDer ROB führt Reihenfolge, Completion, Exception und Zielmetadaten. Ein result-holding ROB wäre ein anderes, hier nicht verwendetes Modell\n\nDas PRF-Bild ersetzt den Ergebniszylinder. Fertige jüngere Befehle stehen in physischen Registern, bis der Head retiriert.\n\nNetz mit doppeltem Boden: rechnen darf chaotisch sein — sichtbar werden geordnet."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#in-order-commit-retire",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#in-order-commit-retire",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "In-Order Commit (Retire)",
-    "text": "In-Order Commit (Retire)\n\nCommit nur am ältesten noch nicht retired Befehl\nErst dann: finales Update der Architektur-Register / Stores\nSpätere fertige Einträge warten im ROB, bis die Vorgänger committed sind\nNach außen: scheinbar sequentielle CPU\n\n\nProgrammierer und OS sehen geordnete Semantik — trotz OoO im Back-End."
+    "text": "In-Order Commit (Retire)\n\n\n\nStore-Queue, Commit und Drain sind drei Schritte. Aliase kann Renaming nicht lösen.\n\n\n\nRetire nur am ältesten noch nicht retired Befehl, bis zur Retire-Breite\nDadurch wird der Architektur-Registerzustand sichtbar. Ein Store darf danach noch im Puffer stehen\nAndere Beobachter sehen Speicher nach RVWMO, nicht automatisch in dieser Retire-Reihenfolge\nSpätere fertige Einträge warten, auch wenn ihre PRF-Werte schon stehen\n\n\nProgrammierer und OS sehen geordnete Semantik — trotz OoO im Back-End."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#exceptions-und-rob",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#exceptions-und-rob",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Exceptions und ROB",
-    "text": "Exceptions und ROB\n\nCommit stoppt am fehlerhaften / unterbrochenen Befehl\nJüngere ROB-Einträge verwerfen (Squash)\nArchitekturzustand entspricht dem Stand vor dem Commit dieses Befehls\nDanach: Trap / ISR — spekulative Arbeit war unsichtbar\n\n\nEleganz: Zukunftsberechnungen verwerfen, ohne RAM-Inkonsistenzen zu hinterlassen."
+    "text": "Exceptions und ROB\n\nSynchrone Exception: ältere Instruktionen dürfen committen. Die fehlerhafte Instruktion committet ihren normalen Effekt nicht. Jüngere Effekte werden verworfen\nEin asynchroner Interrupt hat keinen fehlerhaften Befehl. Er wird an einer zulässigen präzisen Grenze angenommen\nRecovery stellt das gültige Mapping wieder her\n\n\nDer Architekturzustand wird präzise. Ein verworfener Store ist nicht dasselbe wie ein unsichtbarer Cache-Seiteneffekt."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#grenzen-von-ooo",
@@ -609,18 +609,18 @@
     "text": "Drei Phasen — Kurzfazit\n\n\n\nPhase\nOrdnung\nAufgabe\n\n\n\n\nFetch/Decode\nin-order\nlesen, renaming\n\n\nExecute\nout-of-order\nUnits auslasten\n\n\nCommit\nin-order\nsichtbar machen, Exceptions\n\n\n\n\nAnatomie eines High-End-Kerns in einem Satz: geordnet rein, parallel rechnen, geordnet raus."
   },
   {
-    "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#fragen-out-of-order",
-    "href": "vorlesungen/07_moderne_cpu_architekturen.html#fragen-out-of-order",
+    "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#aufgabe-version-und-exception",
+    "href": "vorlesungen/07_moderne_cpu_architekturen.html#aufgabe-version-und-exception",
     "title": "07 · Moderne CPU-Architekturen",
-    "section": "Fragen? — Out-of-Order",
-    "text": "Fragen? — Out-of-Order\n\nZiel des Register Renamings?\nRolle der Reservation Stations?\nWarum ist der ROB für Interrupts/Exceptions unverzichtbar?\n\n\nFortsetzung: Branch Prediction — Sprünge, die selbst OoO-Kerne teuer treffen können."
+    "section": "Aufgabe — Version und Exception",
+    "text": "Aufgabe — Version und Exception\nWelche physische Version liest Befehl B? Was bleibt architektonisch gültig, wenn I2 eine synchrone Exception auslöst, nachdem nur I1 retiriert wurde?\n\nB liest P10, nicht P11. Nach Retire von I1 ist t0 = 10. I2 committet nicht, I3 und I4 werden verworfen. Ein Interrupt ist davon getrennt: er hat keinen fehlerhaften Befehl. Siehe Rename-Tabelle und ROB-Bild."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#control-hazards",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#control-hazards",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Control Hazards",
-    "text": "Control Hazards\n\nDatenabhängigkeiten: u. a. per Renaming entschärft\nNeuer Engpass: Kontrollfluss (beq und andere Branches)\nBeim Fetch des Branch: welcher nächste PC — Fall-through oder Target?\nEntscheidung oft erst nach dem Vergleich in EX (oder später in tiefen Pipelines)\n\n\nDie Pipeline braucht jeden Takt neuen Nachschub — an der Weggabelung fehlt das Vergleichsergebnis noch."
+    "text": "Control Hazards\n\nWAR und WAW kann Renaming entfernen. RAW bleibt. Kontrollfluss ist ein eigener Engpass\nNeuer Engpass: Kontrollfluss (beq und andere Branches)\nBeim Fetch des Branch: welcher nächste PC — Fall-through oder Target?\nEntscheidung oft erst nach dem Vergleich in EX (oder später in tiefen Pipelines)\n\n\nDie Pipeline braucht jeden Takt neuen Nachschub — an der Weggabelung fehlt das Vergleichsergebnis noch."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#kosten-eines-pipeline-flush",
@@ -634,14 +634,14 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#misprediction-zahlenbeispiel",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Misprediction: Zahlenbeispiel",
-    "text": "Misprediction: Zahlenbeispiel\n\n\\(20\\,\\%\\) der Befehle sind Branches\nMisprediction-Rate \\(10\\,\\%\\), Penalty \\(15\\) Takte\nBasis-CPI \\(= 1\\) (ideale Pipeline ohne andere Stalls)\nCPI-Aufschlag: \\(0{,}20 \\times 0{,}10 \\times 15 = 0{,}30\\)\nEffektives CPI \\(\\approx 1{,}30\\) → ca. \\(23\\,\\%\\) langsamer als ideal\n\n\nKlausurtypisch: Branch-Anteil \\(\\times\\) Fehlrate \\(\\times\\) Penalty aufs CPI aufschlagen. \\(1{,}30/1 = 1{,}30\\) Takte pro Befehl \\(\\Rightarrow\\) Durchsatz \\(1/1{,}30 \\approx 0{,}77\\) — rund \\(23\\,\\%\\) langsamer."
+    "text": "Misprediction: Zahlenbeispiel\n\n\n\nCPI 1,30 heißt 30 Prozent längere Laufzeit und etwa 23,1 Prozent weniger Durchsatz.\n\n\n\n\\(20\\,\\%\\) der Befehle sind Branches\nMisprediction-Rate \\(10\\,\\%\\), Penalty \\(15\\) Takte\nBasis-CPI \\(= 1\\) (ideale Pipeline ohne andere Stalls)\nCPI-Aufschlag: \\(0{,}20 \\times 0{,}10 \\times 15 = 0{,}30\\)\nEffektives CPI \\(= 1{,}30\\): bei gleichem \\(N\\) und \\(f\\) ist die Laufzeit 30 Prozent länger\nDer Durchsatz sinkt auf \\(1/1{,}30 \\approx 0{,}769\\), also rund 23,1 Prozent\n\n\nModell ohne Überlappung: Anteil mal Fehlrate mal Penalty. 1,30 CPI bedeutet 30 Prozent mehr Laufzeit und etwa 23 Prozent weniger Durchsatz. Nicht 23 Prozent länger."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#branch-prediction",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#branch-prediction",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Branch Prediction",
-    "text": "Branch Prediction\n\nNicht warten — spekulativ den wahrscheinlichen Weg füllen\nVorhersage typisch schon beim Fetch\nTreffer: praktisch keine Branch-Latenz\nFehlprognose: Flush / Misprediction Penalty\nZiel: hohe Accuracy (in der Praxis oft deutlich über 90 %)\n\n\nGlaskugel der Architektur: richtig geraten → Pipeline bleibt voll; falsch → teurer Rollback."
+    "text": "Branch Prediction\n\nNicht warten — spekulativ den wahrscheinlichen Weg füllen\nVorhersage typisch schon beim Fetch\nEin Treffer vermeidet den Flush, ist aber nicht automatisch kostenlos\nFehlprognose: Flush / Misprediction Penalty\nZiel: hohe Accuracy (in der Praxis oft deutlich über 90 %)\n\n\nGlaskugel der Architektur: richtig geraten → Pipeline bleibt voll; falsch → teurer Rollback."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#statische-vorhersage",
@@ -662,7 +662,7 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#branch-history-table-bht",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Branch History Table (BHT)",
-    "text": "Branch History Table (BHT)\n\nKleiner schneller Speicher (oft SRAM) für Predictions\nIndex: typisch untere PC-Bits der Branch-Adresse\nParallel zum Fetch: Eintrag liefert Taken/Not-Taken-Historie\n\n\nNotizbuch der if-Abfragen: Hausnummer = PC, Eintrag = letztes Verhalten."
+    "text": "Branch History Table (BHT)\n\n\n\nRichtung in der BHT, Ziel im BTB. 0x04 und 0x24 aliasen. gshare: 0101 XOR 0011 = 0110.\n\n\n\nKleiner schneller Speicher (oft SRAM) für Predictions\nIndex: typisch untere PC-Bits der Branch-Adresse\nParallel zum Fetch: Eintrag liefert Taken/Not-Taken-Historie\n\n\nNotizbuch der if-Abfragen: Hausnummer = PC, Eintrag = letztes Verhalten."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#bit-prädiktor",
@@ -676,14 +676,14 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#bit-saturierender-zähler",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "2-Bit saturierender Zähler",
-    "text": "2-Bit saturierender Zähler\nIndustrie-Standard: Zustände \\(00\\)–\\(11\\)\n\n\n\nCode\nBedeutung\nVorhersage\n\n\n\n\n\\(00\\)\nStrongly Not Taken\nNot Taken\n\n\n\\(01\\)\nWeakly Not Taken\nNot Taken\n\n\n\\(10\\)\nWeakly Taken\nTaken\n\n\n\\(11\\)\nStrongly Taken\nTaken\n\n\n\nTaken: \\(+1\\) (Sättigung bei \\(11\\)); Not Taken: \\(-1\\) (Sättigung bei \\(00\\)).\n\n\n\n\n\n%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%\nflowchart LR\n  S00[\"00 Strong NT\"] --&gt;|Taken| S01[\"01 Weak NT\"]\n  S01 --&gt;|Taken| S10[\"10 Weak T\"]\n  S10 --&gt;|Taken| S11[\"11 Strong T\"]\n  S11 --&gt;|Not-Taken| S10\n  S10 --&gt;|Not-Taken| S01\n  S01 --&gt;|Not-Taken| S00\n  style S11 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important\n\n\n\n\n\n\n\nState Machine mit Schwelle in der Mitte: \\(10\\)/\\(11\\) → Taken, sonst Not Taken."
+    "text": "2-Bit saturierender Zähler\n\n\n\nVollständiger Automat. Ab Zustand 11 kostet TTTT N genau einen Miss je Durchlauf.\n\n\nIndustrie-Standard: Zustände \\(00\\)–\\(11\\)\n\n\n\nCode\nBedeutung\nVorhersage\n\n\n\n\n\\(00\\)\nStrongly Not Taken\nNot Taken\n\n\n\\(01\\)\nWeakly Not Taken\nNot Taken\n\n\n\\(10\\)\nWeakly Taken\nTaken\n\n\n\\(11\\)\nStrongly Taken\nTaken\n\n\n\nTaken: \\(+1\\) (Sättigung bei \\(11\\)); Not Taken: \\(-1\\) (Sättigung bei \\(00\\)). Die Selbstschleifen an \\(00\\) und \\(11\\) stehen im Diagramm.\n\nStart im schwachen Not-Taken \\(01\\), erstes Ergebnis Taken: Vorhersage Not Taken, Folgezustand \\(10\\). Ab stark Taken kostet die Folge T T T T N einen Miss. Der unvollständige Kettengraph ohne Sättigungsschleifen gilt nicht mehr."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#hysterese-des-2-bit-zählers",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#hysterese-des-2-bit-zählers",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Hysterese des 2-Bit-Zählers",
-    "text": "Hysterese des 2-Bit-Zählers\n\nLange Schleife → oft \\(11\\) (Strongly Taken)\nEinmaliges Ende: \\(11 \\rightarrow 10\\) — Vorhersage bleibt Taken\nNächster Schleifeneintritt: oft sofort korrekt; Zähler steigt wieder\nMeinungswechsel erst nach zwei widersprechenden Ergebnissen in Folge\n\n\nTrägheit spart Fehlprognosen bei typischen Schleifenabbrüchen."
+    "text": "Hysterese des 2-Bit-Zählers\n\nLange Schleife → oft \\(11\\) (Strongly Taken)\nEinmaliges Ende: \\(11 \\rightarrow 10\\) — Vorhersage bleibt Taken\nNächster Schleifeneintritt: oft sofort korrekt; Zähler steigt wieder\nAus einem starken Zustand braucht der Wechsel zwei widersprechende Ergebnisse. Aus einem schwachen Zustand genügt eines\n\n\nTrägheit spart Fehlprognosen bei typischen Schleifenabbrüchen."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#branch-target-buffer-btb",
@@ -697,28 +697,28 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#globale-historie-korrelation",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Globale Historie (Korrelation)",
-    "text": "Globale Historie (Korrelation)\n\nBranches korrelieren oft im C-Kontrollfluss\nGlobal History Register (GHR): Bitmuster der letzten \\(N\\) Outcomes\nIndexierung der Prediction-Tabellen mit lokaler + globaler Historie\nErkennt Muster über einzelne Sprungstellen hinweg\n\n\nNicht nur „dieser beq“, sondern „was tat das Programm kurz davor?“."
+    "text": "Globale Historie (Korrelation)\n\nBranches korrelieren oft im C-Kontrollfluss\nGlobal History Register (GHR): Bitmuster der letzten \\(N\\) Outcomes\ngshare ist ein konkretes Modell: PC-Index XOR globale Historie. Das ist nicht automatisch lokale plus globale Historie\nErkennt Muster über einzelne Sprungstellen hinweg\n\n\nNicht nur „dieser beq“, sondern „was tat das Programm kurz davor?“."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#fortgeschrittene-prädiktoren",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#fortgeschrittene-prädiktoren",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Fortgeschrittene Prädiktoren",
-    "text": "Fortgeschrittene Prädiktoren\n\nHigh-End-Kerne: deutlich komplexere Modelle (u. a. Perceptron-ähnlich)\nLernen von Gewichtungen aus der Historie in Hardware\nPraxis: sehr hohe Accuracy bei vielen Workloads — selten, aber teuer bei Misses\n\n\nKein ChatGPT im Kern — spezialisierte, winzige Lernhardware für Sprungmuster."
+    "text": "Fortgeschrittene Prädiktoren\n\nTAGE und Perceptron-Prädiktoren sind veröffentlichte Beispiele, nicht die Angabe jedes Kerns\nLernen von Gewichtungen aus der Historie in Hardware\nPraxis: sehr hohe Accuracy bei vielen Workloads — selten, aber teuer bei Misses\n\n\nDie Analogie zum Lernen bleibt im festen Hardware-Modell. Das ist keine allgemeine KI."
   },
   {
-    "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#fragen-branch-prediction",
-    "href": "vorlesungen/07_moderne_cpu_architekturen.html#fragen-branch-prediction",
+    "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#aufgabe-cpi-und-schwacher-zustand",
+    "href": "vorlesungen/07_moderne_cpu_architekturen.html#aufgabe-cpi-und-schwacher-zustand",
     "title": "07 · Moderne CPU-Architekturen",
-    "section": "Fragen? — Branch Prediction",
-    "text": "Fragen? — Branch Prediction\n\nWarum sind Misses bei tiefen Pipelines teuer?\nWie hilft der 2-Bit-Zähler bei verschachtelten Schleifen?\nRolle des BTB?\n\n\nAls Nächstes: Spekulation = Prediction × OoO — und warum Caches Seitenkanäle öffnen können."
+    "section": "Aufgabe — CPI und schwacher Zustand",
+    "text": "Aufgabe — CPI und schwacher Zustand\nWas bedeuten CPI 1,30 für Laufzeit und Durchsatz? Der 2-Bit-Zähler steht auf 01, das nächste Ergebnis ist T. Welche Vorhersage gilt?\n\nLaufzeitfaktor 1,30, also 30 Prozent länger. Durchsatzfaktor etwa 0,769, also rund 23 Prozent weniger Durchsatz. Zustand 01 sagt Not Taken voraus und geht nach T auf 10. Siehe CPI-Bild und den Automaten."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#spekulative-ausführung",
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#spekulative-ausführung",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Spekulative Ausführung",
-    "text": "Spekulative Ausführung\n\nKombination: Branch Prediction + Out-of-Order\nPredictor sagt z. B. „Taken“ → spekulativer Pfad wird gestartet (Issue)\nALUs rechnen und laden bereits — bevor der Branch architektonisch bestätigt ist\n\n\nZenit der Performance: rechnen auf Pfaden, die logisch noch unsicher sind."
+    "text": "Spekulative Ausführung\n\nSpekulativer Fetch braucht kein OoO. Im High-Performance-Modell kommen Prediction und OoO zusammen\nPredictor sagt z. B. „Taken“ → spekulativer Pfad wird gestartet (Issue)\nALUs rechnen und laden bereits — bevor der Branch architektonisch bestätigt ist\n\n\nZenit der Performance: rechnen auf Pfaden, die logisch noch unsicher sind."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#rechnen-auf-verdacht",
@@ -746,7 +746,7 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#seitenkanal-über-den-cache",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Seitenkanal über den Cache",
-    "text": "Seitenkanal über den Cache\nPrinzip (Spectre-artig, stark vereinfacht):\n\nPredictor wird so beeinflusst, dass eine Bounds-Prüfung fehlgeht\nSpekulativ: Zugriff außerhalb des erlaubten Index\nGeheimnis beeinflusst Folgezugriffe (Cache-Zustand)\nRollback löscht Register — Cache-Zustand bleibt messbar\n\n\nKein „Passwort im Register behalten“ — das Timing des Caches verrät Indizes."
+    "text": "Seitenkanal über den Cache\n\n\n\nDie Prüfung bleibt korrekt. Der transiente Probe-Zugriff kann die Cache-Spur hinterlassen.\n\n\nPrinzip (Spectre-artig, stark vereinfacht):\n\nDie Bounds-Prüfung bleibt architektonisch korrekt\nDer vorhergesagte Pfad läuft transient, bevor die Prüfung wirkt\nDas Geheimnis steuert die Adresse eines folgenden Probe-Zugriffs\nSquash verwirft den Architekturzustand. Die Cache-Spur kann bleiben\n\n\nEin schneller Hit ist ein verrauschtes Indiz, kein automatischer Beweis und keine Messung aus dieser Vorlesung."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#timing-als-orakel",
@@ -760,7 +760,7 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#mitigationen",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Mitigationen",
-    "text": "Mitigationen\n\nSoftware: härtere Isolation (z. B. KPTI) — oft mit Leistungskosten\nMicrocode / Fences: Spekulation an kritischen Stellen einschränken\nNeuere Generationen: strengere Isolation spekulativer Cache-Effekte in Hardware\nTrade-off: Sicherheit vs. IPC\n\n\nPatches und Fences kosten Performance; langfristig hilft Silizium-Design."
+    "text": "Mitigationen\n\nKPTI zielt vor allem auf den ursprünglichen Meltdown-Mechanismus\nPassendes Bounds-Masking oder eine geeignete Barriere kann bestimmte Spectre-v1-Fälle treffen. Nicht jede Fence ist auf jeder ISA eine Spekulationsbarriere\nNeuere Hardware mindert einzelne Wege und macht nicht jeden Cache-Effekt unsichtbar\nSpectre ist damit nicht vollständig gelöst\n\n\nPatches und Fences kosten Performance; langfristig hilft Silizium-Design."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#ausblick-labor-compiler-hilft-der-pipeline",
@@ -774,7 +774,7 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#was--o3-typisch-tut",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Was -O3 typisch tut",
-    "text": "Was -O3 typisch tut\n\n-O0: zeilennahe Übersetzung — gut debugbar, schlecht für Pipelines\n-O3: globale Analyse, Umsortierung, aggressivere Transformationen\nFokus: Latenz verstecken, Branches reduzieren, ILP freilegen\n\n\nDerselbe Algorithmus, anderer Assembler — Laufzeit kann stark differieren."
+    "text": "Was -O3 typisch tut\n\n-O0 ist zum Debuggen gedacht und keine garantierte Zeile-für-Zeile-Übersetzung\n-O2 und -O3 erlauben mehr Analysen. -O3 garantiert weder Unrolling noch weniger Branches noch kürzere Laufzeit\nOb eine Schleife ausgerollt wird, hängt von Compiler, Version, -march und dem Code ab\n\n\nDerselbe Algorithmus, anderer Assembler — Laufzeit kann stark differieren."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#trick-instruction-scheduling",
@@ -802,7 +802,7 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#laboridee-godbolt-und-messung",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Laboridee: Godbolt und Messung",
-    "text": "Laboridee: Godbolt und Messung\nGeplant (Details im Übungsblatt):\n\nTarget z. B. rv32gc in Godbolt\nUmschalten -O1 / -O3: Unrolling und Scheduling sichtbar machen\nOptional: Zyklusmessung in Renode/Ripes — Laufzeit/CPI-Effekt belegen\n\n\nSehen (Assembler) und messen (Zyklen) — derselbe C-Algorithmus, andere Pipeline-Last."
+    "text": "Laboridee: Godbolt und Messung\nGeplant (Details im Übungsblatt):\n\nGodbolt zeigt die Übersetzung, kein OoO-Timing\nEin Ripes-Vergleich gilt nur für das dort gewählte Pipeline-Modell, nicht für eine Desktop-OoO-CPU\nRenode ohne validiertes Mikroarchitekturmodell belegt keine Stall-, Branch- oder OoO-Zahlen\nFlags, Compilerversion und ABI gehören zur Beobachtung. Siehe Übungsblatt\n\n\nSehen (Assembler) und messen (Zyklen) — derselbe C-Algorithmus, andere Pipeline-Last."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#zusammenfassung-block-7",
@@ -823,7 +823,7 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#ausblick-und-abschluss",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Ausblick und Abschluss",
-    "text": "Ausblick und Abschluss\n\nÜbungsblatt: Godbolt — -O0/-O3, Scheduling, Unrolling\nOptional: Zyklusvergleich in der Simulation\n\nVielen Dank — viel Erfolg beim Experimentieren.\n\nWer Assembler-Optimierungen lesen kann, programmiert näher an der Hardware. Viel Erfolg!"
+    "text": "Ausblick und Abschluss\n\nÜbungsblatt: Godbolt — -O0/-O3, Scheduling, Unrolling\nOptional: Zyklusvergleich in der Simulation\n\nVielen Dank — viel Erfolg beim Experimentieren.\n\nQuellen, Stand der Vorlesung: RISC-V ISA und RVWMO; BOOM-Pipeline, ROB und LSU als dokumentiertes OoO-Beispiel, nicht als Laborplattform; GCC Optimize-Options; Spectre- und Meltdown-Paper; Ripes und Renode nur in den dort genannten Grenzen. Adressen und Breiten dieser Folien sind das Lehrmodell.\n\n\nWer Assembler-Optimierungen lesen kann, programmiert näher an der Hardware. Viel Erfolg!"
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#willkommen-zu-block-5",

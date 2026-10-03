@@ -261,14 +261,14 @@ flowchart LR
 <p>Kurz-Recap aus Block 6 (Vertiefung im Übungsblatt):</p>
 <ul>
 <li>DMA kopiert Arrays autonom; Polling blockiert die CPU stark</li>
-<li>Mit DMA bleibt die Hauptschleife (z. B. LED) oft reaktionsfähig</li>
+<li>Ein Heartbeat aus <code>main()</code> kann weiterlaufen. Das beweist keine Last von null</li>
 <li>Bus-Mastering und Cycle Stealing: DMA teilt sich den Bus mit der CPU</li>
 <li>Folge: weniger ALU-Zeit für stupides Kopieren — mehr Zeit für echte Berechnung</li>
 </ul>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb1-1"><a aria-label="1"></a><span class="co">/* Konzept — Adressen/Bits fiktiv bzw. Datenblatt */</span></span>
 <span id="cb1-2"><a aria-label="2"></a>DMA_CH1<span class="op">-&gt;</span>SRC_ADDR <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)</span>text_array<span class="op">;</span></span>
 <span id="cb1-3"><a aria-label="3"></a>DMA_CH1<span class="op">-&gt;</span>DST_ADDR <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)&amp;</span>UART_TX<span class="op">;</span></span>
-<span id="cb1-4"><a aria-label="4"></a>DMA_CH1<span class="op">-&gt;</span>CONTROL <span class="op">|=</span> DMA_ENABLE<span class="op">;</span>  <span class="co">/* CPU kehrt sofort zurück */</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-4"><a aria-label="4"></a>DMA_CH1<span class="op">-&gt;</span>CONTROL <span class="op">=</span> DMA_ENABLE<span class="op">;</span>  <span class="co">/* fiktiv, kein blindes |= */</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p>DMA befreit von Kopierarbeit. Als Nächstes: Wie schnell rechnet die CPU selbst auf Befehlsebene?</p>
 <style type="text/css">
@@ -307,6 +307,12 @@ flowchart LR
 </section>
 <section id="refresher-mct1-5-stufen-pipeline" class="slide level2">
 <h2>Refresher MCT1: 5-Stufen-Pipeline</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/07_moderne_cpu_architekturen/pipe.png"></p>
+<figcaption>Fünf ALU-Befehle, neun Takte, CPI 1,8. Ein Stall ohne Forwarding macht zehn Takte.</figcaption>
+</figure>
+</div>
 <p>Klassische RISC-Pipeline (Harris/Harris):</p>
 <table class="caption-top">
 <thead>
@@ -344,7 +350,7 @@ flowchart LR
 </tr>
 </tbody>
 </table>
-<p>Idealfall nach Füllen: ein abgeschlossener Befehl pro Takt.</p>
+<p>Nach dem Füllen strebt der Durchsatz gegen ein Retire je Takt. Fünf Befehle brauchen im Modell ohne Stall <span class="math inline">\(N+k-1 = 9\)</span> Takte, mittleres CPI <span class="math inline">\(= 1{,}8\)</span>.</p>
 <aside class="notes">
 <p>Stand MCT1: Fließband mit fünf Stufen — Grundlage für alles Weitere heute.</p>
 <style type="text/css">
@@ -362,16 +368,17 @@ flowchart LR
 <section id="metriken-ipc-und-cpi" class="slide level2">
 <h2>Metriken: IPC und CPI</h2>
 <ul>
-<li>IPC (Instructions Per Cycle): abgeschlossene Befehle pro Takt (höher besser)</li>
-<li>CPI (Cycles Per Instruction): Takte pro Befehl im Mittel (niedriger besser)</li>
-<li>Kehrwerte: <span class="math inline">\(\mathrm{CPI} = 1/\mathrm{IPC}\)</span></li>
-<li>Laufzeit:</li>
+<li>IPC: retired ISA-Instruktionen pro Core-Takt im betrachteten Fenster</li>
+<li>Execution-Completion und Retire können in verschiedenen Takten liegen</li>
+<li>Micro-Ops sind keine ISA-IPC</li>
+<li>CPI = Takte / retired Instruktionen. CPI und IPC sind nur dann Kehrwerte</li>
+<li>Laufzeit bei konstanter Frequenz <span class="math inline">\(f\)</span> im selben Fenster:</li>
 </ul>
 <p><span class="math display">\[
-T = N_{\mathrm{Instr}} \times \mathrm{CPI} \times T_{\mathrm{Takt}}
+T = N \times \mathrm{CPI} / f
 \]</span></p>
 <aside class="notes">
-<p>Drei Hebel: weniger Befehle, kürzerer Takt, bessere Architektur (kleineres CPI).</p>
+<p>Ein Compiler kann N ändern. Höheres IPC allein verkürzt die Laufzeit nicht. Mittelwerte verschiedener Läufe nicht ungewichtet invertieren. Kurze Sequenzen enthalten Füllung und Leerung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -410,9 +417,9 @@ T = N_{\mathrm{Instr}} \times \mathrm{CPI} \times T_{\mathrm{Takt}}
 <h2>Die Taktraten-Mauer (Power Wall)</h2>
 <ul>
 <li>Idee der 2000er: Frequenz massiv erhöhen (GHz-Wettrennen)</li>
-<li>Dynamische Verlustleistung und Leckströme begrenzen den sinnvollen Takt</li>
-<li>Typisch: Desktop-/Mobile-Kerne oft im Bereich weniger GHz — nicht „unendlich“</li>
-<li>CPI/IPC verbessern, statt nur höher zu takten</li>
+<li>Vereinfacht <span class="math inline">\(P_{dyn} \approx \alpha C V^{2} f\)</span>. Leckleistung ist davon getrennt</li>
+<li>Keine feste Frequenzgrenze aus dieser Formel. Breitere Kerne brauchen mehr Ports, Scheduler und Bypass</li>
+<li>CPI verbessern ist ein Weg, kein kostenloser Ersatz für Takt</li>
 </ul>
 <aside class="notes">
 <p>Pentium-4-Ära: Hoffnung auf extrem hohe GHz — Physik und Kühlung setzen Grenzen.</p>
@@ -430,29 +437,19 @@ T = N_{\mathrm{Instr}} \times \mathrm{CPI} \times T_{\mathrm{Takt}}
 </section>
 <section id="die-leitfrage-des-tages" class="slide level2">
 <h2>Die Leitfrage des Tages</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/07_moderne_cpu_architekturen/width.png"></p>
+<figcaption>Skalar 4/5 = 0,8. Zweifach 4/3 ≈ 1,33. Ein Doppeltakt ist nicht das mittlere IPC.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Taktfrequenz: physikalisch begrenzt</li>
 <li>Skalare Pipeline: Ideal <span class="math inline">\(\mathrm{CPI} = 1\)</span> (mit Stalls oft <span class="math inline">\(&gt; 1\)</span>)</li>
-<li>Wie erreicht man <span class="math inline">\(\mathrm{CPI} &lt; 1\)</span> (mehrere Completions pro Takt) bei gleichem Takt?</li>
+<li>Wie kann der Kern langfristig mehr als eine ISA-Instruktion je Takt retiren?</li>
 <li>Antwort: Parallelität <em>innerhalb</em> des Kerns (ILP ausnutzen)</li>
 </ul>
-<div class="cell" data-reveal="true" data-fig-width="3.4" data-layout-align="default">
-<div class="cell-output-display">
-<div>
-<p></p><figure class=""><p></p>
-<div>
-<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  A[Befehl 1] --&gt; C[Completion in Takt 1]
-  B[Befehl 2] --&gt; C
-  C --&gt; D[IPC = 2, CPI = 0.5]
-  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-</pre>
-</div>
-<p></p></figure><p></p>
-</div>
-</div>
-</div>
+<p>Das Zeitdiagramm oben ersetzt die Ein-Takt-Skizze. IPC wird über das ganze Fenster gerechnet.</p>
 <aside class="notes">
 <p>Nicht schneller takten — breiter und smarter schedulen.</p>
 <style type="text/css">
@@ -541,13 +538,20 @@ flowchart TD
 </section>
 <section id="datenabhängigkeiten-raw" class="slide level2">
 <h2>Datenabhängigkeiten: RAW</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/07_moderne_cpu_architekturen/deps.png"></p>
+<figcaption>I1–I3: RAW bleibt, WAR und WAW sind Namenskonflikte auf t0.</figcaption>
+</figure>
+</div>
 <ul>
 <li>True Dependency / Read-After-Write (RAW): Befehl 2 braucht Ergebnis von Befehl 1</li>
 </ul>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb3-1"><a aria-label="1"></a><span class="bu">add</span> t0<span class="op">,</span> t1<span class="op">,</span> t2   <span class="op">#</span> schreibt t0</span>
 <span id="cb3-2"><a aria-label="2"></a><span class="bu">sub</span> t3<span class="op">,</span> t0<span class="op">,</span> t4   <span class="op">#</span> liest t0 — muss warten</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li>Keine Parallelität dieser beiden im selben EX-Schritt — ILP dieses Paares = 1 (rein sequentiell)</li>
+<li>Dieses Paar hat ILP 1. Das ist keine Aussage über das ganze Programm</li>
+<li>Forwarding verkürzt die Wartezeit und hebt die RAW-Kante nicht auf</li>
 </ul>
 <aside class="notes">
 <p>Bekannt aus MCT1: echte Datenabhängigkeit — Hardware kann Mathematik nicht „wegoptimieren“.</p>
@@ -588,7 +592,8 @@ flowchart TD
 <h2>Superskalare Architekturen</h2>
 <ul>
 <li>Skalar: typisch ein Issue pro Takt</li>
-<li>Superskalar: Multiple Issue — mehrere Befehle starten (nahezu) im selben Takt die Execute-Phase</li>
+<li>Superskalar: Multiple Issue. Das ist noch nicht Out-of-Order</li>
+<li>Fetch-Bytes, Decode, Issue, Ports und Retire-Breite sind verschiedene Größen</li>
 <li>Pipeline wird „breiter“: mehrspurige Autobahn statt einspurigem Fließband</li>
 </ul>
 <aside class="notes">
@@ -607,33 +612,18 @@ flowchart TD
 </section>
 <section id="mehrere-execution-units" class="slide level2">
 <h2>Mehrere Execution Units</h2>
-<p>Beispiel Issue-Width <span class="math inline">\(\approx 3\)</span>:</p>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/07_moderne_cpu_architekturen/frontend.png"></p>
+<figcaption>Fetch, Decode, Issue, zwei ALU, eine LSU, Retire 2. Der Engpass ist hier das Retire.</figcaption>
+</figure>
+</div>
 <ul>
-<li>ALU 1, ALU 2 (Integer/Logik)</li>
-<li>Load/Store-Unit</li>
+<li>Zwei Integer-ALU und eine LSU sind das vereinfachte Modell aus der Abbildung</li>
+<li>Ein pipelinierter Multiplizierer trennt Latenz und Initiationsintervall</li>
 </ul>
-<div class="cell" data-reveal="true" data-fig-width="3.8" data-layout-align="default">
-<div class="cell-output-display">
-<div>
-<p></p><figure class=""><p></p>
-<div>
-<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  ID[Decode] --&gt;|1| ALU1[ALU 1]
-  ID --&gt;|2| ALU2[ALU 2]
-  ID --&gt;|3| LSU[Load/Store]
-  ALU1 --&gt; WB[Write Back]
-  ALU2 --&gt; WB
-  LSU --&gt; WB
-  style ID fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-</pre>
-</div>
-<p></p></figure><p></p>
-</div>
-</div>
-</div>
 <aside class="notes">
-<p>Drei unabhängige Befehle → drei Units → im Ideal drei Completions; CPI kann unter 1 sinken.</p>
+<p>Drei Units reichen nicht für IPC 3. Im Bild begrenzt die Retire-Breite 2 den nachhaltigen Durchsatz, wenn alles andere passt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -649,7 +639,7 @@ flowchart LR
 <section id="multi-issue-fetch-und-decode" class="slide level2">
 <h2>Multi-Issue Fetch und Decode</h2>
 <ul>
-<li>Fetch holt mehrere Instruktionen pro Takt aus dem I-Cache (z. B. 16 Byte)</li>
+<li>Fetch holt zum Beispiel 16 Byte. Mit der C-Erweiterung ist das keine feste Instruktionszahl</li>
 <li>Decode prüft Abhängigkeiten <em>zwischen</em> den Kandidaten und verteilt auf Units</li>
 <li>Aufwand der Abhängigkeitsprüfung wächst stark mit der Issue-Width</li>
 </ul>
@@ -690,12 +680,19 @@ flowchart LR
 </section>
 <section id="problem-cache-miss-in-order" class="slide level2">
 <h2>Problem: Cache-Miss in-order</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/07_moderne_cpu_architekturen/ooo.png"></p>
+<figcaption>Dieselben vier Befehle: in-order 7 Takte, OoO 6 Takte. Der Miss bleibt, Retire wartet.</figcaption>
+</figure>
+</div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb4-1"><a aria-label="1"></a>lw  t0<span class="op">,</span> <span class="dv">0</span><span class="op">(</span>s1<span class="op">)</span>    <span class="op">#</span> Miss → viele Wartezyklen</span>
 <span id="cb4-2"><a aria-label="2"></a><span class="bu">add</span> t1<span class="op">,</span> t0<span class="op">,</span> t2   <span class="op">#</span> RAW auf t0 → muss warten</span>
 <span id="cb4-3"><a aria-label="3"></a><span class="bu">sub</span> t4<span class="op">,</span> t5<span class="op">,</span> t6   <span class="op">#</span> unabhängig — trotzdem oft blockiert</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li>In-Order: unabhängiger <code>sub</code> wartet hinter dem Stau</li>
-<li>Units stehen ungenutzt — IPC bricht ein</li>
+<li>Lehrannahme hier: der In-Order-Kern gibt hinter dem wartenden Load nichts weiter aus</li>
+<li>Reale In-Order-Kerne dürfen davon abweichen</li>
+<li>Der Miss bleibt auch bei OoO bestehen. Unabhängige Befehle können ihn nur überlappen</li>
 </ul>
 <aside class="notes">
 <p>Cache-Misses sind Gift für strikte Programmreihenfolge trotz freier ALUs.</p>
@@ -760,12 +757,12 @@ flowchart LR
 <section id="engpass-32-isa-register" class="slide level2">
 <h2>Engpass: 32 ISA-Register</h2>
 <ul>
-<li>RISC-V: 32 Architektur-Register <code>x0</code>–<code>x31</code></li>
-<li>Compiler muss Register stark wiederverwenden → viele WAW/WAR</li>
-<li>Künstliche Konflikte drosseln ausnutzbares ILP</li>
+<li>RV32I und RV64I: 32 Integerregister <code>x0</code>–<code>x31</code>. <code>x0</code> ist fest 0</li>
+<li>Das sind Architektur-Namen, keine physischen Kisten. RV32E hat ein anderes Registerprofil</li>
+<li>Wiederverwendung erzeugt WAR/WAW. Erweiterungen bringen weitere Registerdateien</li>
 </ul>
 <aside class="notes">
-<p>ISA-Register sind die sichtbare Schnittstelle — zu wenige physische „Kisten“ für aggressives Scheduling.</p>
+<p>Zu wenige Namen erzeugen falsche Abhängigkeiten. Wie viele physische Register ein Kern hat, steht nicht in der ISA.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -778,15 +775,11 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-ilp-und-superskalarität" class="slide level2">
-<h2>Fragen? — ILP und Superskalarität</h2>
-<ul>
-<li>Wie hebt Superskalarität die IPC?</li>
-<li>Warum stoppt ein Cache-Miss eine In-Order-Pipeline oft global?</li>
-<li>RAW vs.&nbsp;WAW/WAR?</li>
-</ul>
+<section id="aufgabe-raw-und-breite" class="slide level2">
+<h2>Aufgabe — RAW und Breite</h2>
+<p>Warum bleibt die Kante von I1 nach I2 bestehen, obwohl I3 und I4 unabhängig sind? Warum folgt aus zwei ALU nicht IPC 2?</p>
 <aside class="notes">
-<p>Als Nächstes: Out-of-Order — Staus umfahren, falsche Abhängigkeiten per Renaming auflösen.</p>
+<p>I2 liest t0, das I1 erst liefert. Das ist RAW. I3 und I4 können den Miss nur überlappen. Die Retire-Breite und der älteste unfertige Befehl begrenzen den Durchsatz. Siehe Abhängigkeitsbild und das OoO-Zeitdiagramm.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -804,7 +797,7 @@ flowchart LR
 <ul>
 <li>Dynamisches Scheduling: blockierte Befehle „parken“</li>
 <li>Unabhängige spätere Befehle dürfen vorgezogen werden</li>
-<li>Ausführung asynchron, sobald Operanden bereit sind — nicht strikt nach Programmzeile</li>
+<li>Issue in datenabhängiger, dynamisch gewählter Reihenfolge. Der Kern bleibt getaktet</li>
 </ul>
 <aside class="notes">
 <p>Modern: nicht mehr nur „nächster PC“ — freie Units mit bereiten Operanden füttern.</p>
@@ -824,8 +817,8 @@ flowchart LR
 <h2>Datenfluss-Maschine</h2>
 <ul>
 <li>Instruktion „feuert“, wenn Operanden da sind — nicht nur wenn der PC sie erreicht</li>
-<li>Cache-Miss blockiert vor allem <em>abhängige</em> Nachfolger</li>
-<li>Unabhängiger Code kann am Stau vorbeilaufen</li>
+<li>Der Miss blockiert die Nutzer des Load. Unabhängige Befehle können vorbeilaufen, bis Issue-Queue oder ROB voll sind</li>
+<li>„Nur Abhängige warten“ gilt nicht ohne diese Grenzen</li>
 </ul>
 <aside class="notes">
 <p>Paradigmenwechsel: vom starren Befehlszeiger zum datengetriebenen Issue.</p>
@@ -905,9 +898,9 @@ flowchart LR
 <section id="register-renaming" class="slide level2">
 <h2>Register Renaming</h2>
 <ul>
-<li>OoO-Kerne: großer Pool physischer Register (Größenordnung: oft <span class="math inline">\(&gt; 100\)</span>)</li>
-<li>Architektur-Register (<code>x0</code>–<code>x31</code>) sind Namen / Mapping</li>
-<li>Jeder Befehl mit Zielregister bekommt typisch ein neues freies physisches Ziel</li>
+<li>Die ISA-Namen werden auf eine größere physische Datei abgebildet. Eine Zahl über 100 ist kein allgemeines Minimum</li>
+<li>Jeder Befehl mit Ziel außer der festen Null bekommt typisch ein neues physisches Register</li>
+<li>Befehle ohne Ziel und <code>x0</code> sind Ausnahmen</li>
 </ul>
 <aside class="notes">
 <p>Genialer Trick: WAW/WAR verschwinden, weil Schreibziele physisch getrennt werden.</p>
@@ -925,6 +918,12 @@ flowchart LR
 </section>
 <section id="renaming-am-beispiel-waw" class="slide level2">
 <h2>Renaming am Beispiel (WAW)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/07_moderne_cpu_architekturen/rename.png"></p>
+<figcaption>A schreibt P10, B liest P10, C schreibt P11. E/F zeigen das WAR-Muster.</figcaption>
+</figure>
+</div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb7-1"><a aria-label="1"></a><span class="bu">add</span> t0<span class="op">,</span> t1<span class="op">,</span> t2</span>
 <span id="cb7-2"><a aria-label="2"></a><span class="bu">sub</span> t0<span class="op">,</span> t4<span class="op">,</span> t5</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Hardware (schematisch):</p>
@@ -932,7 +931,7 @@ flowchart LR
 <li><code>add</code> → schreibt <code>P10</code> (Mapping <code>t0</code> → <code>P10</code>)</li>
 <li><code>sub</code> → schreibt <code>P11</code> (neues Mapping <code>t0</code> → <code>P11</code>)</li>
 </ul>
-<p>Kein gemeinsames physisches Ziel → paralleles Issue möglich.</p>
+<p>Getrennte Ziele erlauben unabhängige Ausführung. Zwei belegte ALU-Ports können das Issue trotzdem verhindern.</p>
 <aside class="notes">
 <p>Namen werden recycelt, physische Kisten sind frisch — ILP gerettet.</p>
 <style type="text/css">
@@ -951,8 +950,8 @@ flowchart LR
 <h2>Reservation Stations</h2>
 <ul>
 <li>Nach Renaming: Befehle in Reservation Stations / Issue Queue</li>
-<li>Puffer vor den Units (oft viele Dutzend bis <span class="math inline">\(&gt; 100\)</span> Einträge)</li>
-<li>Warten auf Operanden (physische Register / Tag-Match am Datenbus)</li>
+<li>Klassisch Reservation Stations, alternativ eine gemeinsame Issue Queue. Ein einzelner Common Data Bus ist nur das Lehrbild</li>
+<li>Operand bereit reicht nicht: Unit, Port und Auswahlregel müssen passen</li>
 </ul>
 <aside class="notes">
 <p>Wartehalle: Bordkarte = physische Register; Abflug = Operanden komplett.</p>
@@ -1012,27 +1011,17 @@ flowchart LR
 </section>
 <section id="reorder-buffer-rob" class="slide level2">
 <h2>Reorder Buffer (ROB)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/07_moderne_cpu_architekturen/rob.png"></p>
+<figcaption>Werte stehen in der PRF. Der ROB merkt sich Ordnung, Ready und Exceptions.</figcaption>
+</figure>
+</div>
 <ul>
-<li>ALU-/Load-Ergebnisse nicht sofort final sichtbar schreiben</li>
-<li>Zuerst in den ROB (Ringpuffer), sortiert nach ursprünglicher Programmordnung</li>
+<li>In diesem PRF-Modell schreibt die ALU in ein physisches Register, nicht in den ROB</li>
+<li>Der ROB führt Reihenfolge, Completion, Exception und Zielmetadaten. Ein result-holding ROB wäre ein anderes, hier nicht verwendetes Modell</li>
 </ul>
-<div class="cell" data-reveal="true" data-fig-width="3.6" data-layout-align="default">
-<div class="cell-output-display">
-<div>
-<p></p><figure class=""><p></p>
-<div>
-<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  ALU1 --&gt;|Befehl 5 fertig| ROB[(ROB)]
-  ALU2 --&gt;|Befehl 2 fertig| ROB
-  LSU --&gt;|Befehl 1 fertig| ROB
-  style ROB fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-</pre>
-</div>
-<p></p></figure><p></p>
-</div>
-</div>
-</div>
+<p>Das PRF-Bild ersetzt den Ergebniszylinder. Fertige jüngere Befehle stehen in physischen Registern, bis der Head retiriert.</p>
 <aside class="notes">
 <p>Netz mit doppeltem Boden: rechnen darf chaotisch sein — sichtbar werden geordnet.</p>
 <style type="text/css">
@@ -1049,11 +1038,17 @@ flowchart LR
 </section>
 <section id="in-order-commit-retire" class="slide level2">
 <h2>In-Order Commit (Retire)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/07_moderne_cpu_architekturen/lsu.png"></p>
+<figcaption>Store-Queue, Commit und Drain sind drei Schritte. Aliase kann Renaming nicht lösen.</figcaption>
+</figure>
+</div>
 <ul>
-<li>Commit nur am ältesten noch nicht retired Befehl</li>
-<li>Erst dann: finales Update der Architektur-Register / Stores</li>
-<li>Spätere fertige Einträge warten im ROB, bis die Vorgänger committed sind</li>
-<li>Nach außen: scheinbar sequentielle CPU</li>
+<li>Retire nur am ältesten noch nicht retired Befehl, bis zur Retire-Breite</li>
+<li>Dadurch wird der Architektur-Registerzustand sichtbar. Ein Store darf danach noch im Puffer stehen</li>
+<li>Andere Beobachter sehen Speicher nach RVWMO, nicht automatisch in dieser Retire-Reihenfolge</li>
+<li>Spätere fertige Einträge warten, auch wenn ihre PRF-Werte schon stehen</li>
 </ul>
 <aside class="notes">
 <p>Programmierer und OS sehen geordnete Semantik — trotz OoO im Back-End.</p>
@@ -1072,13 +1067,12 @@ flowchart LR
 <section id="exceptions-und-rob" class="slide level2">
 <h2>Exceptions und ROB</h2>
 <ul>
-<li>Commit stoppt am fehlerhaften / unterbrochenen Befehl</li>
-<li>Jüngere ROB-Einträge verwerfen (Squash)</li>
-<li>Architekturzustand entspricht dem Stand vor dem Commit dieses Befehls</li>
-<li>Danach: Trap / ISR — spekulative Arbeit war unsichtbar</li>
+<li>Synchrone Exception: ältere Instruktionen dürfen committen. Die fehlerhafte Instruktion committet ihren normalen Effekt nicht. Jüngere Effekte werden verworfen</li>
+<li>Ein asynchroner Interrupt hat keinen fehlerhaften Befehl. Er wird an einer zulässigen präzisen Grenze angenommen</li>
+<li>Recovery stellt das gültige Mapping wieder her</li>
 </ul>
 <aside class="notes">
-<p>Eleganz: Zukunftsberechnungen verwerfen, ohne RAM-Inkonsistenzen zu hinterlassen.</p>
+<p>Der Architekturzustand wird präzise. Ein verworfener Store ist nicht dasselbe wie ein unsichtbarer Cache-Seiteneffekt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1155,15 +1149,11 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-out-of-order" class="slide level2">
-<h2>Fragen? — Out-of-Order</h2>
-<ul>
-<li>Ziel des Register Renamings?</li>
-<li>Rolle der Reservation Stations?</li>
-<li>Warum ist der ROB für Interrupts/Exceptions unverzichtbar?</li>
-</ul>
+<section id="aufgabe-version-und-exception" class="slide level2">
+<h2>Aufgabe — Version und Exception</h2>
+<p>Welche physische Version liest Befehl B? Was bleibt architektonisch gültig, wenn I2 eine synchrone Exception auslöst, nachdem nur I1 retiriert wurde?</p>
 <aside class="notes">
-<p>Fortsetzung: Branch Prediction — Sprünge, die selbst OoO-Kerne teuer treffen können.</p>
+<p>B liest P10, nicht P11. Nach Retire von I1 ist t0 = 10. I2 committet nicht, I3 und I4 werden verworfen. Ein Interrupt ist davon getrennt: er hat keinen fehlerhaften Befehl. Siehe Rename-Tabelle und ROB-Bild.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1179,7 +1169,7 @@ flowchart LR
 <section id="control-hazards" class="slide level2">
 <h2>Control Hazards</h2>
 <ul>
-<li>Datenabhängigkeiten: u. a. per Renaming entschärft</li>
+<li>WAR und WAW kann Renaming entfernen. RAW bleibt. Kontrollfluss ist ein eigener Engpass</li>
 <li>Neuer Engpass: Kontrollfluss (<code>beq</code> und andere Branches)</li>
 <li>Beim Fetch des Branch: welcher nächste PC — Fall-through oder Target?</li>
 <li>Entscheidung oft erst nach dem Vergleich in EX (oder später in tiefen Pipelines)</li>
@@ -1222,15 +1212,22 @@ flowchart LR
 </section>
 <section id="misprediction-zahlenbeispiel" class="slide level2">
 <h2>Misprediction: Zahlenbeispiel</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/07_moderne_cpu_architekturen/cpi.png"></p>
+<figcaption>CPI 1,30 heißt 30 Prozent längere Laufzeit und etwa 23,1 Prozent weniger Durchsatz.</figcaption>
+</figure>
+</div>
 <ul>
 <li><span class="math inline">\(20\,\%\)</span> der Befehle sind Branches</li>
 <li>Misprediction-Rate <span class="math inline">\(10\,\%\)</span>, Penalty <span class="math inline">\(15\)</span> Takte</li>
 <li>Basis-CPI <span class="math inline">\(= 1\)</span> (ideale Pipeline ohne andere Stalls)</li>
 <li>CPI-Aufschlag: <span class="math inline">\(0{,}20 \times 0{,}10 \times 15 = 0{,}30\)</span></li>
-<li>Effektives CPI <span class="math inline">\(\approx 1{,}30\)</span> → ca. <span class="math inline">\(23\,\%\)</span> langsamer als ideal</li>
+<li>Effektives CPI <span class="math inline">\(= 1{,}30\)</span>: bei gleichem <span class="math inline">\(N\)</span> und <span class="math inline">\(f\)</span> ist die Laufzeit 30 Prozent länger</li>
+<li>Der Durchsatz sinkt auf <span class="math inline">\(1/1{,}30 \approx 0{,}769\)</span>, also rund 23,1 Prozent</li>
 </ul>
 <aside class="notes">
-<p>Klausurtypisch: Branch-Anteil <span class="math inline">\(\times\)</span> Fehlrate <span class="math inline">\(\times\)</span> Penalty aufs CPI aufschlagen. <span class="math inline">\(1{,}30/1 = 1{,}30\)</span> Takte pro Befehl <span class="math inline">\(\Rightarrow\)</span> Durchsatz <span class="math inline">\(1/1{,}30 \approx 0{,}77\)</span> — rund <span class="math inline">\(23\,\%\)</span> langsamer.</p>
+<p>Modell ohne Überlappung: Anteil mal Fehlrate mal Penalty. 1,30 CPI bedeutet 30 Prozent mehr Laufzeit und etwa 23 Prozent weniger Durchsatz. Nicht 23 Prozent länger.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1248,7 +1245,7 @@ flowchart LR
 <ul>
 <li>Nicht warten — spekulativ den wahrscheinlichen Weg füllen</li>
 <li>Vorhersage typisch schon beim Fetch</li>
-<li>Treffer: praktisch keine Branch-Latenz</li>
+<li>Ein Treffer vermeidet den Flush, ist aber nicht automatisch kostenlos</li>
 <li>Fehlprognose: Flush / Misprediction Penalty</li>
 <li>Ziel: hohe Accuracy (in der Praxis oft deutlich über 90 %)</li>
 </ul>
@@ -1311,6 +1308,12 @@ flowchart LR
 </section>
 <section id="branch-history-table-bht" class="slide level2">
 <h2>Branch History Table (BHT)</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/07_moderne_cpu_architekturen/bpred.png"></p>
+<figcaption>Richtung in der BHT, Ziel im BTB. 0x04 und 0x24 aliasen. gshare: 0101 XOR 0011 = 0110.</figcaption>
+</figure>
+</div>
 <ul>
 <li>Kleiner schneller Speicher (oft SRAM) für Predictions</li>
 <li>Index: typisch untere PC-Bits der Branch-Adresse</li>
@@ -1354,6 +1357,12 @@ flowchart LR
 </section>
 <section id="bit-saturierender-zähler" class="slide level2">
 <h2>2-Bit saturierender Zähler</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/07_moderne_cpu_architekturen/pred.png"></p>
+<figcaption>Vollständiger Automat. Ab Zustand 11 kostet TTTT N genau einen Miss je Durchlauf.</figcaption>
+</figure>
+</div>
 <p>Industrie-Standard: Zustände <span class="math inline">\(00\)</span>–<span class="math inline">\(11\)</span></p>
 <table class="caption-top">
 <thead>
@@ -1386,29 +1395,9 @@ flowchart LR
 </tr>
 </tbody>
 </table>
-<p>Taken: <span class="math inline">\(+1\)</span> (Sättigung bei <span class="math inline">\(11\)</span>); Not Taken: <span class="math inline">\(-1\)</span> (Sättigung bei <span class="math inline">\(00\)</span>).</p>
-<div class="cell" data-reveal="true" data-fig-width="4.2" data-layout-align="default">
-<div class="cell-output-display">
-<div>
-<p></p><figure class=""><p></p>
-<div>
-<pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  S00["00 Strong NT"] --&gt;|Taken| S01["01 Weak NT"]
-  S01 --&gt;|Taken| S10["10 Weak T"]
-  S10 --&gt;|Taken| S11["11 Strong T"]
-  S11 --&gt;|Not-Taken| S10
-  S10 --&gt;|Not-Taken| S01
-  S01 --&gt;|Not-Taken| S00
-  style S11 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-</pre>
-</div>
-<p></p></figure><p></p>
-</div>
-</div>
-</div>
+<p>Taken: <span class="math inline">\(+1\)</span> (Sättigung bei <span class="math inline">\(11\)</span>); Not Taken: <span class="math inline">\(-1\)</span> (Sättigung bei <span class="math inline">\(00\)</span>). Die Selbstschleifen an <span class="math inline">\(00\)</span> und <span class="math inline">\(11\)</span> stehen im Diagramm.</p>
 <aside class="notes">
-<p>State Machine mit Schwelle in der Mitte: <span class="math inline">\(10\)</span>/<span class="math inline">\(11\)</span> → Taken, sonst Not Taken.</p>
+<p>Start im schwachen Not-Taken <span class="math inline">\(01\)</span>, erstes Ergebnis Taken: Vorhersage Not Taken, Folgezustand <span class="math inline">\(10\)</span>. Ab stark Taken kostet die Folge T T T T N einen Miss. Der unvollständige Kettengraph ohne Sättigungsschleifen gilt nicht mehr.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1427,7 +1416,7 @@ flowchart LR
 <li>Lange Schleife → oft <span class="math inline">\(11\)</span> (Strongly Taken)</li>
 <li>Einmaliges Ende: <span class="math inline">\(11 \rightarrow 10\)</span> — Vorhersage bleibt Taken</li>
 <li>Nächster Schleifeneintritt: oft sofort korrekt; Zähler steigt wieder</li>
-<li>Meinungswechsel erst nach zwei widersprechenden Ergebnissen in Folge</li>
+<li>Aus einem starken Zustand braucht der Wechsel zwei widersprechende Ergebnisse. Aus einem schwachen Zustand genügt eines</li>
 </ul>
 <aside class="notes">
 <p>Trägheit spart Fehlprognosen bei typischen Schleifenabbrüchen.</p>
@@ -1470,7 +1459,7 @@ flowchart LR
 <ul>
 <li>Branches korrelieren oft im C-Kontrollfluss</li>
 <li>Global History Register (GHR): Bitmuster der letzten <span class="math inline">\(N\)</span> Outcomes</li>
-<li>Indexierung der Prediction-Tabellen mit lokaler + globaler Historie</li>
+<li>gshare ist ein konkretes Modell: PC-Index XOR globale Historie. Das ist nicht automatisch lokale plus globale Historie</li>
 <li>Erkennt Muster über einzelne Sprungstellen hinweg</li>
 </ul>
 <aside class="notes">
@@ -1490,12 +1479,12 @@ flowchart LR
 <section id="fortgeschrittene-prädiktoren" class="slide level2">
 <h2>Fortgeschrittene Prädiktoren</h2>
 <ul>
-<li>High-End-Kerne: deutlich komplexere Modelle (u. a. Perceptron-ähnlich)</li>
+<li>TAGE und Perceptron-Prädiktoren sind veröffentlichte Beispiele, nicht die Angabe jedes Kerns</li>
 <li>Lernen von Gewichtungen aus der Historie in Hardware</li>
 <li>Praxis: sehr hohe Accuracy bei vielen Workloads — selten, aber teuer bei Misses</li>
 </ul>
 <aside class="notes">
-<p>Kein ChatGPT im Kern — spezialisierte, winzige Lernhardware für Sprungmuster.</p>
+<p>Die Analogie zum Lernen bleibt im festen Hardware-Modell. Das ist keine allgemeine KI.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1508,15 +1497,11 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="fragen-branch-prediction" class="slide level2">
-<h2>Fragen? — Branch Prediction</h2>
-<ul>
-<li>Warum sind Misses bei tiefen Pipelines teuer?</li>
-<li>Wie hilft der 2-Bit-Zähler bei verschachtelten Schleifen?</li>
-<li>Rolle des BTB?</li>
-</ul>
+<section id="aufgabe-cpi-und-schwacher-zustand" class="slide level2">
+<h2>Aufgabe — CPI und schwacher Zustand</h2>
+<p>Was bedeuten CPI 1,30 für Laufzeit und Durchsatz? Der 2-Bit-Zähler steht auf 01, das nächste Ergebnis ist T. Welche Vorhersage gilt?</p>
 <aside class="notes">
-<p>Als Nächstes: Spekulation = Prediction × OoO — und warum Caches Seitenkanäle öffnen können.</p>
+<p>Laufzeitfaktor 1,30, also 30 Prozent länger. Durchsatzfaktor etwa 0,769, also rund 23 Prozent weniger Durchsatz. Zustand 01 sagt Not Taken voraus und geht nach T auf 10. Siehe CPI-Bild und den Automaten.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1532,7 +1517,7 @@ flowchart LR
 <section id="spekulative-ausführung" class="slide level2">
 <h2>Spekulative Ausführung</h2>
 <ul>
-<li>Kombination: Branch Prediction + Out-of-Order</li>
+<li>Spekulativer Fetch braucht kein OoO. Im High-Performance-Modell kommen Prediction und OoO zusammen</li>
 <li>Predictor sagt z. B. „Taken“ → spekulativer Pfad wird gestartet (Issue)</li>
 <li>ALUs rechnen und laden bereits — bevor der Branch architektonisch bestätigt ist</li>
 </ul>
@@ -1616,15 +1601,21 @@ flowchart LR
 </section>
 <section id="seitenkanal-über-den-cache" class="slide level2">
 <h2>Seitenkanal über den Cache</h2>
+<div class="quarto-figure quarto-figure-center">
+<figure>
+<p><img data-src="../assets/figures/07_moderne_cpu_architekturen/spectre.png"></p>
+<figcaption>Die Prüfung bleibt korrekt. Der transiente Probe-Zugriff kann die Cache-Spur hinterlassen.</figcaption>
+</figure>
+</div>
 <p>Prinzip (Spectre-artig, stark vereinfacht):</p>
 <ol type="1">
-<li>Predictor wird so beeinflusst, dass eine Bounds-Prüfung fehlgeht</li>
-<li>Spekulativ: Zugriff außerhalb des erlaubten Index</li>
-<li>Geheimnis beeinflusst Folgezugriffe (Cache-Zustand)</li>
-<li>Rollback löscht Register — Cache-Zustand bleibt messbar</li>
+<li>Die Bounds-Prüfung bleibt architektonisch korrekt</li>
+<li>Der vorhergesagte Pfad läuft transient, bevor die Prüfung wirkt</li>
+<li>Das Geheimnis steuert die Adresse eines folgenden Probe-Zugriffs</li>
+<li>Squash verwirft den Architekturzustand. Die Cache-Spur kann bleiben</li>
 </ol>
 <aside class="notes">
-<p>Kein „Passwort im Register behalten“ — das Timing des Caches verrät Indizes.</p>
+<p>Ein schneller Hit ist ein verrauschtes Indiz, kein automatischer Beweis und keine Messung aus dieser Vorlesung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1662,10 +1653,10 @@ flowchart LR
 <section id="mitigationen" class="slide level2">
 <h2>Mitigationen</h2>
 <ul>
-<li>Software: härtere Isolation (z. B. KPTI) — oft mit Leistungskosten</li>
-<li>Microcode / Fences: Spekulation an kritischen Stellen einschränken</li>
-<li>Neuere Generationen: strengere Isolation spekulativer Cache-Effekte in Hardware</li>
-<li>Trade-off: Sicherheit vs.&nbsp;IPC</li>
+<li>KPTI zielt vor allem auf den ursprünglichen Meltdown-Mechanismus</li>
+<li>Passendes Bounds-Masking oder eine geeignete Barriere kann bestimmte Spectre-v1-Fälle treffen. Nicht jede Fence ist auf jeder ISA eine Spekulationsbarriere</li>
+<li>Neuere Hardware mindert einzelne Wege und macht nicht jeden Cache-Effekt unsichtbar</li>
+<li>Spectre ist damit nicht vollständig gelöst</li>
 </ul>
 <aside class="notes">
 <p>Patches und Fences kosten Performance; langfristig hilft Silizium-Design.</p>
@@ -1705,9 +1696,9 @@ flowchart LR
 <section id="was--o3-typisch-tut" class="slide level2">
 <h2>Was <code>-O3</code> typisch tut</h2>
 <ul>
-<li><code>-O0</code>: zeilennahe Übersetzung — gut debugbar, schlecht für Pipelines</li>
-<li><code>-O3</code>: globale Analyse, Umsortierung, aggressivere Transformationen</li>
-<li>Fokus: Latenz verstecken, Branches reduzieren, ILP freilegen</li>
+<li><code>-O0</code> ist zum Debuggen gedacht und keine garantierte Zeile-für-Zeile-Übersetzung</li>
+<li><code>-O2</code> und <code>-O3</code> erlauben mehr Analysen. <code>-O3</code> garantiert weder Unrolling noch weniger Branches noch kürzere Laufzeit</li>
+<li>Ob eine Schleife ausgerollt wird, hängt von Compiler, Version, <code>-march</code> und dem Code ab</li>
 </ul>
 <aside class="notes">
 <p>Derselbe Algorithmus, anderer Assembler — Laufzeit kann stark differieren.</p>
@@ -1790,9 +1781,10 @@ flowchart LR
 <h2>Laboridee: Godbolt und Messung</h2>
 <p>Geplant (Details im Übungsblatt):</p>
 <ul>
-<li>Target z. B. <code>rv32gc</code> in Godbolt</li>
-<li>Umschalten <code>-O1</code> / <code>-O3</code>: Unrolling und Scheduling sichtbar machen</li>
-<li>Optional: Zyklusmessung in Renode/Ripes — Laufzeit/CPI-Effekt belegen</li>
+<li>Godbolt zeigt die Übersetzung, kein OoO-Timing</li>
+<li>Ein Ripes-Vergleich gilt nur für das dort gewählte Pipeline-Modell, nicht für eine Desktop-OoO-CPU</li>
+<li>Renode ohne validiertes Mikroarchitekturmodell belegt keine Stall-, Branch- oder OoO-Zahlen</li>
+<li>Flags, Compilerversion und ABI gehören zur Beobachtung. Siehe Übungsblatt</li>
 </ul>
 <aside class="notes">
 <p>Sehen (Assembler) und messen (Zyklen) — derselbe C-Algorithmus, andere Pipeline-Last.</p>
@@ -1861,6 +1853,19 @@ flowchart LR
 <li>Optional: Zyklusvergleich in der Simulation</li>
 </ul>
 <p>Vielen Dank — viel Erfolg beim Experimentieren.</p>
+<aside class="notes">
+<p>Quellen, Stand der Vorlesung: RISC-V ISA und RVWMO; BOOM-Pipeline, ROB und LSU als dokumentiertes OoO-Beispiel, nicht als Laborplattform; GCC Optimize-Options; Spectre- und Meltdown-Paper; Ripes und Renode nur in den dort genannten Grenzen. Adressen und Breiten dieser Folien sind das Lehrmodell.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
 <aside class="notes">
 <p>Wer Assembler-Optimierungen lesen kann, programmiert näher an der Hardware. Viel Erfolg!</p>
 <style type="text/css">
