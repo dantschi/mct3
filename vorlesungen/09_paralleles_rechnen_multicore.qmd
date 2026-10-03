@@ -45,11 +45,11 @@ Kurz-Recap aus Block 8 (Vertiefung im Übungsblatt):
 
 - TFLM-Inferenz auf dem RISC-V-Kern
 - Matrix-Last blockiert die General-Purpose-CPU lange
-- Ohne RVV/NPU: Memory Wall spürbar
-- DLP vs. ILP: Spezialist vs. Alleskönner
+- Eine funktionale Simulation hat keine Memory Wall gemessen
+- TLP und DLP schließen sich nicht aus
 
 ::: notes
-Heute wieder Alleskönner-Kerne: OS und gemischte Tasks brauchen TLP, nicht nur Matrizen.
+OS-Tasks sind ein TLP-Beispiel. Auch Datenarbeit kann Threads nutzen. Matrizen können zusätzlich DLP verwenden.
 :::
 
 ## Erinnerung: Taktraten-Mauer
@@ -68,7 +68,7 @@ Plan B der Industrie nach dem GHz-Wettrennen: Parallelität auf Thread-Ebene.
 - Zwei (oder mehr) Kerne auf einem Chip statt „doppelt so schneller“ Einzelkern
 - TLP: unabhängige Threads/Tasks parallel
 - Beispiel: UI/Media auf Kern 0, Hintergrundarbeit auf Kern 1
-- Oft bessere Energieeffizienz als ein extrem hoch getakteter Kern
+- Mehr Kerne sparen nicht stets Energie und beschleunigen einen einzelnen Thread nicht
 
 ::: notes
 Zweiter Arbeiter statt einen zu überhitzen — aber Kommunikation wird zum Problem.
@@ -76,10 +76,12 @@ Zweiter Arbeiter statt einen zu überhitzen — aber Kommunikation wird zum Prob
 
 ## Symmetric Multiprocessing (SMP)
 
-- SMP: alle Kerne gleichartig (symmetrisch)
-- Gemeinsamer Zugriff auf RAM und Peripherie
-- OS (Linux, FreeRTOS, …) kann Tasks migrieren
-- big.LITTLE u. Ä. hier ausgeblendet — Fokus SMP
+![Zwei gleiche Kerne, private L1, beispielhaftes L2. Migration ist nicht automatisch.](../assets/figures/09_paralleles_rechnen_multicore/smp.png)
+
+- Lehr-SMP: gleiche Kerne, ein Betriebssystem, gemeinsamer Speicherzugriff
+- Private L1 und ein geteiltes L2 sind ein Beispiel, keine Definition
+- Migration hängt von Scheduler, Port und Affinity ab. Nicht jedes FreeRTOS ist SMP
+- AMP und heterogene Kerne bleiben abgegrenzt
 
 ::: notes
 Klassisches PC-/Phone-Modell: gleichberechtigte Kerne, Scheduler verteilt.
@@ -119,23 +121,25 @@ Eine CPU: Write-Back genial. Zwei CPUs: ohne Kohärenz zerbricht die Semantik.
 
 ## Kohärenzverlust (Stale Data)
 
+![Write-Through ohne Invalidation lässt die fremde Kopie stehen. MESI, RMW und Ordnung lösen Verschiedenes.](../assets/figures/09_paralleles_rechnen_multicore/three.png)
+
 - Private Write-Back-Caches können unterschiedliche Sichten auf dieselbe Adresse erzeugen
 - Kohärenz (pro Adresse): alle Kerne sehen eine einheitliche Reihenfolge der Writes
-- Ohne Hardware-Kohärenz: OS-Flags, Queues, Sync unbrauchbar
+- Kohärenz ordnet Writes einer Adresse. Sie macht weder `i++` atomar noch ein Daten-plus-Flag korrekt
+- Non-cacheable Speicher und Ownership bleiben möglich, besonders in AMP
 
 ::: notes
-Kohärenz $\neq$ volle Speicher-Konsistenz für Mehrwort-Operationen — dafür später Atomics/Locks.
+Konsistenz beschreibt Beobachtungsreihenfolgen mehrerer Zugriffe. Atomizität schützt eine Operation vor Teilbeobachtung.
 :::
 
 ## Warum Software-Flush scheitert
 
-- Bei DMA: gezielte Cache-Maintenance vor/nach seltenen Transfers
-- Bei Multicore: tausende Shared-Variablen pro ms (Queues, Locks, …)
-- Manuelles Spülen nach jedem Write zerstört den Multicore-Gewinn
-- Braucht unsichtbare, schnelle Hardware-Kohärenz
+- Für cachebares SMP-Sharing ist manuelles Spülen nach jedem Write unpraktikabel
+- DMA-Maintenance ist nicht per Definition selten
+- Hardware-Kohärenz kann für die Anwendung unsichtbar sein und kostet trotzdem Traffic
 
 ::: notes
-Write-Through überall wäre korrekt, aber Bus und Energie würden kollabieren.
+Write-Through aktualisiert den unteren Speicher und invalidiert allein keine fremde Cache-Kopie.
 :::
 
 ## Bus Snooping
@@ -150,7 +154,7 @@ Idee bleibt: Caches koordinieren die „Wahrheit“ einer Adresse — Implementi
 
 ## MESI-Protokoll
 
-- State Machine pro Cache-Line (typisch 64 Byte)
+- Zustandsautomat je Cache-Line. 64 Byte sind hier nur ein Beispiel
 - Zustände: Modified (M), Exclusive (E), Shared (S), Invalid (I)
 - Basis vieler kohärenter Multicore-Designs (Varianten: MOESI, …)
 
@@ -159,6 +163,8 @@ Konzept der vier Buchstaben zählt — nicht jede Transitionstabelle auswendig.
 :::
 
 ## MESI: Zustandsübersicht
+
+![Lokale Ereignisse und Fremdtransaktionen getrennt. S bedeutet teilbar, nicht zwingend mehrere Kopien.](../assets/figures/09_paralleles_rechnen_multicore/mesi.png)
 
 ```{mermaid}
 %%| fig-width: 4.2
@@ -181,8 +187,8 @@ Die Pfeile sind die klausurrelevanten Übergänge. Merken Sie sich besonders: Wr
 
 ## Zustand M (Modified)
 
-- Line lokal geändert — RAM veraltet
-- Exklusiv: keine andere gültige Kopie
+- Line lokal geändert. Der untere Stand kann noch alt sein
+- Exklusiv: kein anderer gültiger Besitzer im Modell
 - Klassischer Write-Back-„Boss“-Zustand
 
 ::: notes
@@ -191,7 +197,7 @@ Monopol auf die Wahrheit dieser Adresse.
 
 ## Zustand E (Exclusive)
 
-- Sauber: Cache = RAM
+- Sauber: Übereinstimmung mit dem kohärenten unteren Stand
 - Exklusiv: niemand sonst hat die Line
 - Write → oft still zu M, ohne Broadcast
 
@@ -201,7 +207,7 @@ Sauber und allein — Schreiben ohne Netzwerk-Meeting.
 
 ## Zustand S (Shared)
 
-- Sauber, aber mehrere Kerne haben Kopien
+- Sauber und teilbar. Es müssen nicht nachweislich mehrere Kopien existieren
 - Gut für paralleles Lesen
 - Vor lokalem Write: andere Kopien invalidieren
 
@@ -212,7 +218,7 @@ Read-only-Sharing effizient — Write braucht Kohärenzaktion.
 ## Zustand I (Invalid)
 
 - Nach Reset oder Invalidate
-- Inhalt unbrauchbar → Miss beim Zugriff
+- Lokal ungültig. Die Bits müssen nicht gelöscht sein. Ein Hit auf I ist verboten
 - Daten müssen neu geholt werden
 
 ::: notes
@@ -234,10 +240,12 @@ Snooping/Directory entscheidet: allein, geteilt oder Owner-Supply bei Modified.
 
 ## MESI: Write auf Shared
 
+![Erst Ownership und Bestätigung, dann der Write. Ein Broadcast allein ist noch kein Abschluss.](../assets/figures/09_paralleles_rechnen_multicore/own.png)
+
 - Core 0 und 1: `x` in S
 - Core 0: `x = 5`
-- Vor Write: Invalidate-Broadcast
-- Dann lokal schreiben, Zustand → M
+- Erst Ownership und die nötigen Invalidates abschließen
+- Danach im Modell schreiben und nach M gehen. Der Broadcast allein ist nicht der Abschluss
 
 ::: notes
 Geteilte Ressource nie heimlich ändern.
@@ -254,6 +262,8 @@ Konsistenz: erzwungenes Verwerfen, dann Nachladen der Wahrheit.
 
 ## MESI-Beispiel: Zustandsfolge
 
+![Nach dem Write ist Core0 M mit 5 und der RAM noch 0. Der nächste Read liefert 5.](../assets/figures/09_paralleles_rechnen_multicore/trace.png)
+
 Zwei Kerne, Variable `x`, Start beide Invalid:
 
 | Schritt | Aktion | Core 0 | Core 1 |
@@ -263,8 +273,8 @@ Zwei Kerne, Variable `x`, Start beide Invalid:
 | 3 | Core 0 schreibt `x=5` | M | I |
 | 4 | Core 1 liest `x` | S | S |
 
-- Schritt 3: Invalidate-Broadcast, dann lokal M
-- Schritt 4: Owner-Supply (Intervention) oder Memory-Pfad → beide S
+- Nach dem Write kann der RAM noch 0 enthalten, während Core0 M den Wert 5 hält
+- Der folgende Read erhält 5. Beide Lines werden S, der untere Stand wird 5
 
 ::: notes
 Typische Klausurfrage: Tabelle ausfüllen. Üben Sie die Sequenz Read-Miss → Shared → Write → Invalidate → erneutes Lesen.
@@ -282,23 +292,24 @@ Skalierung: Verwaltungslast kann Datenbandbreite fressen.
 
 ## False Sharing
 
+![temp1 bei +0 und temp2 bei +4 teilen die 64-Byte-Line ab 0x20001000.](../assets/figures/09_paralleles_rechnen_multicore/false.png)
+
 - Core 0: `temp1`, Core 1: `temp2` — logisch unabhängig
 - Liegen in derselben Cache-Line → Write invalidiert den Partner
 - Ping-Pong trotz verschiedener Variablen
-- Abhilfe: Alignment / Padding auf getrennte Lines
+- Padding trennt nur bei passender Basis, Objektgröße und echter Line
+- Es kostet Speicher und kann die Lokalität verschlechtern. Ein Simulator ohne Kohärenzzeit misst das nicht
 
 ::: notes
-Hardware kennt 64-Byte-Blöcke, keine C-Namen.
+64 Byte sind die angenommene Line, keine universelle Größe. True Sharing wäre der gemeinsame Zähler.
 :::
 
-## Fragen? — Kohärenz
+## Aufgabe — MESI-Zeile
 
-- Warum Bus Snooping?
-- Exclusive vs. Modified?
-- Warum erzeugt Write auf Shared Bus-Verkehr?
+Core0 hat nach seinem Write den Zustand M und den Wert 5. Welchen Wert hat der RAM in diesem Modell noch, und was sieht Core1 beim folgenden Read?
 
 ::: notes
-Als Nächstes: Race Conditions — MESI lügt nicht, versteht aber kein `i++`.
+Der RAM kann noch 0 sein. Core1 erhält 5, beide werden S, der untere Stand wird 5. S heißt nicht, dass vorher mehrere Kopien nachgewiesen wurden. Siehe die Zustandsfolge.
 :::
 
 ## Software: gemeinsamer Zähler
@@ -313,7 +324,7 @@ Einfachste Aufgabe — parallel gefährlich.
 
 ## Anatomie von `i++`
 
-In C wirkt atomar — in Assembler typisch RMW:
+Eine Quelltextoperation, keine Atomizität. Das typische RMW lautet:
 
 ```asm
 lw   t0, 0(s1)   # Read
@@ -324,17 +335,19 @@ sw   t0, 0(s1)   # Write
 - Drei Schritte — können sich zwischen Kernen überlappen
 
 ::: notes
-CPU addiert nicht „im RAM“ — immer Register-Umweg.
+Dieses Interleaving motiviert das Problem. Ein konkurrierendes normales C-int ist ein Data Race und in C11 undefiniert, nicht nur manchmal 1.
 :::
 
 ## Race Condition
+
+![Beide schreiben 1. MESI verbreitet die Writes, der Endwert bleibt 1.](../assets/figures/09_paralleles_rechnen_multicore/race.png)
 
 1. Core 0 liest 0
 2. Core 1 liest 0 (Shared)
 3. Core 0 schreibt 1
 4. Core 1 schreibt ebenfalls 1 (seine lokale Rechnung)
 
-Ergebnis oft 1 statt 2 — ein Update verloren.
+Im Hardwarebild endet der Speicher bei 1. Das ist keine garantierte Semantik des fehlerhaften C-Programms.
 
 ::: notes
 Wettlauf: beide rechnen auf demselben Startwert.
@@ -356,22 +369,21 @@ Idee: Mutual Exclusion — aber Check und Set sind getrennt.
 Schloss-Metapher stimmt logisch — atomar nicht. `volatile` verhindert Compiler-Optimierung des Spins, macht Check+Set aber nicht atomar.
 :::
 
-## Warum Software-Locks scheitern
+## Warum diese Check-then-Set-Schleife scheitert
 
-- `lock == 0` lesen und `lock = 1` setzen: zwei Ops
-- Beide Kerne sehen „frei“ → beide betreten den kritischen Abschnitt
-- Race auf dem Lock selbst — braucht Hardware-Atomics
+- Prüfen und Setzen sind zwei Operationen. `volatile` ändert das nicht
+- Beide können frei sehen und eintreten
+- Korrekte Software-Locks nutzen atomare Primitive und Ordnung, sie sind nicht unmöglich
 
 ::: notes
-Problem nur verschoben — Silizium muss RMW unteilbar machen.
+Rein algorithmische Verfahren bleiben eine angenommene, fortgeschrittene Alternative.
 :::
 
 ## RISC-V A-Extension
 
-- Atomic Instructions: unteilbares RMW für eine Adresse zwischen Harts (gemäß Spezifikation)
-- Grundlage für Multicore-OS und sichere Shared-Zähler
-- Zwei Familien: LR/SC und AMO
-- Hinweis: paralleles DMA auf dieselbe Adresse bleibt Software-Risiko
+- A oder Zalrsc/Zaamo, ausgerichtet, nur in unterstützten Regionen
+- LR/SC und AMO gelten für eine Adresse in ihrer Domäne, nicht für den ganzen Bus
+- DMA gehört nur dazu, wenn die Reservationsdomäne das festlegt
 
 ::: notes
 Ohne Atomics kein korrektes Multicore-OS auf Shared Memory. DMA braucht eigene Sync-Disziplin.
@@ -379,9 +391,9 @@ Ohne Atomics kein korrektes Multicore-OS auf Shared Memory. DMA braucht eigene S
 
 ## LR/SC
 
-- `lr.w`: lesen + Reservation/Monitor auf Adresse
-- `sc.w`: schreiben nur, wenn Reservation noch gültig
-- Sonst: Store fehlgeschlagen → Software wiederholt
+- `lr.w` liest und setzt eine Reservation auf eine implementierungsabhängige Granule
+- `sc.w` schreibt bei Erfolg und liefert 0. Bei Fehlschlag kein Store und ein Wert ungleich 0
+- Die Reservation ist kein gehaltenes Mutex
 
 ::: notes
 Überwachungszaun um die Adresse zwischen Load und Store.
@@ -398,6 +410,8 @@ Erfolgspfad: wie RMW, Monitor still.
 
 ## LR/SC: Fehlschlag
 
+![SC-Erfolg ist 0. Der zweite SC schreibt nicht. Ein Fehlschlag ohne fremden Store ist zulässig.](../assets/figures/09_paralleles_rechnen_multicore/lrsc.png)
+
 - Beide: `lr.w` nahezu gleichzeitig
 - Core 0: `sc.w` ok
 - Core 1: `sc.w` scheitert (Reservation gebrochen / Kohärenz)
@@ -409,30 +423,33 @@ Zweiter Kern prallt ab — Zustand bleibt konsistent.
 
 ## LR/SC: Spinlock in Assembler
 
+![Acquire mit lr.w.aq, Release mit fence rw,w vor dem Store. Kein Flush als Ersatz.](../assets/figures/09_paralleles_rechnen_multicore/lock.png)
+
 ```asm
 acquire:
-  lr.w   t0, (a0)      /* Lock-Adresse in a0 */
-  bnez   t0, acquire   /* belegt? erneut versuchen */
-  li     t1, 1
-  sc.w   t2, t1, (a0)  /* t2=0 bei Erfolg */
-  bnez   t2, acquire   /* Reservation gebrochen → Retry */
-  /* kritischer Abschnitt */
+  lr.w.aq t0, (a0)
+  bnez    t0, acquire
+  li      t1, 1
+  sc.w    t2, t1, (a0)
+  bnez    t2, acquire
 release:
-  sw     zero, 0(a0)   /* Lock freigeben */
+  fence rw, w
+  sw    zero, 0(a0)
 ```
 
-- `sc.w` liefert Status in `t2`: 0 = Erfolg, sonst Fehlschlag
-- Typisches Muster für Mutex/Spinlock auf RISC-V ohne AMO
+- Erfolg von `sc.w` ist 0. Die Sequenz ist Lehrannahme für gewöhnlichen Speicher und hier nicht assembliert
+- Im kritischen Abschnitt nicht schlafen und keine blockierende Arbeit ausführen
 
 ::: notes
-Genau diese Retry-Schleife erwartet die Klausur: LR, Test, SC, bei Fehler zurück. Release oft als einfacher Store (ggf. mit `fence`).
+Ohne die Release-Fence publiziert der Store das Schloss, nicht zuverlässig die vorherigen Daten. Ein ISR-Spin auf dasselbe Schloss kann sich selbst blockieren.
 :::
 
 ## AMO-Befehle
 
-- z. B. `amoadd.w`: Add am Speicherpfad
-- RMW in Hardware „hinter der Tür“
-- Adresse kurz für andere Zugriffe geschützt
+![amoadd.w von 10 um 3 liefert alt 10 und neu 13. Zwei Inkremente enden bei 2.](../assets/figures/09_paralleles_rechnen_multicore/atomic.png)
+
+- `amoadd.w` auf den Wert 10 mit Addend 3: Rückgabe 10, Speicher 13
+- Das ist kein globaler Bus-Lock. Ohne aq/rl fehlt die zusätzliche Ordnung
 
 ::: notes
 Ein Befehl statt explizitem LR/SC-Loop für einfache Ops.
@@ -445,18 +462,22 @@ Ein Befehl statt explizitem LR/SC-Loop für einfache Ops.
 
 _Atomic int zaehler = 0;
 
-void isr_oder_core1(void) {
-    atomic_fetch_add(&zaehler, 1);
+void hart_increment(void) {
+    atomic_fetch_add(&zaehler, 1); /* seq_cst */
 }
 ```
 
-- Compiler erzeugt LR/SC oder AMO — kein Inline-Asm nötig
+- Der Compiler kann AMO, LR/SC oder einen Library-Fallback erzeugen
+- `atomic_fetch_add` ist standardmäßig sequentially consistent und macht nicht das ganze Programm seriell
+- Ein blockierender Fallback gehört nicht in eine ISR
 
 ::: notes
 Modernes C trifft RISC-V-A — Brücke Software/Hardware.
 :::
 
 ## Deadlocks
+
+![A-dann-B vermeidet den Zyklus. Timeout gibt keinen konsistenten Zustand zurück.](../assets/figures/09_paralleles_rechnen_multicore/dead.png)
 
 - Locks gegen Races — Risiko: zirkuläres Warten
 - Core 0 hält A, will B; Core 1 hält B, will A
@@ -466,14 +487,12 @@ Modernes C trifft RISC-V-A — Brücke Software/Hardware.
 Atomics schützen Daten, nicht vor schlechter Lock-Ordnung.
 :::
 
-## Fragen? — Race Conditions
+## Aufgabe — Schloss und ISR
 
-- Race bei `zaehler++`?
-- Warum reicht normales `int lock` nicht?
-- Wie sichert LR/SC den Zugriff?
+Warum genügt `volatile` nicht für das Check-then-Set? Was passiert, wenn die ISR auf das Schloss spinnt, das der unterbrochene Kontext hält?
 
 ::: notes
-Kohärenz = Wahrheit; Atomics = unteilbare Updates. Als Nächstes: Amdahl und Semesterfazit.
+`volatile` erzwingt Zugriffe und schafft keine Atomizität und keine Ordnung. Die ISR und der unterbrochene Kontext warten aufeinander: Selbstdeadlock. Muster: Acquire mit `lr.w.aq`, Erfolgscode 0, Release mit `fence rw,w` vor dem Store.
 :::
 
 ## Amdahls Gesetz
@@ -493,24 +512,24 @@ Mehr Kerne helfen nur dem parallelen Anteil. 10 % seriell → maximal 10× Speed
 
 ## Amdahl: Zahlenbeispiel
 
+![S(4)=2,5 und S(100)=4,8077. Das liegt nahe an 5, die Effizienz ist etwa 4,8 Prozent.](../assets/figures/09_paralleles_rechnen_multicore/amdahl.png)
+
 - Programm: 80 % parallel, 20 % seriell ($s = 0{,}2$)
 - 4 Kerne: $S(4) = 1 / (0{,}2 + 0{,}8/4) = 1 / 0{,}4 = 2{,}5$
-- 100 Kerne: $S(100) \approx 1 / (0{,}2 + 0{,}008) \approx 4{,}8$
-- Trotz 100 Kernen weit unter 5× — der serielle Rest dominiert
+- 100 Kerne: $S(100) = 1/0{,}208 \approx 4{,}8077$, nahe an der Grenze 5
+- Die Effizienz $S(100)/100$ ist nur etwa 4,8 Prozent. Overhead ist in dieser Rechnung noch 0
 
 ::: notes
-Klausurtypisch: Einsetzen und interpretieren. Optimierung des seriellen Pfads lohnt oft mehr als „noch ein Kern“.
+Feste Arbeit, ideale Balance, kein o(N). Eine größere Aufgabe ist eine andere Frage. 4,8 ist nicht weit unter 5.
 :::
 
 ## Unser fertiges SoC (Rückblick)
 
 Dual-Core-Idee mit Bausteinen aus MCT3:
 
-- Kerne: Pipeline/OoO-Konzepte, Atomics
-- Speicher: L1 (MESI), Hierarchie, Execute-in-Place aus Flash
-- Zeit/IRQ: CLINT, PLIC, Timer/PWM, WDT
-- Busse: UART, SPI, I2C
-- Offload: DMA; optional Edge-AI-Pfad
+- Konzept, nicht das Laborgerät: OoO, MESI und SMP sind hier nicht als vorhandenes Target belegt
+- Behandelt: Caches, CLINT/PLIC als RISC-V-Beispiel, UART/SPI/I2C, DMA, Timer
+- Optional und nicht im Repository nachgewiesen: RVV, NPU, kohärentes SMP
 
 ::: notes
 Vom Addierer zum überblickbaren Microcontroller-SoC.
@@ -520,7 +539,7 @@ Vom Addierer zum überblickbaren Microcontroller-SoC.
 
 | Feind | Lösungspfad |
 |-------|-------------|
-| Memory Wall | Caches, DLP (Vektoren/NPUs) |
+| Memory Wall | Lokalität, Tiling, Bandbreite, nicht nur DLP |
 | Control Hazards | Prediction, Unrolling, Scheduling |
 | CPU blockiert durch I/O | Interrupts, DMA |
 
@@ -544,9 +563,9 @@ Röntgenblick: eine C-Zeile kann harmlos oder systemtötend sein.
 
 ## Infos zur Klausur
 
-- Schriftlich, Dauer laut Modulbeschreibung / Ankündigung
-- Hilfsmittel: nicht programmierbarer Taschenrechner; keine Skripte
-- Fokus: Konzepte, kleine Rechnungen (z. B. AMAT), Skizzen, C-Ausschnitte
+- Dauer und Hilfsmittel nur aus der autorisierten Ankündigung. Hier nichts Neues festlegen
+- Unbestätigte Formalia vor der Klausur prüfen
+- Fokus der Vorlesung: Konzepte, kleine Rechnungen, Skizzen, kurze C-Ausschnitte
 
 ::: notes
 Problemlösung vor Auswendiglernen von Datenblatt-Adressen.
@@ -623,6 +642,10 @@ Kohärenz hält Caches ehrlich; Atomics halten Updates unteilbar; Amdahl hält E
 - Labor-Finale: Probeaufgaben, Renode, offene Fragen
 
 Vielen Dank für Ihre Mitarbeit im Semester!
+
+::: notes
+Quellen: RISC-V A-Extension und RVWMO, C11-Atomics, Kernel-Hinweis zu False Sharing. Kein kohärenter Multicore-Simulator und keine RISC-V-Toolchain wurden für Zeit oder Assemblat verwendet.
+:::
 
 ::: notes
 Freude, Sie durch die SoC-Ebenen begleitet zu haben — viel Erfolg in der Klausur.

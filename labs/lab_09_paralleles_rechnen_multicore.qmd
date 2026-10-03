@@ -31,8 +31,8 @@ In einem SMP-SoC hat jeder Kern einen privaten L1-Cache mit *Write-Back*.
 ::: {.content-visible when-profile="solution"}
 **Musterlösung Aufgabe 1.1**
 
-1. Write-Back schreibt zuerst nur in den privaten L1 — der RAM bleibt veraltet (*Stale Data*). Core 1 darf den RAM nicht als Wahrheit nehmen; die aktuelle Kopie kann im L1 von Core 0 liegen.
-2. Multicore teilt sich ständig Shared-Variablen (Queues, Locks, …). Manuelles Flushen nach jedem Write zerstört den Cache-Vorteil und überlastet den Bus. Kohärenz muss unsichtbar in Hardware laufen (Snooping / Directory).
+1. Write-Back hält die neue Kopie zunächst im privaten L1. Core 1 darf den RAM nicht als einzige Wahrheit lesen. Write-Through ohne Invalidation würde den RAM aktualisieren und die fremde Cache-Kopie trotzdem stehen lassen.
+2. Für häufiges cachebares Sharing ist manuelles Spülen unpraktikabel. Non-cacheable Speicher bleibt eine AMP-Möglichkeit. Hardware-Kohärenz kostet Traffic, auch wenn die Anwendung sie nicht aufruft.
 :::
 
 {{< pagebreak >}}
@@ -51,9 +51,8 @@ In einem SMP-SoC hat jeder Kern einen privaten L1-Cache mit *Write-Back*.
 ::: {.content-visible when-profile="solution"}
 **Musterlösung Aufgabe 1.2**
 
-1. **M (Modified):** verändert, weicht vom RAM ab, einzigartig. **E (Exclusive):** sauber, einzigartig. **S (Shared):** sauber, mehrere Kopien. **I (Invalid):** ungültig → Miss beim Zugriff.
-
-2. Core 0 darf nicht „heimlich“ schreiben: Invalidate-Broadcast auf dem Bus. Core 1 snoopt und setzt lokal auf **I**. Danach schreibt Core 0 und geht auf **M**. Liest Core 1 später, Miss → frische Daten typisch von Core 0.
+1. **M:** geändert und exklusiv, unterer Stand kann alt sein. **E:** sauber und exklusiv. **S:** sauber und teilbar, nicht zwingend mehrere nachweisbare Kopien. **I:** lokal ungültig.
+2. Core 0 erwirbt Ownership und schließt die Invalidates ab. Core 1 geht nach **I**, Core 0 nach **M**. Der Broadcast allein ist noch nicht der Write.
 :::
 
 {{< pagebreak >}}
@@ -78,7 +77,7 @@ Betrachten Sie `zaehler++;` auf einer globalen Variable.
 
 1. `lw` (lesen) → `addi` (+1) → `sw` (zurückschreiben).
 
-2. Beispiel: Core 0 liest `0`; Core 1 liest `0`; Core 0 schreibt `1`; Core 1 schreibt ebenfalls `1` und überschreibt Core 0 → Speicher zeigt `1`, ein Update ist verloren.
+2. Im Hardwarebild lesen beide 0 und schreiben beide 1. Ein Update geht verloren. Ein normales konkurrierendes C-`int` ist außerdem ein Data Race und in C11 undefiniert. `volatile` macht daraus keine Synchronisation.
 :::
 
 ### Aufgabe 2.2: RISC-V Atomics (LR/SC)
@@ -97,8 +96,8 @@ Software-Locks wie `while(lock==1); lock=1;` scheitern, weil Prüfen und Setzen 
 ::: {.content-visible when-profile="solution"}
 **Musterlösung Aufgabe 2.2**
 
-1. `lr.w` liest und aktiviert einen Monitor (Reservation) auf der Adresse. `sc.w` schreibt *nur*, wenn der Monitor bestätigt, dass inzwischen kein anderer Master (Kern/DMA) die Adresse verändert hat.
-2. Monitor-Prüfung schlägt fehl: Store wird nicht ausgeführt; `sc.w` liefert einen Fehlercode (typisch $\neq 0$). Software muss die Sequenz ab `lr.w` wiederholen.
+1. `lr.w` liest und setzt eine Reservation auf eine implementierungsabhängige Granule, nicht auf ein gehaltenes Mutex. `sc.w` schreibt nur bei gültiger Reservation.
+2. Der Store unterbleibt. Der Rückgabewert ist ungleich 0; Erfolg wäre 0. Die Software wiederholt ab `lr.w`. Ein Fehlschlag ist auch ohne Store eines anderen Harts zulässig. DMA bricht die Reservation nur, wenn die Plattform dieselbe Domäne definiert. Für ein Schloss kommen Acquire und eine Release-Fence hinzu.
 :::
 
 {{< pagebreak >}}
@@ -158,7 +157,7 @@ Software-Locks wie `while(lock==1); lock=1;` scheitern, weil Prüfen und Setzen 
 **Musterlösung Aufgabe 3.3**
 
 1. `ARR` begrenzt die Periode/Frequenz; `CCR` ist die Compare-Schwelle (Duty Cycle, typisch $\mathrm{CCR}/\mathrm{ARR}$ im Vorlesungsmodell).
-2. Schnelles SPI verlangt Bytes im µs-Takt → millionenfache ISRs mit Push/Pop-Overhead (*Interrupt Storm*). DMA als Bus-Master kopiert SRAM → Peripherie und entlastet die CPU.
+2. Ein Byte-IRQ bei schnellem SPI kann die angenommene CPU-Kapazität überschreiten. DMA übernimmt die Kopierschleife und hebt das SCK-Limit nicht auf.
 :::
 
 ### Aufgabe 3.4: AMAT-Wiederholung
