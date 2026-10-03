@@ -2393,19 +2393,37 @@ flowchart LR
 <section id="c-write-transaktion" class="slide level2">
 <h2>C: Write-Transaktion</h2>
 <p>Ablauf: START → Adresse+W → Reg → Daten → STOP</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb4-1"><a aria-label="1"></a><span class="dt">int</span> sensor_wakeup<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb4-2"><a aria-label="2"></a>    i2c_send_start<span class="op">();</span></span>
-<span id="cb4-3"><a aria-label="3"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0xD0</span><span class="bu">u</span><span class="op">);</span>          <span class="co">/* 0x68 &lt;&lt; 1 | Write */</span></span>
-<span id="cb4-4"><a aria-label="4"></a>    <span class="cf">if</span> <span class="op">(!</span>wait_for_ack_timeout<span class="op">())</span> <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
-<span id="cb4-5"><a aria-label="5"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x6B</span><span class="bu">u</span><span class="op">);</span>          <span class="co">/* PWR_MGMT_1 */</span></span>
-<span id="cb4-6"><a aria-label="6"></a>    <span class="cf">if</span> <span class="op">(!</span>wait_for_ack_timeout<span class="op">())</span> <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
-<span id="cb4-7"><a aria-label="7"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x00</span><span class="bu">u</span><span class="op">);</span>          <span class="co">/* Sleep aus, Lehrwert */</span></span>
-<span id="cb4-8"><a aria-label="8"></a>    <span class="cf">if</span> <span class="op">(!</span>wait_for_ack_timeout<span class="op">())</span> <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
-<span id="cb4-9"><a aria-label="9"></a>    i2c_send_stop<span class="op">();</span></span>
-<span id="cb4-10"><a aria-label="10"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
-<span id="cb4-11"><a aria-label="11"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb4-1"><a aria-label="1"></a><span class="kw">enum</span> <span class="op">{</span></span>
+<span id="cb4-2"><a aria-label="2"></a>    I2C_OK <span class="op">=</span> <span class="dv">0</span><span class="op">,</span></span>
+<span id="cb4-3"><a aria-label="3"></a>    I2C_NACK <span class="op">=</span> <span class="dv">1</span><span class="op">,</span></span>
+<span id="cb4-4"><a aria-label="4"></a>    I2C_TIMEOUT <span class="op">=</span> <span class="dv">2</span><span class="op">,</span></span>
+<span id="cb4-5"><a aria-label="5"></a>    I2C_ARB_LOST <span class="op">=</span> <span class="dv">3</span><span class="op">,</span></span>
+<span id="cb4-6"><a aria-label="6"></a>    I2C_BUS_ERR <span class="op">=</span> <span class="dv">4</span></span>
+<span id="cb4-7"><a aria-label="7"></a><span class="op">};</span></span>
+<span id="cb4-8"><a aria-label="8"></a></span>
+<span id="cb4-9"><a aria-label="9"></a><span class="dt">static</span> <span class="dt">int</span> i2c_fail<span class="op">(</span><span class="dt">int</span> st<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-10"><a aria-label="10"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_ARB_LOST <span class="op">&amp;&amp;</span> i2c_owns_bus<span class="op">())</span></span>
+<span id="cb4-11"><a aria-label="11"></a>        i2c_send_stop<span class="op">();</span></span>
+<span id="cb4-12"><a aria-label="12"></a>    <span class="cf">return</span> st<span class="op">;</span></span>
+<span id="cb4-13"><a aria-label="13"></a><span class="op">}</span></span>
+<span id="cb4-14"><a aria-label="14"></a></span>
+<span id="cb4-15"><a aria-label="15"></a><span class="dt">int</span> sensor_wakeup<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-16"><a aria-label="16"></a>    <span class="dt">int</span> st<span class="op">;</span></span>
+<span id="cb4-17"><a aria-label="17"></a>    i2c_send_start<span class="op">();</span></span>
+<span id="cb4-18"><a aria-label="18"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0xD0</span><span class="bu">u</span><span class="op">);</span></span>
+<span id="cb4-19"><a aria-label="19"></a>    st <span class="op">=</span> wait_phase<span class="op">();</span></span>
+<span id="cb4-20"><a aria-label="20"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
+<span id="cb4-21"><a aria-label="21"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x6B</span><span class="bu">u</span><span class="op">);</span></span>
+<span id="cb4-22"><a aria-label="22"></a>    st <span class="op">=</span> wait_phase<span class="op">();</span></span>
+<span id="cb4-23"><a aria-label="23"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
+<span id="cb4-24"><a aria-label="24"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x00</span><span class="bu">u</span><span class="op">);</span></span>
+<span id="cb4-25"><a aria-label="25"></a>    st <span class="op">=</span> wait_phase<span class="op">();</span></span>
+<span id="cb4-26"><a aria-label="26"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
+<span id="cb4-27"><a aria-label="27"></a>    i2c_send_stop<span class="op">();</span></span>
+<span id="cb4-28"><a aria-label="28"></a>    <span class="cf">return</span> I2C_OK<span class="op">;</span></span>
+<span id="cb4-29"><a aria-label="29"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Ein NACK oder ein abgelaufenes Zeitlimit beendet die Funktion. <code>wait_for_ack()</code> ohne Timeout darf bei fehlendem Sensor nicht hängen bleiben. STOP nur, solange dieser Controller den Bus besitzt.</p>
+<p>Ein NACK, ein Timeout, ein Arbitration-Verlust und ein Busfehler sind verschiedene Statuswerte. <code>wait_phase</code> begrenzt Start, Byte, Empfang, Stretching und Stop. STOP nur, solange dieser Controller den Bus besitzt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2427,22 +2445,28 @@ flowchart LR
 </figure>
 </div>
 <p>Zuerst Registerzeiger setzen (Write), dann Repeated START und Read:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb5-1"><a aria-label="1"></a><span class="co">/* Timeout. Fehlercode bleibt getrennt von den Bytes. */</span></span>
-<span id="cb5-2"><a aria-label="2"></a><span class="dt">int</span> read_accel_xyz<span class="op">(</span><span class="dt">uint8_t</span> out<span class="op">[</span><span class="dv">6</span><span class="op">])</span> <span class="op">{</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb5-1"><a aria-label="1"></a><span class="dt">int</span> read_accel_xyz<span class="op">(</span><span class="dt">uint8_t</span> out<span class="op">[</span><span class="dv">6</span><span class="op">])</span> <span class="op">{</span></span>
+<span id="cb5-2"><a aria-label="2"></a>    <span class="dt">int</span> st<span class="op">;</span></span>
 <span id="cb5-3"><a aria-label="3"></a>    i2c_send_start<span class="op">();</span></span>
-<span id="cb5-4"><a aria-label="4"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0xD0</span><span class="bu">u</span><span class="op">);</span>          <span class="co">/* 0x68 &lt;&lt; 1 | Write */</span></span>
-<span id="cb5-5"><a aria-label="5"></a>    <span class="cf">if</span> <span class="op">(!</span>wait_for_ack_timeout<span class="op">())</span> <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
-<span id="cb5-6"><a aria-label="6"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x3B</span><span class="bu">u</span><span class="op">);</span></span>
-<span id="cb5-7"><a aria-label="7"></a>    <span class="cf">if</span> <span class="op">(!</span>wait_for_ack_timeout<span class="op">())</span> <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
-<span id="cb5-8"><a aria-label="8"></a>    i2c_send_start<span class="op">();</span>              <span class="co">/* Repeated Start */</span></span>
-<span id="cb5-9"><a aria-label="9"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0xD1</span><span class="bu">u</span><span class="op">);</span>          <span class="co">/* Read */</span></span>
-<span id="cb5-10"><a aria-label="10"></a>    <span class="cf">if</span> <span class="op">(!</span>wait_for_ack_timeout<span class="op">())</span> <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
-<span id="cb5-11"><a aria-label="11"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> <span class="dv">5</span><span class="op">;</span> i<span class="op">++)</span></span>
-<span id="cb5-12"><a aria-label="12"></a>        out<span class="op">[</span>i<span class="op">]</span> <span class="op">=</span> i2c_read_byte_ack<span class="op">();</span></span>
-<span id="cb5-13"><a aria-label="13"></a>    out<span class="op">[</span><span class="dv">5</span><span class="op">]</span> <span class="op">=</span> i2c_read_byte_nack<span class="op">();</span> <span class="co">/* normaler Abschluss */</span></span>
-<span id="cb5-14"><a aria-label="14"></a>    i2c_send_stop<span class="op">();</span></span>
-<span id="cb5-15"><a aria-label="15"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
-<span id="cb5-16"><a aria-label="16"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-4"><a aria-label="4"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0xD0</span><span class="bu">u</span><span class="op">);</span></span>
+<span id="cb5-5"><a aria-label="5"></a>    st <span class="op">=</span> wait_phase<span class="op">();</span></span>
+<span id="cb5-6"><a aria-label="6"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
+<span id="cb5-7"><a aria-label="7"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x3B</span><span class="bu">u</span><span class="op">);</span></span>
+<span id="cb5-8"><a aria-label="8"></a>    st <span class="op">=</span> wait_phase<span class="op">();</span></span>
+<span id="cb5-9"><a aria-label="9"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
+<span id="cb5-10"><a aria-label="10"></a>    i2c_send_start<span class="op">();</span></span>
+<span id="cb5-11"><a aria-label="11"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0xD1</span><span class="bu">u</span><span class="op">);</span></span>
+<span id="cb5-12"><a aria-label="12"></a>    st <span class="op">=</span> wait_phase<span class="op">();</span></span>
+<span id="cb5-13"><a aria-label="13"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
+<span id="cb5-14"><a aria-label="14"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> <span class="dv">5</span><span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb5-15"><a aria-label="15"></a>        st <span class="op">=</span> i2c_read_ack<span class="op">(&amp;</span>out<span class="op">[</span>i<span class="op">]);</span></span>
+<span id="cb5-16"><a aria-label="16"></a>        <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
+<span id="cb5-17"><a aria-label="17"></a>    <span class="op">}</span></span>
+<span id="cb5-18"><a aria-label="18"></a>    st <span class="op">=</span> i2c_read_nack<span class="op">(&amp;</span>out<span class="op">[</span><span class="dv">5</span><span class="op">]);</span></span>
+<span id="cb5-19"><a aria-label="19"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
+<span id="cb5-20"><a aria-label="20"></a>    i2c_send_stop<span class="op">();</span></span>
+<span id="cb5-21"><a aria-label="21"></a>    <span class="cf">return</span> I2C_OK<span class="op">;</span></span>
+<span id="cb5-22"><a aria-label="22"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p>Klassisches Muster: Pointer setzen, dann lesen — oft ohne STOP dazwischen (Repeated Start).</p>
 <style type="text/css">
@@ -2532,14 +2556,18 @@ flowchart LR
 <li>16-Bit-Werte oft als High- dann Low-Byte (Big-Endian am Sensor)</li>
 <li>In C zusammensetzen:</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb8-1"><a aria-label="1"></a><span class="dt">uint8_t</span> b<span class="op">[</span><span class="dv">6</span><span class="op">];</span></span>
-<span id="cb8-2"><a aria-label="2"></a><span class="cf">if</span> <span class="op">(</span>read_accel_xyz<span class="op">(</span>b<span class="op">)</span> <span class="op">!=</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb8-3"><a aria-label="3"></a>    <span class="co">/* Timeout, NACK oder Busfehler. 0x00 wäre ein gültiger Messwert. */</span></span>
-<span id="cb8-4"><a aria-label="4"></a><span class="op">}</span></span>
-<span id="cb8-5"><a aria-label="5"></a><span class="dt">uint16_t</span> ux <span class="op">=</span> <span class="op">(</span><span class="dt">uint16_t</span><span class="op">)(((</span><span class="dt">uint16_t</span><span class="op">)</span>b<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">&lt;&lt;</span> <span class="dv">8</span><span class="op">)</span> <span class="op">|</span> b<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
-<span id="cb8-6"><a aria-label="6"></a><span class="dt">int16_t</span> x <span class="op">=</span> <span class="op">(</span><span class="dt">int16_t</span><span class="op">)</span>ux<span class="op">;</span>   <span class="co">/* 0x1000 -&gt; 4096 */</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb8-1"><a aria-label="1"></a><span class="dt">int16_t</span> decode_x<span class="op">(</span><span class="dt">const</span> <span class="dt">uint8_t</span> b<span class="op">[</span><span class="dv">6</span><span class="op">],</span> <span class="dt">int</span> st<span class="op">,</span> <span class="dt">int</span> <span class="op">*</span>ok<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb8-2"><a aria-label="2"></a>    <span class="dt">uint16_t</span> ux<span class="op">;</span></span>
+<span id="cb8-3"><a aria-label="3"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb8-4"><a aria-label="4"></a>        <span class="op">*</span>ok <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb8-5"><a aria-label="5"></a>        <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb8-6"><a aria-label="6"></a>    <span class="op">}</span></span>
+<span id="cb8-7"><a aria-label="7"></a>    ux <span class="op">=</span> <span class="op">(</span><span class="dt">uint16_t</span><span class="op">)(((</span><span class="dt">uint16_t</span><span class="op">)</span>b<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">&lt;&lt;</span> <span class="dv">8</span><span class="op">)</span> <span class="op">|</span> b<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
+<span id="cb8-8"><a aria-label="8"></a>    <span class="op">*</span>ok <span class="op">=</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb8-9"><a aria-label="9"></a>    <span class="cf">return</span> <span class="op">(</span><span class="dt">int16_t</span><span class="op">)</span>ux<span class="op">;</span> <span class="co">/* 0x1000 -&gt; 4096 */</span></span>
+<span id="cb8-10"><a aria-label="10"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Häufiger Fehler: Bytes vertauscht oder Vorzeichen falsch interpretiert.</p>
+<p>Häufiger Fehler: den Puffer trotz Fehlerstatus dekodieren. High-Byte liegt bei <code>b[0]</code>. Der Cast auf <code>int16_t</code> übernimmt das Zweierkomplement, nachdem die Bytes unsigned zusammengesetzt wurden. <code>0x00</code> bis <code>0xFF</code> bleiben gültige Messbytes.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;

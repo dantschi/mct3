@@ -1202,14 +1202,14 @@ flowchart LR
 <tr class="even">
 <td>Server</td>
 <td>1024 Bit, LMUL 1</td>
-<td>32, zuletzt 8</td>
+<td>32, dann 20+20 oder 32+8</td>
 <td>32</td>
 </tr>
 </tbody>
 </table>
 <p>Gleiche RVV-Schleifenidee skaliert mit <span class="math inline">\(\mathrm{VLEN}\)</span> — ohne feste Packed-SIMD-Breite im Quelltext.</p>
 <aside class="notes">
-<p>1000/32 ist nicht teilbar: 31 mal VL 32 und einmal VL 8. Ein Binary braucht ISA, ABI und einen Kern mit RVV.</p>
+<p>1000 Elemente und VLMAX 32: nach 30 vollen Schritten ist AVL 40. Dann erlaubt die Spezifikation jede VL von 20 bis 32. Diese Folie zeigt zwei zulässige Reste, 20+20 und 32+8. Der Zeiger folgt immer dem zurückgegebenen VL.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1356,11 +1356,11 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="aufgabe-rest-8" class="slide level2">
-<h2>Aufgabe — Rest 8</h2>
-<p>VLMAX ist 32, AVL ist 1000. Wie viele Iterationen und welches letzte VL entstehen, wenn der Rest klein genug für ein VL bleibt?</p>
+<section id="aufgabe-avl-40" class="slide level2">
+<h2>Aufgabe — AVL 40</h2>
+<p>VLMAX ist 32. Nach 30 Schritten mit VL 32 bleiben 40 Elemente. Welche letzten VL-Werte sind zulässig, und wie viele Iterationen ergeben 1000 Elemente?</p>
 <aside class="notes">
-<p>31 mal 32 und einmal 8. Zusammen 32 Iterationen und 1000 Elemente. VL ist nicht in jedem AVL-Bereich min(AVL, VLMAX). Siehe die RVV-Abbildung.</p>
+<p>Zulässig sind zum Beispiel 20 und 20 oder 32 und 8. Beide Folgen haben insgesamt 32 Iterationen. <code>vsetvli</code> allein legt die letzte Länge nicht fest. Der Zeiger rückt um das tatsächlich zurückgegebene VL mal 4 Byte vor.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1589,7 +1589,7 @@ flowchart TD
 <li>Das ist kein Ergebnis je Takt ab Takt 3. Readout der lokalen Summen kommt danach</li>
 </ul>
 <aside class="notes">
-<p>Wie Instruction-Pipeline: erst füllen, dann kontinuierlicher Ausstoß.</p>
+<p>Die vier lokalen Summen sind nach Takt 4 fertig. Der Readout ist ein eigener Schritt. Ein kontinuierlicher Strom bräuchte einen extra definierten Tile-Takt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1881,7 +1881,7 @@ flowchart TD
 </section>
 <section id="modell-als-c-array" class="slide level2">
 <h2>Modell als C-Array</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb5-1"><a aria-label="1"></a><span class="co">/* Intelligenz als .rodata im Flash */</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb5-1"><a aria-label="1"></a><span class="co">/* Platzhalter, kein gültiges Modell und keine Lizenzdatei. */</span></span>
 <span id="cb5-2"><a aria-label="2"></a><span class="dt">const</span> <span class="dt">unsigned</span> <span class="dt">char</span> step_model_tflite<span class="op">[]</span></span>
 <span id="cb5-3"><a aria-label="3"></a>    __attribute__<span class="op">((</span>aligned<span class="op">(</span><span class="dv">4</span><span class="op">)))</span> <span class="op">=</span> <span class="op">{</span></span>
 <span id="cb5-4"><a aria-label="4"></a>    <span class="bn">0x1c</span><span class="op">,</span> <span class="bn">0x00</span><span class="op">,</span> <span class="bn">0x00</span><span class="op">,</span> <span class="bn">0x00</span><span class="op">,</span> <span class="bn">0x54</span><span class="op">,</span> <span class="bn">0x46</span><span class="op">,</span> <span class="bn">0x4c</span><span class="op">,</span> <span class="bn">0x33</span><span class="op">,</span></span>
@@ -1903,15 +1903,20 @@ flowchart TD
 </section>
 <section id="tensor-arena" class="slide level2">
 <h2>Tensor Arena</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource cpp number-lines code-with-copy"><code class="sourceCode cpp"><span id="cb6-1"><a aria-label="1"></a><span class="at">const</span> <span class="dt">int</span> kTensorArenaSize <span class="op">=</span> <span class="dv">10</span> <span class="op">*</span> <span class="dv">1024</span><span class="op">;</span></span>
-<span id="cb6-2"><a aria-label="2"></a><span class="dt">uint8_t</span> tensor_arena<span class="op">[</span>kTensorArenaSize<span class="op">];</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource cpp number-lines code-with-copy"><code class="sourceCode cpp"><span id="cb6-1"><a aria-label="1"></a><span class="kw">alignas</span><span class="op">(</span><span class="dv">16</span><span class="op">)</span> <span class="at">static</span> <span class="dt">uint8_t</span> tensor_arena<span class="op">[</span><span class="dv">1024</span><span class="op">];</span></span>
+<span id="cb6-2"><a aria-label="2"></a><span class="co">/* 1024 Byte sind eine Lehrannahme, kein gemessenes Budget. */</span></span>
 <span id="cb6-3"><a aria-label="3"></a></span>
-<span id="cb6-4"><a aria-label="4"></a><span class="co">/* Lehrschnitt, hier nicht übersetzt. Kein TFLM-Tree im Repository.</span></span>
-<span id="cb6-5"><a aria-label="5"></a><span class="co">   Konstruktor ohne ErrorReporter, Rückgaben prüfen. */</span></span>
-<span id="cb6-6"><a aria-label="6"></a><span class="cf">if</span> <span class="op">(</span>model<span class="op">-&gt;</span>version<span class="op">()</span> <span class="op">!=</span> TFLITE_SCHEMA_VERSION<span class="op">)</span> <span class="op">{</span> <span class="co">/* Abbruch */</span> <span class="op">}</span></span>
-<span id="cb6-7"><a aria-label="7"></a>tflite<span class="op">::</span>MicroInterpreter interpreter<span class="op">(</span></span>
-<span id="cb6-8"><a aria-label="8"></a>    model<span class="op">,</span> resolver<span class="op">,</span> tensor_arena<span class="op">,</span> kTensorArenaSize<span class="op">);</span></span>
-<span id="cb6-9"><a aria-label="9"></a><span class="cf">if</span> <span class="op">(</span>interpreter<span class="op">.</span>AllocateTensors<span class="op">()</span> <span class="op">!=</span> kTfLiteOk<span class="op">)</span> <span class="op">{</span> <span class="co">/* Arena */</span> <span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-4"><a aria-label="4"></a><span class="at">static</span> <span class="dt">int</span> setup_interpreter<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb6-5"><a aria-label="5"></a>    <span class="cf">if</span> <span class="op">(</span>model <span class="op">==</span> <span class="dv">0</span><span class="op">)</span></span>
+<span id="cb6-6"><a aria-label="6"></a>        <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
+<span id="cb6-7"><a aria-label="7"></a>    <span class="cf">if</span> <span class="op">(</span>model<span class="op">-&gt;</span>version<span class="op">()</span> <span class="op">!=</span> TFLITE_SCHEMA_VERSION<span class="op">)</span></span>
+<span id="cb6-8"><a aria-label="8"></a>        <span class="cf">return</span> <span class="op">-</span><span class="dv">2</span><span class="op">;</span></span>
+<span id="cb6-9"><a aria-label="9"></a>    tflite<span class="op">::</span>MicroInterpreter ip<span class="op">(</span></span>
+<span id="cb6-10"><a aria-label="10"></a>        model<span class="op">,</span> resolver<span class="op">,</span> tensor_arena<span class="op">,</span> <span class="dv">1024</span><span class="op">);</span></span>
+<span id="cb6-11"><a aria-label="11"></a>    <span class="cf">if</span> <span class="op">(</span>ip<span class="op">.</span>AllocateTensors<span class="op">()</span> <span class="op">!=</span> kTfLiteOk<span class="op">)</span></span>
+<span id="cb6-12"><a aria-label="12"></a>        <span class="cf">return</span> <span class="op">-</span><span class="dv">3</span><span class="op">;</span></span>
+<span id="cb6-13"><a aria-label="13"></a>    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb6-14"><a aria-label="14"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li>Statischer SRAM-Block — keine Heap-Leaks</li>
 <li>Zu kleine Arena → klarer Fehler bei Allokation</li>
@@ -1932,15 +1937,27 @@ flowchart TD
 </section>
 <section id="inferenz-zyklus" class="slide level2">
 <h2>Inferenz-Zyklus</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource cpp number-lines code-with-copy"><code class="sourceCode cpp"><span id="cb7-1"><a aria-label="1"></a><span class="co">/* Int8-Lehrschnitt. 128 ist kein definiertes 3-Achsen-Fenster. */</span></span>
-<span id="cb7-2"><a aria-label="2"></a><span class="cf">if</span> <span class="op">(</span>input<span class="op">-&gt;</span>type <span class="op">!=</span> kTfLiteInt8<span class="op">)</span> <span class="op">{</span> <span class="co">/* Typfehler */</span> <span class="op">}</span></span>
-<span id="cb7-3"><a aria-label="3"></a><span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> input<span class="op">-&gt;</span>bytes<span class="op">;</span> i<span class="op">++)</span></span>
-<span id="cb7-4"><a aria-label="4"></a>    input<span class="op">-&gt;</span>data<span class="op">.</span>int8<span class="op">[</span>i<span class="op">]</span> <span class="op">=</span> quantize<span class="op">(</span>sample<span class="op">[</span>i<span class="op">]);</span></span>
-<span id="cb7-5"><a aria-label="5"></a><span class="cf">if</span> <span class="op">(</span>interpreter<span class="op">.</span>Invoke<span class="op">()</span> <span class="op">!=</span> kTfLiteOk<span class="op">)</span> <span class="op">{</span> <span class="co">/* Invoke-Fehler */</span> <span class="op">}</span></span>
-<span id="cb7-6"><a aria-label="6"></a><span class="dt">int8_t</span> logit <span class="op">=</span> output<span class="op">-&gt;</span>data<span class="op">.</span>int8<span class="op">[</span><span class="dv">2</span><span class="op">];</span></span>
-<span id="cb7-7"><a aria-label="7"></a><span class="co">/* logit ist kein kalibrierter Score und 0,8 keine Schwelle */</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource cpp number-lines code-with-copy"><code class="sourceCode cpp"><span id="cb7-1"><a aria-label="1"></a><span class="at">static</span> <span class="dt">int</span> run_window<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb7-2"><a aria-label="2"></a>    TfLiteTensor <span class="op">*</span>in <span class="op">=</span> interpreter<span class="op">.</span>input<span class="op">(</span><span class="dv">0</span><span class="op">);</span></span>
+<span id="cb7-3"><a aria-label="3"></a>    TfLiteTensor <span class="op">*</span>out <span class="op">=</span> interpreter<span class="op">.</span>output<span class="op">(</span><span class="dv">0</span><span class="op">);</span></span>
+<span id="cb7-4"><a aria-label="4"></a>    <span class="cf">if</span> <span class="op">(</span>in <span class="op">==</span> <span class="dv">0</span> <span class="op">||</span> out <span class="op">==</span> <span class="dv">0</span><span class="op">)</span></span>
+<span id="cb7-5"><a aria-label="5"></a>        <span class="cf">return</span> <span class="op">-</span><span class="dv">4</span><span class="op">;</span></span>
+<span id="cb7-6"><a aria-label="6"></a>    <span class="cf">if</span> <span class="op">(</span>in<span class="op">-&gt;</span>type <span class="op">!=</span> kTfLiteInt8<span class="op">)</span></span>
+<span id="cb7-7"><a aria-label="7"></a>        <span class="cf">return</span> <span class="op">-</span><span class="dv">5</span><span class="op">;</span></span>
+<span id="cb7-8"><a aria-label="8"></a>    <span class="cf">if</span> <span class="op">(</span>in<span class="op">-&gt;</span>bytes <span class="op">!=</span> <span class="op">(</span><span class="dt">int</span><span class="op">)</span><span class="kw">sizeof</span><span class="op">(</span>sample<span class="op">))</span></span>
+<span id="cb7-9"><a aria-label="9"></a>        <span class="cf">return</span> <span class="op">-</span><span class="dv">6</span><span class="op">;</span></span>
+<span id="cb7-10"><a aria-label="10"></a>    <span class="cf">if</span> <span class="op">(</span>out<span class="op">-&gt;</span>type <span class="op">!=</span> kTfLiteInt8 <span class="op">||</span> out<span class="op">-&gt;</span>bytes <span class="op">&lt;</span> <span class="dv">3</span><span class="op">)</span></span>
+<span id="cb7-11"><a aria-label="11"></a>        <span class="cf">return</span> <span class="op">-</span><span class="dv">7</span><span class="op">;</span></span>
+<span id="cb7-12"><a aria-label="12"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> in<span class="op">-&gt;</span>bytes<span class="op">;</span> i<span class="op">++)</span></span>
+<span id="cb7-13"><a aria-label="13"></a>        in<span class="op">-&gt;</span>data<span class="op">.</span>int8<span class="op">[</span>i<span class="op">]</span> <span class="op">=</span> quantize<span class="op">(</span>sample<span class="op">[</span>i<span class="op">],</span> in<span class="op">);</span></span>
+<span id="cb7-14"><a aria-label="14"></a>    <span class="cf">if</span> <span class="op">(</span>interpreter<span class="op">.</span>Invoke<span class="op">()</span> <span class="op">!=</span> kTfLiteOk<span class="op">)</span></span>
+<span id="cb7-15"><a aria-label="15"></a>        <span class="cf">return</span> <span class="op">-</span><span class="dv">8</span><span class="op">;</span></span>
+<span id="cb7-16"><a aria-label="16"></a>    <span class="cf">return</span> out<span class="op">-&gt;</span>data<span class="op">.</span>int8<span class="op">[</span><span class="dv">2</span><span class="op">];</span> <span class="co">/* Logit, keine Wahrscheinlichkeit */</span></span>
+<span id="cb7-17"><a aria-label="17"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li>Rohdaten → Tensor → <code>Invoke()</code> → Scores</li>
+<li><code>sample</code> hat dieselbe Länge wie der bestätigte Int8-Input.</li>
+<li>Index 2 wird nur gelesen, wenn mindestens drei Ausgabebytes existieren.</li>
+<li>Es gibt im Repository kein gültiges Modell und keinen gepinnten TFLM-Commit.</li>
 </ul>
 <aside class="notes">
 <p>Weniger handgeschriebene Filter — schwarze Kiste mit Wahrscheinlichkeiten.</p>

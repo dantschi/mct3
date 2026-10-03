@@ -708,7 +708,7 @@ flowchart LR
 <li>Hardware: nie nur ein Byte — immer ein ganzer Block (Cache Line)</li>
 </ul>
 <aside class="notes">
-<p>Die zweite Säule ist die räumliche Lokalität. Die Wette der Hardware lautet hier: Wenn die CPU die Adresse 1000 liest, wird sie als Nächstes sehr wahrscheinlich die Adresse 1004 lesen. Um Zeit zu sparen, bringt der Cache beim Besuch im DRAM nicht nur das angefragte Byte mit, sondern packt gleich die nächsten 64 Bytes mit ein. Das ist ein Geniestreich!</p>
+<p>Die zweite Säule ist die räumliche Lokalität. Die Wette der Hardware lautet hier: Wenn die CPU die Adresse 1000 liest, wird sie als Nächstes sehr wahrscheinlich die Adresse 1004 lesen. Um Zeit zu sparen, lädt ein Miss die gesamte Line, ausgerichtet auf die Blockgrenze. Das ist nicht „die nächsten 64 Bytes ab der angefragten Adresse“. Die Quelle ist die nächste zuständige Ebene, nicht automatisch DRAM.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -893,7 +893,7 @@ flowchart LR
 <li>Ein L1-Miss kann in L2 treffen; erst ein Miss der letzten Cache-Ebene geht zum DRAM</li>
 </ul>
 <aside class="notes">
-<p>Das sind die wichtigsten Vokabeln des heutigen Tages. Ein Cache Hit ist ein Treffer, ein Erfolg. Die Pipeline rennt weiter. Ein Cache Miss ist ein Fehlschlag. Der Cache muss zugeben, dass er das gesuchte Datum nicht hat. Jetzt friert die CPU ein und wir müssen auf den lahmen Hauptspeicher warten.</p>
+<p>Ein Cache Miss heißt: die Line fehlt in dieser Ebene. Die einfache Pipeline aus MCT1 wartet dann. Eine OoO-CPU kann andere Befehle überlappen. Das ist kein Einfrieren jeder Implementierung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1014,7 +1014,8 @@ flowchart LR
 <li>Räumliche Lokalität <span class="math inline">\(\Rightarrow\)</span> keine Einzelbyte-Verwaltung</li>
 <li>Verwaltungseinheit: Cache Block / Cache Line</li>
 <li>Typisch 32 oder 64 Bytes zusammenhängender Speicher</li>
-<li>Ein Miss lädt immer die gesamte Line aus dem DRAM</li>
+<li>Ein Miss beschafft die ganze, an der Blockgrenze ausgerichtete Line aus der nächsten zuständigen Ebene</li>
+<li>Ein L1-Miss kann in L2 treffen. DRAM ist nicht jede Quelle</li>
 </ul>
 <div class="quarto-figure quarto-figure-center">
 <figure>
@@ -1561,7 +1562,7 @@ flowchart TD
 <li>Vorteil: kein Thrashing — A und B können nebeneinander leben</li>
 </ul>
 <aside class="notes">
-<p>Um Thrashing zu stoppen, geben wir die starren Parkplätze auf. Fully Associative heißt absolute Freiheit. Ein Block aus dem RAM darf in jede beliebige Zeile des Caches geschrieben werden. Dadurch können Variable A und Variable B aus unserem C-Beispiel friedlich nebeneinander im Cache leben, auch wenn ihre Adressen eigentlich kollidieren würden.</p>
+<p>Vollassoziativität beseitigt die Indexkonflikte dieses Beispiels. Capacity Misses und Thrashing durch ein zu großes Working Set bleiben möglich.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1701,7 +1702,7 @@ flowchart LR
 </tbody>
 </table>
 <aside class="notes">
-<p>Das ist der Sweetspot. Wenn wir einen 4-Way Set-Associative Cache bauen, brauchen wir nur vier Komparatoren. Das ist billig und kalt. Wenn unser C-Programm jetzt Variable A und B abfragt, die denselben Index haben, legen wir A in Way 0 und B in Way 1 des selben Sets. Das Thrashing-Problem ist gelöst.</p>
+<p>Das löst die Indexkollision von A und B. Es beseitigt nicht jedes Thrashing.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;

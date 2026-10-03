@@ -1390,13 +1390,23 @@ flowchart LR
 <li>Ohne Update: sofort erneuter Eintritt nach <code>mret</code></li>
 <li>Pflicht in der ISR: neuen Zukunftswert nach <code>mtimecmp</code> schreiben</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb8-1"><a aria-label="1"></a><span class="dt">void</span> timer_isr<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb8-2"><a aria-label="2"></a>    <span class="dt">uint64_t</span> now <span class="op">=</span> read_mtime<span class="op">();</span></span>
-<span id="cb8-3"><a aria-label="3"></a>    write_mtimecmp<span class="op">(</span>now <span class="op">+</span> INTERVAL<span class="op">);</span>  <span class="co">/* neu scharf schalten */</span></span>
-<span id="cb8-4"><a aria-label="4"></a>    <span class="co">/* eigentliche Arbeit ... */</span></span>
-<span id="cb8-5"><a aria-label="5"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb8-1"><a aria-label="1"></a><span class="dt">static</span> <span class="dt">uint64_t</span> next_deadline<span class="op">;</span></span>
+<span id="cb8-2"><a aria-label="2"></a></span>
+<span id="cb8-3"><a aria-label="3"></a><span class="dt">void</span> timer_isr<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb8-4"><a aria-label="4"></a>    <span class="dt">uint64_t</span> now <span class="op">=</span> read_mtime<span class="op">();</span></span>
+<span id="cb8-5"><a aria-label="5"></a>    <span class="dt">unsigned</span> steps <span class="op">=</span> <span class="dv">0</span><span class="bu">u</span><span class="op">;</span></span>
+<span id="cb8-6"><a aria-label="6"></a>    <span class="cf">do</span> <span class="op">{</span></span>
+<span id="cb8-7"><a aria-label="7"></a>        next_deadline <span class="op">+=</span> TICKS_PER_MS<span class="op">;</span></span>
+<span id="cb8-8"><a aria-label="8"></a>        steps<span class="op">++;</span></span>
+<span id="cb8-9"><a aria-label="9"></a>    <span class="op">}</span> <span class="cf">while</span> <span class="op">((</span><span class="dt">int64_t</span><span class="op">)(</span>next_deadline <span class="op">-</span> now<span class="op">)</span> <span class="op">&lt;=</span> <span class="dv">0</span></span>
+<span id="cb8-10"><a aria-label="10"></a>             <span class="op">&amp;&amp;</span> steps <span class="op">&lt;</span> <span class="dv">4</span><span class="bu">u</span><span class="op">);</span></span>
+<span id="cb8-11"><a aria-label="11"></a>    <span class="cf">if</span> <span class="op">((</span><span class="dt">int64_t</span><span class="op">)(</span>next_deadline <span class="op">-</span> now<span class="op">)</span> <span class="op">&lt;=</span> <span class="dv">0</span><span class="op">)</span></span>
+<span id="cb8-12"><a aria-label="12"></a>        next_deadline <span class="op">=</span> now <span class="op">+</span> TICKS_PER_MS<span class="op">;</span> <span class="co">/* Rest überspringen */</span></span>
+<span id="cb8-13"><a aria-label="13"></a>    write_mtimecmp<span class="op">(</span>next_deadline<span class="op">);</span></span>
+<span id="cb8-14"><a aria-label="14"></a>    uptime_ms<span class="op">++;</span> <span class="co">/* ein Eintritt, kein Zählen jedes verpassten Ticks */</span></span>
+<span id="cb8-15"><a aria-label="15"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Häufiger Anfängerfehler: LED toggeln und zurückkehren, ohne mtimecmp zu aktualisieren — dann feuert der Alarm sofort wieder. Besser <code>mtimecmp += INTERVAL</code> statt <code>now + INTERVAL</code>, um Drift durch ISR-Latenz zu vermeiden.</p>
+<p><code>now + INTERVAL</code> wäre das relative Modell und verschiebt die Phase um die ISR-Latenz. Hier gilt der absolute Merker. Höchstens vier Nachholschritte, danach wird der Rest übersprungen. Das Pending-Bit zählt nicht mehrere Perioden.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1468,17 +1478,13 @@ flowchart LR
 <li>Umrechnung in Software nötig</li>
 <li>Beispiel: Quarz <span class="math inline">\(10\,\mathrm{MHz}\)</span> <span class="math inline">\(\Rightarrow\)</span> <span class="math inline">\(10^{7}\)</span> Takte/s</li>
 <li>Pro ms: <span class="math inline">\(10^{7}/1000 = 10^{4}\)</span> Takte</li>
-<li>Nächster Alarm: <code>mtimecmp = mtime + 10000</code></li>
+<li>Nächster Alarm im absoluten Modell: <code>next_deadline</code>, nicht <code>now + 10000</code></li>
+<li><code>now + 10000</code> bleibt nur das relative Gegenbeispiel und driftet</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb9-1"><a aria-label="1"></a><span class="pp">#define TIMER_FREQ   </span><span class="dv">10000000</span><span class="pp">  </span><span class="co">/* 10 MHz */</span></span>
-<span id="cb9-2"><a aria-label="2"></a><span class="pp">#define TICKS_PER_MS </span><span class="op">(</span><span class="pp">TIMER_FREQ </span><span class="op">/</span><span class="pp"> </span><span class="dv">1000</span><span class="op">)</span></span>
-<span id="cb9-3"><a aria-label="3"></a></span>
-<span id="cb9-4"><a aria-label="4"></a><span class="dt">void</span> timer_isr<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb9-5"><a aria-label="5"></a>    <span class="dt">uint64_t</span> now <span class="op">=</span> read_mtime<span class="op">();</span></span>
-<span id="cb9-6"><a aria-label="6"></a>    write_mtimecmp<span class="op">(</span>now <span class="op">+</span> TICKS_PER_MS<span class="op">);</span></span>
-<span id="cb9-7"><a aria-label="7"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb9-1"><a aria-label="1"></a><span class="pp">#define TIMER_FREQ   </span><span class="dv">10000000</span><span class="bu">u</span></span>
+<span id="cb9-2"><a aria-label="2"></a><span class="pp">#define TICKS_PER_MS </span><span class="op">(</span><span class="pp">TIMER_FREQ </span><span class="op">/</span><span class="pp"> </span><span class="dv">1000</span><span class="bu">u</span><span class="op">)</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Im Datenblatt steht die Timer-Frequenz. Daraus berechnen Sie Ticks pro Millisekunde und programmieren <code>mtimecmp</code> entsprechend — das ist typische Labor-Mathematik.</p>
+<p>Bei 10 MHz sind 10000 Takte eine Millisekunde. Die ISR oben schreibt den absoluten Termin. Ein relativer Addend auf <code>now</code> verschiebt jede folgende Periode um die Latenz.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1585,8 +1591,8 @@ flowchart LR
 <span id="cb10-21"><a aria-label="21"></a></span>
 <span id="cb10-22"><a aria-label="22"></a><span class="dt">void</span> init_system_tick<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
 <span id="cb10-23"><a aria-label="23"></a>    <span class="co">/* Stack und mtvec müssen schon stehen */</span></span>
-<span id="cb10-24"><a aria-label="24"></a>    <span class="dt">uint64_t</span> now <span class="op">=</span> read_mtime<span class="op">();</span></span>
-<span id="cb10-25"><a aria-label="25"></a>    write_mtimecmp<span class="op">(</span>now <span class="op">+</span> <span class="dv">10000</span><span class="bu">u</span><span class="op">);</span>  <span class="co">/* 10 MHz, 1 ms */</span></span>
+<span id="cb10-24"><a aria-label="24"></a>    next_deadline <span class="op">=</span> read_mtime<span class="op">()</span> <span class="op">+</span> <span class="dv">10000</span><span class="bu">u</span><span class="op">;</span> <span class="co">/* erster Termin */</span></span>
+<span id="cb10-25"><a aria-label="25"></a>    write_mtimecmp<span class="op">(</span>next_deadline<span class="op">);</span></span>
 <span id="cb10-26"><a aria-label="26"></a>    set_csr<span class="op">(</span>mie<span class="op">,</span> <span class="op">(</span><span class="dv">1</span><span class="bu">u</span> <span class="op">&lt;&lt;</span> <span class="dv">7</span><span class="op">));</span>       <span class="co">/* MTIE */</span></span>
 <span id="cb10-27"><a aria-label="27"></a>    set_csr<span class="op">(</span>mstatus<span class="op">,</span> MSTATUS_MIE<span class="op">);</span></span>
 <span id="cb10-28"><a aria-label="28"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
@@ -1828,16 +1834,21 @@ flowchart LR
 <figcaption>Claim löscht PLIC-Pending, nicht die Ursache im UART. ID 0 nicht abschließen.</figcaption>
 </figure>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb11-1"><a aria-label="1"></a><span class="dt">void</span> external_interrupt_handler<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb11-2"><a aria-label="2"></a>    <span class="dt">uint32_t</span> id <span class="op">=</span> <span class="op">*(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*)</span>PLIC_CLAIM_REG<span class="op">;</span></span>
-<span id="cb11-3"><a aria-label="3"></a>    my_isr_functions<span class="op">[</span>id<span class="op">]();</span></span>
-<span id="cb11-4"><a aria-label="4"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb11-1"><a aria-label="1"></a><span class="pp">#define PLIC_MAX_ID </span><span class="dv">3</span><span class="bu">u</span></span>
+<span id="cb11-2"><a aria-label="2"></a></span>
+<span id="cb11-3"><a aria-label="3"></a><span class="dt">uint32_t</span> plic_claim<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb11-4"><a aria-label="4"></a>    <span class="cf">return</span> <span class="op">*(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*)</span>PLIC_CLAIM_REG<span class="op">;</span></span>
+<span id="cb11-5"><a aria-label="5"></a><span class="op">}</span></span>
+<span id="cb11-6"><a aria-label="6"></a></span>
+<span id="cb11-7"><a aria-label="7"></a><span class="dt">void</span> plic_complete<span class="op">(</span><span class="dt">uint32_t</span> id<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb11-8"><a aria-label="8"></a>    <span class="op">*(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*)</span>PLIC_CLAIM_REG <span class="op">=</span> id<span class="op">;</span></span>
+<span id="cb11-9"><a aria-label="9"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li>MMIO-Read auf Claim-Register → Gewinner-ID</li>
-<li>Danach direkter Sprung (z. B. Funktionszeiger-Array)</li>
+<li>Ein Claim kann 0 liefern: kein Interrupt</li>
+<li>ID 0 nicht abschließen und keinen Handler aufrufen</li>
 </ul>
 <aside class="notes">
-<p>Ein Read ersetzt die lange Abfragekette: ID lesen, passende ISR aufrufen.</p>
+<p>Der folgende vollständige Handler prüft den Bereich, bevor ein Funktionszeiger benutzt wird.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1874,14 +1885,19 @@ flowchart LR
 <section id="claim-und-complete" class="slide level2">
 <h2>Claim und Complete</h2>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb12-1"><a aria-label="1"></a><span class="dt">void</span> external_interrupt_handler<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb12-2"><a aria-label="2"></a>    <span class="dt">uint32_t</span> id <span class="op">=</span> <span class="op">*(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*)</span>PLIC_CLAIM_REG<span class="op">;</span></span>
-<span id="cb12-3"><a aria-label="3"></a>    my_isr_functions<span class="op">[</span>id<span class="op">]();</span>                 <span class="co">/* Treiberarbeit */</span></span>
-<span id="cb12-4"><a aria-label="4"></a>    <span class="op">*(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*)</span>PLIC_CLAIM_REG <span class="op">=</span> id<span class="op">;</span>  <span class="co">/* Complete */</span></span>
-<span id="cb12-5"><a aria-label="5"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb12-2"><a aria-label="2"></a>    <span class="dt">uint32_t</span> id <span class="op">=</span> plic_claim<span class="op">();</span></span>
+<span id="cb12-3"><a aria-label="3"></a>    <span class="cf">if</span> <span class="op">(</span>id <span class="op">==</span> <span class="dv">0</span><span class="bu">u</span><span class="op">)</span></span>
+<span id="cb12-4"><a aria-label="4"></a>        <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb12-5"><a aria-label="5"></a>    <span class="cf">if</span> <span class="op">(</span>id <span class="op">&gt;</span> PLIC_MAX_ID <span class="op">||</span> handlers<span class="op">[</span>id<span class="op">]</span> <span class="op">==</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-6"><a aria-label="6"></a>        plic_complete<span class="op">(</span>id<span class="op">);</span> <span class="co">/* einmal, keine Schleife */</span></span>
+<span id="cb12-7"><a aria-label="7"></a>        <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb12-8"><a aria-label="8"></a>    <span class="op">}</span></span>
+<span id="cb12-9"><a aria-label="9"></a>    handlers<span class="op">[</span>id<span class="op">]();</span>      <span class="co">/* Ursache im Gerät quittieren */</span></span>
+<span id="cb12-10"><a aria-label="10"></a>    plic_complete<span class="op">(</span>id<span class="op">);</span>   <span class="co">/* nur diese gültige ID */</span></span>
+<span id="cb12-11"><a aria-label="11"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li>Während Claimed: dieselbe Quelle blockiert; andere dürfen pending werden</li>
-<li>ID zurückschreiben → Kanal wieder freigeben</li>
-<li>Danach <code>mret</code> in den unterbrochenen Kontext</li>
+<li>Eine Quelle je Eintritt. Weitere Pending-Quellen kommen mit dem nächsten External Interrupt.</li>
+<li>Unbekannte IDs werden abgeschlossen, damit der PLIC nicht hängen bleibt.</li>
 </ul>
 <aside class="notes">
 <p>Ohne Complete bleibt die Quelle oft dauerhaft blockiert. Claim und Complete teilen sich typischerweise dieselbe Registeradresse (Read vs.&nbsp;Write).</p>

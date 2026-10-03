@@ -683,12 +683,12 @@ f_{\mathrm{cnt}} = \frac{10^{8}}{10^{4}} = 10\,\mathrm{kHz}
 <ul>
 <li>Wo endet das Zählen? → Auto-Reload / Period Register (ARR)</li>
 <li>Absolute Obergrenze des Zählers</li>
-<li>Erreicht <code>CNT</code> den ARR-Wert: Hardware setzt typisch auf 0 zurück</li>
-<li>Dieser Rücksetzzyklus definiert die Periode des Timers</li>
-<li>Achtung Datenblatt: Periode oft <span class="math inline">\(ARR\)</span> oder <span class="math inline">\(ARR + 1\)</span> Ticks</li>
+<li>Erreicht <code>CNT</code> den Wert ARR, ist das noch ein voller Tick</li>
+<li>Der nächste Zählschritt setzt auf 0. Die Periode ist ARR+1</li>
+<li>Im Kernmodell: PSC+1, Vergleich <code>CNT &lt; CCR</code>, Active-High</li>
 </ul>
 <aside class="notes">
-<p>ARR ist das Limit. Ob die Periode <span class="math inline">\(ARR\)</span> oder <span class="math inline">\(ARR+1\)</span> Zählschritte hat, steht im Datenblatt (Hersteller unterscheiden sich) — vor Duty-Cycle-Rechnungen immer nachschlagen.</p>
+<p>ARR bleibt ein vollständiges Intervall. Andere Timer, die beim Erreichen sofort zurücksetzen, sind ein anderes Modell.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -839,7 +839,7 @@ f_{\mathrm{cnt}} = \frac{10^{8}}{10^{4}} = 10\,\mathrm{kHz}
 <section id="die-analoge-illusion" class="slide level2">
 <h2>Die analoge Illusion</h2>
 <ul>
-<li>Zurück zur Leitfrage: 50 % Motorleistung mit binärem Pin?</li>
+<li>Zurück zur Leitfrage: 50 Prozent aktive Zeit an einem binären Pin?</li>
 <li>Trick: Pin sehr schnell ein- und ausschalten</li>
 <li>Beispiel: 1 kHz, je Hälfte der Periode HIGH/LOW</li>
 <li>Motor und Auge sind zu träge, um dem Stottern zu folgen</li>
@@ -934,7 +934,7 @@ f_{\mathrm{cnt}} = \frac{10^{8}}{10^{4}} = 10\,\mathrm{kHz}
 \mathrm{Duty\ Cycle} = \frac{t_{\mathrm{HIGH}}}{T}
 \]</span></p>
 <ul>
-<li>Prozentsatz der Energie, die wir einbringen</li>
+<li>Anteil der aktiven Zeit im gewählten PWM-Modell</li>
 <li>Periode/Frequenz konstant; wir ändern den Duty Cycle</li>
 </ul>
 <aside class="notes">
@@ -2002,23 +2002,31 @@ flowchart TD
           display:block!important;
       }</style></aside>
 </section>
-<section id="fading-in-der-main-schleife" class="slide level2">
-<h2>Fading in der Main-Schleife</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb7-1"><a aria-label="1"></a><span class="dt">int</span> main<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb7-2"><a aria-label="2"></a>    init_pwm<span class="op">();</span></span>
-<span id="cb7-3"><a aria-label="3"></a>    <span class="dt">int</span> brightness <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
-<span id="cb7-4"><a aria-label="4"></a>    <span class="cf">while</span> <span class="op">(</span><span class="dv">1</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb7-5"><a aria-label="5"></a>        set_led_brightness<span class="op">(</span>brightness<span class="op">);</span></span>
-<span id="cb7-6"><a aria-label="6"></a>        brightness <span class="op">=</span> <span class="op">(</span>brightness <span class="op">+</span> <span class="dv">1</span><span class="op">)</span> <span class="op">%</span> <span class="dv">101</span><span class="op">;</span> <span class="co">/* Sprung 100 auf 0 */</span></span>
-<span id="cb7-7"><a aria-label="7"></a>        <span class="co">/* Deadline aus Block 3, kein blockierendes Warten als Gesundheitsbeweis */</span></span>
-<span id="cb7-8"><a aria-label="8"></a>        wdt_feed<span class="op">();</span></span>
-<span id="cb7-9"><a aria-label="9"></a>    <span class="op">}</span></span>
-<span id="cb7-10"><a aria-label="10"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="fading-alle-10-ms" class="slide level2">
+<h2>Fading alle 10 ms</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb7-1"><a aria-label="1"></a><span class="pp">#define FADE_TICKS </span><span class="dv">100000</span><span class="bu">u</span><span class="pp"> </span><span class="co">/* 10 ms bei 10 MHz */</span></span>
+<span id="cb7-2"><a aria-label="2"></a></span>
+<span id="cb7-3"><a aria-label="3"></a><span class="dt">static</span> <span class="dt">uint64_t</span> next_fade<span class="op">;</span></span>
+<span id="cb7-4"><a aria-label="4"></a><span class="dt">static</span> <span class="dt">int</span> brightness<span class="op">;</span></span>
+<span id="cb7-5"><a aria-label="5"></a><span class="dt">static</span> <span class="dt">int</span> dir <span class="op">=</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb7-6"><a aria-label="6"></a></span>
+<span id="cb7-7"><a aria-label="7"></a><span class="dt">void</span> fade_poll<span class="op">(</span><span class="dt">uint64_t</span> now<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb7-8"><a aria-label="8"></a>    <span class="cf">if</span> <span class="op">((</span><span class="dt">int64_t</span><span class="op">)(</span>now <span class="op">-</span> next_fade<span class="op">)</span> <span class="op">&lt;</span> <span class="dv">0</span><span class="op">)</span></span>
+<span id="cb7-9"><a aria-label="9"></a>        <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb7-10"><a aria-label="10"></a>    next_fade <span class="op">+=</span> FADE_TICKS<span class="op">;</span></span>
+<span id="cb7-11"><a aria-label="11"></a>    set_led_brightness<span class="op">((</span><span class="dt">uint8_t</span><span class="op">)</span>brightness<span class="op">);</span></span>
+<span id="cb7-12"><a aria-label="12"></a>    brightness <span class="op">+=</span> dir<span class="op">;</span></span>
+<span id="cb7-13"><a aria-label="13"></a>    <span class="cf">if</span> <span class="op">(</span>brightness <span class="op">&gt;=</span> <span class="dv">100</span> <span class="op">||</span> brightness <span class="op">&lt;=</span> <span class="dv">0</span><span class="op">)</span></span>
+<span id="cb7-14"><a aria-label="14"></a>        dir <span class="op">=</span> <span class="op">-</span>dir<span class="op">;</span></span>
+<span id="cb7-15"><a aria-label="15"></a>    <span class="cf">if</span> <span class="op">(</span>step_done<span class="op">)</span></span>
+<span id="cb7-16"><a aria-label="16"></a>        wdt_feed<span class="op">();</span></span>
+<span id="cb7-17"><a aria-label="17"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li>Die Rampe springt von 100 auf 0. Ein Feed beweist nur, dass diese Schleife noch laeuft.</li>
+<li>Die Helligkeit steigt und fällt. Es gibt keinen Sprung von 100 auf 0.</li>
+<li>Der Feed hängt an <code>step_done</code>, nicht daran, dass die Zeile erreicht wurde.</li>
 </ul>
 <aside class="notes">
-<p>Sauberer: Wartezeiten über SysTick statt busy <code>delay</code>. Wichtig bleibt: Feed nur hier, nicht in der ISR.</p>
+<p>Sauberer Takt kommt aus dem absoluten Tick von Block 3. Der Watchdog wird nur nach abgeschlossener Arbeit gefüttert, nicht in der Timer-ISR.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;

@@ -578,7 +578,7 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#reorder-buffer-rob",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "Reorder Buffer (ROB)",
-    "text": "Reorder Buffer (ROB)\n\n\n\nWerte stehen in der PRF. Der ROB merkt sich Ordnung, Ready und Exceptions.\n\n\n\nIn diesem PRF-Modell schreibt die ALU in ein physisches Register, nicht in den ROB\nDer ROB führt Reihenfolge, Completion, Exception und Zielmetadaten. Ein result-holding ROB wäre ein anderes, hier nicht verwendetes Modell\n\nDas PRF-Bild ersetzt den Ergebniszylinder. Fertige jüngere Befehle stehen in physischen Registern, bis der Head retiriert.\n\nNetz mit doppeltem Boden: rechnen darf chaotisch sein — sichtbar werden geordnet."
+    "text": "Reorder Buffer (ROB)\n\n\n\nWerte stehen in der PRF. Der ROB merkt sich Ordnung, Ready und Exceptions.\n\n\n\nIn diesem PRF-Modell schreibt die ALU in ein physisches Register, nicht in den ROB\nDer ROB führt Reihenfolge, Completion, Exception und Zielmetadaten. Ein result-holding ROB wäre ein anderes, hier nicht verwendetes Modell\n\nFertige jüngere Befehle stehen in physischen Registern, bis der Head retiriert.\n\nNetz mit doppeltem Boden: rechnen darf chaotisch sein — sichtbar werden geordnet."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#in-order-commit-retire",
@@ -676,7 +676,7 @@
     "href": "vorlesungen/07_moderne_cpu_architekturen.html#bit-saturierender-zähler",
     "title": "07 · Moderne CPU-Architekturen",
     "section": "2-Bit saturierender Zähler",
-    "text": "2-Bit saturierender Zähler\n\n\n\nVollständiger Automat. Ab Zustand 11 kostet TTTT N genau einen Miss je Durchlauf.\n\n\nIndustrie-Standard: Zustände \\(00\\)–\\(11\\)\n\n\n\nCode\nBedeutung\nVorhersage\n\n\n\n\n\\(00\\)\nStrongly Not Taken\nNot Taken\n\n\n\\(01\\)\nWeakly Not Taken\nNot Taken\n\n\n\\(10\\)\nWeakly Taken\nTaken\n\n\n\\(11\\)\nStrongly Taken\nTaken\n\n\n\nTaken: \\(+1\\) (Sättigung bei \\(11\\)); Not Taken: \\(-1\\) (Sättigung bei \\(00\\)). Die Selbstschleifen an \\(00\\) und \\(11\\) stehen im Diagramm.\n\nStart im schwachen Not-Taken \\(01\\), erstes Ergebnis Taken: Vorhersage Not Taken, Folgezustand \\(10\\). Ab stark Taken kostet die Folge T T T T N einen Miss. Der unvollständige Kettengraph ohne Sättigungsschleifen gilt nicht mehr."
+    "text": "2-Bit saturierender Zähler\n\n\n\nVollständiger Automat. Ab Zustand 11 kostet TTTT N genau einen Miss je Durchlauf.\n\n\nIndustrie-Standard: Zustände \\(00\\)–\\(11\\)\n\n\n\nCode\nBedeutung\nVorhersage\n\n\n\n\n\\(00\\)\nStrongly Not Taken\nNot Taken\n\n\n\\(01\\)\nWeakly Not Taken\nNot Taken\n\n\n\\(10\\)\nWeakly Taken\nTaken\n\n\n\\(11\\)\nStrongly Taken\nTaken\n\n\n\nTaken: \\(+1\\) (Sättigung bei \\(11\\)); Not Taken: \\(-1\\) (Sättigung bei \\(00\\)). Die Selbstschleifen an \\(00\\) und \\(11\\) stehen im Diagramm.\n\nStart im schwachen Not-Taken \\(01\\), erstes Ergebnis Taken: Vorhersage Not Taken, Folgezustand \\(10\\). Ab stark Taken kostet die Folge T T T T N einen Miss."
   },
   {
     "objectID": "vorlesungen/07_moderne_cpu_architekturen.html#hysterese-des-2-bit-zählers",
@@ -1327,14 +1327,14 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#c-write-transaktion",
     "title": "05 · Serielle Bussysteme",
     "section": "C: Write-Transaktion",
-    "text": "C: Write-Transaktion\nAblauf: START → Adresse+W → Reg → Daten → STOP\nint sensor_wakeup(void) {\n    i2c_send_start();\n    i2c_send_byte(0xD0u);          /* 0x68 &lt;&lt; 1 | Write */\n    if (!wait_for_ack_timeout()) return -1;\n    i2c_send_byte(0x6Bu);          /* PWR_MGMT_1 */\n    if (!wait_for_ack_timeout()) return -1;\n    i2c_send_byte(0x00u);          /* Sleep aus, Lehrwert */\n    if (!wait_for_ack_timeout()) return -1;\n    i2c_send_stop();\n    return 0;\n}\n\nEin NACK oder ein abgelaufenes Zeitlimit beendet die Funktion. wait_for_ack() ohne Timeout darf bei fehlendem Sensor nicht hängen bleiben. STOP nur, solange dieser Controller den Bus besitzt."
+    "text": "C: Write-Transaktion\nAblauf: START → Adresse+W → Reg → Daten → STOP\nenum {\n    I2C_OK = 0,\n    I2C_NACK = 1,\n    I2C_TIMEOUT = 2,\n    I2C_ARB_LOST = 3,\n    I2C_BUS_ERR = 4\n};\n\nstatic int i2c_fail(int st) {\n    if (st != I2C_ARB_LOST && i2c_owns_bus())\n        i2c_send_stop();\n    return st;\n}\n\nint sensor_wakeup(void) {\n    int st;\n    i2c_send_start();\n    i2c_send_byte(0xD0u);\n    st = wait_phase();\n    if (st != I2C_OK) return i2c_fail(st);\n    i2c_send_byte(0x6Bu);\n    st = wait_phase();\n    if (st != I2C_OK) return i2c_fail(st);\n    i2c_send_byte(0x00u);\n    st = wait_phase();\n    if (st != I2C_OK) return i2c_fail(st);\n    i2c_send_stop();\n    return I2C_OK;\n}\n\nEin NACK, ein Timeout, ein Arbitration-Verlust und ein Busfehler sind verschiedene Statuswerte. wait_phase begrenzt Start, Byte, Empfang, Stretching und Stop. STOP nur, solange dieser Controller den Bus besitzt."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#c-read-mit-repeated-start",
     "href": "vorlesungen/05_serielle_bussysteme.html#c-read-mit-repeated-start",
     "title": "05 · Serielle Bussysteme",
     "section": "C: Read mit Repeated Start",
-    "text": "C: Read mit Repeated Start\n\n\n\nSechs Bytes ab 0x3B. Das Beispiel ergibt +0,25 g, −0,5 g und +1 g.\n\n\nZuerst Registerzeiger setzen (Write), dann Repeated START und Read:\n/* Timeout. Fehlercode bleibt getrennt von den Bytes. */\nint read_accel_xyz(uint8_t out[6]) {\n    i2c_send_start();\n    i2c_send_byte(0xD0u);          /* 0x68 &lt;&lt; 1 | Write */\n    if (!wait_for_ack_timeout()) return -1;\n    i2c_send_byte(0x3Bu);\n    if (!wait_for_ack_timeout()) return -1;\n    i2c_send_start();              /* Repeated Start */\n    i2c_send_byte(0xD1u);          /* Read */\n    if (!wait_for_ack_timeout()) return -1;\n    for (int i = 0; i &lt; 5; i++)\n        out[i] = i2c_read_byte_ack();\n    out[5] = i2c_read_byte_nack(); /* normaler Abschluss */\n    i2c_send_stop();\n    return 0;\n}\n\nKlassisches Muster: Pointer setzen, dann lesen — oft ohne STOP dazwischen (Repeated Start)."
+    "text": "C: Read mit Repeated Start\n\n\n\nSechs Bytes ab 0x3B. Das Beispiel ergibt +0,25 g, −0,5 g und +1 g.\n\n\nZuerst Registerzeiger setzen (Write), dann Repeated START und Read:\nint read_accel_xyz(uint8_t out[6]) {\n    int st;\n    i2c_send_start();\n    i2c_send_byte(0xD0u);\n    st = wait_phase();\n    if (st != I2C_OK) return i2c_fail(st);\n    i2c_send_byte(0x3Bu);\n    st = wait_phase();\n    if (st != I2C_OK) return i2c_fail(st);\n    i2c_send_start();\n    i2c_send_byte(0xD1u);\n    st = wait_phase();\n    if (st != I2C_OK) return i2c_fail(st);\n    for (int i = 0; i &lt; 5; i++) {\n        st = i2c_read_ack(&out[i]);\n        if (st != I2C_OK) return i2c_fail(st);\n    }\n    st = i2c_read_nack(&out[5]);\n    if (st != I2C_OK) return i2c_fail(st);\n    i2c_send_stop();\n    return I2C_OK;\n}\n\nKlassisches Muster: Pointer setzen, dann lesen — oft ohne STOP dazwischen (Repeated Start)."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#renode-virtueller-i2c-sensor",
@@ -1362,7 +1362,7 @@
     "href": "vorlesungen/05_serielle_bussysteme.html#endianness",
     "title": "05 · Serielle Bussysteme",
     "section": "Endianness",
-    "text": "Endianness\n\n16-Bit-Werte oft als High- dann Low-Byte (Big-Endian am Sensor)\nIn C zusammensetzen:\n\nuint8_t b[6];\nif (read_accel_xyz(b) != 0) {\n    /* Timeout, NACK oder Busfehler. 0x00 wäre ein gültiger Messwert. */\n}\nuint16_t ux = (uint16_t)(((uint16_t)b[0] &lt;&lt; 8) | b[1]);\nint16_t x = (int16_t)ux;   /* 0x1000 -&gt; 4096 */\n\nHäufiger Fehler: Bytes vertauscht oder Vorzeichen falsch interpretiert."
+    "text": "Endianness\n\n16-Bit-Werte oft als High- dann Low-Byte (Big-Endian am Sensor)\nIn C zusammensetzen:\n\nint16_t decode_x(const uint8_t b[6], int st, int *ok) {\n    uint16_t ux;\n    if (st != I2C_OK) {\n        *ok = 0;\n        return 0;\n    }\n    ux = (uint16_t)(((uint16_t)b[0] &lt;&lt; 8) | b[1]);\n    *ok = 1;\n    return (int16_t)ux; /* 0x1000 -&gt; 4096 */\n}\n\nHäufiger Fehler: den Puffer trotz Fehlerstatus dekodieren. High-Byte liegt bei b[0]. Der Cast auf int16_t übernimmt das Zweierkomplement, nachdem die Bytes unsigned zusammengesetzt wurden. 0x00 bis 0xFF bleiben gültige Messbytes."
   },
   {
     "objectID": "vorlesungen/05_serielle_bussysteme.html#polling-vs.-interrupt",
@@ -1698,7 +1698,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#quittieren-des-timer-interrupts",
     "title": "03 · Interrupts & Timer",
     "section": "Quittieren des Timer-Interrupts",
-    "text": "Quittieren des Timer-Interrupts\n\nVergleich ist \\(\\ge\\): Interrupt bleibt aktiv, solange mtime &gt;= mtimecmp\nOhne Update: sofort erneuter Eintritt nach mret\nPflicht in der ISR: neuen Zukunftswert nach mtimecmp schreiben\n\nvoid timer_isr(void) {\n    uint64_t now = read_mtime();\n    write_mtimecmp(now + INTERVAL);  /* neu scharf schalten */\n    /* eigentliche Arbeit ... */\n}\n\nHäufiger Anfängerfehler: LED toggeln und zurückkehren, ohne mtimecmp zu aktualisieren — dann feuert der Alarm sofort wieder. Besser mtimecmp += INTERVAL statt now + INTERVAL, um Drift durch ISR-Latenz zu vermeiden."
+    "text": "Quittieren des Timer-Interrupts\n\nVergleich ist \\(\\ge\\): Interrupt bleibt aktiv, solange mtime &gt;= mtimecmp\nOhne Update: sofort erneuter Eintritt nach mret\nPflicht in der ISR: neuen Zukunftswert nach mtimecmp schreiben\n\nstatic uint64_t next_deadline;\n\nvoid timer_isr(void) {\n    uint64_t now = read_mtime();\n    unsigned steps = 0u;\n    do {\n        next_deadline += TICKS_PER_MS;\n        steps++;\n    } while ((int64_t)(next_deadline - now) &lt;= 0\n             && steps &lt; 4u);\n    if ((int64_t)(next_deadline - now) &lt;= 0)\n        next_deadline = now + TICKS_PER_MS; /* Rest überspringen */\n    write_mtimecmp(next_deadline);\n    uptime_ms++; /* ein Eintritt, kein Zählen jedes verpassten Ticks */\n}\n\nnow + INTERVAL wäre das relative Modell und verschiebt die Phase um die ISR-Latenz. Hier gilt der absolute Merker. Höchstens vier Nachholschritte, danach wird der Rest übersprungen. Das Pending-Bit zählt nicht mehrere Perioden."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#konzept-der-system-tick",
@@ -1719,7 +1719,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#mathematik-takte-berechnen",
     "title": "03 · Interrupts & Timer",
     "section": "Mathematik: Takte berechnen",
-    "text": "Mathematik: Takte berechnen\n\n\n\nDrift 11,2 ms statt 11,0 ms. Sechs fällige Millisekunden, nächste Deadline 16 ms.\n\n\n\nmtime zählt Oszillator-Takte, keine Sekunden\nUmrechnung in Software nötig\nBeispiel: Quarz \\(10\\,\\mathrm{MHz}\\) \\(\\Rightarrow\\) \\(10^{7}\\) Takte/s\nPro ms: \\(10^{7}/1000 = 10^{4}\\) Takte\nNächster Alarm: mtimecmp = mtime + 10000\n\n#define TIMER_FREQ   10000000  /* 10 MHz */\n#define TICKS_PER_MS (TIMER_FREQ / 1000)\n\nvoid timer_isr(void) {\n    uint64_t now = read_mtime();\n    write_mtimecmp(now + TICKS_PER_MS);\n}\n\nIm Datenblatt steht die Timer-Frequenz. Daraus berechnen Sie Ticks pro Millisekunde und programmieren mtimecmp entsprechend — das ist typische Labor-Mathematik."
+    "text": "Mathematik: Takte berechnen\n\n\n\nDrift 11,2 ms statt 11,0 ms. Sechs fällige Millisekunden, nächste Deadline 16 ms.\n\n\n\nmtime zählt Oszillator-Takte, keine Sekunden\nUmrechnung in Software nötig\nBeispiel: Quarz \\(10\\,\\mathrm{MHz}\\) \\(\\Rightarrow\\) \\(10^{7}\\) Takte/s\nPro ms: \\(10^{7}/1000 = 10^{4}\\) Takte\nNächster Alarm im absoluten Modell: next_deadline, nicht now + 10000\nnow + 10000 bleibt nur das relative Gegenbeispiel und driftet\n\n#define TIMER_FREQ   10000000u\n#define TICKS_PER_MS (TIMER_FREQ / 1000u)\n\nBei 10 MHz sind 10000 Takte eine Millisekunde. Die ISR oben schreibt den absoluten Termin. Ein relativer Addend auf now verschiebt jede folgende Periode um die Latenz."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#software-interrupts-im-clint",
@@ -1747,7 +1747,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#c-beispiel-system-tick-initialisieren",
     "title": "03 · Interrupts & Timer",
     "section": "C-Beispiel: System-Tick initialisieren",
-    "text": "C-Beispiel: System-Tick initialisieren\n/* Lehr-Modell, keine geprüfte SiFive-Map */\n#define CLINT_MTIMECMP 0x02004000u\n#define CLINT_MTIME    0x0200BFF8u\n\nstatic uint64_t read_mtime(void) {\n    volatile uint32_t *mt = (volatile uint32_t *)CLINT_MTIME;\n    uint32_t hi, lo;\n    do {\n        hi = mt[1];\n        lo = mt[0];\n    } while (hi != mt[1]); /* nur ein konsistenter Snapshot */\n    return ((uint64_t)hi &lt;&lt; 32) | lo;\n}\n\nstatic void write_mtimecmp(uint64_t v) {\n    volatile uint32_t *cmp = (volatile uint32_t *)CLINT_MTIMECMP;\n    cmp[0] = 0xffffffffu;          /* kein zu kleiner Zwischenwert */\n    cmp[1] = (uint32_t)(v &gt;&gt; 32);\n    cmp[0] = (uint32_t)v;\n}\n\nvoid init_system_tick(void) {\n    /* Stack und mtvec müssen schon stehen */\n    uint64_t now = read_mtime();\n    write_mtimecmp(now + 10000u);  /* 10 MHz, 1 ms */\n    set_csr(mie, (1u &lt;&lt; 7));       /* MTIE */\n    set_csr(mstatus, MSTATUS_MIE);\n}\n\nKein 64-Bit-Store auf RV32. Die drei 32-Bit-Schreibungen sind die Compare-Sequenz.\nAdressen sind das Lehr-Modell, nicht das Labor-Datenblatt.\n\n\nRezept: Zeit lesen, Intervall addieren, Compare setzen — dann MTIE und MIE. Adressen sind beispielhaft (SiFive-üblich); immer Datenblatt prüfen."
+    "text": "C-Beispiel: System-Tick initialisieren\n/* Lehr-Modell, keine geprüfte SiFive-Map */\n#define CLINT_MTIMECMP 0x02004000u\n#define CLINT_MTIME    0x0200BFF8u\n\nstatic uint64_t read_mtime(void) {\n    volatile uint32_t *mt = (volatile uint32_t *)CLINT_MTIME;\n    uint32_t hi, lo;\n    do {\n        hi = mt[1];\n        lo = mt[0];\n    } while (hi != mt[1]); /* nur ein konsistenter Snapshot */\n    return ((uint64_t)hi &lt;&lt; 32) | lo;\n}\n\nstatic void write_mtimecmp(uint64_t v) {\n    volatile uint32_t *cmp = (volatile uint32_t *)CLINT_MTIMECMP;\n    cmp[0] = 0xffffffffu;          /* kein zu kleiner Zwischenwert */\n    cmp[1] = (uint32_t)(v &gt;&gt; 32);\n    cmp[0] = (uint32_t)v;\n}\n\nvoid init_system_tick(void) {\n    /* Stack und mtvec müssen schon stehen */\n    next_deadline = read_mtime() + 10000u; /* erster Termin */\n    write_mtimecmp(next_deadline);\n    set_csr(mie, (1u &lt;&lt; 7));       /* MTIE */\n    set_csr(mstatus, MSTATUS_MIE);\n}\n\nKein 64-Bit-Store auf RV32. Die drei 32-Bit-Schreibungen sind die Compare-Sequenz.\nAdressen sind das Lehr-Modell, nicht das Labor-Datenblatt.\n\n\nRezept: Zeit lesen, Intervall addieren, Compare setzen — dann MTIE und MIE. Adressen sind beispielhaft (SiFive-üblich); immer Datenblatt prüfen."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#zusammenfassung-clint",
@@ -1817,7 +1817,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#schritt-1-claim",
     "title": "03 · Interrupts & Timer",
     "section": "Schritt 1: Claim",
-    "text": "Schritt 1: Claim\n\n\n\nClaim löscht PLIC-Pending, nicht die Ursache im UART. ID 0 nicht abschließen.\n\n\nvoid external_interrupt_handler(void) {\n    uint32_t id = *(volatile uint32_t *)PLIC_CLAIM_REG;\n    my_isr_functions[id]();\n}\n\nMMIO-Read auf Claim-Register → Gewinner-ID\nDanach direkter Sprung (z. B. Funktionszeiger-Array)\n\n\nEin Read ersetzt die lange Abfragekette: ID lesen, passende ISR aufrufen."
+    "text": "Schritt 1: Claim\n\n\n\nClaim löscht PLIC-Pending, nicht die Ursache im UART. ID 0 nicht abschließen.\n\n\n#define PLIC_MAX_ID 3u\n\nuint32_t plic_claim(void) {\n    return *(volatile uint32_t *)PLIC_CLAIM_REG;\n}\n\nvoid plic_complete(uint32_t id) {\n    *(volatile uint32_t *)PLIC_CLAIM_REG = id;\n}\n\nEin Claim kann 0 liefern: kein Interrupt\nID 0 nicht abschließen und keinen Handler aufrufen\n\n\nDer folgende vollständige Handler prüft den Bereich, bevor ein Funktionszeiger benutzt wird."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#atomares-lesen-und-löschen",
@@ -1831,7 +1831,7 @@
     "href": "vorlesungen/03_interrupts_timer.html#claim-und-complete",
     "title": "03 · Interrupts & Timer",
     "section": "Claim und Complete",
-    "text": "Claim und Complete\nvoid external_interrupt_handler(void) {\n    uint32_t id = *(volatile uint32_t *)PLIC_CLAIM_REG;\n    my_isr_functions[id]();                 /* Treiberarbeit */\n    *(volatile uint32_t *)PLIC_CLAIM_REG = id;  /* Complete */\n}\n\nWährend Claimed: dieselbe Quelle blockiert; andere dürfen pending werden\nID zurückschreiben → Kanal wieder freigeben\nDanach mret in den unterbrochenen Kontext\n\n\nOhne Complete bleibt die Quelle oft dauerhaft blockiert. Claim und Complete teilen sich typischerweise dieselbe Registeradresse (Read vs. Write)."
+    "text": "Claim und Complete\nvoid external_interrupt_handler(void) {\n    uint32_t id = plic_claim();\n    if (id == 0u)\n        return;\n    if (id &gt; PLIC_MAX_ID || handlers[id] == 0) {\n        plic_complete(id); /* einmal, keine Schleife */\n        return;\n    }\n    handlers[id]();      /* Ursache im Gerät quittieren */\n    plic_complete(id);   /* nur diese gültige ID */\n}\n\nEine Quelle je Eintritt. Weitere Pending-Quellen kommen mit dem nächsten External Interrupt.\nUnbekannte IDs werden abgeschlossen, damit der PLIC nicht hängen bleibt.\n\n\nOhne Complete bleibt die Quelle oft dauerhaft blockiert. Claim und Complete teilen sich typischerweise dieselbe Registeradresse (Read vs. Write)."
   },
   {
     "objectID": "vorlesungen/03_interrupts_timer.html#plic-in-software-steuern-mmio",
@@ -1999,7 +1999,7 @@
     "href": "vorlesungen/01_speicherphysik.html#prüfungsleistung-und-laborbetrieb",
     "title": "01 · Speicherphysik & RAM-Typen",
     "section": "Prüfungsleistung und Laborbetrieb",
-    "text": "Prüfungsleistung und Laborbetrieb\n\nTheorie und Praxis: je Einheit 2 Stunden Theorie und 2 Stunden Labor\nLabor als Schlüssel: C-Treiber für das Verständnis der SoC-Architektur\nPrüfungsform: schriftliche Klausur am Semesterende (ca. 90 Minuten)\nKlausurinhalte: C-Code, Pointer-Arithmetik, Architektur, Cache-Berechnungen\nFokus auf Problemlösung, nicht auf Auswendiglernen von Datenblättern\n\n\nWie in MCT1 gilt auch hier: Die Vorlesung gibt Ihnen die Konzepte, aber das echte Verständnis kommt im Labor. Wer die Laborblätter selbstständig in Renode löst, hat bereits 80 % der Klausurvorbereitung erledigt. In der Klausur werden wir keine Registeradressen eines bestimmten Chips abfragen, sondern Konzepte: Wie richten Sie einen DMA-Transfer ein? Warum tritt ein Cache-Miss auf?"
+    "text": "Prüfungsleistung und Laborbetrieb\n\nTheorie und Praxis: je Einheit 2 Stunden Theorie und 2 Stunden Labor\nLabor als Schlüssel: C-Treiber für das Verständnis der SoC-Architektur\nPrüfungsform: schriftliche Klausur. Dauer und Hilfsmittel stehen in der offiziellen Ankündigung.\nKlausurinhalte: C-Code, Pointer-Arithmetik, Architektur, Cache-Berechnungen\nFokus auf Problemlösung, nicht auf Auswendiglernen von Datenblättern\n\n\nWie in MCT1 gilt auch hier: Die Vorlesung gibt Ihnen die Konzepte, aber das echte Verständnis kommt im Labor. Wer die Laborblätter selbstständig in Renode löst, hat bereits 80 % der Klausurvorbereitung erledigt. In der Klausur werden wir keine Registeradressen eines bestimmten Chips abfragen, sondern Konzepte: Wie richten Sie einen DMA-Transfer ein? Warum tritt ein Cache-Miss auf?"
   },
   {
     "objectID": "vorlesungen/01_speicherphysik.html#agenda-für-den-heutigen-tag",
@@ -2062,7 +2062,7 @@
     "href": "vorlesungen/01_speicherphysik.html#klassifikation-2-random-access-vs.-sequenziell",
     "title": "01 · Speicherphysik & RAM-Typen",
     "section": "Klassifikation 2: Random Access vs. sequenziell",
-    "text": "Klassifikation 2: Random Access vs. sequenziell\nRandom Access (wahlfreier Zugriff)\n\nJede Adresse ist direkt ansprechbar — die Latenz muss deshalb nicht für jede Anfrage gleich sein\nBeispiel RAM: kein Spulen wie bei einem Band; Caches und DRAM-Zeilen ändern die konkrete Wartezeit trotzdem\n\nSequenzieller Zugriff\n\nDaten nur der Reihe nach (wie eine Kassette)\nEnde erreicht man erst nach dem Durchlaufen der davorliegenden Daten\n\nArchitektur-Bedeutung: CPUs führen Code nur aus Random-Access-Speichern direkt aus.\n\nDer Begriff „RAM“ (Random Access Memory) wird oft synonym für Arbeitsspeicher genutzt, aber eigentlich beschreibt er eine Zugriffsmethode. „Wahlfrei“ bedeutet, die Latenz ist unabhängig vom Ort der Daten. Wenn Sie ein Magnetband haben, dauert es Minuten, um an das Ende des Bandes zu spulen. Eine CPU braucht aber für jeden Befehl im Speicher sofortigen Zugriff, daher muss Code zwingend in einem Random-Access-Speicher liegen."
+    "text": "Klassifikation 2: Random Access vs. sequenziell\nRandom Access (wahlfreier Zugriff)\n\nJede Adresse ist direkt ansprechbar — die Latenz muss deshalb nicht für jede Anfrage gleich sein\nBeispiel RAM: kein Spulen wie bei einem Band; Caches und DRAM-Zeilen ändern die konkrete Wartezeit trotzdem\n\nSequenzieller Zugriff\n\nDaten nur der Reihe nach (wie eine Kassette)\nEnde erreicht man erst nach dem Durchlaufen der davorliegenden Daten\n\nArchitektur-Bedeutung: CPUs führen Code nur aus Random-Access-Speichern direkt aus.\n\nDer Begriff „RAM“ beschreibt die direkte Adressierbarkeit, nicht dieselbe Latenz für jede Adresse. Caches und DRAM-Zeilen ändern die Wartezeit. Ein Band muss dagegen die davorliegenden Daten durchlaufen."
   },
   {
     "objectID": "vorlesungen/01_speicherphysik.html#die-speicherhierarchie-pyramide",
@@ -2223,7 +2223,7 @@
     "href": "vorlesungen/01_speicherphysik.html#sram-prinzip",
     "title": "01 · Speicherphysik & RAM-Typen",
     "section": "SRAM — Prinzip",
-    "text": "SRAM — Prinzip\n\nStatisch: Wert bleibt ohne Auffrischen, solange Strom anliegt\nKein Refresh nötig (im Gegensatz zu DRAM)\nSchnellste verfügbare Speichertechnologie\nLatenz oft unter \\(1\\,\\mathrm{ns}\\)\nKehrseite: geringe Dichte — viele Transistoren pro Zelle\n\n\n„Statisch“ bedeutet hier nicht, dass Daten bei Stromausfall erhalten bleiben, sondern dass das Bit im Transistornetzwerk stabil liegt, solange die Betriebsspannung da ist. SRAM ist das Rückgrat schneller Caches und Register."
+    "text": "SRAM — Prinzip\n\nStatisch: Wert bleibt ohne Auffrischen, solange Strom anliegt\nKein Refresh nötig (im Gegensatz zu DRAM)\nSchnell auf der Zell- und Cache-Ebene; die Systemlatenz ist eine andere Größe\nKeine pauschale Grenze unter \\(1\\,\\mathrm{ns}\\) ohne benannte Ebene\nKehrseite: geringe Dichte — viele Transistoren pro Zelle\n\n\n„Statisch“ bedeutet hier nicht, dass Daten bei Stromausfall erhalten bleiben, sondern dass das Bit im Transistornetzwerk stabil liegt, solange die Betriebsspannung da ist. SRAM ist das Rückgrat schneller Caches und Register."
   },
   {
     "objectID": "vorlesungen/01_speicherphysik.html#refresher-das-d-flip-flop-mct1",
@@ -2559,7 +2559,7 @@
     "href": "vorlesungen/01_speicherphysik.html#zusammenfassung-block-1",
     "title": "01 · Speicherphysik & RAM-Typen",
     "section": "Zusammenfassung Block 1",
-    "text": "Zusammenfassung Block 1\n\nSpeicherphysik: Kompromisse aus Kosten, Geschwindigkeit, Dichte\nFlash (non-volatil): Firmware; NOR oft mit XIP in MCUs\nSRAM (6T): schnell, teuer — Caches und Register\nDRAM (1T1C): dicht, Refresh — Hauptspeicher\nLinker-Skript verteilt Software auf physische Zonen\n\n\nDamit ist Block 1 geschlossen. In Block 2 (Vorlesung 2) sehen wir, wie Caches die DRAM-Latenz verbergen. Vielen Dank für Ihre Aufmerksamkeit."
+    "text": "Zusammenfassung Block 1\n\nSpeicherphysik: Kompromisse aus Kosten, Geschwindigkeit, Dichte\nFlash (non-volatil): Firmware; NOR oft mit XIP in MCUs\nSRAM (6T): schnell, teuer — typische Cache-Zellen. Ein Registerfile ist nicht pauschal dieselbe Zelle\nDRAM (1T1C): dicht, Refresh — Hauptspeicher\nLinker-Skript verteilt Software auf physische Zonen\n\n\nDamit ist Block 1 geschlossen. In Block 2 (Vorlesung 2) sehen wir, wie Caches die DRAM-Latenz verbergen. Vielen Dank für Ihre Aufmerksamkeit."
   },
   {
     "objectID": "index.html",
@@ -2713,7 +2713,7 @@
     "href": "vorlesungen/02_speicherhierarchie.html#säule-2-räumliche-lokalität",
     "title": "02 · Speicherhierarchie & Caches",
     "section": "Säule 2: Räumliche Lokalität",
-    "text": "Säule 2: Räumliche Lokalität\n\nSpatial Locality: nach einer Adresse folgen sehr wahrscheinlich die Nachbarn\nMetapher: Band 2 der Enzyklopädie — Band 3 gleich mitnehmen\nHardware: nie nur ein Byte — immer ein ganzer Block (Cache Line)\n\n\nDie zweite Säule ist die räumliche Lokalität. Die Wette der Hardware lautet hier: Wenn die CPU die Adresse 1000 liest, wird sie als Nächstes sehr wahrscheinlich die Adresse 1004 lesen. Um Zeit zu sparen, bringt der Cache beim Besuch im DRAM nicht nur das angefragte Byte mit, sondern packt gleich die nächsten 64 Bytes mit ein. Das ist ein Geniestreich!"
+    "text": "Säule 2: Räumliche Lokalität\n\nSpatial Locality: nach einer Adresse folgen sehr wahrscheinlich die Nachbarn\nMetapher: Band 2 der Enzyklopädie — Band 3 gleich mitnehmen\nHardware: nie nur ein Byte — immer ein ganzer Block (Cache Line)\n\n\nDie zweite Säule ist die räumliche Lokalität. Die Wette der Hardware lautet hier: Wenn die CPU die Adresse 1000 liest, wird sie als Nächstes sehr wahrscheinlich die Adresse 1004 lesen. Um Zeit zu sparen, lädt ein Miss die gesamte Line, ausgerichtet auf die Blockgrenze. Das ist nicht „die nächsten 64 Bytes ab der angefragten Adresse“. Die Quelle ist die nächste zuständige Ebene, nicht automatisch DRAM."
   },
   {
     "objectID": "vorlesungen/02_speicherhierarchie.html#räumliche-lokalität-im-c-code",
@@ -2769,7 +2769,7 @@
     "href": "vorlesungen/02_speicherhierarchie.html#cache-hit-vs.-cache-miss",
     "title": "02 · Speicherhierarchie & Caches",
     "section": "Cache Hit vs. Cache Miss",
-    "text": "Cache Hit vs. Cache Miss\nCache Hit (Treffer):\n\nAdresse liegt als Kopie im Cache\nLieferung in der Hit Time des getroffenen Levels\nEin L1-Miss kann in L2 treffen; erst ein Miss der letzten Cache-Ebene geht zum DRAM\n\n\nDas sind die wichtigsten Vokabeln des heutigen Tages. Ein Cache Hit ist ein Treffer, ein Erfolg. Die Pipeline rennt weiter. Ein Cache Miss ist ein Fehlschlag. Der Cache muss zugeben, dass er das gesuchte Datum nicht hat. Jetzt friert die CPU ein und wir müssen auf den lahmen Hauptspeicher warten."
+    "text": "Cache Hit vs. Cache Miss\nCache Hit (Treffer):\n\nAdresse liegt als Kopie im Cache\nLieferung in der Hit Time des getroffenen Levels\nEin L1-Miss kann in L2 treffen; erst ein Miss der letzten Cache-Ebene geht zum DRAM\n\n\nEin Cache Miss heißt: die Line fehlt in dieser Ebene. Die einfache Pipeline aus MCT1 wartet dann. Eine OoO-CPU kann andere Befehle überlappen. Das ist kein Einfrieren jeder Implementierung."
   },
   {
     "objectID": "vorlesungen/02_speicherhierarchie.html#hit-rate-und-miss-rate",
@@ -2804,7 +2804,7 @@
     "href": "vorlesungen/02_speicherhierarchie.html#wir-laden-niemals-einzelne-bytes",
     "title": "02 · Speicherhierarchie & Caches",
     "section": "Wir laden niemals einzelne Bytes",
-    "text": "Wir laden niemals einzelne Bytes\n\nRäumliche Lokalität \\(\\Rightarrow\\) keine Einzelbyte-Verwaltung\nVerwaltungseinheit: Cache Block / Cache Line\nTypisch 32 oder 64 Bytes zusammenhängender Speicher\nEin Miss lädt immer die gesamte Line aus dem DRAM\n\n\n\n\nAdresse 1000 liegt in der Line 960–1023, Offset 40. Nicht 1000–1063.\n\n\n\n\n\nFeld\nBedeutung\n\n\n\n\nValid\nEintrag wurde geladen\n\n\nTag\nwelcher Block\n\n\nDaten\n64 Byte auf Blockgrenze\n\n\nDirty\nnur bei Write-Back: verändert\n\n\n\n\nDie dezimale Adresse 1000: floor(1000/64)*64 = 960, Offset 40. Ein ausgerichtetes uint32_t-Array hat 16 Elemente pro Line."
+    "text": "Wir laden niemals einzelne Bytes\n\nRäumliche Lokalität \\(\\Rightarrow\\) keine Einzelbyte-Verwaltung\nVerwaltungseinheit: Cache Block / Cache Line\nTypisch 32 oder 64 Bytes zusammenhängender Speicher\nEin Miss beschafft die ganze, an der Blockgrenze ausgerichtete Line aus der nächsten zuständigen Ebene\nEin L1-Miss kann in L2 treffen. DRAM ist nicht jede Quelle\n\n\n\n\nAdresse 1000 liegt in der Line 960–1023, Offset 40. Nicht 1000–1063.\n\n\n\n\n\nFeld\nBedeutung\n\n\n\n\nValid\nEintrag wurde geladen\n\n\nTag\nwelcher Block\n\n\nDaten\n64 Byte auf Blockgrenze\n\n\nDirty\nnur bei Write-Back: verändert\n\n\n\n\nDie dezimale Adresse 1000: floor(1000/64)*64 = 960, Offset 40. Ein ausgerichtetes uint32_t-Array hat 16 Elemente pro Line."
   },
   {
     "objectID": "vorlesungen/02_speicherhierarchie.html#cache-line-und-räumliche-lokalität",
@@ -2944,7 +2944,7 @@
     "href": "vorlesungen/02_speicherhierarchie.html#fully-associative-cache",
     "title": "02 · Speicherhierarchie & Caches",
     "section": "Fully Associative Cache",
-    "text": "Fully Associative Cache\n\nGegenteil von Direct Mapped: Fully Associative (vollassoziativ)\nRegel: RAM-Block darf an jedem freien Platz liegen\nParkhaus: freie Platzwahl\nVorteil: kein Thrashing — A und B können nebeneinander leben\n\n\nUm Thrashing zu stoppen, geben wir die starren Parkplätze auf. Fully Associative heißt absolute Freiheit. Ein Block aus dem RAM darf in jede beliebige Zeile des Caches geschrieben werden. Dadurch können Variable A und Variable B aus unserem C-Beispiel friedlich nebeneinander im Cache leben, auch wenn ihre Adressen eigentlich kollidieren würden."
+    "text": "Fully Associative Cache\n\nGegenteil von Direct Mapped: Fully Associative (vollassoziativ)\nRegel: RAM-Block darf an jedem freien Platz liegen\nParkhaus: freie Platzwahl\nVorteil: kein Thrashing — A und B können nebeneinander leben\n\n\nVollassoziativität beseitigt die Indexkonflikte dieses Beispiels. Capacity Misses und Thrashing durch ein zu großes Working Set bleiben möglich."
   },
   {
     "objectID": "vorlesungen/02_speicherhierarchie.html#das-such-problem-bei-fully-associative",
@@ -2972,7 +2972,7 @@
     "href": "vorlesungen/02_speicherhierarchie.html#n-way-set-associative-struktur",
     "title": "02 · Speicherhierarchie & Caches",
     "section": "N-Way Set-Associative Struktur",
-    "text": "N-Way Set-Associative Struktur\n\nCache in Sets; jedes Set hat \\(N\\) Ways\nBeispiel 4-Way: Index zeigt auf Set mit 4 Blöcken\nSuche: nur \\(N\\) parallele Komparatoren (z. B. 4)\nBestes aus beiden Welten:\n\nwenig Komparatoren (schnell, sparsam)\nbis zu \\(N\\) Blöcke mit gleichem Index ohne gegenseitiges Rauswerfen\n\n\n\n\n\nIndex\nWay 0\nWay 1\nWay 2\nWay 3\n\n\n\n\nSet 0\nBlock\nBlock\nBlock\nBlock\n\n\nSet 1\n…\n…\n…\n…\n\n\n\n\nDas ist der Sweetspot. Wenn wir einen 4-Way Set-Associative Cache bauen, brauchen wir nur vier Komparatoren. Das ist billig und kalt. Wenn unser C-Programm jetzt Variable A und B abfragt, die denselben Index haben, legen wir A in Way 0 und B in Way 1 des selben Sets. Das Thrashing-Problem ist gelöst."
+    "text": "N-Way Set-Associative Struktur\n\nCache in Sets; jedes Set hat \\(N\\) Ways\nBeispiel 4-Way: Index zeigt auf Set mit 4 Blöcken\nSuche: nur \\(N\\) parallele Komparatoren (z. B. 4)\nBestes aus beiden Welten:\n\nwenig Komparatoren (schnell, sparsam)\nbis zu \\(N\\) Blöcke mit gleichem Index ohne gegenseitiges Rauswerfen\n\n\n\n\n\nIndex\nWay 0\nWay 1\nWay 2\nWay 3\n\n\n\n\nSet 0\nBlock\nBlock\nBlock\nBlock\n\n\nSet 1\n…\n…\n…\n…\n\n\n\n\nDas löst die Indexkollision von A und B. Es beseitigt nicht jedes Thrashing."
   },
   {
     "objectID": "vorlesungen/02_speicherhierarchie.html#praxis-2-way-und-4-way",
@@ -3294,7 +3294,7 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#das-auto-reload-register-arr",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Das Auto-Reload Register (ARR)",
-    "text": "Das Auto-Reload Register (ARR)\n\nWo endet das Zählen? → Auto-Reload / Period Register (ARR)\nAbsolute Obergrenze des Zählers\nErreicht CNT den ARR-Wert: Hardware setzt typisch auf 0 zurück\nDieser Rücksetzzyklus definiert die Periode des Timers\nAchtung Datenblatt: Periode oft \\(ARR\\) oder \\(ARR + 1\\) Ticks\n\n\nARR ist das Limit. Ob die Periode \\(ARR\\) oder \\(ARR+1\\) Zählschritte hat, steht im Datenblatt (Hersteller unterscheiden sich) — vor Duty-Cycle-Rechnungen immer nachschlagen."
+    "text": "Das Auto-Reload Register (ARR)\n\nWo endet das Zählen? → Auto-Reload / Period Register (ARR)\nAbsolute Obergrenze des Zählers\nErreicht CNT den Wert ARR, ist das noch ein voller Tick\nDer nächste Zählschritt setzt auf 0. Die Periode ist ARR+1\nIm Kernmodell: PSC+1, Vergleich CNT &lt; CCR, Active-High\n\n\nARR bleibt ein vollständiges Intervall. Andere Timer, die beim Erreichen sofort zurücksetzen, sind ein anderes Modell."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#zähl-modus-up-counting",
@@ -3329,7 +3329,7 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#die-analoge-illusion",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Die analoge Illusion",
-    "text": "Die analoge Illusion\n\nZurück zur Leitfrage: 50 % Motorleistung mit binärem Pin?\nTrick: Pin sehr schnell ein- und ausschalten\nBeispiel: 1 kHz, je Hälfte der Periode HIGH/LOW\nMotor und Auge sind zu träge, um dem Stottern zu folgen\nEffekt: schnelles Schalten. Wahrnehmung und mechanische Wirkung sind davon zu trennen.\n\n\nWenn Licht sehr schnell blinkt, mittelt das Auge die Helligkeit. Motoren mitteln über Masse und Induktivität ähnlich."
+    "text": "Die analoge Illusion\n\nZurück zur Leitfrage: 50 Prozent aktive Zeit an einem binären Pin?\nTrick: Pin sehr schnell ein- und ausschalten\nBeispiel: 1 kHz, je Hälfte der Periode HIGH/LOW\nMotor und Auge sind zu träge, um dem Stottern zu folgen\nEffekt: schnelles Schalten. Wahrnehmung und mechanische Wirkung sind davon zu trennen.\n\n\nWenn Licht sehr schnell blinkt, mittelt das Auge die Helligkeit. Motoren mitteln über Masse und Induktivität ähnlich."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#was-ist-pwm",
@@ -3350,7 +3350,7 @@
     "href": "vorlesungen/04_aktorik_sicherheit.html#der-duty-cycle-tastverhältnis",
     "title": "04 · Aktorik & Sicherheit",
     "section": "Der Duty Cycle (Tastverhältnis)",
-    "text": "Der Duty Cycle (Tastverhältnis)\n\nWichtigste PWM-Größe: Anteil der HIGH-Zeit an der Periode\n\n\\[\n\\mathrm{Duty\\ Cycle} = \\frac{t_{\\mathrm{HIGH}}}{T}\n\\]\n\nProzentsatz der Energie, die wir einbringen\nPeriode/Frequenz konstant; wir ändern den Duty Cycle\n\n\nIm Code regeln Sie typischerweise den Duty Cycle (Dimmer, Sollgeschwindigkeit) — nicht die Grundfrequenz."
+    "text": "Der Duty Cycle (Tastverhältnis)\n\nWichtigste PWM-Größe: Anteil der HIGH-Zeit an der Periode\n\n\\[\n\\mathrm{Duty\\ Cycle} = \\frac{t_{\\mathrm{HIGH}}}{T}\n\\]\n\nAnteil der aktiven Zeit im gewählten PWM-Modell\nPeriode/Frequenz konstant; wir ändern den Duty Cycle\n\n\nIm Code regeln Sie typischerweise den Duty Cycle (Dimmer, Sollgeschwindigkeit) — nicht die Grundfrequenz."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#duty-cycle-in-prozent",
@@ -3619,11 +3619,11 @@
     "text": "Hilfsfunktion: Prozent → CCR\nvoid set_led_brightness(uint8_t percent) {\n    if (percent &gt; 100) percent = 100;\n    const uint32_t N = 1000u; /* ARR + 1 im Kernmodell */\n    uint32_t ccr = ((uint32_t)percent * N) / 100u;\n    TIMER_CCR1 = ccr;\n}\n\n0, 25, 50 und 100 Prozent ergeben CCR 0, 250, 500 und 1000.\nKleine Abstraktion erleichtert die Main-Logik\n\n\nTypische HAL-Schicht: set_led_brightness(50) statt roher Registerarithmetik in jedem Aufrufer."
   },
   {
-    "objectID": "vorlesungen/04_aktorik_sicherheit.html#fading-in-der-main-schleife",
-    "href": "vorlesungen/04_aktorik_sicherheit.html#fading-in-der-main-schleife",
+    "objectID": "vorlesungen/04_aktorik_sicherheit.html#fading-alle-10-ms",
+    "href": "vorlesungen/04_aktorik_sicherheit.html#fading-alle-10-ms",
     "title": "04 · Aktorik & Sicherheit",
-    "section": "Fading in der Main-Schleife",
-    "text": "Fading in der Main-Schleife\nint main(void) {\n    init_pwm();\n    int brightness = 0;\n    while (1) {\n        set_led_brightness(brightness);\n        brightness = (brightness + 1) % 101; /* Sprung 100 auf 0 */\n        /* Deadline aus Block 3, kein blockierendes Warten als Gesundheitsbeweis */\n        wdt_feed();\n    }\n}\n\nDie Rampe springt von 100 auf 0. Ein Feed beweist nur, dass diese Schleife noch laeuft.\n\n\nSauberer: Wartezeiten über SysTick statt busy delay. Wichtig bleibt: Feed nur hier, nicht in der ISR."
+    "section": "Fading alle 10 ms",
+    "text": "Fading alle 10 ms\n#define FADE_TICKS 100000u /* 10 ms bei 10 MHz */\n\nstatic uint64_t next_fade;\nstatic int brightness;\nstatic int dir = 1;\n\nvoid fade_poll(uint64_t now) {\n    if ((int64_t)(now - next_fade) &lt; 0)\n        return;\n    next_fade += FADE_TICKS;\n    set_led_brightness((uint8_t)brightness);\n    brightness += dir;\n    if (brightness &gt;= 100 || brightness &lt;= 0)\n        dir = -dir;\n    if (step_done)\n        wdt_feed();\n}\n\nDie Helligkeit steigt und fällt. Es gibt keinen Sprung von 100 auf 0.\nDer Feed hängt an step_done, nicht daran, dass die Zeile erreicht wurde.\n\n\nSauberer Takt kommt aus dem absoluten Tick von Block 3. Der Watchdog wird nur nach abgeschlossener Arbeit gefüttert, nicht in der Timer-ISR."
   },
   {
     "objectID": "vorlesungen/04_aktorik_sicherheit.html#den-crash-provozieren",
@@ -4449,7 +4449,7 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#ein-binary-viele-mathrmvlen",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Ein Binary, viele \\(\\mathrm{VLEN}\\)",
-    "text": "Ein Binary, viele \\(\\mathrm{VLEN}\\)\n\n\n\n128 Bit: 250 Schritte zu VL 4. 1024 Bit: 31 Schritte zu VL 32 plus VL 8.\n\n\nBeispiel: 1000 Elemente, vadd.vv (schematisch)\n\n\n\n\n\n\n\n\n\nPlattform\nBreite (schematisch)\n\\(\\mathrm{VL}\\) (e32)\nSchleifenläufe\n\n\n\n\nEdge\nschmal (z. B. 128 Bit)\n4\n250\n\n\nServer\n1024 Bit, LMUL 1\n32, zuletzt 8\n32\n\n\n\nGleiche RVV-Schleifenidee skaliert mit \\(\\mathrm{VLEN}\\) — ohne feste Packed-SIMD-Breite im Quelltext.\n\n1000/32 ist nicht teilbar: 31 mal VL 32 und einmal VL 8. Ein Binary braucht ISA, ABI und einen Kern mit RVV."
+    "text": "Ein Binary, viele \\(\\mathrm{VLEN}\\)\n\n\n\n128 Bit: 250 Schritte zu VL 4. 1024 Bit: 31 Schritte zu VL 32 plus VL 8.\n\n\nBeispiel: 1000 Elemente, vadd.vv (schematisch)\n\n\n\n\n\n\n\n\n\nPlattform\nBreite (schematisch)\n\\(\\mathrm{VL}\\) (e32)\nSchleifenläufe\n\n\n\n\nEdge\nschmal (z. B. 128 Bit)\n4\n250\n\n\nServer\n1024 Bit, LMUL 1\n32, dann 20+20 oder 32+8\n32\n\n\n\nGleiche RVV-Schleifenidee skaliert mit \\(\\mathrm{VLEN}\\) — ohne feste Packed-SIMD-Breite im Quelltext.\n\n1000 Elemente und VLMAX 32: nach 30 vollen Schritten ist AVL 40. Dann erlaubt die Spezifikation jede VL von 20 bis 32. Diese Folie zeigt zwei zulässige Reste, 20+20 und 32+8. Der Zeiger folgt immer dem zurückgegebenen VL."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#energie-weniger-instruction-fetch",
@@ -4494,11 +4494,11 @@
     "text": "Kurzfazit RVV\n\nEin Befehl, lange Arrays\n\\(\\mathrm{VLEN}\\)/\\(\\mathrm{VL}\\) abstrahiert Hardwarebreite\nBinary skaliert von Edge bis Server\nWeniger Front-End-Last (DLP)\nLoads und Chaining senken interne Wartezeiten\n\n\nElegante DLP-Integration in eine Allzweck-ISA."
   },
   {
-    "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#aufgabe-rest-8",
-    "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#aufgabe-rest-8",
+    "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#aufgabe-avl-40",
+    "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#aufgabe-avl-40",
     "title": "08 · KI-Beschleuniger & Edge AI",
-    "section": "Aufgabe — Rest 8",
-    "text": "Aufgabe — Rest 8\nVLMAX ist 32, AVL ist 1000. Wie viele Iterationen und welches letzte VL entstehen, wenn der Rest klein genug für ein VL bleibt?\n\n31 mal 32 und einmal 8. Zusammen 32 Iterationen und 1000 Elemente. VL ist nicht in jedem AVL-Bereich min(AVL, VLMAX). Siehe die RVV-Abbildung."
+    "section": "Aufgabe — AVL 40",
+    "text": "Aufgabe — AVL 40\nVLMAX ist 32. Nach 30 Schritten mit VL 32 bleiben 40 Elemente. Welche letzten VL-Werte sind zulässig, und wie viele Iterationen ergeben 1000 Elemente?\n\nZulässig sind zum Beispiel 20 und 20 oder 32 und 8. Beide Folgen haben insgesamt 32 Iterationen. vsetvli allein legt die letzte Länge nicht fest. Der Zeiger rückt um das tatsächlich zurückgegebene VL mal 4 Byte vor."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#was-ist-eine-npu",
@@ -4554,7 +4554,7 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#datenfluss-füllt-das-array",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Datenfluss füllt das Array",
-    "text": "Datenfluss füllt das Array\n\n\n\nC00 fertig in Takt 2, C01 und C10 in Takt 3, C11 in Takt 4.\n\n\n\\(2\\times 2\\)-Idee (schematisch):\n\nTakt 1: erste Paare treffen sich, Summen starten\nTakt 2: Wellen wandern, neue Werte am Rand\nIm 2×2-Output-Stationary-Beispiel enden die vier Summen in den Takten 2, 3, 3 und 4\nDas ist kein Ergebnis je Takt ab Takt 3. Readout der lokalen Summen kommt danach\n\n\nWie Instruction-Pipeline: erst füllen, dann kontinuierlicher Ausstoß."
+    "text": "Datenfluss füllt das Array\n\n\n\nC00 fertig in Takt 2, C01 und C10 in Takt 3, C11 in Takt 4.\n\n\n\\(2\\times 2\\)-Idee (schematisch):\n\nTakt 1: erste Paare treffen sich, Summen starten\nTakt 2: Wellen wandern, neue Werte am Rand\nIm 2×2-Output-Stationary-Beispiel enden die vier Summen in den Takten 2, 3, 3 und 4\nDas ist kein Ergebnis je Takt ab Takt 3. Readout der lokalen Summen kommt danach\n\n\nDie vier lokalen Summen sind nach Takt 4 fertig. Der Readout ist ein eigener Schritt. Ein kontinuierlicher Strom bräuchte einen extra definierten Tile-Takt."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#weight-stationary",
@@ -4645,21 +4645,21 @@
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#modell-als-c-array",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Modell als C-Array",
-    "text": "Modell als C-Array\n/* Intelligenz als .rodata im Flash */\nconst unsigned char step_model_tflite[]\n    __attribute__((aligned(4))) = {\n    0x1c, 0x00, 0x00, 0x00, 0x54, 0x46, 0x4c, 0x33,\n    /* … weitere Bytes … */\n};\n\nDie Bytes sind Modelldaten. Kernel in der Firmware führen Operatoren aus. Flash-Lesen ist möglich, wenn Plattform und Kernel das erlauben."
+    "text": "Modell als C-Array\n/* Platzhalter, kein gültiges Modell und keine Lizenzdatei. */\nconst unsigned char step_model_tflite[]\n    __attribute__((aligned(4))) = {\n    0x1c, 0x00, 0x00, 0x00, 0x54, 0x46, 0x4c, 0x33,\n    /* … weitere Bytes … */\n};\n\nDie Bytes sind Modelldaten. Kernel in der Firmware führen Operatoren aus. Flash-Lesen ist möglich, wenn Plattform und Kernel das erlauben."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#tensor-arena",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#tensor-arena",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Tensor Arena",
-    "text": "Tensor Arena\nconst int kTensorArenaSize = 10 * 1024;\nuint8_t tensor_arena[kTensorArenaSize];\n\n/* Lehrschnitt, hier nicht übersetzt. Kein TFLM-Tree im Repository.\n   Konstruktor ohne ErrorReporter, Rückgaben prüfen. */\nif (model-&gt;version() != TFLITE_SCHEMA_VERSION) { /* Abbruch */ }\ntflite::MicroInterpreter interpreter(\n    model, resolver, tensor_arena, kTensorArenaSize);\nif (interpreter.AllocateTensors() != kTfLiteOk) { /* Arena */ }\n\nStatischer SRAM-Block — keine Heap-Leaks\nZu kleine Arena → klarer Fehler bei Allokation\n\n\nSicherheit durch feste Grenzen statt stiller Stack-Korruption."
+    "text": "Tensor Arena\nalignas(16) static uint8_t tensor_arena[1024];\n/* 1024 Byte sind eine Lehrannahme, kein gemessenes Budget. */\n\nstatic int setup_interpreter(void) {\n    if (model == 0)\n        return -1;\n    if (model-&gt;version() != TFLITE_SCHEMA_VERSION)\n        return -2;\n    tflite::MicroInterpreter ip(\n        model, resolver, tensor_arena, 1024);\n    if (ip.AllocateTensors() != kTfLiteOk)\n        return -3;\n    return 0;\n}\n\nStatischer SRAM-Block — keine Heap-Leaks\nZu kleine Arena → klarer Fehler bei Allokation\n\n\nSicherheit durch feste Grenzen statt stiller Stack-Korruption."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#inferenz-zyklus",
     "href": "vorlesungen/08_ki_beschleuniger_edge_ai.html#inferenz-zyklus",
     "title": "08 · KI-Beschleuniger & Edge AI",
     "section": "Inferenz-Zyklus",
-    "text": "Inferenz-Zyklus\n/* Int8-Lehrschnitt. 128 ist kein definiertes 3-Achsen-Fenster. */\nif (input-&gt;type != kTfLiteInt8) { /* Typfehler */ }\nfor (int i = 0; i &lt; input-&gt;bytes; i++)\n    input-&gt;data.int8[i] = quantize(sample[i]);\nif (interpreter.Invoke() != kTfLiteOk) { /* Invoke-Fehler */ }\nint8_t logit = output-&gt;data.int8[2];\n/* logit ist kein kalibrierter Score und 0,8 keine Schwelle */\n\nRohdaten → Tensor → Invoke() → Scores\n\n\nWeniger handgeschriebene Filter — schwarze Kiste mit Wahrscheinlichkeiten."
+    "text": "Inferenz-Zyklus\nstatic int run_window(void) {\n    TfLiteTensor *in = interpreter.input(0);\n    TfLiteTensor *out = interpreter.output(0);\n    if (in == 0 || out == 0)\n        return -4;\n    if (in-&gt;type != kTfLiteInt8)\n        return -5;\n    if (in-&gt;bytes != (int)sizeof(sample))\n        return -6;\n    if (out-&gt;type != kTfLiteInt8 || out-&gt;bytes &lt; 3)\n        return -7;\n    for (int i = 0; i &lt; in-&gt;bytes; i++)\n        in-&gt;data.int8[i] = quantize(sample[i], in);\n    if (interpreter.Invoke() != kTfLiteOk)\n        return -8;\n    return out-&gt;data.int8[2]; /* Logit, keine Wahrscheinlichkeit */\n}\n\nsample hat dieselbe Länge wie der bestätigte Int8-Input.\nIndex 2 wird nur gelesen, wenn mindestens drei Ausgabebytes existieren.\nEs gibt im Repository kein gültiges Modell und keinen gepinnten TFLM-Commit.\n\n\nWeniger handgeschriebene Filter — schwarze Kiste mit Wahrscheinlichkeiten."
   },
   {
     "objectID": "vorlesungen/08_ki_beschleuniger_edge_ai.html#renode-virtuelle-stimuli",
