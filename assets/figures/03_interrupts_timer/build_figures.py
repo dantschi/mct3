@@ -21,16 +21,34 @@ def save(name, p):
     print(name)
 
 def fig_poll():
-    p = svg(1100, 280)
-    p += [T(16, 20, "Modellzeiten, kein Messwert. Ereignis bei 1,2 ms.", 15, MUTED, w="400")]
-    p += [T(16, 48, "Gelegentliches Polling: Fragen bei 0, 1, 2 ms. Erkannt bei 2 ms, Wartezeit 0,8 ms.", 16, EXT)]
-    p += [T(16, 78, "Dazwischen sinnvolle Main-Arbeit. Das ist nicht dauerndes Busy-Waiting.", 15)]
-    p += [T(16, 116, "Interrupt: Ereignis, Latenz bis ISR, kurze ISR, Rueckkehr. Latenz ist nicht null.", 16, LOCAL)]
-    p += [T(16, 150, "Zweite Stufe: ISR setzt nur ein Flag. Main verarbeitet danach.", 16, SW)]
-    p += [T(16, 190, "Reaktionszeit, ISR-Dauer und blockierte Zeit sind drei Groessen.", 16)]
-    p += [T(16, 230, "Ein Interrupt allein spart keine Energie. Schlaf nur mit korrektem Warten.", 15, MUTED, w="400")]
-    p += [T(16, 260, "Polling ist nicht gleich unmoegliches Multitasking.", 15, MUTED, w="400")]
+    p = svg(1100, 320)
+    p += [T(16, 22, "Modell. Ereignis bei 1,2 ms. Wartezeit bis dahin 0,8 ms.", 15, MUTED, w="400")]
+    lanes = [
+        (40, "Busy-Wait", "#FFEBEE", "CPU belegt bis 1,2 ms"),
+        (110, "Periodisch", "#FFF3E0", "Fragen 0 / 1 / 2 ms"),
+        (180, "Interrupt", "#E8F5E9", "Latenz, ISR, weiter Main"),
+    ]
+    for y, name, fill, cap in lanes:
+        p += [box(16, y, 160, 52, INK, fill), T(28, y + 32, name, 16)]
+        p += [box(200, y, 860, 52, INK, "#fff"), T(220, y + 32, cap, 16)]
+    p += [T(200, 268, "Markierung Ereignis", 14, "#B71C1C")]
+    p += [f'<line x1="520" y1="40" x2="520" y2="232" stroke="#B71C1C" stroke-width="2"/>']
+    p += [T(16, 300, "0,8 ms ist die angenommene Zeit bis zum Ereignis, nicht die Interruptlatenz.", 15, MUTED, w="400")]
     save("poll-vs-irq.svg", p)
+
+def fig_mtvec():
+    p = svg(1100, 280)
+    p += [T(16, 20, "BASE 0x80000100. Vectored-Registerwert 0x80000101.", 15)]
+    labels = ["Exc", "d", "d", "MSI", "d", "d", "d", "MTI", "d", "d", "d", "MEI"]
+    for i, lab in enumerate(labels):
+        col = "#E8F5E9" if lab != "d" else "#F5F5F7"
+        p += [box(16 + i * 88, 40, 80, 44, INK, col), T(24 + i * 88, 68, f"{i} {lab}", 13)]
+    p += [T(16, 120, "Cause 3 -> +12 = 0x8000010C", 16)]
+    p += [T(16, 150, "Cause 7 -> +28 = 0x8000011C", 16)]
+    p += [T(16, 180, "Cause 11 -> +44 = 0x8000012C", 16)]
+    p += [T(16, 220, "Abstand 4 Byte bleibt auch bei komprimierten Befehlen fest.", 16)]
+    p += [T(16, 252, "Exceptionen gehen an BASE, nicht in einen Cause-Slot.", 16)]
+    save("mtvec.svg", p)
 
 def fig_levels():
     p = svg(1100, 300)
@@ -46,18 +64,6 @@ def fig_levels():
     p += [T(16, 250, "O(1) waehlt nur die Kategorie. Die ISR-Laufzeit bleibt workloadabhaengig.", 15, MUTED, w="400")]
     p += [T(16, 280, "Lokal heisst dem Hart zugeordnet, nicht automatisch kuerzere Leitung.", 15, MUTED, w="400")]
     save("two-levels.svg", p)
-
-def fig_mtvec():
-    p = svg(1100, 280)
-    p += [T(16, 20, "BASE 0x80000100. Direct-Wert 0x80000100, Vectored-Wert 0x80000101.", 16)]
-    p += [box(16, 36, 700, 36, HW, "#F3E5F5"), T(28, 60, "Bits 31:2 BASE    Bits 1:0 MODE", 16, HW)]
-    p += [T(16, 100, "MSI Cause 3: 0x8000010C", 16, LOCAL)]
-    p += [T(16, 128, "MTI Cause 7: 0x8000011C", 16, LOCAL)]
-    p += [T(16, 156, "MEI Cause 11: 0x8000012C", 16, EXT)]
-    p += [T(16, 190, "Synchrone Exceptions bleiben bei BASE, auch im Vectored Mode.", 16)]
-    p += [T(16, 220, "Slots 0..11 je 4 Byte. Abstand ist fest, nicht die aktuelle Befehlslaenge.", 16)]
-    p += [T(16, 250, "jal x0, Ziel. Mit RVC den Bereich .option norvc schuetzen.", 15, MUTED, w="400")]
-    save("mtvec.svg", p)
 
 def fig_trap():
     p = svg(1100, 240)
