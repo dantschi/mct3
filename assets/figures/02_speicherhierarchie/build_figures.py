@@ -36,7 +36,7 @@ def fig_locality():
         c = MISS if lab == "Miss" else HIT
         p += [box(16 + i * 140, 164, 120, 36, "#fff", c), T(28 + i * 140, 188, lab, 16, c)]
     p += [T(16, 230, "Befehlsfolge PC, PC+4 liegt im L1-I. Daten-Loads liegen im L1-D.", 16)]
-    p += [T(16, 258, "i, sum, limit der C-Schleife müssen keine Data-Cache-Zugriffe sein.", 16, MUTED, w="400")]
+    p += [T(16, 258, "Assemblerfolge ist gemischt. Die Kaesten sind zwei getrennte Vergleichsspuren.", 15, MUTED, w="400")]
     save("locality.svg", p)
 
 def fig_layout():
@@ -93,40 +93,70 @@ def fig_bits():
     band(p, 120, "4-Way, gleiche Datenkapazität, 128 Sets: Tag 0x91A2, Set 89, Offset 56", [(480, "Tag 19 Bit", TAG), (180, "Index 7", IDX), (160, "Off 6", OFF)])
     save("bitfields.svg", p)
 
+def arrow(x1, y1, x2, y2):
+    return f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{INK}" stroke-width="2" marker-end="url(#arr)"/>'
+
 def fig_datapath():
-    p = svg(1100, 300)
-    p += [T(16, 22, "Direct Mapped: ein Way. 4-Way: vier Vergleiche, gleicher Datenumfang.", 16)]
-    p += [box(16, 40, 200, 50, "#FFF3E0", IDX), T(28, 70, "Index → Decoder", 15, IDX)]
-    p += [box(240, 40, 200, 50, "#F3E5F5", TAG), T(252, 70, "Tag-Speicher", 15, TAG)]
-    p += [box(460, 40, 180, 50), T(476, 70, "Valid", 15)]
-    p += [box(660, 40, 200, 50, "#E3F2FD", OFF), T(676, 70, "Datenarray", 15, OFF)]
-    p += [box(240, 120, 220, 44, "#fff", HIT), T(252, 148, "Tag gleich und Valid", 15, HIT)]
-    p += [box(500, 120, 220, 44, "#E3F2FD", OFF), T(512, 148, "Offset wählt Wort", 15, OFF)]
-    p += [box(760, 120, 140, 44), T(790, 148, "zur CPU", 15)]
-    p += [T(16, 200, "4-Way: vier Ways des Sets, vier Komparatoren, ein Daten-MUX.", 16)]
-    p += [T(16, 232, "Tag-Vergleiche können parallel sein. Der Gesamtzugriff hat trotzdem Laufzeit.", 16)]
-    p += [T(16, 270, "Kein Dividierer für den Index. Decoder, SRAM, Vergleich und MUX brauchen Zeit.", 16, MUTED, w="400")]
+    p = svg(1100, 340)
+    p += ['<defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#1D1D1F"/></marker></defs>']
+    p += [T(16, 24, "Direct-Mapped-Leseweg. Ein Miss geht zur naechsten Ebene, nicht immer zum DRAM.", 16)]
+    steps = [
+        (16, "Adresse"),
+        (190, "Index"),
+        (360, "Tag + Valid"),
+        (560, "Vergleich"),
+        (760, "Offset-MUX"),
+        (940, "CPU"),
+    ]
+    for x, lab in steps:
+        p += [box(x, 48, 140, 44, "#fff", INK), T(x + 10, 76, lab, 15)]
+    for x in (156, 330, 500, 700, 900):
+        p += [arrow(x, 70, x + 30, 70)]
+    p += [box(190, 130, 310, 70, "#F3E5F5", TAG), T(204, 158, "gespeichertes Tag", 16, TAG), T(204, 184, "Valid = 1 und Tag gleich", 15, TAG)]
+    p += [box(560, 130, 300, 70, "#E3F2FD", OFF), T(574, 158, "Datenarray, ein Way", 16, OFF), T(574, 184, "Offset waehlt das Wort", 15, OFF)]
+    p += [arrow(345, 130, 345, 96)]
+    p += [arrow(700, 130, 830, 96)]
+    p += [box(16, 230, 500, 80, "#FFEBEE", MISS), T(28, 260, "Miss: Fill von der naechsten Ebene", 16, MISS), T(28, 288, "alte Dirty-Line zuerst sichern", 15, MISS)]
+    p += [box(540, 230, 530, 80, "#E8F5E9", HIT), T(552, 260, "4-Way: vier Kandidaten, ein Hit-Way", 16, HIT), T(552, 288, "Decoder, SRAM, Vergleich brauchen Zeit", 15, HIT)]
     save("datapath.svg", p)
 
 def fig_thrash():
-    p = svg(1100, 280)
-    p += [T(16, 22, "0x1000 und 0x9000, kalter Cache. Beide: Set 64.", 16)]
-    p += [T(16, 52, "Direct Mapped: Tags 0 und 1. Acht Misses (2 compulsory, 6 conflict).", 17, MISS)]
-    p += [T(16, 88, "4-Way, LRU: Tags 0 und 4. Zwei Misses, danach sechs Hits.", 17, HIT)]
-    p += [T(16, 130, "Miss-Arten: compulsory (erster Bezug), capacity (Working Set > Cache), conflict (Mapping).", 16)]
-    p += [T(16, 168, "Fully associative vermeidet diesen Mapping-Konflikt, nicht jeden Capacity Miss.", 16)]
-    p += [T(16, 210, "C-Arrays kollidieren nur bei passenden Basisadressen. Der Quelltext allein beweist das nicht.", 16, MUTED, w="400")]
-    p += [T(16, 250, "W+1 Blöcke im selben Set überfordern auch einen W-Way-Cache.", 16)]
+    p = svg(1100, 420)
+    p += [T(16, 24, "Acht Loads: 0x1000 / 0x9000 im Wechsel. Kalt, keine Prefetches.", 16)]
+    p += [T(16, 52, "DM  Index 64   Tags 0 und 1", 16, MISS)]
+    p += [T(560, 52, "4-Way  Set 64   Tags 0 und 4", 16, HIT)]
+    seq = ["1000", "9000", "1000", "9000", "1000", "9000", "1000", "9000"]
+    dm = ["M", "M", "M", "M", "M", "M", "M", "M"]
+    way = ["M", "M", "H", "H", "H", "H", "H", "H"]
+    p += [T(24, 80, "Zugriff", 14), T(258, 80, "DM", 14, MISS), T(328, 80, "4W", 14, HIT)]
+    for i, (a, d, w) in enumerate(zip(seq, dm, way)):
+        y = 96 + i * 36
+        p += [box(16, y, 220, 30), T(24, y + 21, f"{i+1}  0x{a}", 15)]
+        p += [box(250, y, 50, 30, "#FFEBEE", MISS), T(264, y + 21, d, 15, MISS)]
+        c = "#FFEBEE" if w == "M" else "#E8F5E9"
+        col = MISS if w == "M" else HIT
+        p += [box(320, y, 50, 30, c, col), T(334, y + 21, w, 15, col)]
+    p += [box(420, 96, 640, 250), T(436, 128, "DM: beide Bloecke brauchen denselben Platz.", 16, MISS)]
+    p += [T(436, 164, "Erste zwei Misses: compulsory.", 16)]
+    p += [T(436, 200, "Sechs weitere: conflict, Cache sonst leer.", 16)]
+    p += [T(436, 248, "4-Way: zwei Ways, danach Hits.", 16, HIT)]
+    p += [T(436, 292, "Capacity-Miss ist das nicht.", 16)]
     save("thrashing.svg", p)
 
 def fig_repl():
-    p = svg(1100, 260)
-    p += [T(16, 22, "Ein 4-Way-Set, Folge A B C D A E. Kalt. LRU und FIFO starten gleich.", 16)]
-    p += [T(16, 60, "Nach A B C D A:", 18)]
-    p += [T(16, 96, "FIFO-Ladereihenfolge: A ältester Geladener (Hit auf A ändert FIFO nicht) → E verdrängt A", 16, MISS)]
-    p += [T(16, 136, "LRU-Nutzung: A wurde zuletzt genutzt → ältester ist B → E verdrängt B", 16, HIT)]
-    p += [T(16, 180, "LRU ist eine Heuristik für zeitliche Lokalität, nicht die immer beste Policy.", 16)]
-    p += [T(16, 214, "Zeitstempel sind eine mögliche Umsetzung. Pseudo-LRU nähert LRU mit weniger Zustand an.", 16, MUTED, w="400")]
+    p = svg(1100, 360)
+    p += [T(16, 24, "Ein kaltes 4-Way-Set. Alt links, neu rechts. Nur Loads.", 16)]
+    p += [T(16, 56, "FIFO nach A B C D A", 16, MISS), T(560, 56, "LRU nach A B C D A", 16, HIT)]
+    fifo = ["A alt", "B", "C", "D neu"]
+    lru = ["B alt", "C", "D", "A neu"]
+    for i, lab in enumerate(fifo):
+        p += [box(16 + i * 120, 72, 110, 44, "#FFEBEE", MISS), T(28 + i * 120, 100, lab, 16, MISS)]
+    for i, lab in enumerate(lru):
+        p += [box(560 + i * 120, 72, 110, 44, "#E8F5E9", HIT), T(572 + i * 120, 100, lab, 16, HIT)]
+    p += [box(16, 150, 500, 80, "#FFEBEE", MISS), T(28, 182, "E verdrängt FIFO-A", 18, MISS), T(28, 210, "Hit auf A aendert FIFO nicht", 15, MISS)]
+    p += [box(560, 150, 500, 80, "#E8F5E9", HIT), T(572, 182, "E verdrängt LRU-B", 18, HIT), T(572, 210, "A wurde zuletzt benutzt", 15, HIT)]
+    p += [T(16, 270, "Danach: FIFO B C D E,  LRU C D A E.", 16)]
+    p += [T(16, 310, "LRU kennt die Zukunft nicht. Pseudo-LRU naehert die Reihenfolge an.", 16, MUTED, w="400")]
     save("fifo-lru.svg", p)
 
 def fig_writes():
@@ -155,15 +185,31 @@ def fig_alloc():
     save("write-allocate.svg", p)
 
 def fig_matrix():
-    p = svg(1100, 280)
-    p += [T(16, 20, "Miniaturmodell, nicht die 1000×1000-Matrix: uint32_t m[16][16], Basis 0x1000", 16, TAG)]
-    p += [T(16, 48, "Zeile = 64 Byte = eine Line. Cache 512 Byte, direct mapped, 8 Sets, kalt, nur diese Loads.", 15)]
-    p += [T(16, 84, "Adresse(m[r][c]) = 0x1000 + 4*(16*r + c)", 18)]
-    p += [T(16, 124, "Zeilenweise: 16 Misses, 240 Hits.", 18, HIT)]
-    p += [T(16, 156, "Spaltenweise: 256 Misses, 0 Hits.", 18, MISS)]
-    p += [T(16, 196, "1000×1000, 4 Byte: Zeilenabstand 4000 Byte. 4000 ist kein Vielfaches von 64.", 16)]
-    p += [T(16, 228, "Die erste Line einer Zeile beginnt dann nicht generell bei Spalte 0.", 16)]
-    p += [T(16, 262, "Stores nur unter genannter Write-Allocate-Policy. Compiler kann Schleifen verändern.", 15, MUTED, w="400")]
+    p = svg(1100, 420)
+    p += [T(16, 22, "Miniatur: 16 Zeilen, je eine 64-Byte-Line. 8 DM-Plaetze. Nicht 1000x1000.", 16)]
+    for r in range(16):
+        y = 40 + r * 18
+        col = "#E8F5E9" if r < 8 else "#FFEBEE"
+        p += [box(16, y, 28, 16, col, INK), T(48, y + 13, f"Zeile {r:02d}  Set {r % 8}", 13)]
+    p += [box(280, 40, 360, 140, "#E8F5E9", HIT)]
+    p += [T(296, 70, "Zeilenweise", 18, HIT)]
+    p += [T(296, 100, "1 Miss, dann 15 Hits", 16, HIT)]
+    p += [T(296, 130, "gesamt 16 M / 240 H", 16, HIT)]
+    p += [T(296, 160, "Line bleibt bis Zeilenende", 15, HIT)]
+    p += [box(280, 200, 360, 160, "#FFEBEE", MISS)]
+    p += [T(296, 230, "Spaltenweise", 18, MISS)]
+    p += [T(296, 260, "Schritt = eine Zeile = 64 B", 16, MISS)]
+    p += [T(296, 290, "Zeile r und r+8: Set r%8", 16, MISS)]
+    p += [T(296, 320, "gesamt 256 M / 0 H", 16, MISS)]
+    p += [box(680, 40, 390, 320)]
+    p += [T(696, 70, "Grosses C-Beispiel getrennt", 16, TAG)]
+    p += [T(696, 110, "1000 Spalten x 4 Byte", 16)]
+    p += [T(696, 146, "Zeilenabstand 4000 Byte", 16)]
+    p += [T(696, 182, "4000 mod 64 = 32", 16)]
+    p += [T(696, 230, "Keine exakte Miss-Quote", 16, MISS)]
+    p += [T(696, 266, "ohne festgelegte Spur.", 16, MISS)]
+    p += [T(16, 360, "Nur die 256 Daten-Loads. Basis 0x1000 ist eine Annahme.", 15, MUTED, w="400")]
+    p += [T(16, 390, "Store-Zaehlung nur mit genannter Write-Allocate-Policy.", 15, MUTED, w="400")]
     save("matrix.svg", p)
 
 def fig_visible():

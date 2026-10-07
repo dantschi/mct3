@@ -28,7 +28,7 @@ flowchart LR
 ```
 
 ::: notes
-Herzlich willkommen zur zweiten Einheit! In Block 1 haben wir Speicher auf Transistor- und Kondensatorebene betrachtet (Flash, SRAM, DRAM). Heute verlassen wir die reine Physik und gehen zur Architektur: Caches verbergen die DRAM-Latenz. Dabei sehen Sie auch, warum die Struktur Ihres C-Codes die Hit Rate — und damit die Laufzeit — stark beeinflussen kann.
+Willkommen zu Block 2 schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Willkommen zurück zur zweiten Vorlesung in Mikrocomputertechnik 3. Rückblick: Block 1 hat Speicher auf Transistor-/Kondensatorebene untersucht (Flash, SRAM, DRAM). Heute: Bindeglied zwischen schneller CPU und langsamem RAM. Fokus: das Konzept der Caches. Ziel: verstehen, warum die Art Ihres C-Codes die Hardware massiv beeinflusst. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Anknüpfung: Memory Map und Linker
@@ -46,7 +46,7 @@ const int config = 1;  // typisch: Flash (.rodata)
 ```
 
 ::: notes
-In Block 1 haben wir Memory Map und Linker-Skript konzeptionell eingeführt; das zugehörige Renode-Labor steht als Übungsblatt noch aus. Für heute reicht der Anschluss: Die CPU greift über Adressen auf SRAM/DRAM zu — und genau dort setzen Caches an.
+Anknüpfung: Memory Map und Linker schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Memory Map: Flash, SRAM und MMIO belegen feste Adressbereiche. Linker-Skript legt `.text` in den Flash, Variablen in den SRAM. C-Pointer adressieren physische Bausteine über denselben Adressraum. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Kurz-Recap: SRAM vs. DRAM
@@ -66,7 +66,7 @@ Aus Block 1 (Spickzettel) — die Motivation für Caches:
 *Schematisch — Trendillustration aus Block 1.*
 
 ::: notes
-Kurz wiederholt aus Block 1: SRAM ist schnell, aber teuer; DRAM fasst Gigabytes, ist aber langsam. Genau dieses Spannungsfeld erzwingt die Speicherhierarchie und den Cache als Zwischenschicht.
+Kurz-Recap: SRAM vs. DRAM schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. SRAM: schnell und flächenintensiv, häufig für Caches. Registerfiles können auch aus Flip-Flops oder Latches bestehen, nicht nur aus 6T-Zellen. DRAM (1T1C): dicht und günstig, aber hohe Latenz (Refresh, Multiplexing). Wunsch „alles SRAM“ ist wirtschaftlich und flächenmäßig unrealistisch. SRAM   DRAM. Geschwindigkeit   sehr hoch   niedriger. Kosten / Bit   hoch   niedrig. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die CPU hungert — das Latenz-Problem
@@ -83,7 +83,7 @@ Kurz wiederholt aus Block 1: SRAM ist schnell, aber teuer; DRAM fasst Gigabytes,
 | ALU Sub | 1 Takt |
 
 ::: notes
-3 GHz und 100 ns ergeben 300 Takte. Die Spanne 3–5 GHz mal 50–100 ns ist etwa 150–500 Takte. Ein Stall friert nicht jede moderne CPU vollständig ein; das Modell hier ist die einfache Pipeline aus MCT1.
+Die CPU hungert — das Latenz-Problem schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Moderne CPU: ca. 3–5 GHz. DRAM-Latenz: ca. 50–100 ns. Daraus folgen grob 150–500 Takte, nicht 100–300. Das einfache blockierende Modell unten nutzt getrennt 100 Takte Wartezeit. Schritt   Dauer (einfaches blockierendes Modell). ALU Add   1 Takt. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die Illusion erschaffen
@@ -95,7 +95,7 @@ Kurz wiederholt aus Block 1: SRAM ist schnell, aber teuer; DRAM fasst Gigabytes,
 - Ideal: CPU merkt kaum, dass DRAM existiert
 
 ::: notes
-Da wir die Physik nicht ändern können, bedienen wir uns einer Illusion. Wir geben der CPU einen winzigen, aber extrem schnellen Schreibtisch (den Cache). Den riesigen Aktenschrank (den DRAM) stellen wir in den Keller. Die Kunst besteht nun darin, immer genau die Akten auf den Schreibtisch zu legen, die die CPU in den nächsten Millisekunden brauchen wird. Wenn das klappt, rechnet die CPU mit maximaler Geschwindigkeit.
+Die Illusion erschaffen schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Ziel: Nutzer und CPU „betrügen“. Illusion: Speicher so schnell wie SRAM und so billig/groß wie DRAM. Trick: kleine, versteckte SRAM-Schicht zwischen CPU und DRAM. Name: Cache (französisch: geheimes Versteck). Ideal: CPU merkt kaum, dass DRAM existiert. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Cache als Zwischenschicht
@@ -110,7 +110,7 @@ flowchart LR
 ```
 
 ::: notes
-Schematisch: Die CPU spricht zuerst mit dem Cache. Nur bei einem Miss geht der Weg zum DRAM — oft hunderte Takte. Genau diese Zwischenschicht macht die Memory Wall handhabbar.
+Cache als Zwischenschicht schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Die Abbildung zeigt den nächsten Schritt des einfachen blockierenden Lehrmodells. Folgen Sie den Pfeilen von der Anfrage über die Prüfung bis zur Antwort. Zahlen in der Zeichnung sind Lehrannahmen. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Agenda für den heutigen Tag
@@ -123,7 +123,7 @@ Schematisch: Die CPU spricht zuerst mit dem Cache. Nur bei einem Miss geht der W
 6. Brückenschlag zum C-Code; Ausblick Labor (z. B. Ripes)
 
 ::: notes
-Um diese Illusion perfekt zu machen, müssen wir verstehen, wie der Cache organisiert ist. Wir starten mit der Theorie der Lokalität, klären dann die Vokabeln der Computerarchitekten und schauen uns danach die konkreten Hardware-Schaltungen an, die Daten im Cache wiederfinden. Am Ende übersetzen wir das alles in C-Code.
+Agenda für den heutigen Tag schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Die Abbildung zeigt den nächsten Schritt des einfachen blockierenden Lehrmodells. Folgen Sie den Pfeilen von der Anfrage über die Prüfung bis zur Antwort. Zahlen in der Zeichnung sind Lehrannahmen. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Lernziele Block 2
@@ -135,7 +135,7 @@ Um diese Illusion perfekt zu machen, müssen wir verstehen, wie der Cache organi
 - C-Code so schreiben, dass Cache-Hits maximiert werden
 
 ::: notes
-Am Ende dieser Vorlesung können Sie Memory Wall, Lokalität und AMAT erklären sowie Direct-Mapped von Set-Associative unterscheiden. Cache-freundlichen C-Code werden Sie im geplanten Labor (z. B. mit Ripes) weiter vertiefen, sobald das Übungsblatt vorliegt.
+Lernziele Block 2 schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Memory Wall erklären können. Zeitliche und räumliche Lokalität unterscheiden. Hit Rate, Miss Penalty und AMAT berechnen. Direct-Mapped und Set-Associative Caches unterscheiden. C-Code so schreiben, dass Cache-Hits maximiert werden. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die Leitfrage des Tages
@@ -147,7 +147,7 @@ Am Ende dieser Vorlesung können Sie Memory Wall, Lokalität und AMAT erklären 
 - Eine Hit Rate von 95 % ist ein Rechenbeispiel, keine Garantie und keine Vorhersagegenauigkeit der nächsten Adresse
 
 ::: notes
-Der Cache speichert Blöcke und behält sie. Prefetching ist eine optionale zusätzliche Wette, nicht dasselbe wie die Hit Rate.
+Die Leitfrage des Tages schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Ein Cache ist nutzlos, wenn nicht die benötigten Daten darin liegen. Hardware muss „ahnen“, was die Software als Nächstes tut. Problem: Silizium kann keine C-Programme lesen und nicht in die Zukunft sehen. Leitfrage: Welche Adressmuster nutzt ein Cache ohne das C-Programm zu lesen? Eine Hit Rate von 95 % ist ein Rechenbeispiel, keine Garantie und keine Vorhersagegenauigkeit der nächsten Adresse. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die Memory Wall im Detail
@@ -167,7 +167,7 @@ Der Cache speichert Blöcke und behält sie. Prefetching ist eine optionale zus�
 *Schematische Trendillustration, workloadabhängig. Keine Messreihe und kein Beweis für 0 % Mehrleistung.*
 
 ::: notes
-Latenz und Bandbreite sind verschiedene Größen. Eine schnellere CPU kann bei speichergebundenen Programmen wenig bringen; „0 %“ wäre nur ein Extremfall, keine allgemeine Aussage.
+Die Memory Wall im Detail schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Seit ~1980: CPU-Geschwindigkeit wuchs jahrzehntelang stark. DRAM: deutlich langsameres Wachstum der Latenz/Performance. Diese öffnende Schere heißt Memory Wall (Speichermauer). Ab einem Punkt bringt ein schnellerer Kern kaum noch Zuwachs. Flaschenhals: Datenlieferung, nicht die ALU. Epoche (schematisch)   CPU relativ   DRAM relativ. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Zyklen vs. Zugriffszeiten
@@ -177,10 +177,10 @@ Beispiel: RISC-V-SoC mit $3\,\mathrm{GHz}$
 - 1 Takt: $\dfrac{1}{3\cdot 10^{9}}\,\mathrm{s} \approx 0{,}33\,\mathrm{ns}$
 - L1-Cache: ca. $1\,\mathrm{ns}$ $\rightarrow$ $\approx 3$ Takte
 - DRAM: ca. $100\,\mathrm{ns}$ $\rightarrow$ $\approx 300$ Takte
-- Jeder Hauptspeicherzugriff kostet hunderte Arbeitsgelegenheiten
+- Im einfachen blockierenden Modell kostet ein abhängiger Hauptspeicherzugriff hunderte Takte. Andere Kerne können Arbeit überlappen
 
 ::: notes
-Zahlen sprechen lauter als Worte. Bei 3 Gigahertz tickt die Uhr der CPU alle 0,33 Nanosekunden. Wenn wir auf den L1-Cache zugreifen, geht das rasend schnell, vielleicht verlieren wir ein oder zwei Takte. Aber wenn wir auf den RAM warten, stehen wir 300 Takte still! Stellen Sie sich vor, Sie müssten bei jedem Wort, das Sie lesen, 300 Sekunden (5 Minuten) die Augen schließen. Sie würden niemals ein Buch beenden.
+Bei 3 GHz dauert ein Takt etwa 0,333 ns. Eine angenommene L1-Zeit von 1 ns entspricht etwa drei Taktperioden. 100 ns entsprechen etwa 300 Takten. Die Tabelle mit 100 Takten ist ein getrenntes blockierendes Modell. Nur ein vollständig abhängiger Zugriff wartet so lange. Eine Out-of-Order-CPU kann andere Befehle überlappen. Diese Zahlen beschreiben nicht den Kurs-Mikrocontroller. L1 bedeutet Level 1. Die 3-GHz-Rechnung und das AMAT-Modell mit einem Takt Hit Time plus 100 Takten zusätzlicher Penalty sind zwei getrennte Illustrationen. 300 Takte sind hier die angenommene DRAM-Größenordnung, nicht die Miss Penalty der späteren AMAT-Rechnung. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Stalls und Bubbles — Link zu MCT1
@@ -195,7 +195,7 @@ add  t1, t0, t2    # wartet auf t0
 ```
 
 ::: notes
-Hunderte Bubbles beschreiben dieses Lehr-Modell, nicht jede Out-of-Order-CPU.
+Stalls und Bubbles — Link zu MCT1 schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Hazard-Logik kann im einfachen blockierenden Modell Fetch und Decode anhalten. Eine Bubble ist ein eingefügter Leertakt, keine aus dem Speicher geladene NOP-Instruktion. Unabhängige Befehle können in anderen Implementierungen weiterlaufen. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die Lösung: Speicherhierarchie
@@ -212,7 +212,7 @@ Hunderte Bubbles beschreiben dieses Lehr-Modell, nicht jede Out-of-Order-CPU.
 - Takte auf der Folie sind Größenordnungen, keine Messreihe
 
 ::: notes
-Nicht jeder L1-Miss geht bis zum DRAM. Ein Treffer in L2 bleibt in der Hierarchie.
+Die Lösung: Speicherhierarchie schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. L1: winzig (z. B. 32 KB), on-chip SRAM, 1–3 Takte. L2: größer (z. B. 512 KB), SRAM, 10–15 Takte. L3: sehr groß (z. B. 32 MB), SRAM, 30–40 Takte. Main Memory: riesig (z. B. 16 GB), DRAM, $\approx 300$ Takte. Hardware kopiert Blöcke automatisch zwischen den Schichten. L1 klein und nah, weitere SRAM-Ebenen größer, DRAM oft die unterste Ebene. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die Geheimwaffe: Lokalitätsprinzip
@@ -224,7 +224,7 @@ Nicht jeder L1-Miss geht bis zum DRAM. Ein Treffer in L2 bleibt in der Hierarchi
 - Zwei Säulen: zeitliche und räumliche Lokalität
 
 ::: notes
-Jetzt lösen wir unsere Leitfrage auf. Warum funktioniert der Cache? Weil unsere Programme nicht chaotisch auf Speicher zugreifen. Wenn Programme bei jedem Takt eine völlig zufällige Adresse aus 16 Gigabyte RAM abfragen würden, wäre der Cache nutzlos und die Hit-Rate läge bei 0 %. Aber Code wird von Menschen geschrieben. Wir nutzen Schleifen. Wir nutzen strukturierte Arrays. Dieses geordnete Verhalten rettet die Architektur.
+Gleichverteilte zufällige Zugriffe haben keine starke Lokalität. Ein endlicher, schon gefüllter Cache kann trotzdem zufällig treffen. Die Trefferquote liegt dann oft niedrig, aber nicht exakt bei null. Gleichverteilung ist ein Modell, kein Synonym für jedes Programm. Zeitliche Lokalität nutzt dieselbe Adresse erneut, räumliche Lokalität die Nachbarbytes derselben ausgerichteten Line. Ein Working Set ist die aktuell häufig benutzte Menge. Der Cache arbeitet auf Adressen, nicht auf C-Variablennamen. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Säule 1: Zeitliche Lokalität
@@ -234,24 +234,24 @@ Jetzt lösen wir unsere Leitfrage auf. Warum funktioniert der Cache? Weil unsere
 - Hardware: geladene Daten bleiben eine Weile im Cache
 
 ::: notes
-Die erste Säule ist die zeitliche Lokalität. Die Regel lautet: Was gerade benutzt wurde, wird bald wieder gebraucht. Das klingt banal, ist aber die fundamentale Daseinsberechtigung für den Cache. Wenn die CPU eine Adresse anfragt, kopiert der Cache sie nicht nur durch, sondern speichert sie ab, weil er darauf wettet, dass die CPU bald wieder genau dieselbe Adresse anfragen wird.
+Säule 1: Zeitliche Lokalität schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Temporal Locality: eine gerade genutzte Adresse wird sehr wahrscheinlich bald wieder genutzt. Metapher: aufgeschlagenes Buch bleibt auf dem Schreibtisch. Hardware: geladene Daten bleiben eine Weile im Cache. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
-## Zeitliche Lokalität im C-Code
+## Zeitliche Lokalität in einer Zugriffsspur
 
-Die Schleife selbst zeigt zeitliche Lokalität der *Befehle* (L1-I). `i`, `sum` und `limit` können in Registern liegen oder wegoptimiert werden. Sie sind kein Beweis für wiederholte Data-Cache-Loads.
+Die drei Loads sind Lehrcode, nicht die Übersetzung einer Schleife. `a0` ist hier `0x1000`.
 
 ```asm
-# explizite Load-Folge, nicht das optimierte Ergebnis der Schleife
-lw t0, 0(a0)    # 0x1000
-lw t0, 0(a0)    # wieder 0x1000
-lw t1, 4(a0)    # 0x1004, räumlich
+# Lehrcode — nicht assembliert oder ausgeführt.
+lw t0, 0(a0)   # 0x1000
+lw t0, 0(a0)   # wieder 0x1000
+lw t1, 4(a0)   # 0x1004
 ```
 
 ![Zeitliche Wiederholung derselben Adresse gegen benachbarte Adressen in einer Line.](../assets/figures/02_speicherhierarchie/locality.png)
 
 ::: notes
-`volatile` kann Loads erzwingen, ist aber keine Optimierungsstrategie und umgeht den Cache nicht. Lösung der Übungsfrage: 0x1000, 0x1000 ist zeitlich; 0x1000, 0x1004 ist räumlich. Im Assembler oben existieren genau diese drei Loads.
+Die drei `lw` sind eine angenommene Zugriffsspur, kein Compilerergebnis. `a0` hält im Modell die ausgerichtete Adresse 0x1000. Der erste Load verfehlt im kalten Cache, der zweite trifft dieselbe Adresse, der dritte liest 0x1004 und liegt in derselben 64-Byte-Line. Die Kästen der Abbildung sind zwei getrennte Vergleichsspuren, nicht diese gemischte Assemblerfolge. `volatile` erzwingt keinen Cache-Bypass. Die nächste Folie betrachtet nur die Nachbaradressen. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt.
 :::
 
 ## Säule 2: Räumliche Lokalität
@@ -261,7 +261,7 @@ lw t1, 4(a0)    # 0x1004, räumlich
 - Hardware: nie nur ein Byte — immer ein ganzer Block (Cache Line)
 
 ::: notes
-Die zweite Säule ist die räumliche Lokalität. Die Wette der Hardware lautet hier: Wenn die CPU die Adresse 1000 liest, wird sie als Nächstes sehr wahrscheinlich die Adresse 1004 lesen. Um Zeit zu sparen, lädt ein Miss die gesamte Line, ausgerichtet auf die Blockgrenze. Das ist nicht „die nächsten 64 Bytes ab der angefragten Adresse“. Die Quelle ist die nächste zuständige Ebene, nicht automatisch DRAM.
+Säule 2: Räumliche Lokalität schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Spatial Locality: nach einer Adresse folgen sehr wahrscheinlich die Nachbarn. Metapher: Band 2 der Enzyklopädie — Band 3 gleich mitnehmen. Hardware: nie nur ein Byte — immer ein ganzer Block (Cache Line). Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Räumliche Lokalität im C-Code
@@ -274,16 +274,16 @@ Zwei typische Quellen:
 Wenn `array[0]` geladen wird, lädt der Cache oft schon `array[1]`, `[2]`, …
 
 ```c
+/* Lehrcode — nicht kompiliert oder ausgeführt.
+   Didaktischer Ausschnitt: Stores, nicht die Load-Spur. */
 int daten[100];
-
-// Klassischer Array-Durchlauf — hohe räumliche Lokalität
 for (int i = 0; i < 100; i++) {
     daten[i] = 0;
 }
 ```
 
 ::: notes
-Warum stimmt diese Wette der Hardware fast immer? Weil Code sequenziell ist. Der Program Counter zählt fast immer einfach +4 weiter. Und bei Datenstrukturen lieben wir Arrays. Wenn Sie in C ein Array anlegen, liegen die Elemente im RAM physikalisch direkt nebeneinander. Wenn Sie das erste Element lesen, zieht der Cache den gesamten restlichen Datenblock in den schnellen SRAM. Der Zugriff auf Element 2, 3 und 4 kostet dann in der Regel nur noch die Hit Time — ohne erneute Miss Penalty.
+Die Schleife schreibt Nullen, sie lädt das Array nicht. Das ist ein Store-Beispiel. Ob die Line in den Cache kommt, hängt von Write-Allocate ab. Der Program Counter steigt bei einer 32-Bit-Instruktion ohne Sprung um vier. Komprimierte RISC-V-Instruktionen und Sprünge ändern das. Eine C-Schleife ist ohne Übersetzung keine beobachtete Maschinenspur. Lehrcode, nicht kompiliert. uint32_t belegt hier vier Byte. Ein zusammenhängendes Array im Adressmodell ist keine Zusage über die physische DRAM-Zellgeometrie. Für einen Store-Hit muss die Line vorhanden sein. Für einen Store-Miss legt nur Write-Allocate eine neue Line an. Der gezeigte C-Ausschnitt ist didaktisch und unvollständig. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Array vs. Linked List
@@ -295,7 +295,7 @@ Warum stimmt diese Wette der Hardware fast immer? Weil Code sequenziell ist. Der
 ![Array nutzt eine Line gemeinsam. Die Liste ist ein mögliches Streulayout.](../assets/figures/02_speicherhierarchie/array-list.png)
 
 ::: notes
-Das ist eine fundamentale Erkenntnis für Sie als Software-Entwickler. In der Informatik lernt man oft, dass verkettete Listen wegen flexibler Einfügeoperationen attraktiv sind. Aus Sicht der modernen Hardware sind sie problematisch: Die Knoten liegen quer im RAM verstreut. Der Cache lädt bei Knoten 1 oft Daten mit, die für Knoten 2 nutzlos sind. Arrays sind auf modernen CPUs deshalb oft um ein Vielfaches schneller — allein wegen besserer Cache-Nutzung.
+Array vs. Linked List schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Pointer-Knoten können verstreut liegen; das ist möglich, nicht zwingend. Dann füllt eine Line Nachbardaten, die der nächste Knoten nicht nutzt. Ein kompaktes Listenlayout kann räumliche Lokalität behalten. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Layout im Speicher: Array vs. Liste
@@ -303,7 +303,7 @@ Das ist eine fundamentale Erkenntnis für Sie als Software-Entwickler. In der In
 Die Abbildung steht auf der vorigen Folie: zusammenhängende Wörter gegen ein ausdrücklich mögliches Streulayout.
 
 ::: notes
-Nicht jede Liste ist cache-feindlich. Ein Array in C liegt im Beispiel dicht.
+Layout im Speicher: Array vs. Liste schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Die Abbildung zeigt den nächsten Schritt des einfachen blockierenden Lehrmodells. Folgen Sie den Pfeilen von der Anfrage über die Prüfung bis zur Antwort. Zahlen in der Zeichnung sind Lehrannahmen. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die 90/10-Regel
@@ -312,7 +312,7 @@ Nicht jede Liste ist cache-feindlich. Ein Array in C liegt im Beispiel dicht.
 - Der übrige Code wird nicht grundsätzlich nur einmal geladen
 
 ::: notes
-„90/10“ ist eine Orientierung, keine Garantie. Der Rest des Programms kann ebenfalls wiederholt ausgeführt werden.
+Die 90/10-Regel schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Faustregel, workloadabhängig: oft liegt viel Laufzeit in wenig Code. Der übrige Code wird nicht grundsätzlich nur einmal geladen. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Übung — Lokalität
@@ -320,7 +320,7 @@ Nicht jede Liste ist cache-feindlich. Ein Array in C liegt im Beispiel dicht.
 Welche Folge ist zeitlich, welche räumlich: `0x1000, 0x1000` oder `0x1000, 0x1004`? Welche Loads stehen im gezeigten Assembler wirklich?
 
 ::: notes
-Zeitlich: zweimal 0x1000. Räumlich: 0x1000 dann 0x1004 in derselben 64-Byte-Line. Der Assembler enthält genau diese drei `lw`, nicht die C-Variablen i, sum und limit.
+Übung — Lokalität schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Die Abbildung zeigt den nächsten Schritt des einfachen blockierenden Lehrmodells. Folgen Sie den Pfeilen von der Anfrage über die Prüfung bis zur Antwort. Zahlen in der Zeichnung sind Lehrannahmen. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Was ist ein Cache?
@@ -331,7 +331,7 @@ Zeitlich: zweimal 0x1000. Räumlich: 0x1000 dann 0x1004 in derselben 64-Byte-Lin
 - CPU fordert `0x1000` an — der Cache fängt die Anfrage ab
 
 ::: notes
-Wir klären nun das Vokabular. Wichtig ist: Der Cache ist unsichtbar. In MCT1 haben wir Register mit lw und sw manuell geladen. Den Cache laden Sie nicht manuell. Wenn Sie einen Load-Befehl ausführen, prüft die Hardware heimlich, ob die Adresse im Cache liegt. Wenn ja, antwortet der Cache. Wenn nein, reicht der Cache die Anfrage an den RAM weiter.
+Was ist ein Cache schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Kleiner, schneller Speicher mit Kopien aus einem größeren, langsameren Speicher. Transparent: Software sieht ihn in der Regel nicht (`load_to_cache` gibt es nicht). Steuerwerk kopiert, sucht und verwaltet autonom. CPU fordert `0x1000` an — der Cache fängt die Anfrage ab. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Split Caches: L1i und L1d
@@ -346,7 +346,7 @@ Wir klären nun das Vokabular. Wichtig ist: Der Cache ist unsichtbar. In MCT1 ha
 ![L1-I für Fetch, L1-D für Loads/Stores, gemeinsam zur nächsten Ebene.](../assets/figures/02_speicherhierarchie/hierarchy.png)
 
 ::: notes
-Auf dem Level 1, also direkt an der CPU, haben wir fast immer zwei Caches. Einen für Code, einen für Daten. Warum? Damit unsere Pipeline aus MCT1 nicht blockiert. Wenn die Fetch-Stufe den nächsten Befehl laden will und die Memory-Stufe gleichzeitig ein Array liest, würden sie sich bei einem gemeinsamen Cache blockieren. Durch Split-Caches haben wir zwei getrennte Eingangstüren. Auf Level 2 wird dann meistens alles wieder in einem gemeinsamen (unified) Cache zusammengefasst.
+Split Caches: L1i und L1d schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Von-Neumann-Flaschenhals auf L1-Ebene entschärfen. Split Caches (Harvard auf L1): L1-I: nur Befehle (Fetch). L1-D: nur Daten (Memory). Vorteil: Fetch und Memory gleichzeitig, ohne Streit um denselben Port. L2 oft unified (gemeinsam für Code und Daten). Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Cache Hit vs. Cache Miss
@@ -358,7 +358,7 @@ Cache Hit (Treffer):
 - Ein L1-Miss kann in L2 treffen; erst ein Miss der letzten Cache-Ebene geht zum DRAM
 
 ::: notes
-Ein Cache Miss heißt: die Line fehlt in dieser Ebene. Die einfache Pipeline aus MCT1 wartet dann. Eine OoO-CPU kann andere Befehle überlappen. Das ist kein Einfrieren jeder Implementierung.
+Cache Hit vs. Cache Miss schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Adresse liegt als Kopie im Cache. Lieferung in der Hit Time des getroffenen Levels. Ein L1-Miss kann in L2 treffen; erst ein Miss der letzten Cache-Ebene geht zum DRAM. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Hit Rate und Miss Rate
@@ -373,7 +373,7 @@ $$
 - Praxiswerte hängen vom Workload ab; 90–98 % ist ein typischer Bereich, keine Garantie
 
 ::: notes
-95 % im Rechenbeispiel heißt 95 von 100 betrachteten Zugriffen, nicht eine Vorhersagegenauigkeit der nächsten Adresse.
+Hit Rate und Miss Rate schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Hit Rate: Anteil der Zugriffe, die im Cache gefunden werden. Miss Rate: Anteil der Fehlschläge. Praxiswerte hängen vom Workload ab; 90–98 % ist ein typischer Bereich, keine Garantie. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Miss Penalty
@@ -383,7 +383,7 @@ $$
 - Das 3-GHz-Beispiel „100 ns = 300 Takte“ ist eine andere Größenordnung, nicht diese Penalty
 
 ::: notes
-Zusätzliche Penalty heißt: der Miss kostet Hit Time plus Penalty, nicht die Penalty statt der Hit Time.
+Miss Penalty schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Hit Time: Kosten jedes Zugriffs im Modell, hier 1 Takt. Miss Penalty: *zusätzliche* Kosten nur der Misses, hier 100 Takte. Das 3-GHz-Beispiel „100 ns = 300 Takte“ ist eine andere Größenordnung, nicht diese Penalty. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## AMAT — Average Memory Access Time
@@ -398,7 +398,7 @@ $$
 - Nur bei Miss kommt die gewichtete Penalty hinzu
 
 ::: notes
-Das ist die wichtigste Formel der Speicherarchitektur. Wenn Sie bei Intel oder Apple Chips designen, optimieren Sie diese Formel. Die Average Memory Access Time sagt uns, wie lange die CPU im Schnitt für einen Speicherzugriff warten muss. Wir zahlen immer den Preis für den Blick in den Cache (Hit Time). Und in einem bestimmten Prozentsatz der Fälle (Miss Rate) zahlen wir zusätzlich die teure Strafe (Miss Penalty).
+AMAT heißt Average Memory Access Time, die mittlere Zugriffszeit der betrachteten Anfragen. Mit Hit Time t und zusätzlicher Miss Penalty p gilt AMAT = t + m·p, weil jeder Zugriff t bezahlt. Bei t = 1 Takt und p = 100 Takten kostet ein Miss 101 Takte. Das ist kein Worst Case und kein gemessener Programm-Speedup. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Rechenbeispiel: Macht des Caches
@@ -419,10 +419,10 @@ $$
 6 Takte sind die mittlere Zugriffszeit. $100/6$ ist ein Verhältnis dieser Zeiten, kein gemessener Speedup des Programms.
 
 ::: notes
-Dieselbe Zahl folgt aus $1 + 0{,}05\cdot 100$. Eine optionale Vertiefung wäre eine rekursive L1/L2-Formel; dort müssen lokale und globale Miss Rates getrennt werden.
+95 Treffer mal 1 Takt plus 5 Fehlschläge mal 101 Takte ergeben 600 Takte. 600 geteilt durch 100 Zugriffe ist AMAT = 6 Takte. Die fünf Misses bezahlen die Prüfung ebenfalls. 100/6 vergleicht nur die modellierten Zugriffszeiten mit einem separaten Modell von 100 Takten ohne Cache. Die fünf Fehlschläge kosten je 101 Takte, zusammen 505. Die 95 Treffer kosten 95. Summe 600. Eine optionale zweite Ebene mit lokaler Miss Rate 0,20 und 10 Takten L2-Zeit ergäbe ein anderes Modell: 1 plus 0,05 mal (10 plus 0,20 mal 100) gleich 2,5 Takte. Die globale Miss Rate dahinter wäre 0,01. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
-## Wir laden niemals einzelne Bytes
+## Cache-Verwaltung in ganzen Lines
 
 - Räumliche Lokalität $\Rightarrow$ keine Einzelbyte-Verwaltung
 - Verwaltungseinheit: Cache Block / Cache Line
@@ -440,7 +440,7 @@ Dieselbe Zahl folgt aus $1 + 0{,}05\cdot 100$. Eine optionale Vertiefung wäre e
 | Dirty | nur bei Write-Back: verändert |
 
 ::: notes
-Die dezimale Adresse 1000: floor(1000/64)*64 = 960, Offset 40. Ein ausgerichtetes uint32_t-Array hat 16 Elemente pro Line.
+Ein CPU-Load darf ein einzelnes Byte anfordern. Das Cache-Modell verwaltet und beschafft trotzdem eine ganze, an der Blockgrenze ausgerichtete Line. Nicht jede Region, insbesondere MMIO, ist cachebar. Dezimal 1000 liegt in der Line 960 bis 1023, Offset 40. Das ist nicht die Hexadresse 0x1000. floor(1000/64) ist 15, die Basis ist 960, das Ende ist 1023, der Offset ist 40. Ein Byte-Load der CPU ändert diese Verwaltungsgröße nicht. Liegt das erste Arrayelement nicht auf der Line-Grenze, passen nicht automatisch 16 Werte in dieselbe Line. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Cache Line und räumliche Lokalität
@@ -450,7 +450,7 @@ Die dezimale Adresse 1000: floor(1000/64)*64 = 960, Offset 40. Ein ausgerichtete
 - „Garantierte Hits“ gibt es ohne diese Annahme nicht
 
 ::: notes
-Ein Miss lädt die Line auf Blockgrenze. Die nächsten Elemente derselben gültigen Line sind Hits, bis sie verdrängt oder invalidiert wird. Das ist das Modell, keine Garantie für jedes kompilierte Programm.
+Cache Line und räumliche Lokalität schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Miss bei `array[0]` lädt die ganze Line (z. B. 16 Integers). Weitere Elemente derselben gültigen Line sind Hits, solange die Line nicht verdrängt oder invalidiert wird. „Garantierte Hits“ gibt es ohne diese Annahme nicht. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Anatomie einer Cache-Zeile
@@ -466,7 +466,7 @@ Ein Cache-Eintrag enthält drei Felder:
 | 1 Bit | z. B. 17 Bit | z. B. 64 Bytes |
 
 ::: notes
-Im SRAM des Caches speichern wir nicht nur die Daten. Wir müssen die Daten markieren. Stellen Sie sich vor, Sie legen Aktenordner aus dem Keller auf den Schreibtisch. Wenn auf dem Ordner nicht steht, wo er herkommt, wissen Sie später nicht, wem die Daten gehören. Dieses Etikett ist das Tag. Und das Valid-Bit brauchen wir, weil der Cache beim Einschalten des PCs voller Strom-Rauschen und Müll ist. Das Valid-Bit sagt: Diese Daten sind frisch und echt.
+Anatomie einer Cache-Zeile schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Valid   Tag   Daten. 1 Bit   z. B. 17 Bit   z. B. 64 Bytes. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Blockgröße: Der Kompromiss
@@ -476,7 +476,7 @@ Im SRAM des Caches speichern wir nicht nur die Daten. Wir müssen die Daten mark
 - Industrie-Sweetspot: oft 32–64 Bytes pro Line
 
 ::: notes
-Könnten wir nicht einfach 4-Kilobyte-Blöcke laden? Die Antwort liegt wieder im magischen Dreieck. Ein L1-Cache hat vielleicht nur 32 Kilobyte. Wenn wir 4 Kilobyte große Blöcke nutzen, passen genau 8 Blöcke in den Cache. Wenn das Programm nun an 9 verschiedenen Stellen im RAM gleichzeitig arbeitet, werfen sich diese Blöcke ständig gegenseitig aus dem Cache. Die Miss Penalty explodiert, weil das ständige Nachladen den Speicherbus blockiert. 64 Bytes haben sich heute als guter Kompromiss erwiesen.
+Blockgröße: Der Kompromiss schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Größere Lines: bessere räumliche Lokalität — aber höhere Miss Penalty. Wenige große Blöcke: weniger „Slots“, mehr Verdrängung (Thrashing). Industrie-Sweetspot: oft 32–64 Bytes pro Line. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Übung — AMAT
@@ -484,7 +484,7 @@ Könnten wir nicht einfach 4-Kilobyte-Blöcke laden? Die Antwort liegt wieder im
 Berechnen Sie AMAT für Hit Rate 95 % und 80 % bei Hit Time 1 und zusätzlicher Penalty 100. Was bedeutet „zusätzlich“?
 
 ::: notes
-95 %: $1+0{,}05\cdot 100=6$. 80 %: $1+0{,}2\cdot 100=21$. Zusätzlich heißt: die Hit Time wird immer gezahlt, die Penalty nur bei Misses.
+Bei 95 Prozent Hit Rate ist die Miss Rate 0,05 und AMAT = 1 + 0,05·100 = 6 Takte. Bei 80 Prozent ist die Miss Rate 0,20 und AMAT = 21 Takte. AMAT ist nicht 5 oder 20, weil die Hit Time bei jedem Zugriff anfällt. Beide Fälle nutzen dieselbe Hit Time und dieselbe zusätzliche Penalty. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Das Mapping-Problem
@@ -497,7 +497,7 @@ Berechnen Sie AMAT für Hit Rate 95 % und 80 % bei Hit Time 1 und zusätzlicher 
 - Drei grundlegende Strategien lösen dieses Problem
 
 ::: notes
-Wir stehen vor einem logistischen Engpass. Wir haben Millionen von Aktenordnern im Keller, aber nur 512 freie Plätze auf unserem Schreibtisch. Wenn wir eine Akte hochholen, wo legen wir sie ab? Und wenn die CPU eine Akte sucht, wie findet sie diese in etwa 1 Nanosekunde wieder? Wenn die CPU jede der 512 Positionen nacheinander durchsuchen müsste, wäre der Zeitvorteil des Caches sofort wieder zerstört.
+Das Mapping-Problem schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Massives Platzproblem zwischen RAM und Cache. RAM: z. B. 4 GB (Millionen Cache-Blöcke). L1-Cache: z. B. 32 KB (vielleicht nur 512 Cache-Zeilen). Frage: Wo darf ein RAM-Block im Cache abgelegt werden? Herausforderung: Mapping in Hardware, idealerweise in höchstens 1 Takt. Drei grundlegende Strategien lösen dieses Problem. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Mapping: Kapazität vs. Suche
@@ -511,7 +511,7 @@ flowchart LR
 ```
 
 ::: notes
-Schematische Größenordnung: Der Hauptspeicher fasst Millionen Blöcke, der L1-Cache nur wenige hundert Zeilen. Die Mapping-Funktion muss deshalb in Hardware extrem schnell entscheiden, wohin ein Block gehört und wo er gesucht wird.
+Mapping: Kapazität vs. Suche schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Die Abbildung zeigt den nächsten Schritt des einfachen blockierenden Lehrmodells. Folgen Sie den Pfeilen von der Anfrage über die Prüfung bis zur Antwort. Zahlen in der Zeichnung sind Lehrannahmen. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Direct Mapped Cache
@@ -523,7 +523,7 @@ Schematische Größenordnung: Der Hauptspeicher fasst Millionen Blöcke, der L1-
 - Vorteil: Suche nur an genau diesem einen Platz
 
 ::: notes
-Direct Mapped ist die simpelste und schnellste Hardware-Lösung. Jedem RAM-Block wird mathematisch ein fester Platz im Cache diktiert. Das ist wie in einem Parkhaus, in dem Sie nicht frei parken dürfen. Wenn die CPU wissen will, ob Block 512 im Cache ist, weiß sie sofort: „Wenn er da ist, dann zwingend auf Platz 0.“ Die Hardware schaut nur auf Fach 0. Ist er da, Hit. Ist er nicht da, Miss.
+Direct Mapped Cache schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Einfachste Strategie: Direct Mapped (Direktabbildung). Regel: jeder RAM-Block hat genau einen festen Platz im Cache. Parkhaus-Metapher: Parkplatznummer aus den letzten Ziffern des Nummernschilds. Endet das Schild auf 05 → nur Parkplatz 05. Vorteil: Suche nur an genau diesem einen Platz. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Direct Mapped: feste Zuordnung
@@ -540,7 +540,7 @@ flowchart LR
 ```
 
 ::: notes
-Beispiel mit 512 Zeilen: Block 0 und Block 512 konkurrieren um dieselbe Cache-Zeile 0. Genau diese Kollision führt später zum Thrashing-Problem.
+Direct Mapped: feste Zuordnung schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Die Abbildung zeigt den nächsten Schritt des einfachen blockierenden Lehrmodells. Folgen Sie den Pfeilen von der Anfrage über die Prüfung bis zur Antwort. Zahlen in der Zeichnung sind Lehrannahmen. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Modulo-Arithmetik in Hardware
@@ -550,7 +550,7 @@ Beispiel mit 512 Zeilen: Block 0 und Block 512 konkurrieren um dieselbe Cache-Ze
 - Die Auswahl selbst ist verdrahtet; der Speicherzugriff ist deshalb nicht verzögerungsfrei
 
 ::: notes
-1234 mod 100 nutzt die letzten Dezimalziffern. $2^9$ nutzt neun Indexbits. Das ersetzt keinen physikalisch laufzeitfreien Pfad.
+Modulo-Arithmetik in Hardware schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Cache-Index $= (\text{RAM-Blockadresse}) \bmod (\text{Anzahl Cache-Zeilen})$. Modulo einer Zweierpotenz ist ein Bitfeld, kein allgemeiner Dividierer. Die Auswahl selbst ist verdrahtet; der Speicherzugriff ist deshalb nicht verzögerungsfrei. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die Adress-Zerlegung
@@ -570,7 +570,7 @@ Diese drei Felder sind der Schlüssel jeder Cache-Architektur.
 - Leitungen, Decoder, SRAM, Komparator und MUX haben trotzdem Laufzeit
 
 ::: notes
-Direct Mapped: Tag 0x2468, Index 345, Offset 56. 4-Way bei gleicher Datenkapazität: Tag 0x91A2, Set 89, Offset 56. „0 Takte“ für die Bitselektion wäre falsch.
+Die Adress-Zerlegung schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. $S = C/(B\cdot W)$, Offset $\log_2 B$, Index $\log_2 S$, Tag $P-b-s$. Zweierpotenzen erlauben die Zerlegung durch Bitfelder, ohne Dividierer. Leitungen, Decoder, SRAM, Komparator und MUX haben trotzdem Laufzeit. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Feld 1: Der Block Offset
@@ -590,7 +590,7 @@ flowchart TD
 ```
 
 ::: notes
-Das erste Bündel sind die untersten Bits. Erinnern wir uns: Der Cache lädt immer fette 64-Byte-Blöcke. Wenn der 64-Byte-Block endlich gefunden ist, müssen wir aus diesen 64 Bytes das richtige Stück herausschneiden, das die CPU angefragt hat. Bei 64 Bytes brauchen wir exakt 6 Bits, um jedes Byte darin durchzunummerieren.
+Feld 1: Der Block Offset schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Wo in der Cache-Zeile liegt das gesuchte Byte? Eine Line bringt z. B. 64 Bytes am Stück. CPU will oft nur ein 4-Byte-Wort. $2^{6} = 64$ → unterste 6 Bits als Offset innerhalb des Blocks. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Feld 2: Der Cache Index
@@ -601,7 +601,7 @@ Das erste Bündel sind die untersten Bits. Erinnern wir uns: Der Cache lädt imm
 - Diese Bits gehen direkt an den Adress-Decoder des Cache-SRAM
 
 ::: notes
-Das ist der Index. Er sagt der Hardware, in welche Schublade sie greifen muss. Wenn wir 512 Schubladen haben, reichen 9 Bits völlig aus. Wir nehmen also die nächsten 9 Kabel der Adresse, schließen sie an den SRAM des Caches an und die Schublade springt sofort auf. Kein Suchen, kein Warten. Purer Random Access in Sub-Nanosekunden.
+Bei 512 Sets genügen neun Indexbits, bei 128 Sets im Vier-Wege-Vergleich sieben. Der Decoder wählt das Set, nicht den Treffer. Decoder, SRAM, Vergleich und Multiplexer brauchen reale Zeit. Für 0x12345678 wählt das Direct-Mapped-Modell Index 345 von 512. Der Decoder liest diese eine Zeile. Erst Tag und Valid entscheiden den Treffer. Bei gleicher Datenkapazität und vier Wegen bleiben 128 Sets, also sieben Indexbits und Set 89. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Feld 3: Das Tag
@@ -614,7 +614,7 @@ Das ist der Index. Er sagt der Hardware, in welche Schublade sie greifen muss. W
 - Der Vergleich ist ein Bitvergleich mit Reduktion, nicht ein einzelnes XOR als vollständige Schaltung
 
 ::: notes
-Tag = floor(Blocknummer / Anzahl Sets). Blocknummer 512 und Tag 1 sind verschiedene Zahlen.
+Feld 3: Das Tag schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Prüft: Sind das wirklich meine Daten? Alias-Problem: Millionen RAM-Blöcke teilen denselben Index. Beim Öffnen der Zeile: welches der vielen Blöcke liegt darin? Oberste Bits = Tag. Bei 512 Sets hat Block 512 den Tag 1, nicht das Etikett 512. Der Vergleich ist ein Bitvergleich mit Reduktion, nicht ein einzelnes XOR als vollständige Schaltung. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Das Valid-Bit — Boot-Problem
@@ -626,7 +626,7 @@ Tag = floor(Blocknummer / Anzahl Sets). Blocknummer 512 und Tag 1 sind verschied
 - Hit nur wenn Tag übereinstimmt und $\text{Valid} = 1$
 
 ::: notes
-Das Valid-Bit rettet den Computer beim Einschalten. Ohne dieses Bit würde die CPU beim ersten Load-Befehl einen Hit melden, weil der physikalische Zufallsmüll im SRAM zufällig das richtige Tag-Muster aufweist. Das Valid-Bit sagt knallhart: „Dieser Eintrag ist Müll, er wurde noch nie absichtlich aus dem RAM geladen.“
+Das Valid-Bit — Boot-Problem schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Nach Einschalten: SRAM voller zufälligem Rauschen. Zufällig könnte das Rauschen dem gesuchten Tag gleichen. Lösung: 1-Bit Valid-Flag. Hardware-Reset setzt alle Valid-Bits auf 0. Hit nur wenn Tag übereinstimmt und $\text{Valid} = 1$. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Ablauf eines Lesezugriffs (Direct Mapped)
@@ -639,7 +639,7 @@ Das Valid-Bit rettet den Computer beim Einschalten. Ohne dieses Bit würde die C
 ![Index öffnet das Set, Tag und Valid vergleichen, Offset wählt das Wort, Daten gehen zur CPU.](../assets/figures/02_speicherhierarchie/datapath.png)
 
 ::: notes
-Beim 4-Way-Modell vergleichen vier Ways parallel. Der Daten-MUX wählt den treffenden Way. Die Datenkapazität bleibt 32 KiB, der Cache wird nicht viermal größer.
+Zuerst wird die Adresse zerlegt, dann das eine Set gelesen, Tag und Valid geprüft. Ein Treffer liefert den Offset-Bereich. Ein Fehlschlag fragt die nächste zuständige Ebene, nicht grundsätzlich DRAM. Der Vier-Wege-Vergleich ist eine spätere Erweiterung, nicht der titelgebende Ablauf. Die Adresse zerfällt in Tag, Index und Offset. Der Index liest eine Zeile. Hit bedeutet gültiges passendes Tag, dann liefert der Offset das angeforderte Wort. Beim Miss füllt die nächste Ebene diese eine Zeile. Die abhängige Pipeline wartet im blockierenden Modell. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Vorteil von Direct Mapped
@@ -650,7 +650,7 @@ Beim 4-Way-Modell vergleichen vier Ways parallel. Der Daten-MUX wählt den treff
 - Bei Miss keine Wahl: nur ein Platz kann verdrängt werden
 
 ::: notes
-Direct Mapped Caches sind wunderschön simpel. Die Hardware-Ingenieure lieben sie, weil sie kaum Strom verbrauchen und rasend schnell sind. Es gibt keine Diskussion, wer den Parkplatz räumen muss, wenn ein neues Auto kommt. Es gibt für das neue Auto ja eh nur diesen einen Platz. Der alte Besitzer fliegt gnadenlos raus.
+Vorteil von Direct Mapped schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Suche nur an einer Stelle → minimaler Hardware-Aufwand. Nur ein Komparator: Strom und Chipfläche sparen. Schnelle Hit-Time: oft Antwort in einem Takt. Bei Miss keine Wahl: nur ein Platz kann verdrängt werden. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Nachteil: Thrashing
@@ -662,7 +662,7 @@ Direct Mapped Caches sind wunderschön simpel. Die Hardware-Ingenieure lieben si
 - Der übrige Cache kann leer bleiben; das ist kein Capacity Miss dieses Paars
 
 ::: notes
-Fully associative legt beide Blöcke ohne diesen Index-Konflikt ab. Ein zu großes Working Set erzeugt trotzdem Capacity Misses.
+Nachteil: Thrashing schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Beide Adressen treffen Set 64. Direct-Mapped-Tags 0 und 1, 4-Way-Tags 0 und 4. Zwei compulsory Misses, im Direct Mapped zusätzlich sechs Conflict Misses. Der übrige Cache kann leer bleiben; das ist kein Capacity Miss dieses Paars. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Thrashing-Beispiel in C
@@ -681,7 +681,7 @@ for (int i = 0; i < 1000; i++) {
 ```
 
 ::: notes
-Ein harmlos wirkendes C-Programm: Zwei Arrays werden addiert. Wenn der Linker diese Arrays so platziert, dass ihre Adressen denselben Cache-Index ergeben — und der Cache Direct Mapped ist — können sich A und B gegenseitig verdrängen. Dann läuft das Programm deutlich langsamer. Ob die Kollision wirklich eintritt, hängt von Alignment, Größen und Cache-Parametern ab; dem Quelltext allein sieht man das oft nicht an.
+Thrashing-Beispiel in C schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Die Abbildung zeigt den nächsten Schritt des einfachen blockierenden Lehrmodells. Folgen Sie den Pfeilen von der Anfrage über die Prüfung bis zur Antwort. Zahlen in der Zeichnung sind Lehrannahmen. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Übung — Adressfelder
@@ -689,7 +689,7 @@ Ein harmlos wirkendes C-Programm: Zwei Arrays werden addiert. Wenn der Linker di
 Bestimmen Sie für 0x12345678 im Referenzmodell Tag, Index und Offset, direct mapped. Was liefert die Folge 0x1000, 0x9000, 0x1000 im kalten Direct-Mapped-Cache?
 
 ::: notes
-Tag 0x2468, Index 345, Offset 56. Die Folge trifft zweimal Set 64 mit verschiedenen Tags: Miss, Miss, Miss.
+Für 0x12345678 im Direct-Mapped-Modell gilt Offset 56, Index 345 und Tag 0x2468. Die Folge 0x1000, 0x9000, 0x1000 hat dreimal Index 64 und die Tags 0, 1, 0. Im kalten Cache sind das drei Misses, nicht zweimal Set 64. Rechnung: Blocknummer ist floor(Adresse/64). Index ist diese Nummer modulo 512, das Tag der ganzzahlige Quotient. Offset ist der Rest der Adresse modulo 64. Für 0x1000 und 0x9000 ist der Abstand 32768 Byte, also genau eine Direct-Mapped-Kapazität. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Fully Associative Cache
@@ -697,10 +697,10 @@ Tag 0x2468, Index 345, Offset 56. Die Folge trifft zweimal Set 64 mit verschiede
 - Gegenteil von Direct Mapped: Fully Associative (vollassoziativ)
 - Regel: RAM-Block darf an jedem freien Platz liegen
 - Parkhaus: freie Platzwahl
-- Vorteil: kein Thrashing — A und B können nebeneinander leben
+- Vorteil: die Indexkollision von A und B entfällt. Capacity Misses bleiben möglich
 
 ::: notes
-Vollassoziativität beseitigt die Indexkonflikte dieses Beispiels. Capacity Misses und Thrashing durch ein zu großes Working Set bleiben möglich.
+Jeder Block darf in jedem Platz liegen. Dadurch entfällt der Indexkonflikt von 0x1000 und 0x9000. Ein zu großes Working Set kann weiterhin verdrängen. Compulsory Misses bleiben. Vollassoziativität maximiert nicht allgemein die Hit Rate und ist nicht unbrauchbar. Im Referenzmodell gibt es 512 Datenplätze und ein einziges Set. Die acht Zugriffe auf 0x1000 und 0x9000 brauchen dann keine festen Indexplätze. Ein Working Set aus 513 verschiedenen Lines passt trotzdem nicht gleichzeitig hinein. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Das Such-Problem bei Fully Associative
@@ -725,7 +725,7 @@ flowchart LR
 ```
 
 ::: notes
-Wenn es keinen festen Parkplatz mehr gibt, muss die CPU jedes Mal das gesamte Parkhaus absuchen, um ihr Auto zu finden. In der Informatik lösen wir das durch massive Parallelität. Wir bauen für jede einzelne Zeile des Caches einen eigenen Komparator-Schaltkreis. Wenn die CPU eine Anfrage stellt, brüllen alle 512 Komparatoren gleichzeitig auf. Einer meldet hoffentlich: „Ich hab's!“.
+Das Such-Problem bei Fully Associative schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Freiheit hat einen Preis: Wo liegt der Block? Kein Index mehr — Adresse nur noch Tag und Offset. Hardware muss alle Zeilen parallel nach dem Tag durchsuchen. Bei 512 Zeilen: 512 parallele Komparatoren. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Nachteile von Fully Associative
@@ -736,7 +736,7 @@ Wenn es keinen festen Parkplatz mehr gibt, muss die CPU jedes Mal das gesamte Pa
 - Fazit: für große L1-Caches in der Praxis unbrauchbar
 
 ::: notes
-Fully Associative Caches sind theoretisch attraktiv, weil sie Hit-Raten maximieren — physikalisch aber teuer: Hitzeentwicklung und Platzbedarf der parallelen Vergleichslogik machen die Architektur für große L1-Caches ungeeignet. Wir brauchen einen Kompromiss aus beiden Welten.
+Nachteile von Fully Associative schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Strom und Hitze: hunderte parallele Vergleiche jede Nanosekunde. Chipfläche: Komparatoren oft größer als der SRAM selbst. Latenz: große ODER-Netze verlangsamen das Hit-Signal. Fazit: für große L1-Caches in der Praxis unbrauchbar. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Der Mittelweg: Set-Associative Cache
@@ -747,7 +747,7 @@ Fully Associative Caches sind theoretisch attraktiv, weil sie Hit-Raten maximier
 - Sie müssen in Zone 05 parken, dürfen dort aber einen der 4 Plätze wählen
 
 ::: notes
-Willkommen beim Industriestandard. Fast jeder Prozessor in Ihrem Handy oder Laptop nutzt Set-Associative Caches. Wir mischen die Strategien. Die Adresse sagt uns wieder: „Geh zu Index 5“. Aber auf Index 5 gibt es nicht nur eine Cache-Zeile, sondern eine kleine Menge (ein Set) von Zeilen.
+Der Mittelweg: Set-Associative Cache schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Industriestandard: Set-Associative (mengenassoziativ). Hybrid aus Direct Mapped und Fully Associative. Parkhaus: feste Zone (Set) wie Direct Mapped — darin z. B. 4 freie Plätze (Ways). Sie müssen in Zone 05 parken, dürfen dort aber einen der 4 Plätze wählen. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## N-Way Set-Associative Struktur
@@ -765,7 +765,7 @@ Willkommen beim Industriestandard. Fast jeder Prozessor in Ihrem Handy oder Lapt
 | Set 1 | … | … | … | … |
 
 ::: notes
-Das löst die Indexkollision von A und B. Es beseitigt nicht jedes Thrashing.
+N-Way Set-Associative Struktur schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Cache in Sets; jedes Set hat $N$ Ways. Beispiel 4-Way: Index zeigt auf Set mit 4 Blöcken. Suche: nur $N$ parallele Komparatoren (z. B. 4). Bestes aus beiden Welten: wenig Komparatoren (schnell, sparsam). bis zu $N$ Blöcke mit gleichem Index ohne gegenseitiges Rauswerfen. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Praxis: 2-Way und 4-Way
@@ -779,7 +779,7 @@ Das löst die Indexkollision von A und B. Es beseitigt nicht jedes Thrashing.
 *Angaben schematisch — konkrete Werte den jeweiligen Microarchitecture-/Datenblättern entnehmen.*
 
 ::: notes
-Assoziativität ist das Stellrad der Computerarchitekten. Für den L1-Cache, der extrem schnell sein muss, wählt man oft moderate Assoziativität (z. B. 4- oder 8-Way). Für den L3-Cache, bei dem Kapazität und Hit-Rate wichtiger sind als die letzte Nanosekunde, sind höhere Assoziativitäten üblich. Die konkreten Zahlen variieren stark zwischen Herstellern und Generationen.
+Praxis: 2-Way und 4-Way schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Moderne CPUs nutzen typischerweise Set-Associative Caches. Typische Größenordnungen (schematisch, je nach Generation/Produkt): L1: oft 4-Way oder 8-Way. L3: oft höhere Assoziativität (z. B. 12–16-Way). Größeres $N$: weniger Konflikt-Misses, aber mehr Komparatoren und Strom. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Adress-Zerlegung bei Set-Associative
@@ -793,7 +793,7 @@ Assoziativität ist das Stellrad der Computerarchitekten. Für den L1-Cache, der
 |--------------------|-------------------------|----------------------|
 
 ::: notes
-Das ist wichtig für Klausuraufgaben: Wenn Sie einen Cache von Direct Mapped auf 4-Way umbauen (bei gleicher Gesamtkapazität), schrumpft die Anzahl der Indizes um den Faktor 4. Sie brauchen also 2 Index-Bits weniger. Diese 2 Bits rücken eine Stelle nach links und werden Teil des Tags. Der Offset bleibt immer gleich, denn die Blockgröße ändert sich ja nicht.
+Adress-Zerlegung bei Set-Associative schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Ein Set fasst mehrere Ways → insgesamt weniger Sets. Weniger Sets → weniger Index-Bits. Eingesparte Index-Bits wandern ins Tag. Offset bleibt gleich (Blockgröße unverändert). Tag (z. B. 19 Bit)   Set-Index (z. B. 7 Bit)   Offset (z. B. 6 Bit). Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Hardware-Ablauf beim N-Way Cache
@@ -817,7 +817,7 @@ flowchart LR
 ```
 
 ::: notes
-Die Hardware arbeitet stark parallel. Wir greifen in die Schublade (das Set) und ziehen gleichzeitig vier Ordner heraus. Vier Angestellte prüfen gleichzeitig die vier Etiketten (Komparatoren). Derjenige, der das richtige Etikett hat, schiebt die Akte zur CPU durch. Die anderen drei werfen die Akten wieder zurück.
+Hardware-Ablauf beim N-Way Cache schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Die Abbildung zeigt den nächsten Schritt des einfachen blockierenden Lehrmodells. Folgen Sie den Pfeilen von der Anfrage über die Prüfung bis zur Antwort. Zahlen in der Zeichnung sind Lehrannahmen. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Eviction — Verdrängung
@@ -828,7 +828,7 @@ Die Hardware arbeitet stark parallel. Wir greifen in die Schublade (das Set) und
 - Hardware braucht eine Replacement Policy
 
 ::: notes
-Freiheit bringt Verantwortung. Wenn wir vier Plätze in unserem Set haben und alle voll sind, müssen wir eine Entscheidung treffen. Welchen der vier wertvollen Cache-Einträge opfern wir, um Platz für den neuen Block aus dem langsamen RAM zu schaffen? Wenn wir den falschen wählen, zerstören wir die zeitliche Lokalität.
+Eviction — Verdrängung schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Direct Mapped: voller Platz → alter Block fliegt raus (keine Wahl). N-Way: Set voll (alle $N$ Ways belegt) → welcher Block wird geopfert? Eviction = Verdrängung. Hardware braucht eine Replacement Policy. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Replacement: Random und FIFO
@@ -841,10 +841,10 @@ Random:
 FIFO (First-In-First-Out):
 
 - Ältesten geladenen Block verdrängen
-- Problem: früh geladene, aber oft genutzte Daten (z. B. Schleifenzähler) fliegen unnötig raus
+- Problem: früh geladene, weiter genutzte Blöcke können trotzdem das Victim sein
 
 ::: notes
-Die Hardware-Ingenieure haben viel experimentiert. Einfacher Zufall funktioniert erstaunlich gut und kostet fast kein Silizium. FIFO, also das Rauswerfen des ältesten Eintrags, klingt fair, ist aber oft dumm. Die Variable i einer Schleife wurde ganz zu Beginn geladen, wird aber in jedem Takt gebraucht. FIFO würde sie einfach rauswerfen.
+FIFO merkt sich die Ladereihenfolge, nicht die letzte Nutzung. Ein Schleifenzähler ist kein belastbares Beispiel, weil er in einem Register bleiben kann. Die Spur A, B, C, D, A, E zeigt den Unterschied zu LRU an echten Blocknamen. Nach A, B, C, D, A bleibt die FIFO-Reihenfolge A, B, C, D. E verdrängt A. LRU hat nach dem Hit auf A die Reihenfolge B, C, D, A und verdrängt B. Random braucht einen Auswahlmechanismus und ist nicht kostenfrei. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Replacement: LRU
@@ -856,7 +856,7 @@ Die Hardware-Ingenieure haben viel experimentiert. Einfacher Zufall funktioniert
 - Zeitstempel sind eine mögliche Umsetzung. Pseudo-LRU spart Bits
 
 ::: notes
-Nach dem erneuten A ist A bei FIFO weiter der älteste geladene Block. LRU hat B als am längsten ungenutzt.
+Replacement: LRU schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Ein Hit macht den Block bei LRU wieder jung, bei FIFO bleibt die Ladereihenfolge. LRU ist eine gute Heuristik, nicht perfekt und nicht immer die beste Policy. Zeitstempel sind eine mögliche Umsetzung. Pseudo-LRU spart Bits. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Zusammenfassung Mapping-Strategien
@@ -870,7 +870,7 @@ Nach dem erneuten A ist A bei FIFO weiter der älteste geladene Block. LRU hat B
 | Praxis | billige Chips | kleine Puffer (z. B. TLB) | L1/L2/L3-Standard |
 
 ::: notes
-Hier haben Sie alle drei Welten auf einen Blick. In der Klausur oder in der Industrie werden Sie fast immer auf Set-Associative Caches stoßen, da sie die Nachteile der beiden anderen Extreme perfekt ausbalancieren.
+Zusammenfassung Mapping-Strategien schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Merkmal   Direct Mapped   Fully Associative   N-Way Set-Associative. Platzwahl   1 fester Platz   überall   frei innerhalb eines Sets. Komparatoren   1   sehr viele   $N$ (z. B. 4). Kollisionen   Conflict Misses möglich   keine Conflict Misses   weniger pro Set. Eviction   keine Wahl   LRU / Random   LRU / Random. Praxis   billige Chips   kleine Puffer (z. B. TLB)   L1/L2/L3-Standard. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Übung — gleiche Kapazität
@@ -878,7 +878,7 @@ Hier haben Sie alle drei Welten auf einen Blick. In der Klausur oder in der Indu
 32 KiB und 64-Byte-Lines: Warum hat 4-Way weniger Indexbits als Direct Mapped?
 
 ::: notes
-Die Set-Zahl fällt von 512 auf 128, der Index von 9 auf 7 Bit, der Tag wächst von 17 auf 19. Der Offset bleibt 6. Die Datenkapazität bleibt 32 KiB.
+512 Lines zu je 64 Byte sind 32 KiB, sowohl als 512 mal 1 als auch als 128 mal 4. Bei 32-Bit-Adressen sind die Felder 17/9/6 beziehungsweise 19/7/6 Bit. Metadaten und Replacement-Zustand zählen nicht zur Datenkapazität. KiB bedeutet 1024 Byte. 32 KiB geteilt durch 64 Byte sind 512 Lines. Vier Wege teilen diese Lines auf 128 Sets. log2(64) ist 6, log2(512) ist 9, log2(128) ist 7. Die Tagbreite wächst von 17 auf 19 Bit, die Datenkapazität bleibt 32 KiB. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Das Problem beim Schreiben
@@ -889,7 +889,7 @@ Die Set-Zahl fällt von 512 auf 128, der Index von 9 auf 7 Bit, der Tag wächst 
 - Cache hält dann einen neueren Wert als der RAM
 
 ::: notes
-Caches machen das Lesen effizient. Beim Schreiben entsteht jedoch ein Konsistenzproblem: Wenn Sie in C `a = 5;` schreiben, aktualisiert die CPU den Wert im L1-Cache. Der Wert im Hauptspeicher kann vorerst unverändert bleiben. Die Ebenen sind dann vorübergehend inkonsistent.
+Nach einem Write-Back-Store kann der Cache 5 und die untere Ebene 0 enthalten. Das ist der reguläre Zustand dieser Strategie, kein Kohärenzfehler an sich. Der schreibende Kern muss seine eigenen folgenden Loads korrekt sehen. Andere Agenten brauchen eigene Sichtbarkeitsregeln. sw schreibt ein Wort. Bei Write-Back bleibt die untere Ebene zunächst alt. Der eigene Kern sieht den neuen Wert aus seiner Line. Ein zweiter Kern oder nicht kohärentes DMA sieht ihn nur nach den Regeln seines Protokolls. Dirty ist Verwaltungszustand, kein Fehler. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Das Cache-Kohärenz-Problem
@@ -902,18 +902,18 @@ Caches machen das Lesen effizient. Beim Schreiben entsteht jedoch ein Konsistenz
 - Kein Zicbom und kein MESI für eine beliebige RV32I-Plattform; Multicore folgt in Block 9
 
 ::: notes
-DRAM muss im kohärenten Fall nicht jederzeit den neuesten Wert halten. Ein nicht kohärenter DMA-Leser sieht sonst die alte Kopie.
+Das Cache-Kohärenz-Problem schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Ein kohärenter zweiter Kern kann den aktuellen Wert über das Protokoll sehen. Nicht kohärentes DMA braucht Sichtbarkeit am gemeinsamen Zugriffspunkt. Clean, Invalidate und Flush sind konzeptionell verschieden und plattformabhängig. Kein Zicbom und kein MESI für eine beliebige RV32I-Plattform; Multicore folgt in Block 9. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Schreibstrategie 1: Write-Through
 
 - Write-Through (Durchschreiben)
-- Jeder Schreibvorgang geht synchron in L1 und Main Memory
-- RAM bleibt aktuell (gegenüber dem schreibenden Kern)
-- Achtung Multicore: ein anderer Kern kann trotzdem eine veraltete L1-Kopie halten — volle Kohärenz braucht Invalidierung/Snooping (Block 9)
+- Jeder Schreibvorgang wird an die nächste Ebene weitergegeben
+- Ohne Puffer wartet der Store auf diese Weitergabe. Mit Puffer kann unten noch der alte Wert stehen
+- Ein anderer Kern kann trotzdem eine eigene Kopie halten
 
 ::: notes
-Eine einfache Methode für die RAM-Konsistenz ist das Durchschreiben. Jeder Store-Befehl geht nicht nur in den Cache, sondern wird sofort an den langsamen RAM durchgereicht. Vorteil: keine Diskrepanz zwischen Cache und RAM beim schreibenden Kern — volle Multicore-Kohärenz braucht trotzdem Invalidierung/Snooping.
+Write-Through gibt den Store an die nächste Ebene weiter. Ohne Puffer ist der Store erst abgeschlossen, wenn diese Weitergabe im Modell fertig ist. Mit Puffer kann die CPU weiterlaufen, während unten noch der alte Wert steht. Write-Through invalidiert nicht automatisch die Kopie eines anderen Kerns. Store 5 und danach Store 7 starten bei Cachewort 0 und unterer Ebene 0. Ohne Puffer steht unten nach dem ersten Abschluss 5 und nach dem zweiten 7. Mit Puffer kann die CPU beide Stores annehmen, während unten noch 0 steht. Nach dem Abfluss ohne Write-Merging steht unten 7. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Write-Through: Datenfluss
@@ -921,7 +921,7 @@ Eine einfache Methode für die RAM-Konsistenz ist das Durchschreiben. Jeder Stor
 ![Stores 5 und 7: sofort, gepuffert oder nur im Cache mit Dirty.](../assets/figures/02_speicherhierarchie/write-states.png)
 
 ::: notes
-Die nächste Ebene des Ein-Level-Modells steht hier für den Hauptspeicher. In einer echten Hierarchie schreibt L1 zuerst zur nächsten Cache-Ebene.
+Write-Through: Datenfluss schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Die Abbildung zeigt den nächsten Schritt des einfachen blockierenden Lehrmodells. Folgen Sie den Pfeilen von der Anfrage über die Prüfung bis zur Antwort. Zahlen in der Zeichnung sind Lehrannahmen. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Nachteile von Write-Through
@@ -932,7 +932,7 @@ Die nächste Ebene des Ein-Level-Modells steht hier für den Hauptspeicher. In e
 - Bus durch ständige Einzel-Updates überlastet
 
 ::: notes
-Ohne Puffer verlieren wir den Performance-Vorteil des Caches beim Schreiben weitgehend. Wenn der C-Code eine Variable tausendmal überschreibt und jeder Store synchron auf den DRAM wartet, zahlen wir tausendmal die lange Latenz. Write-Through allein ist deshalb für performante SoCs oft zu teuer — deshalb folgt der Write Buffer.
+Nachteile von Write-Through schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Ohne Write Buffer: jedes `sw` wartet auf den langsamen DRAM ($\approx 300$ Takte). Rückfall in die Memory Wall beim Schreiben. Schreibintensive Programme stark ausgebremst. Bus durch ständige Einzel-Updates überlastet. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Hardware-Hack: Write Buffer
@@ -943,7 +943,7 @@ Ohne Puffer verlieren wir den Performance-Vorteil des Caches beim Schreiben weit
 - Wenn der Buffer voll läuft: CPU muss wieder stallen
 
 ::: notes
-Der Write Buffer wirkt wie ein Postausgangskorb: Die CPU legt den neuen Wert ab und arbeitet weiter; der Controller transportiert ihn asynchron zum DRAM. Das rettet die Performance — solange der Buffer nicht überläuft. Bei dichten Speicher-Kopien kann er schnell voll sein, dann stallen wir erneut.
+Hardware-Hack: Write Buffer schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Write Buffer: kleine FIFO-Warteschlange zwischen L1 und RAM. CPU schreibt rasch in Cache und Buffer und rechnet weiter. Buffer schickt Daten im Hintergrund zum DRAM. Wenn der Buffer voll läuft: CPU muss wieder stallen. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Schreibstrategie 2: Write-Back
@@ -953,7 +953,7 @@ Der Write Buffer wirkt wie ein Postausgangskorb: Die CPU legt den neuen Wert ab 
 - Risiko: Cache ist „schmutzig“ — neuer als der RAM
 
 ::: notes
-Der Industriestandard heute ist oft Write-Back. Die CPU aktualisiert Variablen im Cache, ohne bei jedem Store den RAM zu blockieren. Der Hauptspeicher kann vorübergehend veraltete Kopien halten — riskant für Kohärenz, aber vorteilhaft für die Ausführungsgeschwindigkeit.
+Ein Store-Hit aktualisiert die vorhandene Line und setzt Dirty. Die nächste Ebene bleibt zunächst unverändert. Das spart Verkehr bei wiederholten Stores derselben Line. Ob ein Store-Miss die Line überhaupt anlegt, entscheidet die Allocation-Policy erst danach. Starten Sie mit einer gültigen sauberen Line, Cachewort 0 und untere Ebene 0. Store 5 setzt das Cachewort auf 5 und Dirty auf 1. Store 7 setzt das Cachewort auf 7. Unten steht weiter 0, bis ein Writeback die aktuelle Line überträgt. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Write-Back: Datenfluss
@@ -968,7 +968,7 @@ flowchart TD
 ```
 
 ::: notes
-Schematisch: Der neue Wert liegt im Cache; der DRAM bleibt vorerst unverändert, bis eine Eviction oder ein Kohärenzprotokoll den Block zurückschreibt.
+Write-Back: Datenfluss schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Die Abbildung zeigt den nächsten Schritt des einfachen blockierenden Lehrmodells. Folgen Sie den Pfeilen von der Anfrage über die Prüfung bis zur Antwort. Zahlen in der Zeichnung sind Lehrannahmen. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Das Dirty-Bit
@@ -982,18 +982,18 @@ Schematisch: Der neue Wert liegt im Cache; der DRAM bleibt vorerst unverändert,
 | 1 Bit | 1 Bit | Adress-Etikett | z. B. 64 Bytes |
 
 ::: notes
-Die Hardware muss den Überblick behalten. Neben dem Valid-Bit bekommt jede Zeile ein Dirty-Bit. Ein schmutziger Block bedeutet: „Achtung, meine Daten sind wertvoller als die im RAM. Verliere mich nicht!“
+Das Dirty-Bit schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Dirty-Bit (D) markiert veränderte Cache-Zeilen. Nach Laden aus dem RAM: $\text{Dirty} = 0$ (sauber). Nach erstem `sw` in den Block: $\text{Dirty} = 1$. Valid   Dirty   Tag   Daten. 1 Bit   1 Bit   Adress-Etikett   z. B. 64 Bytes. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Eviction bei Write-Back
 
 - Writebacks entstehen durch Eviction, Maintenance oder Protokollaktionen, nicht nur durch Eviction
-- Dirty = 0: die Line darf verworfen werden
-- Dirty = 1: im einfachen Modell erst zurückschreiben, dann den neuen Block laden
+- Dirty = 0: die Line ist gegenüber der unteren Ebene sauber und darf verworfen werden
+- Dirty = 1: der aktuelle Inhalt muss vor dem Verwerfen gesichert werden
 - Puffer und Überlappung können die Penalty ändern; sie verdoppelt sich nicht allgemein
 
 ::: notes
-Eine saubere Eviction verwirft die Line. Eine schmutzige Eviction schreibt sie zurück. Das ist das Lehr-Modell, keine vollständige Definition aller Writeback-Auslöser.
+Eine saubere Line darf verworfen werden. Eine veränderte Line muss vorher an ihre alte Adresse zurück. Die Rückschreibadresse entsteht aus altem Tag, Set-Index und Offset null, nicht aus der neuen Anfrage. Im Beispiel ersetzt 0x9000 die Dirty-Line 0x1000. Der Writeback geht nach 0x1000. Rekonstruktion: ((alter Tag mal 512) plus Index) mal 64. Mit Tag 0 und Index 64 ergibt das 0x1000. Die neue Anfrage 0x9000 ist die Fill-Adresse danach. Im seriellen Modell kommt der Writeback vor dem neuen Fill. Die Penalty verdoppelt sich dadurch nicht automatisch. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Vergleich Schreibstrategien
@@ -1007,6 +1007,9 @@ Eine saubere Eviction verwirft die Line. Eine schmutzige Eviction schreibt sie z
 
 Write-Through und Write-Back bestimmen die Weitergabe geänderter Cache-Daten, nicht die RAM-Kohärenz.
 
+::: notes
+Write-Through und Write-Back sind die Weitergabe. Write-Allocate und No-Write-Allocate sind eine zweite Achse. Ein Puffer kann den unteren Speicher hinterherhinken lassen. Write-Back braucht das Dirty-Bit. Keine der beiden Strategien stellt allein Mehrkern- oder DMA-Kohärenz her. Mehrkern- und DMA-Sichtbarkeit folgen eigenen Regeln. Ungepuffertes Write-Through schließt den Store erst nach der Weitergabe ab. Der Puffer kann oben schon 7 halten, während unten noch 0 steht. Write-Back bündelt mehrere Stores derselben Line. Die Store-Miss-Policy entscheidet unabhängig, ob die fehlende Line geladen wird. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
+:::
 ## Store-Miss: Write-Allocate
 
 ![Weitergabe der Writes und Behandlung eines Store-Miss sind zwei Achsen.](../assets/figures/02_speicherhierarchie/write-allocate.png)
@@ -1016,18 +1019,18 @@ Write-Through und Write-Back bestimmen die Weitergabe geänderter Cache-Daten, n
 - Typische Paarungen sind Beispiele, keine zwingende Kopplung
 
 ::: notes
-Mit Allocate entsteht nach dem Miss ein gültiger Eintrag. Ohne Allocate bleibt er draußen. Eine Dirty-Line darf verworfen werden, wenn Dirty = 0 oder der Wert bereits sichtbar geschrieben wurde.
+Allocate lädt die fehlende Line und führt den Store dort aus. No-Allocate gibt den Store weiter und legt keinen neuen Eintrag an. Dirty gleich 0 heißt sauber und darf verworfen werden. Dirty gleich 1 verlangt, den aktuellen Inhalt vor dem Verwerfen zu sichern. Ein einzelnes sichtbares Wort ersetzt nicht den gesicherten ganzen Block. Häufiges Paar ist Write-Back mit Allocate und Write-Through mit No-Allocate. Die andere Diagonale ist zulässig. Nach einem Allocate-Fill im Write-Back-Modell ist die Line gültig und nach dem Store dirty. No-Allocate lässt den Cache-Eintrag unverändert und gibt den Store weiter. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Software optimieren
 
 - Hardware bekannt: Cache Lines (räumlich) und LRU (zeitlich)
 - Gute Nachricht: Caches müssen in C nicht manuell programmiert werden
-- Schlechte Nachricht: gegen die Hardware zu programmieren kostet leicht Faktor 100
-- Software-Engineering heute: C-Code für maximale Hits, minimale Misses
+- Gegen das Modell zu programmieren kann Zugriffe verteuern. Ein fester Faktor wird nicht behauptet
+- Ziel ist korrekter Code mit passender Lokalität, nicht maximale Trefferquote um jeden Preis
 
 ::: notes
-Damit verlassen wir die Gatter-Ebene und setzen den Hut des C-Programmierers auf. Das wertvollste Wissen aus dieser Vorlesung für Ihren Berufsalltag: Schreiben Sie cache-freundlichen Code. Wenn Sie wissen, dass der Cache 64-Byte-Blöcke lädt, dürfen Sie niemals wild kreuz und quer durch den Speicher springen.
+Layout und Traversal beeinflussen die Lokalität. Normale cachebare Loads müssen nicht von Hand in den Cache gelegt werden. Nicht jeder Cache benutzt echtes LRU. Verstreute Zugriffe bleiben zulässig, wenn der Algorithmus sie braucht. Ohne Laufzeitmessung bleibt der Nutzen eine Aussage über das Modell. Korrektheit bleibt vor der Trefferquote. Ein zweidimensionales Array in C liegt zeilenweise. Der innere Index sollte deshalb die benachbarten Elemente besuchen, wenn das Modell räumliche Lokalität nutzen soll. MMIO und DMA bleiben außerhalb dieser normalen Load-Regel. volatile umgeht den Cache nicht. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Labor-Szenario: 2D-Arrays
@@ -1043,7 +1046,7 @@ int bild[1000][1000];
 ```
 
 ::: notes
-Genau dieses Phänomen eignet sich gut für ein späteres Labor: Eine Matrix auf Null setzen — zeilenweise oder spaltenweise. Mathematisch identisch, architektonisch oft stark unterschiedlich in der Miss Rate.
+Labor-Szenario: 2D-Arrays schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Beispiel: Matrizen, Bilder, Tabellen. Bild mit $1000 \times 1000$ Pixeln auf 0 setzen. Variante A oder Variante B — mathematisch gleich, architektonisch nicht. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## 2D-Arrays im RAM — Row-Major Order
@@ -1061,7 +1064,7 @@ Genau dieses Phänomen eignet sich gut für ein späteres Labor: Eine Matrix auf
 - Stores der großen Matrix nur unter angenommener Write-Allocate-Policy; das sind nicht alle Zugriffe eines kompilierten Programms
 
 ::: notes
-Adresse(m[r][c]) = 0x1000 + 4*(16*r+c). „Nahe 100 % Miss Rate“ beim großen Beispiel braucht Kapazität, Alignment, Policy und Working Set. Prefetch und der Compiler können das ändern.
+2D-Arrays im RAM — Row-Major Order schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. RAM ist linear, kein 2D-Gitter. C speichert zeilenweise (Row-Major Order). `[0][0]`, `[0][1]`, `[0][2]` liegen nebeneinander. `[0][0]` und `[1][0]` liegen $1000$ Integers ($\approx 4000$ Bytes) auseinander. C legt Zeilen hintereinander. Abstand `[0][0]` zu `[1][0]` bei 1000 Spalten und 4 Byte: 4000 Byte. 4000 ist kein Vielfaches von 64; die erste Line einer Zeile beginnt nicht generell bei Spalte 0. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Cache-Albtraum: spaltenweiser Zugriff
@@ -1078,7 +1081,7 @@ for (int col = 0; col < 1000; col++) {
 Innere Schleife erhöht `row`: Zugriff `[0][0]`, `[1][0]`, `[2][0]`, …
 
 ::: notes
-Schauen Sie sich diesen Code an. Die innere Schleife erhöht row. Das heißt, wir gehen spaltenweise nach unten. Mathematisch ist die Matrix am Ende genullt. Aber schauen wir uns an, was der Cache dabei durchmacht.
+Cache-Albtraum: spaltenweiser Zugriff schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Die Abbildung zeigt den nächsten Schritt des einfachen blockierenden Lehrmodells. Folgen Sie den Pfeilen von der Anfrage über die Prüfung bis zur Antwort. Zahlen in der Zeichnung sind Lehrannahmen. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Was passiert beim spaltenweisen Zugriff?
@@ -1088,7 +1091,7 @@ Schauen Sie sich diesen Code an. Die innere Schleife erhöht row. Das heißt, wi
 - Die mitgeladenen Nachbarn einer Zeile werden bei Spaltentraversal nicht als Nächstes genutzt
 
 ::: notes
-Das Nullsetzen ist eine Store-Folge. Unter Write-Allocate zählt jeder erste Bezug einer Line als Miss. Writebacks kämen zusätzlich, wenn verdrängte Lines dirty sind.
+Im Miniaturmodell gibt es 16 Zeilen-Lines und nur acht Direct-Mapped-Plätze. Zeile r und Zeile r+8 teilen denselben Platz. Beim nächsten Spaltendurchlauf ist die zuerst gebrauchte Line schon verdrängt. Deshalb ergeben die 256 reinen Loads 256 Misses. Das große 1000-mal-1000-Beispiel hat keine exakte Quote ohne festgelegte Spur. Adresse ist 0x1000 plus 4 mal (16 mal Zeile plus Spalte). Zeile und Zeile plus 8 teilen Set Zeile modulo 8. Der zweite Spaltendurchlauf findet die erste Line nicht mehr. Für Stores unter Write-Back und Write-Allocate kommen Dirty-Writebacks hinzu. Die Miss-Zahl ist dann nicht die Writeback-Zahl. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Cache-Traum: zeilenweiser Zugriff
@@ -1109,7 +1112,7 @@ for (int row = 0; row < 1000; row++) {
 - Ein Geschwindigkeitsfaktor ist damit nicht allgemein festgelegt
 
 ::: notes
-Die innere Schleife läuft bei Row-Major über benachbarte Spalten. Das Miniaturmodell quantifiziert das; das große Bild bleibt qualitativ, weil 4000 nicht durch 64 teilbar ist.
+Die innere Schleife läuft über die Spalten einer Zeile. Im Miniaturmodell passen 16 Werte einer ausgerichteten Zeile in eine 64-Byte-Line: ein Miss und 15 Hits. Über 16 Zeilen sind das 16 Misses und 240 Hits. Das gilt für die definierte Load-Spur. Ein Compiler kann die Schleife verändern. Es ist kein gemessener Speedup. Pro ausgerichteter Zeile: der erste Load ist ein Miss, die nächsten 15 Loads treffen dieselbe gültige Line. 16 Zeilen ergeben 16 Misses und 240 Hits, Miss Rate 6,25 Prozent. Dieselbe Zählung für Stores gilt nur bei Write-Allocate. memset oder eine entfernte Schleife wären eine andere Spur. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Ausblick: Visualisierung im Labor
@@ -1121,7 +1124,7 @@ Die innere Schleife läuft bei Row-Major über benachbarte Spalten. Das Miniatur
 - Vergleiche nur bei gleicher Kapazität, Line-Größe, Startzustand und Spur. Ein Exponent in der UI ist keine Anzahl
 
 ::: notes
-Simulatorstatistik, aus AMAT gerechnete Modellwerte und gemessene Laufzeit sind drei verschiedene Dinge. Es gibt hier keine Labor-Screenshots. Die konkrete Ripes-Version und ihre Optionen müssen im Übungsblatt geprüft werden.
+Ausblick: Visualisierung im Labor schließt an die bisherige Cache-Frage an. Ein Cache hält ausgewählte Blockkopien und verkürzt häufige Zugriffe im Mittel. Ripes kann Hit-, Miss- und Writeback-Zähler einer Zugriffsspur zeigen. Der Cache-Simulator modelliert laut Dokumentation keine Cache-Latenzen und damit keine CPU-Laufzeit. Die Memory-Ansicht zeigt auch im Write-Back-Modus die geschriebenen Werte; sie beweist keinen veralteten DRAM-Inhalt. Für die Zählung eignet sich das Single-Cycle-Modell; Pipeline-Stalls können zusätzliche Zugriffe zählen. Vergleiche nur bei gleicher Kapazität, Line-Größe, Startzustand und Spur. Ein Exponent in der UI ist keine Anzahl. Jede Zahl gilt mit ihrer Einheit und der genannten Annahme. Eine C-Zeile ist ohne Übersetzung keine beobachtete Maschinenspur. Hit Rate zählt Treffer einer betrachteten Folge. Die nächste Folie nimmt die noch offene Frage auf. Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Zusammenfassung Block 2
@@ -1136,6 +1139,6 @@ Simulatorstatistik, aus AMAT gerechnete Modellwerte und gemessene Laufzeit sind 
 - Row-Major nutzt Lines; das Miniaturmodell macht die Zählung explizit
 
 ::: notes
-Wir haben damit begründet, warum CPUs trotz relativ langsamem Hauptspeicher leistungsfähig bleiben: Der Cache nutzt Lokalität aus. Im nächsten Block folgen Interrupts und System-Timer. Vielen Dank — und viel Erfolg beim Üben der Konzepte.
+Die Hierarchie nutzt Lokalität. Mapping legt den Platz fest, das Tag identifiziert den Block, Replacement wählt das Opfer, die Schreibpolicy die Weitergabe. AMAT ist das modellierte Mittel, nicht der Worst Case. Write-Through und Write-Back sind unabhängig von Write-Allocate und No-Write-Allocate. Prüfen Sie: Muss ein L1-Miss DRAM erreichen? Darf eine Dirty-Line verworfen werden? Warum unterscheiden sich die Miniatur-Traversals? Halten Sie drei Ebenen auseinander: die Speicheranfrage, die Cache-Verwaltung und das C-Quellprogramm. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und ein Kohärenz-Zeitmodell waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
