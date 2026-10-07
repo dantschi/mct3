@@ -29,7 +29,7 @@ graph LR
 ```
 
 ::: notes
-Herzlich willkommen zu Mikrocomputertechnik 3! Ein Prozessor allein kann nichts bewirken, wenn er keine Daten speichern oder mit der Außenwelt kommunizieren kann. In diesem Semester bauen wir gedanklich ein komplettes System-on-Chip (SoC) um einen RISC-V-Kern herum. Wir werden C-Code schreiben, der direkt mit der Hardware spricht.
+Mikrocomputertechnik 3 verbindet den Rechenkern mit Speicher, Bussen und Peripherie. CPU bedeutet Central Processing Unit, also das Rechenwerk. SoC bedeutet System-on-Chip: viele dieser Funktionen sitzen in einem integrierten System, nicht zwingend alle auf einem einzigen Die. Ein Temperaturmesser liest den Sensor über eine Schnittstelle, legt den Wert im Arbeitsspeicher ab und führt die Firmware aus. Hardwarenahe C-Programmierung erlaubt Zeiger auf Adressen; sie garantiert nicht, dass jeder Zugriff ohne Treiber und ohne passende Speicherattribute funktioniert. Das Kursmodell mit angenommenen Adressen ist keine konkrete Laborplatine. Offen bleibt, welche Architekturbegriffe aus MCT1 wir dafür wieder brauchen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Rückblick: Was wir aus MCT1 wissen
@@ -41,26 +41,28 @@ Herzlich willkommen zu Mikrocomputertechnik 3! Ein Prozessor allein kann nichts 
 - Memory-Mapped I/O: Geräte tarnen sich als Adressen im Arbeitsspeicher
 
 ```riscv
-# MCT1 Refresher: Basisadresse und I/O-Register
-li   s1, 0xF0000000
-lw   t0, 0(s1)
-andi t1, t0, 1
-beq  t1, zero, Wait
+# Lehrcode — nicht assembliert oder ausgeführt.
+# Didaktischer Ausschnitt: Basis und Ready-Bit sind Annahmen.
+    li   s1, 0xF0000000
+Wait:
+    lw   t0, 0(s1)
+    andi t1, t0, 1
+    beq  t1, zero, Wait
 ```
 
 ::: notes
-Erinnern wir uns kurz an unser Handwerkszeug aus MCT1. Wir kennen die Architektur, wir wissen, was ein Load- und ein Store-Befehl auf dem Silizium auslösen und wie Pipelining den Durchsatz maximiert. Am Ende von MCT1 haben wir bereits gesehen, dass LEDs und Schalter über Memory-Mapped I/O angesteuert werden können. Genau an dieser Stelle setzen wir an: Wenn alles über Speicheradressen läuft, müssen wir verstehen, wie diese Speicher physikalisch aufgebaut sind.
+ISA bedeutet Instruction Set Architecture, hier RISC-V. RV32I hat 32 Integerregister mit 32 Bit; x0 liefert immer null, die übrigen 31 sind beschreibbar. Die Pipeline-Stufen sind Fetch, Decode, Execute, Memory und Write-Back. MMIO bedeutet Memory-Mapped Input/Output: ein Gerät belegt Adressen. li ist eine Pseudoinstruktion, lw lädt ein Wort, andi isoliert Bits, beq springt bei Gleichheit. Der gezeigte Ausschnitt ist Lehrcode und wurde nicht assembliert. Die Basis 0xF0000000 und Bit 0 als Ready sind Annahmen. Das Label Wait steht vor dem erneuten lw, sonst wäre das Sprungziel undefiniert. Ein endloses Polling ist kein guter allgemeiner Treiber, weil das Statusregister Seiteneffekte haben kann. Als Nächstes fehlen die übrigen Bausteine um den Kern. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Der Paradigmenwechsel: Core vs. SoC
 
-- Der Core (CPU): reines Rechenwerk (ALU, Register, Pipeline)
-- Früher: CPU, RAM und I/O als getrennte Bausteine auf der Platine
-- Heute: System-on-Chip — alles auf einem Silizium-Die
-- Vorteile: weniger Strom, Kosten und Platz; Herausforderung: Systembus
+- Core: Rechenkern mit ALU, Registern und Pipeline. CPU ist der weitere Begriff für das Rechenwerk
+- MCU: Microcontroller mit Kern, Speicher und Peripherie, oft auf einem Die
+- SoC: System-on-Chip integriert viele Funktionen; großer DRAM kann trotzdem ein eigener Chip sein
+- Ein Mikroprozessor bleibt ein gültiger Begriff. Interne Verbindungen ersetzen nicht jede externe Leitung
 
 ::: notes
-Der Begriff Mikroprozessor ist heute eigentlich fast überholt; wir sprechen meistens von Mikrocontrollern oder System-on-Chips. Warum? Weil es aus physikalischen und finanziellen Gründen viel sinnvoller ist, den Arbeitsspeicher, den Festspeicher und die Peripherie-Controller direkt mit der CPU auf dasselbe Stück Silizium zu drucken. Das spart Latenz und Energie, da keine Signale über kupferne Leiterbahnen einer Platine geschickt werden müssen.
+Der Core ist der Rechenkern mit ALU, Registern und Pipeline. ALU bedeutet Arithmetic Logic Unit. CPU ist der weitere Name des Rechenwerks, MCU bedeutet Microcontroller Unit und umfasst oft Kern, Speicher und Peripherie. Ein SoC integriert viele Systemfunktionen; großer DRAM kann ein eigener Chip mit Controller bleiben. Die Folie sagt deshalb nicht mehr, alles liege auf einem Die, und sie erklärt Mikroprozessoren nicht für überholt. Interne Verbindungen sparen Leitungen auf der Platine, ersetzen aber nicht jede externe Verbindung. Eine kleine MCU mit Flash und SRAM und ein SoC mit externem DRAM sind zwei gültige Beispiele. Die nächste Folie ordnet diese Blöcke am Bus. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## SoC: Komponenten am Systembus
@@ -72,7 +74,7 @@ Der Begriff Mikroprozessor ist heute eigentlich fast überholt; wir sprechen mei
 - Nicht jeder SoC trägt den gesamten Hauptspeicher auf demselben Die
 
 ::: notes
-Die Abbildung trennt L1 von SRAM/Flash/MMIO und zeichnet DRAM gestrichelt außerhalb des Dies. Ein Sensor-MCU hat oft gar kein DRAM.
+Die Abbildung zeigt den Kern, getrennte L1-Instruktions- und Datenpfade, den Systembus, SRAM, NOR-Flash und MMIO. L1 bedeutet Level 1. SRAM ist statisches RAM, DRAM dynamisches RAM. Gestricheltes DRAM liegt außerhalb des Dies und wird über einen Controller erreicht; die CPU adressiert keine rohen Kondensatorzellen. Ein L1-Cache puffert Befehle oder Daten im Kernpfad. Ein UART-Registerblock ist Peripherie und kein Cache. Ein Sensor-MCU kann ohne DRAM auskommen und nur Flash plus SRAM nutzen. Die Abbildung ist ein Schema, keine Flächenmessung. Als Nächstes klären wir die Werkzeuge, mit denen Firmware entsteht. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Unsere Werkzeuge in MCT3
@@ -95,28 +97,28 @@ flowchart LR
 ```
 
 ::: notes
-Da wir nun komplexe Systeme bauen, reicht uns nackter Assembler nicht mehr — die Produktivität wäre zu gering. Wir nutzen C. C ist der Industrie-Standard für hardwarenahe Programmierung, da es uns erlaubt, Adressen als Pointer direkt anzufassen, während uns der Compiler die mühsame Register-Zuweisung abnimmt. Als Laborumgebung nutzen wir Renode, einen professionellen Open-Source-Simulator, der komplette SoCs simulieren kann.
+C ist die Hochsprache. Ein Compiler übersetzt sie, ein Assembler übersetzt Assembler, der Linker bindet Objektdateien zu Firmware. GCC bedeutet GNU Compiler Collection. GNU ist das rekursive Akronym GNU's Not Unix. Die Kette lautet Quelltext, Objektdatei, ELF. ELF bedeutet Executable and Linkable Format. Ein Pointer ist eine Adresse in einem Zeiger. Bare-Metal bedeutet Software ohne Betriebssystem, aber mit Reset, Startup und Treibern. C nimmt die Registerzuteilung ab und garantiert keinen direkten Hardwarezugriff. Assembler bleibt für Startup und für die Kontrolle der Übersetzung nötig. Der gezeigte Weg zu Renode ist ein Zielbild. Eine RISC-V-Toolchain war für diese Überarbeitung nicht verfügbar, der Ausschnitt ist Lehrcode. Als Nächstes muss die emulierte Maschine beschrieben werden. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Was ist Renode?
 
-- Industrie-Standard: u. a. bei Google, Intel und Microchip zur Chip-Simulation
-- Vollständige SoC-Simulation: CPU, Busse, Timer und RAM
+- Renode emuliert eingebettete Systeme funktional. Eine konkrete Kundenliste wird hier nicht behauptet
+- Beschrieben werden CPU, Busse, Timer und Speicher, soweit das Modell sie enthält
 - Professionelles Kommandozeilen-Tool (ohne grafisches Breadboard)
 - Funktionale Emulation von CPU, Bussen und Peripherie — kein Versprechen taktgenauer Chip-Nachbildung
 - Virtuelle Zeit des Simulators ist nicht dasselbe wie ein HDL-Timing-Modell
 - Skript-gesteuert: SoCs über Textdateien (`.resc` / `.repl`)
 
 ```text
-# Beispielhaftes Renode Setup-Skript
-machine LoadPlatformDescription @platforms/cpus/riscv32.repl
-sysbus LoadELF @firmware.elf
-start
-
+# Nicht ausgeführtes Kommandobeispiel. Keine Plattform im Repository.
+# mach create "mct3"
+# machine LoadPlatformDescription @PLATZHALTER.repl
+# sysbus LoadELF @PLATZHALTER.elf
+# start
 ```
 
 ::: notes
-Renode eignet sich, um Firmware gegen eine beschriebene Memory Map und Peripherie zu prüfen. Die virtuelle Zeit steuert die funktionale Simulation; taktgenaue Nachbildung eines konkreten Siliziums braucht ein eigenes Timing-Modell oder HDL-Co-Simulation. Im Repository liegt keine `.repl`-Plattform — Adressen in den Folien bleiben deshalb schematisch.
+Renode ist eine Umgebung für die funktionale Emulation eingebetteter Systeme. Der Monitor nimmt Kommandos entgegen. Die virtuelle Zeit ist die Simulationszeit, kein HDL-Takt. Eine .repl-Datei beschreibt die Plattform, eine .resc-Datei ist ein Kommandoskript. Das sind Dateiendungen, keine Langformen. mach create legt eine Maschine an. Der gezeigte Pfad ist ein Platzhalter und wurde nicht ausgeführt. LoadELF und start sind deshalb keine beobachteten Schritte. Funktionale Emulation belegt keine SRAM- oder DRAM-Zelllatenz. Im Repository liegt keine Plattformdatei. Als Nächstes ordnen wir die Kursblöcke, die auf diesem Werkzeug aufbauen können. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Modul-Übersicht: Unser Fahrplan
@@ -140,7 +142,7 @@ flowchart TD
 ```
 
 ::: notes
-Unser Semester ist logisch gegliedert. Wir starten ganz innen im Chip bei den Speichern und Caches. Dann arbeiten wir uns langsam nach außen: über die System-Timer hin zu den externen Bussen, mit denen wir Sensoren auslesen. In der letzten Phase des Semesters widmen wir uns den hochmodernen Konzepten: Out-of-Order CPUs und maschinelles Lernen direkt auf dem Mikrocontroller (Edge AI).
+Der Fahrplan beginnt beim Speicher, weil spätere Peripherie und Parallelität darauf aufsetzen. RAM ist Random-Access Memory, ein Cache ein schneller Zwischenspeicher. PWM ist Pulse Width Modulation, UART Universal Asynchronous Receiver/Transmitter, I2C Inter-Integrated Circuit, SPI Serial Peripheral Interface, DMA Direct Memory Access. AI beziehungsweise KI bedeutet Artificial Intelligence. Out-of-Order heißt, dass ein Kern Befehle intern außerhalb der Programmreihenfolge ausführen kann. Edge-AI verarbeitet Daten nahe am Gerät. Diese Folie führt die Namen ein und erklärt die Verfahren noch nicht. Die offene Frage ist, wie Theorie und Labor zusammengehören. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Prüfungsleistung und Laborbetrieb
@@ -152,7 +154,7 @@ Unser Semester ist logisch gegliedert. Wir starten ganz innen im Chip bei den Sp
 - Fokus auf Problemlösung, nicht auf Auswendiglernen von Datenblättern
 
 ::: notes
-Wie in MCT1 gilt auch hier: Die Vorlesung gibt Ihnen die Konzepte, aber das echte Verständnis kommt im Labor. Wer die Laborblätter selbstständig in Renode löst, hat bereits 80 % der Klausurvorbereitung erledigt. In der Klausur werden wir keine Registeradressen eines bestimmten Chips abfragen, sondern Konzepte: Wie richten Sie einen DMA-Transfer ein? Warum tritt ein Cache-Miss auf?
+Theorie und Labor gehören zusammen, sobald eine Plattform bereitsteht. Diese Überarbeitung hat keine Firmware ausgeführt. Dauer und Hilfsmittel der Klausur stehen nur in der offiziellen Ankündigung; hier wird keine neue Regel erfunden. Eine konzeptionelle Aufgabe kann fragen, warum ein Objekt in .bss liegt oder warum ein L1-Miss nicht automatisch DRAM heißt. C, Pointer, SoC und DMA sind die Werkzeuge solcher Fragen. Auswendiglernen von Basisadressen ist nicht das Ziel. Als Nächstes wird die heutige Stunde in eine Kausalkette gelegt. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Agenda für den heutigen Tag
@@ -164,7 +166,7 @@ Wie in MCT1 gilt auch hier: Die Vorlesung gibt Ihnen die Konzepte, aber das echt
 5. Spezialspeicher im SoC (DPRAM, FIFOs) und Brückenschlag zum Labor
 
 ::: notes
-Unser heutiges Ziel ist es, das Konzept „Arbeitsspeicher“, das wir in MCT1 als magische Blackbox betrachtet haben, physikalisch zu öffnen. Wir klären heute ein für alle Mal den Unterschied zwischen dem Speicher, auf dem unser Code liegt, und dem Speicher, in dem unsere Variablen leben.
+Die fünf Punkte hängen zusammen. Zuerst begrenzen Architektur und Memory Wall den Zugriff. Dann unterscheiden wir Zugriffsarten. Danach folgen nichtflüchtige Zellen, dann flüchtige Zellen, zuletzt die Abbildung in Software. ROM, EPROM, SRAM, DRAM, DPRAM und FIFO werden jeweils an ihrer Folie definiert. Code liegt nicht immer im Flash und Variablen nicht immer im RAM; das ist nur eine typische Bare-Metal-Anordnung. Die Pause trennt die nichtflüchtige von der flüchtigen Hälfte. Die Lernziele machen diese Kette prüfbar. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Lernziele Block 1
@@ -176,10 +178,12 @@ Unser heutiges Ziel ist es, das Konzept „Arbeitsspeicher“, das wir in MCT1 a
 - Memory Map und Linker-Sections (`.text`, `.data`, `.bss`) zuordnen
 
 ::: notes
-Harris & Harris, *Digital Design and Computer Architecture — RISC-V Edition*, Kap. Memory Systems — Terminologie und Aufbau.
+Am Ende sollen Sie fünf Dinge können: flüchtig und wahlfrei unterscheiden, einen Flash-Zugriff begründen, eine 6T- und eine 1T1C-Zelle erklären, DDR-Bandbreite von Latenz trennen und C-Objekte Sections zuordnen. NOR ist NOT-OR, NAND ist NOT-AND, XIP bedeutet Execute-in-Place. 6T sind sechs Transistoren, 1T1C ein Transistor und ein Kondensator. .text enthält Code, .rodata Konstanten, .data initialisierte Variablen, .bss nullzuinitialisierende Variablen. Die Literatur Harris und Harris, RISC-V Edition, bleibt die Begriffsquelle. Die Leitfrage zeigt, warum eine einzige Zellbauart nicht reicht. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die Leitfrage des Tages
+
+![1 MiB: 20T-Vergleich, 6T-SRAM und 1T1C. Nur Zellbauelemente.](../assets/figures/01_speicherphysik/cell-count.png)
 
 - Die CPU ist schnell: Milliarden Berechnungen pro Sekunde
 - Datenhunger: jede Berechnung braucht Befehle und Daten
@@ -200,7 +204,7 @@ flowchart TD
 ```
 
 ::: notes
-Das D-Flip-Flop aus MCT1 ist großartig, um 32 Register zu bauen. Aber wenn wir ein Gigabyte Speicher bauen wollen und für jedes Bit 20 Transistoren brauchen, würde unser Chip so groß wie ein Fußballfeld werden und sofort verglühen. Wir brauchen grundlegend andere physikalische Konzepte, um Daten dicht und effizient zu speichern. Das ist die Essenz der heutigen Vorlesung.
+Ein Bit ist eine Ja-Nein-Information, ein Byte sind acht Bit. 1 GB sind 10 hoch 9 Byte, also 8 mal 10 hoch 9 Bit. 1 GiB wären 2 hoch 30 Byte und ist hier nicht gemeint. Die Lehrannahme 20 Transistoren je D-Flip-Flop ergibt 160 mal 10 hoch 9 Transistoren nur für die Bits eines Gigabytes. Für 1 MiB, also 8388608 Bit, sind es 167772160 Transistoren. Das ist keine Chipfläche und kein Wärmenachweis. Die CPU-Rechenleistung bleibt geräteabhängig. Die nächste Grenze ist die Organisation der Zugriffe, nicht nur die Transistorzahl. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Systemarchitektur: Von-Neumann
@@ -217,7 +221,7 @@ Das D-Flip-Flop aus MCT1 ist großartig, um 32 Register zu bauen. Aber wenn wir 
 - Am einfachen Ein-Port-Modell kollidieren Fetch und Load
 
 ::: notes
-Linkes Panel: ein Bus. Fetch und Datenzugriff können nicht gleichzeitig. Rechtes Panel ist Modified Harvard und gehört zur nächsten Folie.
+Im klassischen Von-Neumann-Modell liegen Befehle und Daten im selben Speicher. Ein einfaches Modell hat dafür einen gemeinsamen physischen Port. Ein Fetch und ein Daten-Load brauchen dann dieselbe Ressource und bilden einen Structural Hazard, also einen Ressourcenkonflikt. Ein gemeinsamer Adressraum erzwingt diesen einen Port nicht. Die linke Bildhälfte zeigt den Konflikt, die rechte schon getrennte L1-Pfade und gehört streng zur Harvard-Folie. Es wird nicht behauptet, jedes Von-Neumann-System könne nie parallel zugreifen. Die nächste Folie trennt die Wege ausdrücklich. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Systemarchitektur: Harvard
@@ -235,7 +239,7 @@ Linkes Panel: ein Bus. Fetch und Datenzugriff können nicht gleichzeitig. Rechte
 - Der Adressraum kann trotzdem ein linearer 32-Bit-Raum bleiben
 
 ::: notes
-MCT1 nutzte getrennte Instruction- und Data-Memories. Viele SoCs sehen von außen wie Von-Neumann aus und entzerren den Kern nur in den L1-Caches — das rechte Panel.
+Striktes Harvard trennt Instruktions- und Datenspeicher auch im Adressraum. Modified Harvard trennt die L1-I- und L1-D-Pfade und führt sie später auf gemeinsamen Speicher. L1 ist die erste Cache-Ebene, I steht für Instruction, D für Data. Parallel möglich sind dann ein Befehls-Fetch und ein Datenzugriff auf den getrennten ersten Ebenen. Weiter unten können sie wieder kollidieren. Eine Verdopplung der Leistung ist daraus nicht garantiert. Die Memory Wall bleibt, weil der Speicher hinter den Pfaden langsamer sein kann als der Kern. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die Memory Wall
@@ -248,7 +252,7 @@ MCT1 nutzte getrennte Instruction- und Data-Memories. Viele SoCs sehen von auße
 ![Zwei schematische Durchsatz-Kurven: CPU steigt deutlich stärker als die Rate der Speicherzugriffe.](../assets/figures/01_speicherphysik/memory-wall.png)
 
 ::: notes
-Die Kurven sind keine Messreihe. Die 400 Takte gelten nur für einen Zugriff, der die Pipeline vollständig blockiert und sich nicht mit anderen Befehlen überlappt.
+Die Memory Wall bezeichnet den wachsenden Abstand zwischen Kern und Speicher. Latenz ist die Wartezeit bis zum ersten Ergebnis, Bandbreite der Durchsatz danach. Moores Gesetz ist eine historische Beobachtung zur Integrationsdichte, keine Garantie steigender Taktfrequenz. Das Lehrbeispiel 4 GHz mal 100 ns ergibt 400 Taktperioden: 4 mal 10 hoch 9 mal 100 mal 10 hoch minus 9 ist 400. Eine Taktperiode dauert dann 0,25 ns. Das gilt für einen vollständig abhängigen, nicht überlappten Zugriff und beschreibt nicht diesen RISC-V-Kurskern. Die nächste Folie zeigt den Zielkonflikt der Speicherauswahl. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Das magische Speicher-Dreieck
@@ -274,7 +278,7 @@ flowchart TD
 ```
 
 ::: notes
-Dies ist das magische Dreieck der Speicherarchitektur. Wenn jemand zu Ihnen kommt und einen Speicher fordert, der rasend schnell ist, Terabytes an Daten fasst und nur 5 Euro kostet, müssen Sie ihn enttäuschen. Die Physik lässt das nicht zu. Deshalb bestehen Computer nicht aus einem einzigen Speichertyp, sondern aus einer Mischung verschiedener Technologien.
+Geschwindigkeit meint hier vor allem Latenz, Kapazität die speicherbare Menge, Kosten den Preis je Bit. Das Dreieck ist ein Entwurfsbild, kein Satz, dass alle drei Ziele zugleich unmöglich seien. SRAM ist schnell und teuer je Bit, DRAM dichter und billiger je Bit, Massenspeicher noch dichter und nichtflüchtig, aber mit anderen Updatekosten. Der Vergleich gilt nur innerhalb desselben Systemkontexts. Energie und Datenerhalt kommen in den Notizen als weitere Achsen dazu. Vor dem Technologievergleich brauchen wir zwei unabhängige Klassifikationen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Klassifikation 1: Volatil vs. Non-Volatil
@@ -292,7 +296,7 @@ Dies ist das magische Dreieck der Speicherarchitektur. Wenn jemand zu Ihnen komm
 - Nachteil: oft langsamer beim Schreiben, physischer Verschleiß
 
 ::: notes
-Die grundlegendste Unterscheidung von Speichern ist die Frage nach dem Stromausfall. Volatile Speicher sind das Kurzzeitgedächtnis des Computers. Ziehen Sie den Stecker, ist alles weg. Non-Volatile Speicher sind das Langzeitgedächtnis. Für ein funktionierendes System (wie unseren SoC) brauchen wir zwingend beides: einen Festspeicher für Firmware bzw. Boot-Code und einen Arbeitsspeicher für die laufenden Berechnungen.
+Flüchtiger Speicher sichert den Inhalt ohne Versorgung nicht zu. Nichtflüchtiger Speicher ist für den Datenerhalt ohne Versorgung vorgesehen. Sofort weg, Jahre garantiert und beliebig oft beschreibbar sind keine allgemeinen Gesetze. SRAM und DRAM sind beide flüchtig. Eine Batterie erhält die Versorgung, macht die Zelle aber nicht selbst nichtflüchtig. Eine SD-Karte, Secure Digital, ist ein System aus Flash und Controller, keine Zelltechnologie. Retention ist die zugesicherte Haltedauer, Endurance die Zahl der Programmier- und Löschzyklen. Beides steht im Datenblatt. Die zweite Achse ist die Zugriffsart. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Klassifikation 2: Random Access vs. sequenziell
@@ -310,7 +314,7 @@ Die grundlegendste Unterscheidung von Speichern ist die Frage nach dem Stromausf
 Architektur-Bedeutung: CPUs führen Code nur aus Random-Access-Speichern direkt aus.
 
 ::: notes
-Der Begriff „RAM“ beschreibt die direkte Adressierbarkeit, nicht dieselbe Latenz für jede Adresse. Caches und DRAM-Zeilen ändern die Wartezeit. Ein Band muss dagegen die davorliegenden Daten durchlaufen.
+Random Access bedeutet, eine Adresse zu wählen, ohne alle vorherigen Datensätze zu durchlaufen. Gleiche Latenz ist dafür nicht nötig. Eine SRAM-Zelle wird über Wort- und Bitleitung gewählt, ein DRAM-Row-Hit trifft eine schon offene Zeile, ein Band muss gespult werden. NAND ist pageorientiert und trotzdem kein Magnetband. Normale Fetches brauchen einen adressierbaren Pfad. Daten aus Massenspeicher werden dafür üblicherweise in ausführbaren Speicher geladen. Die Folie 38 darf deshalb nicht sagen, jede Adresse sei gleich schnell. Die Hierarchie kombiniert diese Zugriffe. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die Speicherhierarchie-Pyramide
@@ -327,7 +331,7 @@ Prinzip: häufig genutzte Daten liegen weiter oben.
 ![Gestufte Ebenen. Oben weniger Kapazität, kürzere Zugriffszeit, höhere Kosten pro Bit. MCU oft nur Flash+SRAM.](../assets/figures/01_speicherphysik/hierarchy.png)
 
 ::: notes
-Die Pyramide ersetzt die schmale Kästchenkette. Nanosekunden-Angaben der alten Folie vermischten Zellzeit, Cache-Hit und DRAM-Zugriff — die Abbildung bleibt qualitativ.
+Die Pyramide stapelt Register, L1, L2 und L3, dann DRAM und Massenspeicher. SRAM ist Static RAM, DRAM Dynamic RAM, SSD ein Solid State Drive. L1 wird in MCUs eher in Kibibyte beschrieben; ohne Plattform bleiben die Größen qualitativ. Zeitliche Lokalität heißt, denselben Wert bald wieder zu brauchen. Räumliche Lokalität heißt, Nachbarn zu brauchen, etwa beim Durchlaufen eines Arrays. Eine kleine MCU hat oft nur Flash und SRAM und keine drei Cache-Ebenen. Cache-Details folgen in Vorlesung 2. Heute öffnen wir die Zellen dieser Ebenen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Fokus heute: Wir öffnen die Chips
@@ -339,7 +343,7 @@ Die Pyramide ersetzt die schmale Kästchenkette. Nanosekunden-Angaben der alten 
 - Was bedeutet das für uns als C-Programmierer am SoC?
 
 ::: notes
-Nachdem wir nun die Motivation und die Einordnung im System haben, greifen wir uns heute zwei fundamentale Speicherarten heraus: den Festspeicher, auf dem unsere Firmware liegt, und den volatilen Arbeitsspeicher. Wir werden sehen, dass beide extrem unterschiedliche Kompromisse beim Design eingehen mussten.
+Die Ebenen sind das C-Objekt, die Adresse, die Schnittstelle, das Array und die Zelle. Der Fokus liegt auf Zelle und Organisation, nicht darauf, dass Software unwichtig wäre. Flash-Löschung, der Flächenbedarf der 6T-Zelle und der DRAM-Refresh werden später zu Softwareentscheidungen. ROM und Flash halten Firmware, SRAM und DRAM halten Laufzeitdaten. Ein SoC verbindet sie über Adressen. Der nächste Schritt ist der Datenerhalt ohne Betriebsspannung. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Festwertspeicher (Non-Volatile)
@@ -353,7 +357,7 @@ Nachdem wir nun die Motivation und die Einordnung im System haben, greifen wir u
 ![Vergleichsleiste: Programmier- und Löschmethode, ohne Bauteilfotos.](../assets/figures/01_speicherphysik/rom-evolution.png)
 
 ::: notes
-Beginnen wir mit dem Langzeitgedächtnis. Jeder Computer muss beim Einschalten wissen, was er tun soll. Er braucht Boot-Code. Dieser Code muss zwingend auf einem nicht-flüchtigen Speicher liegen. Die Geschichte dieses Speichers ist eine faszinierende Reise davon, wie Hardware immer flexibler und softwareähnlicher wurde.
+Non-Volatile Memory hält Daten ohne Versorgung. ROM bedeutet Read-Only Memory und ist hier der historische Einstieg, nicht die Obermenge jedes nichtflüchtigen Speichers. Die Leiste zeigt Mask-ROM, PROM, EPROM, EEPROM und Flash. Programmieren und Löschen sind verschiedene Vorgänge. Ein System braucht einen Bootpfad. Der Bootcode kann auch von außen kommen und muss nicht im eigenen Flash liegen. Mask-ROM legt den Inhalt schon in der Fertigung fest. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Mask-ROM
@@ -365,7 +369,7 @@ Beginnen wir mit dem Langzeitgedächtnis. Jeder Computer muss beim Einschalten w
 - Heute: kaum noch für Anwendercode; ggf. unveränderliche Boot-Loader
 
 ::: notes
-Der Mask-ROM ist Hard-Coded im wahrsten Sinne des Wortes. Eine Eins ist eine physische Kupferverbindung, eine Null ist eine durchtrennte Leitung. Wenn Sie als Programmierer einen Fehler gemacht haben, mussten Sie den Halbleiter-Hersteller anrufen, eine neue Belichtungsmaske für 100.000 Dollar bestellen und alle produzierten Chips entsorgen. Die Industrie verlangte dringend nach einer besseren Lösung.
+Bei Mask-ROM legt die Fertigung die Zellzustände fest, etwa über Kontakte, die Transistoranordnung oder Implantation. Eine durchtrennte Kupferleitung ist nur ein vereinfachtes Sicherungsbild. Nach der Herstellung ist der Inhalt nicht regulär umprogrammierbar. Ein Maskenfehler ist teuer, macht aber nicht automatisch jeden Chip unbrauchbar. Eine feste Maskengebühr wird hier nicht behauptet. Ein Boot-ROM kann einen Bootloader enthalten, also das erste Programm, das weitere Software lädt. PROM verlagert die einmalige Programmierung zum Anwender. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## PROM (Programmable ROM)
@@ -377,7 +381,7 @@ Der Mask-ROM ist Hard-Coded im wahrsten Sinne des Wortes. Eine Eins ist eine phy
 - Gut für kleine Serien; Firmware-Updates weiterhin unmöglich
 
 ::: notes
-Das PROM war der erste Schritt zur Flexibilität. Man kauft leere Chips und brennt sein Programm mit einem speziellen Programmiergerät hinein. Das passiert wörtlich: Man jagt eine hohe Spannung durch den Chip und brennt winzige Sicherungen durch. Das ist großartig für Kleinserien, aber „One-Time Programmable“ heißt: Bei einem Bug müssen Sie zwar nicht die Maske ändern, aber den Chip müssen Sie trotzdem auslöten und wegwerfen.
+PROM bedeutet Programmable Read-Only Memory. OTP bedeutet One-Time Programmable, wenn die Zelle nur einmal geändert wird. Im gewählten Fuse-Modell ist der Anfangszustand geschlossen und eine hohe Spannung öffnet die Sicherung dauerhaft. Nicht jede OTP-Technik schmilzt eine Sicherung. Antifuse und andere Prinzipien gibt es. Ob die durchgebrannte Zelle logisch 0 oder 1 ist, hängt von der Technologie ab. Das Programmiergerät ist nicht der normale Laufzeitzugriff der CPU. EPROM ergänzt das Löschen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## EPROM (Erasable PROM)
@@ -389,7 +393,7 @@ Das PROM war der erste Schritt zur Flexibilität. Man kauft leere Chips und bren
 - Fenster nach dem Brennen abdecken, sonst löscht Sonnenlicht den Code
 
 ::: notes
-Wenn Sie heute alte Arcade-Automaten oder Synthesizer aus den 80er Jahren aufschrauben, sehen Sie diese wunderschönen Keramikchips mit einem runden Glasfenster in der Mitte. Das ist ein EPROM. Die Idee war revolutionär: Man konnte den Chip unter eine UV-Lampe legen, ihn komplett löschen und neu beschreiben. Es dauerte eine halbe Stunde, aber es sparte enorm viel Geld bei der Entwicklung.
+EPROM bedeutet Erasable Programmable Read-Only Memory. UV bedeutet ultraviolett. Die Zelle hält Ladung isoliert. UV-Licht durch ein Gehäusefenster kann sie löschen. 20 bis 30 Minuten sind nur ein dokumentiertes Beispiel, keine allgemeine Löschzeit. Typisch wird der ganze UV-EPROM gelöscht, nicht ein einzelnes Byte. Ein abgedecktes Fenster schützt vor unbeabsichtigter Bestrahlung. EEPROM ersetzt das optische Löschen durch einen elektrischen Vorgang. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## EEPROM (Electrically Erasable PROM)
@@ -401,7 +405,7 @@ Wenn Sie heute alte Arcade-Automaten oder Synthesizer aus den 80er Jahren aufsch
 - Heute: kleine Konfigurationsdaten (MAC-Adresse, Kalibrierung)
 
 ::: notes
-Das UV-Licht war unpraktisch. Das EEPROM löste dieses Problem, indem man durch geschicktes Anlegen von hohen elektrischen Spannungen die Elektronen wieder aus der Speicherzelle herausziehen konnte. Das Geniale: Man konnte gezielt ein einzelnes Byte löschen, während der Rest des Chips unangetastet blieb. Der Nachteil war jedoch die enorme Größe der einzelnen Zelle, weshalb EEPROMs niemals Gigabyte-Größen erreichten.
+EEPROM bedeutet Electrically Erasable Programmable Read-Only Memory. Programmieren und Löschen erfolgen elektrisch. Die Update-Einheit ist oft feiner als bei Flash, aber byteweise Adressierung bedeutet nicht beliebig schnelles Schreiben. Page-Writes und interne Wartezeiten stehen im Datenblatt. Kalibrierwerte sind ein typischer Einsatz, weil sie selten und klein sind. Eine absolute Kapazitätsobergrenze wird nicht behauptet. Flash spart Steueraufwand, indem es gröber löscht. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Flash-Speicher: Die Revolution der Blöcke
@@ -413,7 +417,7 @@ Das UV-Licht war unpraktisch. Das EEPROM löste dieses Problem, indem man durch 
 - Dominante Technologie für Firmware und Massenspeicher (SSD, USB, Smartphones)
 
 ::: notes
-In den 80er Jahren suchte die Industrie nach einem Weg, die Vorteile von EEPROMs (elektrisches Löschen) mit einer hohen Speicherdichte zu vereinen. Der Ingenieur Fujio Masuoka bei Toshiba erfand den Flash-Speicher. Sein Trick: Er warf die komplexe Verschaltung weg, die nötig war, um jedes Byte einzeln zu löschen. Flash kann nur blockweise gelöscht werden. Das sparte so viel Platz auf dem Silizium, dass Flash die Welt eroberte.
+Flash ist elektrisch programmierbar und wird in Blöcken oder Sektoren gelöscht. Zelle, Page und Erase-Block sind verschiedene Größen und bausteinspezifisch. Ein kleines Update kann deshalb einen großen Bereich betreffen. Flash wurde 1984 angekündigt, NAND 1987. Das sind historische Marken, keine Bewertung der Produkte. Ein normales Speicherbild wird nicht als Marketingzahl verwendet. Die nächste Folie erklärt, wie die Ladung ohne Versorgung bleibt. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Das Floating-Gate (logische Sicht)
@@ -427,7 +431,7 @@ In den 80er Jahren suchte die Industrie nach einem Weg, die Vorteile von EEPROMs
 ![Querschnitt: Source, Drain, Kanal, Oxid, Floating Gate, Control Gate — mit und ohne Ladung.](../assets/figures/01_speicherphysik/floating-gate.png)
 
 ::: notes
-Linkes Panel: leeres Floating Gate, niedrigere Vth. Rechtes Panel: gefangene Elektronen, höhere Vth. Charge-Trap-Flash ohne Floating Gate ist hier nicht gezeichnet.
+Source und Drain begrenzen den Kanal. Das Control Gate steuert, das Floating Gate speichert Ladung isoliert. Im gewählten n-Kanal-Modell erhöht negative Ladung die Schwellspannung, also die Spannung, ab der der Kanal leitet. Beim Lesen wird dieses Verhalten geprüft, nicht ein Draht zum Floating Gate. SLC bedeutet Single-Level Cell, hier ein Bit je Zelle. Charge-Trap-Speicher ohne leitendes Floating Gate bleibt eine andere Technologie. Die Verschaltung bestimmt danach den Zugriff. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## NAND vs. NOR Flash
@@ -443,7 +447,7 @@ Flash spaltet sich in zwei Architekturen — je nach Verdrahtung der Floating-Ga
 ![NOR: parallele Pfade zur Bitline. NAND: serieller String mit Auswahltransistoren. Darunter die unterschiedliche Schnittstelle.](../assets/figures/01_speicherphysik/nand-nor.png)
 
 ::: notes
-Die Verschaltung erklärt den Zugriff: NOR kann ein Wort adressieren, NAND liefert eine Page in einen Buffer. NAND ist pageorientiert, nicht „sequenziell wie ein Band“.
+NOR bedeutet NOT-OR, NAND NOT-AND. Die Namen beziehen sich auf die Zellverschaltung. NOR-Zellen haben eher parallele Pfade zur Bitleitung, NAND-Zellen liegen in einem String mit Auswahltransistoren. Die Reihenschaltung bedeutet nicht, dass Software Bytes wie ein Band liest. Serial-NOR kann über einen Controller trotzdem speicherabbildbar sein. NOR wird oft für Code, NAND für Massendaten verwendet. Universelle Latenzzahlen werden nicht behauptet. NOR kann einen Instruktionspfad ermöglichen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## NOR-Flash & Execute-In-Place (XIP)
@@ -454,7 +458,7 @@ Die Verschaltung erklärt den Zugriff: NOR kann ein Wort adressieren, NAND liefe
 - XIP heißt: der Fetch holt den Befehl aus dem NOR, nicht dass jede Adresse dieselbe Latenz hat
 
 ::: notes
-NOR-Flash erlaubt wortweisen Lesezugriff, deshalb kann die Pipeline Befehle direkt daraus holen. Die Latenz liegt typisch über einem SRAM-Hit; „sofort wie SRAM“ wäre die falsche Ebene.
+XIP bedeutet Execute-in-Place: Code wird aus einer speicherabbildbaren nichtflüchtigen Region geholt, ohne ihn vorher vollständig nach RAM zu kopieren. Der Fetch läuft vom Kern über Cache oder Prefetch und den Flash-Controller zum NOR. Ein Cache-Hit liest nicht jedes Mal physisch aus dem Flash. Serielles NOR braucht den Controller. Rohe NAND-Zellen bieten diesen Fetch nicht. XIP garantiert weder kurze noch feste Latenz. C allein legt den Ort trotzdem nicht fest. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## C-Code und der Flash-Speicher
@@ -470,7 +474,7 @@ static const uint32_t table[] = {1, 2}; /* typisch .rodata */
 ```
 
 ::: notes
-Ein AVR-`__flash`-Attribut ist ein Gegenbeispiel: erst ein herstellerspezifisches Attribut zwingt Daten in den Programmspeicher. In diesem Modul bleibt es bei der üblichen `.rodata`-Konvention.
+const ist ein Typqualifizierer. Über diese Deklaration darf das Objekt nicht verändert werden. Es ist keine Flash-Anweisung. static begrenzt die Sichtbarkeit oder die Lebensdauer. uint32_t ist ein vorzeichenloser 32-Bit-Typ. .rodata ist die Section für nur lesbare Daten. Ob sie im Flash liegt, entscheiden Linker und Startup. Eine unbenutzte Tabelle kann der Compiler entfernen. __flash bei AVR ist ein Named Address Space, kein universelles Attribut. mcause ist das RISC-V-Machine-Cause-Register. Ohne Plattform wird kein konkreter Trap-Wert behauptet. Der Code ist Lehrcode und nicht kompiliert. NAND benutzt einen anderen Pfad. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## NAND-Flash (Massenspeicher)
@@ -483,7 +487,7 @@ Ein AVR-`__flash`-Attribut ist ein Gegenbeispiel: erst ein herstellerspezifische
 ![SLC-Modell: gelöscht alles 1, Programmieren setzt ausgewählte Bits auf 0, Erase nur blockweise zurück.](../assets/figures/01_speicherphysik/flash-program-erase.png)
 
 ::: notes
-Ein gewöhnlicher Store kann weder die hohe Programmierspannung noch die Block-Löschung ersetzen. Page- und Blockgrößen stehen im Datenblatt, nicht als universelle Konstanten.
+Eine NAND-Page wird in einen internen Puffer gelesen. Der Controller gibt daraus Daten aus. Programmieren betrifft Pages, Löschen größere Blöcke. Das Modell gelöscht gleich 1 und Programmieren setzt Bits auf 0 ist eine SLC-Konvention, keine Kodierung jeder Technologie. Code aus NAND wird in ausführbares RAM geladen. Der Weg ist Controller, Page Buffer, CPU oder DMA. Ein normaler C-Store ersetzt keinen Flash-Befehl. Programmieren und Löschen verursachen Verschleiß. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die Flash-Krankheit: Wear and Tear
@@ -493,7 +497,7 @@ Ein gewöhnlicher Store kann weder die hohe Programmierspannung noch die Block-L
 - Viele Schreib-/Löschzyklen ermüden das Oxid — die Zahl hängt vom Zelltyp ab, sie ist nicht unendlich und nicht für alle Technologien gleich
 
 ::: notes
-Wenn Sie RAM beschreiben, hält die Zelle das ohne Programmier-Oxid. Flash altert mit Programmier-/Löschzyklen; wie viele Zyklen ein konkretes Medium verträgt, steht im Datenblatt.
+Endurance ist die Zahl der Programmier- und Löschzyklen, Retention die Datenerhaltung danach. P/E bedeutet Program/Erase. Im Zellmodell belasten die hohen Spannungen die Isolation. Ein Host-Write ist nicht automatisch ein physischer Löschvorgang. Puffern, Zusammenfassen und Write Amplification ändern die Zahl der physischen Zyklen. Eine allgemeine Zyklenzahl wird nicht genannt. Ein oft geschriebener Zähler braucht ein anderes Verfahren als einmal programmierte Firmware. Verschleiß lässt sich verteilen, nicht abschaffen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die Rettung: Wear Leveling (FTL)
@@ -506,7 +510,7 @@ Wenn Sie RAM beschreiben, hält die Zelle das ohne Programmier-Oxid. Flash alter
 ![Dieselbe logische Adresse wandert über Updates auf neue physische Blöcke. Alte Kopien werden ungültig.](../assets/figures/01_speicherphysik/wear-leveling.png)
 
 ::: notes
-Adressübersetzung, Verschleißausgleich und Garbage Collection sind drei Aufgaben. Die Abbildung zeigt nur die Zuordnung und ungültige Alt-Daten.
+FTL bedeutet Flash Translation Layer. Eine logische Adresse wird auf eine physische Page oder einen Block abgebildet. Out-of-Place-Update schreibt eine neue Stelle und markiert die alte als ungültig. Wear Leveling verteilt die Zyklen. Garbage Collection gewinnt freie Blöcke zurück. Das sind drei Aufgaben, keine Synonyme. Nicht jeder Host-Write wechselt den ganzen Block. Bei SD und SSD sitzt das oft im Controller. Rohes Flash auf einem Mikrocontroller braucht ein eigenes Verfahren, nicht automatisch einen SSD-FTL. Ein Journal kann kleiner sein. Danach erscheint die Region in der Memory Map. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Memory Map: Wo liegt der Flash im SoC?
@@ -517,7 +521,7 @@ Adressübersetzung, Verschleißausgleich und Garbage Collection sind drei Aufgab
 - Boot per XIP nur, wenn der Fetch-Pfad den NOR-Flash wortweise lesen kann
 
 ::: notes
-Lassen Sie uns den Bogen zurück zu MCT1 schlagen. Der Adressdecoder wählt den Flash-Bereich. Konkrete Basisadressen mischen wir nicht aus STM32- und SiFive-Beispielen.
+Eine Memory Map ordnet Adressbereiche den Ressourcen zu. Die Basisadresse ist der Anfang, die Länge die Größe. Der Adressdecoder wertet Bits aus und wählt den Baustein. Die Adresse sagt nichts über Transistoren. Die späteren Zahlen 0x00000000 für 256 KiB Flash und 0x10000000 für 64 KiB RAM sind Annahmen, kein STM32- und kein SiFive-Layout. XIP funktioniert nur, wenn der Fetch den Speicher wortweise lesen kann. RV32 bezeichnet hier das 32-Bit-Integer-Modell. Als Nächstes fassen wir die nichtflüchtigen Eigenschaften zusammen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Zusammenfassung: Non-Volatile Memory
@@ -529,7 +533,7 @@ Lassen Sie uns den Bogen zurück zu MCT1 schlagen. Der Adressdecoder wählt den 
 - Flash verschleißt (Oxid-Schäden) und braucht Wear Leveling
 
 ::: notes
-Damit haben wir die Basis unserer Speicherpyramide durchleuchtet. Wir wissen nun, wo unser Code liegt, wenn der Strom ausgeschaltet ist, und warum der Prozessor ihn direkt ausführen kann. Aber der Flash-Speicher hat ein Problem: Er ist viel zu langsam für die Arbeitsvariablen unserer Software und er verschleißt, wenn wir ihn ständig mit neuen Werten beschreiben würden.
+Die Tabelle vergleicht Datenerhalt, Lesezugriff, Update- oder Löschgranularität und die typische Verwendung. ROM ist fest nach der Fertigung, EEPROM elektrisch in kleineren Einheiten änderbar, NOR kann einen Fetch-Pfad bieten, NAND ist dicht und pageorientiert. NOR ist nicht immer ein paralleler Außenbus. NAND ist kein Magnetband. Wear Leveling ist keine Pflicht für eine Region, die nie beschrieben wird. Die Kürzel wurden auf den Einzelfolien definiert. Häufig geänderte Laufzeitdaten brauchen einen anderen Speicher. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Der Bedarf an Arbeitsspeicher
@@ -543,7 +547,7 @@ Antwort: volatiler Speicher (RAM).\
 Zwei Technologien: **SRAM** und **DRAM**.
 
 ::: notes
-Für Variablen, Zwischenergebnisse der ALU und den Stack brauchen wir ein perfektes Kurzzeitgedächtnis. Als Nächstes öffnen wir den volatilen Arbeitsspeicher: zuerst SRAM, dann DRAM.
+Arbeitsvariablen, der Stack und Zwischenergebnisse werden oft geändert und sollen passende Latenz haben. Nicht jede Variable liegt im RAM. Der Compiler kann einen Wert in einem Register halten oder entfernen. Nichtflüchtigkeit allein wäre kein Hindernis. Hier stören die Updatekosten des betrachteten Flash. ALU, RAM, SRAM und DRAM werden lokal benannt. Eine Messwertsumme, die jede Probe neu addiert, ist ein Beispiel häufiger Änderungen. Vor der Zellphysik sichern die Fragen die Flash-Grundlagen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Fragen? — Non-Volatile
@@ -553,7 +557,7 @@ Für Variablen, Zwischenergebnisse der ALU und den Stack brauchen wir ein perfek
 - Wear Leveling?
 
 ::: notes
-Bevor wir in die Transistorebene von SRAM und DRAM eintauchen: Ist klar, warum Mikrocontroller Code typischerweise aus NOR-Flash (XIP) ausführen und nicht aus NAND?
+Drei Fragen. Erstens: Warum legt const nicht in Flash ab? Weil const eine Typregel ist und die Section der Linker setzt. Zweitens: Warum kann 0xA5 nach 0x5A im gewählten NOR-Modell eine Löschung brauchen? Weil Bits von 0 nach 1 nur durch Erase des größeren Bereichs zurückkehren. Drittens: Warum ist Wear Leveling kein vollständiges FTL? Weil Übersetzung, Verschleißverteilung und Garbage Collection verschieden sind. XIP, Blocklöschung und FTL wurden oben definiert. Nach der Pause folgt der flüchtige Speicher. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Kurze Pause
@@ -566,19 +570,19 @@ Danach:
 - Spezialspeicher (FIFOs und Dual-Ported RAM)
 
 ::: notes
-Atmen Sie kurz durch. Nach der Pause folgt die Physik des Arbeitsspeichers.
+Zehn Minuten Pause. Bisher hielten nichtflüchtige Zellen Daten ohne Versorgung, aber Updates sind teuer. Danach folgen SRAM und DRAM für häufig geänderte Daten. Eine freiwillige Frage: Warum reicht ein Kondensator nicht als Dauerspeicher? Weil Leckströme die Spannung ändern. Die spätere Antwort ist der Refresh. FIFO und SRAM werden hier nicht neu eingeführt.
 :::
 
 ## Volatiler Speicher: RAM
 
 - Arbeitsspeicher: Kurzzeitgedächtnis des Prozessors
 - Volatil: Daten weg ohne Versorgungsspannung
-- Wahlfreier Zugriff: jede Adresse gleich schnell
+- Wahlfreier Zugriff: jede Adresse ist direkt wählbar. Die Latenz muss nicht gleich sein
 - Zwei Architekturen: SRAM (Static RAM) und DRAM (Dynamic RAM)
 - Gleicher Zweck, grundlegend andere Physik
 
 ::: notes
-Nachdem wir geklärt haben, wie Code den Stromausfall überlebt, widmen wir uns den flüchtigen Speichern. Wenn Sie in C ein Array anlegen oder eine Variable definieren, leben diese im RAM. Damit der Prozessor nicht unnötig wartet, muss dieser Speicher schnell sein. Wir unterscheiden statischen und dynamischen RAM.
+RAM bedeutet Random-Access Memory und beschreibt die direkte Adressierbarkeit, nicht gleiche Latenz für jede Adresse. Flüchtig heißt, ohne Versorgung ist der Inhalt nicht zugesichert. SRAM ist Static RAM, DRAM Dynamic RAM. Laufzeitvariablen liegen in einem typischen Bare-Metal-Programm oft im SRAM. const-Objekte, Registerwerte und wegoptimierte Variablen widerlegen die Aussage, alle Variablen lägen im RAM. SRAM hält Spannungszustände durch Rückkopplung, DRAM eine Ladung, die gepflegt werden muss. Die nächste Übersicht trennt ihre Aufgaben. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## RAM: SRAM und DRAM
@@ -595,7 +599,7 @@ flowchart LR
 ```
 
 ::: notes
-Schematisch: SRAM sitzt nahe an der CPU (Caches, Register), DRAM bildet den großen Hauptspeicher. Beides speichert Bits — mit völlig unterschiedlichen Bauteilen.
+SRAM sitzt häufig klein und schnell nahe am Kern, DRAM als größerer Hauptspeicher in Systemen, die ihn haben. Ein Registerfile ist nicht pauschal eine 6T-Zelle. Beide Technologien sind flüchtig. Die Platzierung ist eine Entwurfsentscheidung, keine Naturregel. Die Sensor-MCU ohne DRAM bleibt das Gegenbeispiel. CPU, SRAM, DRAM und Cache werden hier nur als Rollen benannt. Zuerst zeigt SRAM, wie ein Zustand ohne Refresh hält. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## SRAM — Prinzip
@@ -607,7 +611,7 @@ Schematisch: SRAM sitzt nahe an der CPU (Caches, Register), DRAM bildet den gro�
 - Kehrseite: geringe Dichte — viele Transistoren pro Zelle
 
 ::: notes
-„Statisch“ bedeutet hier nicht, dass Daten bei Stromausfall erhalten bleiben, sondern dass das Bit im Transistornetzwerk stabil liegt, solange die Betriebsspannung da ist. SRAM ist das Rückgrat schneller Caches und Register.
+Statisch bedeutet stabile Speicherung bei anliegender Versorgung ohne periodisches Auffrischen. Es bedeutet nicht nichtflüchtig und nicht stromlos. Die Zelle, das SRAM-Makro mit Decoder und Sense Amplifier und die Cache-Latenz sind drei Ebenen. Ein Cache-Hit ist nicht universell ein Takt, und eine Sub-Nanosekunden-Zahl wird ohne benannte Ebene nicht behauptet. Die Rückkopplung hält die Pegel. Das D-Flip-Flop ist der Vergleich, nicht die übliche große Bitzelle. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Refresher: Das D-Flip-Flop (MCT1)
@@ -619,7 +623,7 @@ Schematisch: SRAM sitzt nahe an der CPU (Caches, Register), DRAM bildet den gro�
 - Lösung: Design auf das physikalische Minimum eindampfen
 
 ::: notes
-Für 32 Register sind Flip-Flops vertretbar. Für Megabyte-Caches im Die brauchen wir eine radikal kleinere Zelle.
+D ist der Dateneingang, Q der gespeicherte Ausgang, CLK der Takt. Ein flankengesteuertes D-Flip-Flop übernimmt D zu einem Flankenzeitpunkt. Das Logikmodell ist nicht die Transistorschaltung. Etwa 20 Transistoren sind eine Vergleichsannahme. Für 1 MiB, 8388608 Bit, wären das 167772160 Transistoren nur in diesem Vergleich. Register aus Flip-Flops bleiben für wenige Bits sinnvoll. Ein Master-Slave-Aufbau erklärt den Aufwand und das Flankenverhalten. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## D-Flip-Flop: Master und Slave
@@ -637,10 +641,14 @@ flowchart TD
   style S fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
 ```
 
-::: notes
-Schematisch: Zwei Latches hintereinander. Funktional stark — flächenmäßig zu teuer für großen SRAM.
-:::
+![Master bei CLK = 0 offen, Slave bei CLK = 1. Q übernimmt an der steigenden Flanke.](../assets/figures/01_speicherphysik/ff-timing.png)
 
+- Master bei CLK = 0 transparent, Slave bei CLK = 1. Die Phasen sind entgegengesetzt
+- Übernahme an der steigenden Flanke. Beide Latches dürfen nicht gleichzeitig offen sein
+
+::: notes
+Zwei Latches liegen hintereinander. Im gewählten positiv flankengesteuerten Modell ist der Master bei CLK gleich 0 transparent und der Slave bei CLK gleich 1. Die Enable-Phasen sind entgegengesetzt. Das Zeitbild zeigt CLK, die beiden Enables, D und Q. Q übernimmt den Wert an der steigenden Flanke. Level-sensitive heißt pegeloffen, edge-triggered flankengesteuert. Wären beide zugleich offen, liefe D unkontrolliert nach Q. SRAM braucht keine solche Taktzelle für jedes Bit, sondern eine kompaktere Rückkopplung. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
+:::
 ## Die 6T-SRAM-Zelle
 
 - Klassisches SRAM-Bit: exakt 6 Transistoren (6T)
@@ -650,7 +658,7 @@ Schematisch: Zwei Latches hintereinander. Funktional stark — flächenmäßig z
 - Bitlines (BL / $\overline{\mathrm{BL}}$): Daten hinein und heraus
 
 ::: notes
-Statt rund 20 Transistoren bleiben sechs: zwei Inverter im Ring und zwei Schalter zu den Bitlines. Eine der am häufigsten gebauten Zellen der Welt.
+Die klassische Zelle hat sechs Transistoren. Zwei CMOS-Inverter bestehen aus vier Transistoren, zwei weitere sind Zugriffstransistoren. CMOS bedeutet Complementary Metal-Oxide-Semiconductor. Es sind nicht vier Inverter. WL ist die Wordline und öffnet beide Zugriffstransistoren. BL und BL_bar sind die komplementären Bitleitungen. nMOS und pMOS sind n- und p-Kanal-Transistoren. 6T ist ein verbreitetes Beispiel, nicht die Definition jedes SRAM. Die Übersicht ordnet dieselben sechs Bauelemente. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## 6T-Zelle: Überblick
@@ -658,7 +666,7 @@ Statt rund 20 Transistoren bleiben sechs: zwei Inverter im Ring und zwei Schalte
 ![Dieselbe 6T-Geometrie: vier Inverter-Transistoren, zwei Access-Transistoren, Q/Q̅, BL/BL̅, WL, VDD, GND. Hold, Lesen und Schreiben ändern nur die Signale.](../assets/figures/01_speicherphysik/sram-6t-states.png)
 
 ::: notes
-Beide Rückkopplungen sind eingezeichnet: Q steuert den rechten Inverter, Q̅ den linken. Die Access-Transistoren hängen an WL.
+Die Zelle hat VDD als positive Versorgung und GND als Bezug. Q und Q_bar sind die komplementären Speicherknoten. Zwei kreuzgekoppelte Inverter bestätigen einander. Zwei Zugriffstransistoren hängen an derselben WL. BL und BL_bar führen nach außen. Hold, Lesen und Schreiben benutzen dieselbe Geometrie und ändern die Signale. Farben allein tragen die Bedeutung nicht. Die Kreuzkopplung erklärt als Nächstes den stabilen Zustand. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Der kreuzgekoppelte Inverter-Ring
@@ -670,7 +678,7 @@ Beide Rückkopplungen sind eingezeichnet: Q steuert den rechten Inverter, Q̅ de
 - Bistabilität: Gleichgewicht, solange Strom anliegt
 
 ::: notes
-Zwei NOT-Gatter im Kreis: Die linke 1 erzwingt rechts 0, die 0 erzwingt links wieder 1. Das System stabilisiert sich selbst — angetrieben von der Versorgungsspannung.
+Liegt Q auf 1 und Q_bar auf 0, bestätigt jeder Inverter den anderen. Der zweite stabile Zustand ist Q gleich 0 und Q_bar gleich 1. NOT ist die Negation. Zwei Inverter ergeben eine positive Rückkopplung des Zustands. Ring meint diese Signalrückkopplung, keinen dauerhaft kreisenden Strom. VDD setzt den Rahmen für die Pegel. Ohne aktivierte WL bleibt die Zelle von den Bitleitungen weitgehend getrennt. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Zustand halten (Hold State)
@@ -678,19 +686,21 @@ Zwei NOT-Gatter im Kreis: Die linke 1 erzwingt rechts 0, die 0 erzwingt links wi
 - Wordline $= 0\,\mathrm{V}$: Hold State
 - Access-Transistoren sperren
 - Zelle von den Bitlines isoliert
-- Strom nur im Inverter-Ring
-- Ruhestrom theoretisch sehr gering
+- Im idealen CMOS-Ruhezustand gibt es keinen dauerhaften Pfad von VDD nach GND
+- Real bleiben Leckströme. Der Zustand wird durch die Spannungsrückkopplung gehalten
 
 ::: notes
-Die meiste Zeit bleibt die Zelle im Hold State: Türen zu, Bit im Ring gefangen. Aktivität auf den Bitlines berührt die Zelle nicht.
+Im Hold ist WL gleich 0 und die Zugriffstransistoren sperren. Die Zelle ist von BL und BL_bar isoliert. Im idealen stabilen CMOS-Zustand gibt es keinen dauerhaften leitenden Pfad von VDD nach GND. Der Zustand wird durch die rückgekoppelten Spannungen gehalten. Real fließen Leckströme. Bit gefangen ist nur eine Metapher. Die große Zeichnung zeigt genau diesen Zustand. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Hold State — Schema
 
-Linkes Panel der 6T-Abbildung: WL = 0, Access-Transistoren sperren, der Ring bleibt geschlossen.
+![WL = 0, Q = 1, Qb = 0. Zwei Inverter halten den Pegel. Kein idealer Haltestromkreis.](../assets/figures/01_speicherphysik/sram-hold.png)
+
+Linkes Panel der 6T-Abbildung bleibt der Vergleich. Diese Folie zeigt den Haltezustand groß.
 
 ::: notes
-Gleiche Geometrie wie Lesen und Schreiben. Nur WL und die Bitline-Treiber ändern sich.
+Die eigene Abbildung zeigt WL gleich 0, Q gleich 1 und Q_bar gleich 0. Beide Zugriffstransistoren sind aus. Die Kreuzkopplung ist sichtbar, ein erfundener Kreisstrom nicht. VDD, GND, WL, BL und BL_bar behalten die Bedeutung der vorigen Folie. Die Notiz muss ohne Rückblättern lesbar sein: Halten ist Isolation plus Rückkopplung. Zum Lesen werden die Bitleitungen vorgeladen und dann kurz angekoppelt. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## SRAM Lesen
@@ -700,7 +710,7 @@ Gleiche Geometrie wie Lesen und Schreiben. Nur WL und die Bitline-Treiber änder
 - Die Zelle zieht eine Leitung nur leicht; sie wird im vorgesehenen Lesen nicht umgeschrieben
 
 ::: notes
-Panel 1: BL und BL̅ auf hoher Spannung. Panel 2: WL = 1, kleine Differenz. Panel 3: der Leseverstärker digitalisiert, Q bleibt.
+Zuerst werden beide Bitleitungen auf VDD vorgeladen, dann die Vorladetreiber gelöst. WL wird aktiv. Der niedrige Zellknoten entlädt seine Bitleitung nur wenig. Der Sense Amplifier digitalisiert die Differenz. Danach wird WL wieder geschlossen. Der Zellzustand soll beim vorgesehenen Lesen erhalten bleiben. Read Stability ist die qualitative Fähigkeit, nicht umzukippen. Eine universelle Transistorgrößenregel wird nicht behauptet. Schreiben muss die Rückkopplung dagegen bewusst überwinden. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## SRAM Schreiben
@@ -710,7 +720,7 @@ Panel 1: BL und BL̅ auf hoher Spannung. Panel 2: WL = 1, kleine Differenz. Pane
 - Die Schreibtreiber müssen die Rückkopplung überwinden; eine feste Transistor-Größenregel gilt nicht für jede Bibliothek
 
 ::: notes
-Panel 1 setzt BL und BL̅ gegensinnig. Panel 2 öffnet WL. Panel 3 isoliert die Zelle mit dem neuen Wert.
+Soll Q von 0 nach 1, treibt das gewählte Modell BL auf 1 und BL_bar auf 0. Die Treiber setzen die Pegel, WL öffnet den Zugriff, die Zelle kippt, WL schließt. Die analoge Treiberstärke und die Zellauslegung balancieren Schreibbarkeit und Lesestabilität. Eine für alle Prozesse geltende Größenregel gibt es hier nicht. Nach dem Schreiben gilt wieder Hold. Der stabile Zustand ohne Refresh macht SRAM für kleine schnelle Speicher attraktiv. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Vorteile von SRAM
@@ -722,7 +732,7 @@ Panel 1 setzt BL und BL̅ gegensinnig. Panel 2 öffnet WL. Panel 3 isoliert die 
 - Integration im selben Logic-Prozess wie die ALU
 
 ::: notes
-SRAM bremst die Pipeline kaum und lässt sich im gleichen Silizium-Prozess wie die Rechenlogik fertigen — ideal für Caches.
+Auf der betrachteten Ebene ist der Zugriff kurz, ein periodischer Refresh fehlt, und die Zellen lassen sich in Logikprozessen integrieren. Eine asynchrone Schnittstelle braucht eine gültige Adresse, Steuersignale und eine spezifizierte Zugriffszeit. Es gibt auch synchrone SRAMs. Die Pipeline wird nicht pauschal kaum gebremst. Decoder, Verstärker und Leitungen bleiben. ALU und Cache werden nur als Nutzer benannt. Sechs Transistoren und die Verschaltung kosten Fläche und Energie. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Nachteile von SRAM
@@ -733,7 +743,7 @@ SRAM bremst die Pipeline kaum und lässt sich im gleichen Silizium-Prozess wie d
 - Ungeeignet für Massenspeicher (Laptop mit 16 GB SRAM wäre unrealistisch)
 
 ::: notes
-Sechs Transistoren pro Bit reichen für Caches, nicht für Gigabyte-Hauptspeicher. Deshalb bleibt DRAM unverzichtbar.
+Gegenüber der klassischen 1T1C-DRAM-Zelle ist die Bitdichte geringer und der Preis je Bit im passenden Vergleich höher. Die Fläche hängt nicht nur von der Transistorzahl ab. Leitungen, Abstände und Peripherie zählen. Eine absolute Aussage, SRAM erreiche niemals Gigabyte, wird ohne Beleg nicht gemacht. Das 6T- und 20T-Beispiel zählt nur Bauelemente. Auch im Ruhezustand bleiben Leckströme. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die Leckströme (Leakage)
@@ -744,7 +754,7 @@ Sechs Transistoren pro Bit reichen für Caches, nicht für Gigabyte-Hauptspeiche
 - Mobile SoCs: Power Gating ganzer SRAM-Blöcke im Standby
 
 ::: notes
-Bei wenigen Nanometern „lecken“ Transistoren. Große SRAM-Caches können im Standby spürbar Energie ziehen — deshalb Power Gating in Smartphones.
+Leakage ist Leckstrom. Dynamische Energie entsteht beim Schalten, statische Verlustleistung im Ruhezustand. Subthreshold- und Gate-Leckströme sind Beispiele, nicht alles ist Quantentunneln. Ein Knotenname wie 3 nm ist keine allgemeine exakte Kanallänge. Clock Gating schaltet den Takt ab und erhält den Zustand. Power Gating trennt die Versorgung und verliert normalen SRAM-Inhalt, wenn keine Retention vorgesehen ist. Deshalb wird SRAM gezielt für kleine schnelle Speicher eingesetzt. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Einsatzgebiet von SRAM im SoC
@@ -754,7 +764,7 @@ Bei wenigen Nanometern „lecken“ Transistoren. Große SRAM-Caches können im 
 - L1/L2 sind häufig SRAM-Makros; die Latenz eines Cache-Hits ist nicht die Zellzeit allein
 
 ::: notes
-SRAM sitzt an der Spitze der Speicherpyramide: Register und Caches. Nur bei Miss geht es weiter zum DRAM.
+SRAM steht in Caches, in kleinen MCU-Arbeitsspeichern und in passenden Puffern. Ein Registerfile kann mehrportig oder anders aufgebaut sein. Ein L1-Miss geht zur nächsten vorhandenen Ebene, etwa L2, und nicht sofort ins DRAM. Eine MCU kann Flash und SRAM ohne DRAM haben. CPU, MCU, SRAM und Cache-Miss werden lokal so verstanden. Die Hierarchie ordnet diese Rollen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## SRAM in der Hierarchie
@@ -771,7 +781,7 @@ flowchart LR
 ```
 
 ::: notes
-Schematisch: Jede Stufe fragt die nächste, wenn Daten fehlen. Moderne Kerne sind oft von großen SRAM-Caches umgeben.
+Die 6T-Zelle erklärt die Technik, der Cache die Funktion. Kleine schnelle Ebenen werden mit größeren langsameren kombiniert. Ein Cache braucht zusätzlich Tags und Steuerung. SRAM-Technologie und Cache sind verschiedene Wörter. L1, L2 und L3 sind Ebenen, keine festen Produktgrößen. Register und Cachezellen werden nicht gleichgesetzt. Der Floorplan zeigt eine schematische räumliche Anordnung. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Schematischer Floorplan
@@ -779,7 +789,7 @@ Schematisch: Jede Stufe fragt die nächste, wenn Daten fehlen. Moderne Kerne sin
 ![Regelmäßige SRAM-Fläche, unregelmäßigere Logik, I/O-Ring. Keine Mikroskopaufnahme.](../assets/figures/01_speicherphysik/floorplan.png)
 
 ::: notes
-Ohne belegbare, passend lizenzierte Die-Aufnahme bleibt es bei diesem Floorplan. Titel bewusst nicht „Mikroskop“.
+Ein Floorplan ordnet Funktionsblöcke auf dem Chip. Die Abbildung ist nicht maßstäblich und keine Flächenmessung. Core, ALU, Registerfile, Cache und Peripheriebereich sind Rollen, soweit sie gezeichnet sind. Nähe kann Leitungen kürzen und beweist keine Zugriffszeit. Die Die-Grenze und die Legende trennen On-Chip von außen. Die SRAM-Zusammenfassung verbindet Zelle, Kosten und Einsatz. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Zusammenfassung SRAM
@@ -791,7 +801,7 @@ Ohne belegbare, passend lizenzierte Die-Aufnahme bleibt es bei diesem Floorplan.
 - Einsatz: Caches und CPU-naher Speicher im SoC
 
 ::: notes
-SRAM ist teuer und schnell — unverzichtbar für die Pipeline. Für den großen Hauptspeicher brauchen wir dichtere Technik: DRAM.
+Zwei kreuzgekoppelte CMOS-Inverter ergeben zwei stabile Zustände bei Versorgung. Zwei Zugriffstransistoren koppeln die Zelle an. Ein periodischer Refresh entfällt. Die Zellzeit ist nicht die Systemlatenz. SRAM bleibt flüchtig. Ein kurzer Puffer spricht für SRAM, ein großer billiger Hauptspeicher oft für DRAM. Die Fragen prüfen die Zelle, bevor DRAM den anderen Kompromiss zeigt. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Fragen? — SRAM
@@ -801,7 +811,7 @@ SRAM ist teuer und schnell — unverzichtbar für die Pipeline. Für den großen
 - Warum kein Refresh bei SRAM?
 
 ::: notes
-Ist das Konzept des selbst-erhaltenden Inverter-Rings klar, bevor wir zu DRAM wechseln?
+Warum ist statisches RAM flüchtig? Weil ohne Versorgung die Pegel nicht zugesichert sind. Wozu zwei Bitleitungen? Für komplementäres Schreiben und ein differentielles Lesesignal. Was unterscheidet Lesen und Schreiben? Lesen soll den Zustand erhalten, Schreiben kippt ihn. WL und BL wurden oben definiert. Falsch wären ein dauernder Haltestrom als Prinzip und die Gleichsetzung mit einem getakteten Flip-Flop. Für mehr Dichte folgen weniger Bauteile und dafür Pflege. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Volatiler Speicher: DRAM
@@ -813,7 +823,7 @@ Ist das Konzept des selbst-erhaltenden Inverter-Rings klar, bevor wir zu DRAM we
 - Zelle einfach, Controller komplex
 
 ::: notes
-Ein 16-GB-Riegel ist DRAM. Maximale Dichte erfordert komplexe Controller, weil die Zellen ihre Ladung nicht dauerhaft halten.
+DRAM bedeutet Dynamic Random-Access Memory. Dynamisch bezieht sich auf den Ladungszustand, der erhalten werden muss, nicht auf malloc. Ein klassisches DRAM braucht Refresh und einen Controller. Eine feste Lebensdauer jeder Zelle in Millisekunden wird nicht zugesichert. Große Hauptspeicher und kleine MCUs ohne DRAM sind verschiedene Systeme. Die klassische Zelle hat einen Transistor und einen Kondensator. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Die 1T1C-Zelle
@@ -824,7 +834,7 @@ Ein 16-GB-Riegel ist DRAM. Maximale Dichte erfordert komplexe Controller, weil d
 - Weniger Bauteile pro Bit sind kaum möglich
 
 ::: notes
-1T1C ist der Dichte-Kompromiss: Ein Transistor, ein Kondensator. Maximale Packungsdichte — um den Preis von Refresh und komplexer Ansteuerung.
+1T1C bedeutet one transistor, one capacitor. 20T ist die Flip-Flop-Vergleichsannahme, 6T die klassische SRAM-Zelle, 1T1C die klassische DRAM-Zelle. Der Transistor schaltet den Zugriff, der Kondensator hält einen Spannungszustand. Das ist nicht das physikalische Minimum jeder Speichertechnik. Decoder und Sense Amplifiers fehlen in der Zellzählung. Für 1 MiB sind es 8388608 Transistoren und ebenso viele Kondensatoren, nur als Zellzählung. Das Schaltbild zeigt Zugriff und Bezug. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## 1T1C — Schema
@@ -832,7 +842,7 @@ Ein 16-GB-Riegel ist DRAM. Maximale Dichte erfordert komplexe Controller, weil d
 ![Access-Transistor: WL am Gate, BL als Datenpfad, Kondensator gegen eine Plate-Elektrode (hier als GND-Modell).](../assets/figures/01_speicherphysik/dram-1t1c.png)
 
 ::: notes
-Der Kondensator hängt nicht „irgendwo an Masse“ ohne Kennzeichnung: die Gegenelektrode ist das Plate-Potential, in der Zeichnung vereinfacht nach GND geführt.
+WL liegt am Gate des Zugriffstransistors, BL ist die Zugriffsleitung, der Speicherknoten hängt am Kondensator. Die Plate-Elektrode ist im Bild auf GND gelegt. Das ist ein vereinfachtes Modell. Reale Plates können eine andere Spannung haben. VDD ist die positive Versorgung, C die Kapazität. Bei WL gleich 0 ist die Zelle isoliert, bei WL gleich 1 an BL gekoppelt. Ladung und Kapazität bestimmen das kleine Signal. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Kondensator als Speicher
@@ -843,7 +853,7 @@ Der Kondensator hängt nicht „irgendwo an Masse“ ohne Kennzeichnung: die Geg
 - 3D-Fertigung: Trench-/Stack-Kondensatoren für Dichte
 
 ::: notes
-Um Kapazität bei kleinem Fußabdruck zu gewinnen, werden Kondensatoren als Gräben oder Stapelstrukturen gefertigt — hochpräzise Halbleitertechnik.
+Q gleich C mal Delta V. Q ist hier die Ladung in Coulomb, nicht der SRAM-Knoten. C ist die Kapazität in Farad, Delta V die Spannung gegen die Plate in Volt. Mit C gleich 20 Femtofarad und Delta V gleich 0,5 Volt ist Q gleich 10 Femtocoulomb. Geteilt durch die Elementarladung 1,602176634 mal 10 hoch minus 19 Coulomb sind das etwa 62415 Elektronen. Femto ist 10 hoch minus 15. Die Werte sind illustrativ. Trench- und Stack-Kondensatoren nutzen die dritte Dimension. Leckströme gefährden diese Ladung. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Was bedeutet „dynamisch“?
@@ -852,7 +862,7 @@ Um Kapazität bei kleinem Fußabdruck zu gewinnen, werden Kondensatoren als Grä
 - Das Refresh-Fenster ist geräte- und temperaturabhängig; 64 ms ist nur ein bekanntes Beispiel, keine Lebensdauer jedes Bits
 
 ::: notes
-Das „D“ steht für dynamisch: ohne organisiertes Auffrischen von Zeilen und Bänken geht die Ladung verloren. Nicht jede Zelle ist nach exakt 64 ms leer, und der ganze Riegel steht nicht für 64 ms still.
+Ein real isolierter Kondensator hält die Spannung nicht unbegrenzt. Temperatur, Streuung und das Datenblatt bestimmen den Refresh. 64 ms sind ein bekanntes Fenster unter geeigneten Bedingungen, keine gemessene Entladezeit jedes Bits. Die Zuordnung von 0 und 1 folgt dem gewählten Spannungsmodell. DRAM und Refresh werden so verstanden: der analoge Zustand muss rechtzeitig rekonstruiert werden. Der Zyklus organisiert diese Pflege. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Der Refresh-Zyklus
@@ -861,7 +871,7 @@ Das „D“ steht für dynamisch: ohne organisiertes Auffrischen von Zeilen und 
 - Ob und wie lange Zugriffe dabei warten, ist geräteabhängig
 
 ::: notes
-Der Controller liest eine Zeile und stellt sie wieder her, bevor das Fenster abläuft. 64 ms bleibt ein Beispiel, kein festes Gesetz.
+Refresh erfasst eine Zeile intern und stellt die Pegel wieder her. Das ist kein CPU-Load jedes Bytes. Das Refresh-Fenster, der Abstand der Kommandos und die Dauer eines Vorgangs sind verschieden. Nicht der ganze Speicher steht während des gesamten Fensters still. Self-Refresh bedeutet, dass der Baustein die Pflege in einem spezifizierten Sparzustand selbst anstößt. Die Spannungskurve zeigt den rechtzeitigen Eingriff. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Refresh — Schema
@@ -869,7 +879,7 @@ Der Controller liest eine Zeile und stellt sie wieder her, bevor das Fenster abl
 ![Spannung über der Zeit: Ladungsverlust, rechtzeitiges Auffrischen, wiederhergestellter Pegel.](../assets/figures/01_speicherphysik/dram-refresh.png)
 
 ::: notes
-Die Kurve ist qualitativ. Der Knick ist ein Refresh, kein Messpunkt.
+Die x-Achse ist die Zeit, die y-Achse die Zellspannung. Die Kurve ist qualitativ, kein Messdatensatz und kein universelles RC-Gesetz. Eine Entscheidungszone markiert, wo die Information noch sicher erkannt werden kann. Der Refresh muss davor erfolgen. Es werden keine willkürlichen Nanosekunden als Messung beschriftet. Das interne Lesen verändert den Zustand und muss ihn wiederherstellen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## DRAM-Lesen ist destruktiv
@@ -880,7 +890,7 @@ Die Kurve ist qualitativ. Der Knick ist ein Refresh, kein Messpunkt.
 - Der Sense Amplifier treibt danach den vollen Pegel zurück in die Zelle
 
 ::: notes
-Panel 2 ist keine Entleerung auf 0. Panel 4 stellt den Zellenpegel wieder her, solange WL aktiv ist.
+Vier Schritte: BL auf VDD durch 2 vorladen, WL aktivieren und Ladung teilen, die kleine Abweichung verstärken, den Zellpegel bei noch aktiver WL restaurieren. Destruktiv heißt veränderte Ladungsverteilung, nicht ein immer leerer Kondensator. Mit Plate 0, VDD 1,2 Volt, C_cell 30 fF, C_BL 300 fF und Vorladung 0,6 Volt wird eine gespeicherte 1 etwa 0,6545 Volt und eine 0 etwa 0,5455 Volt. Die Abweichung ist rund plus oder minus 54,5 Millivolt. SA ist der Sense Amplifier. Er übernimmt Erkennung und Wiederherstellung. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Sense Amplifiers
@@ -890,7 +900,7 @@ Panel 2 ist keine Entleerung auf 0. Panel 4 stellt den Zellenpegel wieder her, s
 - Refresh einer Zeile nutzt denselben Mechanismus
 
 ::: notes
-Ohne Leseverstärker wäre die geteilte Ladung nicht als Bit entscheidbar. Der Restore ist Teil des Lesens, nicht ein späterer Store der CPU.
+Der Sense Amplifier, kurz SA, macht aus der kleinen Differenz volle digitale Pegel. Dieselbe Struktur stellt die Zelle wieder her, solange WL aktiv ist. Ein Row Buffer ist die aktivierte Zeile in diesen Verstärkern, nicht automatisch eine zweite SRAM-Kopie. Zuerst wird die Zeile aktiviert, danach eine Spalte ausgewählt. Schreiben legt den gewünschten Zustand dagegen gezielt auf die Bitleitung. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## DRAM Schreiben
@@ -901,7 +911,7 @@ Ohne Leseverstärker wäre die geteilte Ladung nicht als Bit entscheidbar. Der R
 - Wordline zu — Bit gefangen (bis zum nächsten Refresh)
 
 ::: notes
-Schreiben ist der einfachere Teil: Treiber setzen den Pegel, Transistor verbindet, Kondensator übernimmt.
+Der Auftrag kommt vom Controller zur gewählten Spalte einer aktivierten Zeile. In der Zelle treibt die Bitleitung den Kondensator, WL erlaubt den Zugriff, danach wird WL geschlossen. Moderne Kommandos und Timingbedingungen bleiben darüber bestehen. 0 und 1 beziehen sich auf die festgelegte Spannung. Der Schreibzustand ist das Gegenstück zur Leseabbildung. Millionen Zellen brauchen Bank, Zeile und Spalte. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Adress-Matrix und Multiplexing
@@ -910,7 +920,7 @@ Schreiben ist der einfachere Teil: Treiber setzen den Pegel, Transistor verbinde
 - Die Adresse zerfällt in Bank, Row, Column und Byte-Offset — die Breiten sind nicht zwei gleiche Hälften
 
 ::: notes
-Multiplexing spart Pins, weil Zeile und Spalte nacheinander kommen. Die Bitaufteilung steht im Speicher-Datenblatt, nicht in der CPU-Wortbreite.
+Bank, Row, Column und Byte-Offset sind die Auswahlfelder dieses Lehrbeispiels. Die CPU-Adresse wird vom Controller abgebildet, nicht automatisch in zwei Hälften zu 16 Bit. Vier Bänke, 128 Zeilen, 64 Spalten und 2 Byte ergeben 65536 Byte, also 64 KiB. Die Felder brauchen 2 plus 7 plus 6 plus 1 gleich 16 Bit. Bank 2, Zeile 5, Spalte 9 und Byte 1 ergeben die Adresse 33427 oder 0x8293. Echte DRAMs können verschachteln oder hashen. Die Matrix zeigt Zeile und Spalte. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Multiplexing — Schema
@@ -918,7 +928,7 @@ Multiplexing spart Pins, weil Zeile und Spalte nacheinander kommen. Die Bitaufte
 ![Kleine Matrix, Zeilendecoder-Zeile markiert, Spaltenauswahl, Sense Amplifier / Row Buffer. Adressfelder nur illustrativ.](../assets/figures/01_speicherphysik/dram-matrix.png)
 
 ::: notes
-Die orange Zeile ist aktiv. Der Row Buffer hält sie, die Spalte wählt daraus. Keine 16+16-Aufteilung einer 32-Bit-Adresse.
+Das Bild führt vom Bank- und Zeilenfeld zum Decoder, zur aktiven Zeile und zu den Sense Amplifiers. Die Spaltenauswahl liefert danach die Daten. Alle Pfeile behalten die Bedeutung der vorigen Folie. Die Zeile wird physisch gemeinsam aktiviert, die Spalte danach ausgegeben. Die Größen sind dieselben 64 KiB des Beispiels. Historische RAS- und CAS-Signale beschreiben die ältere Steuerung. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## RAS und CAS
@@ -928,7 +938,7 @@ Die orange Zeile ist aktiv. Der Row Buffer hält sie, die Spalte wählt daraus. 
 - Die Abbildung der vorigen Folie trennt Matrix und diese Schnittstellen-Ebene
 
 ::: notes
-BIOS-„CAS Latency“ beschreibt ein Speicherkommando-Timing, nicht automatisch den klassischen RAS/CAS-Pin von 1980.
+RAS bedeutet Row Address Strobe, CAS Column Address Strobe. Das sind historische Strobe-Signale asynchroner DRAMs. SDRAM benutzt Kommandos wie ACTIVATE, READ, WRITE und PRECHARGE. CAS Latency, kurz CL, ist die spezifizierte Verzögerung vom READ bis zum ersten Datenwort unter passenden Bedingungen, nicht die ganze Latenz eines CPU-Loads. BIOS, Basic Input/Output System, wird hier nicht gebraucht. Row-Hit und Row-Konflikt unterscheiden die Wartezeit. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Warum DRAM langsamer ist als SRAM
@@ -939,7 +949,7 @@ BIOS-„CAS Latency“ beschreibt ein Speicherkommando-Timing, nicht automatisch
 - Mögliche Wartezeiten während Refresh
 
 ::: notes
-Die Latenz folgt aus Physik und Organisation — nicht aus „Böswilligkeit“. Der Inverter-Ring des SRAM antwortet deutlich direkter.
+Nicht jede Anfrage durchläuft dieselbe volle Sequenz. Ein Row-Hit liest eine schon passende offene Zeile. Eine geschlossene Bank braucht ACTIVATE und dann READ. Ein Konflikt kann PRECHARGE, ACTIVATE und READ verlangen. Die Kürzel werden so lokal erklärt. Physik, Organisation, Controller und Refresh tragen zur Latenz bei. Auch SRAM hat Peripherie. Die Zellzeit ist nicht die CPU-Systemlatenz. DDR verbessert danach den Durchsatz der Datenphase. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## SDRAM und DDR
@@ -949,7 +959,7 @@ Die Latenz folgt aus Physik und Organisation — nicht aus „Böswilligkeit“.
 - LPDDR ist eine energiesparende Familie derselben Zellidee
 
 ::: notes
-Die Punkte im Diagramm sind Übernahmezeitpunkte, keine Latenzpfeile. DDR verdoppelt die Transfers pro Takt an der Schnittstelle.
+SDRAM ist Synchronous DRAM, SDR Single Data Rate, DDR Double Data Rate, LPDDR Low-Power DDR. Beim gleichen Bustakt und gleicher Breite überträgt DDR an beiden Flanken. 200 MHz mal 64 Bit durch 8 mal 1 ergibt 1,6 GB/s für SDR und mal 2 ergibt 3,2 GB/s für DDR. DDR sind hier 400 MT/s, Megatransfers je Sekunde, nicht 400 MHz Bustakt. Kommandos, Refresh und Turnaround fehlen. Die Load-Latenz wird nicht halbiert. DRAM wird dort eingesetzt, wo die Kapazität zählt. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Einsatzgebiet von DRAM im SoC
@@ -960,7 +970,7 @@ Die Punkte im Diagramm sind Übernahmezeitpunkte, keine Latenzpfeile. DDR verdop
 - Kleine MCUs: oft nur interner SRAM, kein DRAM
 
 ::: notes
-Große SoCs (z. B. Linux-fähig) brauchen DRAM. Kleine Sensor-MCUs kommen oft mit Kilobyte-SRAM aus.
+DRAM sitzt oft in einem eigenen Gehäuse am Controller, auch als Package-on-Package. SoC heißt nicht, dass der DRAM auf demselben Die liegt. OS bedeutet Operating System. Ein Heap ist ein dynamischer Speicherbereich, malloc die C-Funktion, die ihn bei passender Laufzeit anfordert. Heap-Daten müssen nicht DRAM sein. Kleine MCUs nutzen häufig nur SRAM. Die Vergleichstabelle fasst die Zellkompromisse. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Vergleich: SRAM vs. DRAM
@@ -975,7 +985,7 @@ Große SoCs (z. B. Linux-fähig) brauchen DRAM. Kleine Sensor-MCUs kommen oft mi
 | Kosten / Bit | hoch | niedrig |
 
 ::: notes
-Kein „besser“ oder „schlechter“ — beide sind für ihre Ebene in der Hierarchie optimiert. SRAM ist der schnelle Kurier, DRAM das Containerschiff.
+Beide sind flüchtig. SRAM nutzt im klassischen Modell sechs Transistoren und keinen Refresh, DRAM einen Transistor, einen Kondensator und Refresh. Dichte und Kosten je Bit werden nur auf vergleichbaren Ebenen gegenübergestellt. Schnell und langsam ohne Bezug sind ungenau. Ein Registerfile ist nur dann SRAM, wenn die Implementierung das so baut. Die Tabelle darf Beschriftungen nicht überlagern. Der Spickzettel wird zur Auswahlhilfe. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Spickzettel SRAM / DRAM
@@ -992,7 +1002,7 @@ Kein „besser“ oder „schlechter“ — beide sind für ihre Ebene in der Hi
 *Angaben schematisch — typische Größenordnungen.*
 
 ::: notes
-Diese Dimensionen reichen oft für Klausur und Interview: Cache vs. Hauptspeicher physikalisch begründet.
+Drei Situationen. Ein kleiner schneller Cache spricht für SRAM. Ein großer Hauptspeicher in einem PC-ähnlichen System spricht für DRAM. Eine kleine MCU mit Puffer kann bei SRAM bleiben. Die Antwort hängt von der vorhandenen Hardware ab. Flüchtig und Refresh werden kurz wiederholt. Die Fragen prüfen Physik und die Grenzen der Vereinfachung. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Fragen? — DRAM
@@ -1002,7 +1012,7 @@ Diese Dimensionen reichen oft für Klausur und Interview: Cache vs. Hauptspeiche
 - Refresh-Zyklus klar?
 
 ::: notes
-Ist verständlich, warum Refresh und Multiplexing die Pipeline verzögern können?
+Warum Refresh? Weil Leckströme den analogen Zustand ändern. Was passiert beim Charge Sharing? Die Zellladung teilt sich mit der Bitleitung, der Pegel rückt nur wenig von VDD durch 2 weg, danach wird restauriert. Warum halbiert DDR nicht die Load-Latenz? Weil zwei Transfers je Takt den Durchsatz der Datenphase erhöhen, nicht jede vorherige Phase kürzen. DRAM, DDR, WL und BL bleiben die bekannten Kürzel. Zellzustand, Row Buffer und CPU-Anfrage sind drei Ebenen. Danach folgen besondere Puffer. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Spezialspeicher im SoC
@@ -1013,7 +1023,7 @@ Ist verständlich, warum Refresh und Multiplexing die Pipeline verzögern könne
 - Lösungen: Dual-Ported RAM (DPRAM) und FIFOs
 
 ::: notes
-Manchmal müssen zwei Module gleichzeitig auf denselben Puffer zugreifen. Normales Single-Port-RAM reicht dann nicht.
+DPRAM und FIFO sind Zugriffsorganisationen, keine dritte Zellphysik. DPRAM bedeutet Dual-Port RAM, FIFO First-In First-Out. CPU und Peripherie können zwei Nutzer und zwei Takte sein. Single-Port-RAM mit Arbitration kann denselben Speicher teilen, aber nicht jeden gleichzeitigen Zugriff. Zwei Ports lösen kein Clock-Domain-Crossing. CDC bedeutet die Synchronisation zwischen Taktdomänen. Zuerst werden die zwei Schnittstellen des DPRAM erklärt. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Dual-Ported RAM (DPRAM)
@@ -1023,7 +1033,7 @@ Manchmal müssen zwei Module gleichzeitig auf denselben Puffer zugreifen. Normal
 - Die Transistorzahl hängt von der konkreten Zelltopologie ab; „8T“ ist keine allgemeine Definition
 
 ::: notes
-Beschreiben Sie die Ports, nicht eine feste Transistorzahl.
+Jeder Port hat Adresse, Daten, Lese- oder Schreibsteuerung und gegebenenfalls einen Takt. Echtes Dual-Port erlaubt zwei passende Zugriffe, Simple-Dual-Port oft nur eine Schreib- und eine Leserichtung. Zwei Ports kosten zusätzliche Leitungen. Eine universelle 8T-Zelle wird nicht behauptet. Verschiedene Adressen können parallel bedient werden. Dieselbe Adresse braucht die spezifizierte Regel. Die Zeichnung zeigt beide Ports an demselben Inhalt. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## DPRAM — Schema
@@ -1031,7 +1041,7 @@ Beschreiben Sie die Ports, nicht eine feste Transistorzahl.
 ![Port A und Port B jeweils mit Adresse, Daten und Steuerung.](../assets/figures/01_speicherphysik/dpram.png)
 
 ::: notes
-Die Leitungen sind beschriftet. Ein einzelner Kasten ohne Ports würde die Lernfrage nicht beantworten.
+Port A und Port B haben eigene Adress-, Daten- und Steuerpfade und denselben Speicherinhalt. Wenn das Modell synchron ist, gibt es einen gemeinsamen Takt. Wenn es unabhängig getaktet ist, hat jeder Port seinen Takt. Ein zulässiges Beispiel benutzt verschiedene Adressen. Die Kollision derselben Adresse folgt danach. Die Leitungen sind der Datenfluss, nicht nur eine Beschriftungsübung. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Kollisionsvermeidung im DPRAM
@@ -1041,7 +1051,7 @@ Die Leitungen sind beschriftet. Ein einzelner Kasten ohne Ports würde die Lernf
 - Ein Busy-Flag oder Stall ist eine mögliche, keine universelle Lösung
 
 ::: notes
-Die DPRAM-Abbildung gilt für beide Fälle. Kollisionsverhalten steht im Datenblatt der Zelle, nicht in einer allgemeinen Regel.
+Read gegen Read kann spezifiziert harmlos sein. Read gegen Write und Write gegen Write auf derselben Adresse sind konflikthaft. Gleiche und verschiedene Taktdomänen unterscheiden sich. Ohne konkreten Baustein bleibt das Ergebnis alt, neu oder ungültig eine Datenblattfrage. Ein Busy- oder Stall-Signal ist eine mögliche Schutzstrategie, keine automatische Eigenschaft. Arbitration vergibt den Zugriff. Eine FIFO vermeidet beliebige Nutzeradressen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## FIFO-Puffer
@@ -1051,7 +1061,7 @@ Die DPRAM-Abbildung gilt für beide Fälle. Kollisionsverhalten steht im Datenbl
 - Hardware: SRAM mit Write-/Read-Pointer (Ringpuffer)
 
 ::: notes
-FIFO ist die übliche Warteschlange in *einem* Taktbereich. Zwischen zwei Takten braucht es eine asynchrone FIFO mit Synchronisation, nicht nur den Ring.
+FIFO bedeutet First-In First-Out. Push oder Enqueue legt hinten ab, Pop oder Dequeue nimmt vorn weg. Die Hardware kann aus Registern oder RAM bestehen. Der Write-Pointer zeigt im Lehrbeispiel auf den nächsten freien Platz, der Read-Pointer auf den nächsten lesbaren Eintrag. Empty ist count gleich 0, Full ist count gleich 8 bei acht Plätzen. Überlauf und Unterlauf müssen behandelt werden. Das Modell hat einen gemeinsamen Takt. Eine asynchrone FIFO braucht ein anderes Statuskonzept. Die Schrittfolge zeigt Wraparound. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## FIFO — Schema
@@ -1059,17 +1069,17 @@ FIFO ist die übliche Warteschlange in *einem* Taktbereich. Zwischen zwei Takten
 ![Ring mit Write- und Read-Pointer, belegten Einträgen, Wraparound. Empty und Full als Zählerkonvention.](../assets/figures/01_speicherphysik/fifo-ring.png)
 
 ::: notes
-Ein gewöhnlicher Ringpuffer sitzt in einem Taktbereich. Eine asynchrone FIFO zwischen zwei Takten braucht zusätzliche Synchronisation; der Ring allein löst Clock-Domain-Crossing nicht.
+Acht Plätze, der Ring springt von 7 nach 0. Drei Pushes füllen drei Einträge, ein Pop nimmt den ältesten weg. Gleiche Pointer können leer oder voll bedeuten. In diesem synchronen Modell entscheidet der Zähler. Eine asynchrone Skizze trennt Schreib- und Lesetakt und synchronisiert den Status. Gray-Code für Pointer ist ein verbreitetes Verfahren, kein gemeinsamer atomarer Zähler zwischen den Takten. Solche Puffer entlasten die CPU bei Peripheriedaten. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Hardware-FIFOs für I/O
 
 - Übliche UART: ohne FIFO ein Interrupt pro empfangenem Zeichen, nicht pro Bit
-- Mit FIFO: die CPU wird erst am Watermark geweckt
+- Ein Watermark ist eine mögliche Schwelle, keine universelle UART-Regel. Weniger Bytes als die Schwelle brauchen Timeout, Idle oder Polling
 - Stehen Sender und Empfänger in verschiedenen Takten, ist die FIFO asynchron und braucht Synchronisationslogik
 
 ::: notes
-Das Watermark steht in der Ringpuffer-Abbildung als Idee: nicht jedes Byte unterbricht. Bit-Interrupts wären ein unübliches Bit-Banging, keine Hardware-UART.
+UART bedeutet Universal Asynchronous Receiver/Transmitter, I/O Input/Output. Eine Hardware-UART sammelt Bits zu Zeichen. Ein Interrupt je Bit ist nicht die übliche UART. Mit FIFO sind Schwellen, Timeout oder DMA möglich, je nach Baustein. Watermark ist eine programmierbare Füllstandsschwelle. Drei Bytes bei Schwelle vier brauchen eine Restdatenstrategie, sonst bleiben sie liegen. Unterschiedliche Takte brauchen CDC. Die Baudrate allein beweist den FIFO-Aufbau nicht. Software sieht das über Adressen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Brückenschlag zur Software
@@ -1079,7 +1089,7 @@ Das Watermark steht in der Ringpuffer-Abbildung als Idee: nicht jedes Byte unter
 - Beispiel: Pointer auf Flash vs. Pointer auf SRAM/DRAM
 
 ::: notes
-Memory-Mapping verbindet C-Pointer mit der Physik. Der Compiler kennt Transistoren nicht — der Decoder schon.
+Die CPU sieht einen Zeiger und eine Zahl. Im gewählten RV32-Lehrbild ist der Adressraum 32 Bit. Das ist kein Gesetz jeder CPU. Der Decoder wählt anhand der Bits Flash, SRAM oder ein Gerät. Er kennt keine Kondensatoren. Normale Speicherbereiche und MMIO unterscheiden sich, weil MMIO Seiteneffekte haben kann. Der Pointertyp garantiert nicht das Medium. Die Memory Map verbindet die C-Objekte mit den Bereichen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Memory Map eines Mikrocontrollers
@@ -1095,7 +1105,7 @@ uint32_t buffer[16];
 ![C-Objekte, ELF-Sections, Flash-LMA und RAM-VMA. Startup kopiert .data und nullt .bss.](../assets/figures/01_speicherphysik/memory-map.png)
 
 ::: notes
-table liegt in .rodata im Flash. counter hat ein Initialbild im Flash (LMA) und die Laufzeitvariable im RAM (VMA). buffer liegt nur im RAM. Heap wächst im Beispiel nach oben, der Stack nach unten — das ist eine Konvention, kein Standard der ISA.
+Das Beispiel enthält static const uint32_t table[], uint32_t counter gleich 3 und buffer mit 16 Einträgen. Typisch liegt table in .rodata, counter in .data mit Initialbild im Flash und Laufzeitadresse im RAM, buffer in .bss. Unbenutzte Objekte können verschwinden. ELF ist das Dateiformat, eine Section ein Abschnitt, VMA die Laufzeitadresse und LMA die Adresse des Initialbilds. Nach Reset kopiert Startup .data und nullt .bss, dann kommt main. Stack nach unten und Heap nach oben sind eine Konvention. Das Linker-Skript legt die Zuordnung fest. Der C-Ausschnitt ist Lehrcode und nicht kompiliert. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Das Linker-Skript
@@ -1115,6 +1125,7 @@ SECTIONS {
     *(.data*)
     _data_end = .;
   } > RAM AT> FLASH
+  _data_load = LOADADDR(.data);
   .bss : {
     _bss_start = .;
     *(.bss*)
@@ -1123,10 +1134,10 @@ SECTIONS {
 }
 ```
 
-Startup kopiert `_data_start` aus der LMA im Flash und setzt `.bss` auf 0. Die Adressen sind Platzhalter, kein STM32- und kein SiFive-Layout.
+Startup kopiert von `_data_load` nach `_data_start` und setzt `.bss` auf 0. Das Skript selbst führt die Kopie nicht aus. Die Adressen sind Platzhalter. Lehrcode, nicht gelinkt.
 
 ::: notes
-`> RAM AT> FLASH` trennt VMA und LMA von `.data`. `.bss` hat kein Initialbild im Flash. Quelle der Begriffe: GNU ld, Basic Script Concepts.
+GNU ld ist der Linker. MEMORY nennt ORIGIN und LENGTH. SECTIONS legt .text, .rodata, .data und .bss ab. FLASH beginnt im Beispiel bei 0x00000000 mit 256 KiB, RAM bei 0x10000000 mit 64 KiB. Das sind Annahmen. _data_load gleich LOADADDR von .data ist die Flash-Quelle. _data_start und _data_end sind das RAM-Ziel. .bss hat RAM-Bedarf und im üblichen Bare-Metal-Modell kein Nullbild im Flash. Größer-RAM AT größer-FLASH beschreibt VMA und LMA und kopiert nichts. Der Ausschnitt ist didaktisch und Lehrcode. Reset, Stack und RISC-V-.sdata fehlen. Eine ELF- oder Map-Datei wurde nicht erzeugt, weil keine RISC-V-Toolchain verfügbar war. Ein späteres Labor könnte die Zuordnung prüfen. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Ausblick Labor (Renode)
@@ -1139,7 +1150,7 @@ Geplantes Laborziel (Details folgen mit dem Übungsblatt):
 - Speicherinhalte beobachten
 
 ::: notes
-Sobald das Übungsblatt steht, verifizieren Sie die Konzepte im Simulator — nicht nur „Kompilieren und hoffen“.
+Ein späteres Labor könnte mit einer dann vorhandenen RISC-V-Toolchain und Renode übersetzen, die Map ansehen und Speicher beobachten. Das wurde nicht durchgeführt. Renode, ELF, .repl und die Linker-Map wurden oben benannt. LoadELF kann Segmente laden und ist nicht dasselbe wie ausgeführter Startup. Ein vom Modell genullter RAM beweist die .bss-Schleife nicht. Zelllatenz und Refresh werden am funktionalen Modell nicht gemessen. Die Abschlussfolie verbindet die Teilkonzepte. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 
 ## Zusammenfassung Block 1
@@ -1151,6 +1162,6 @@ Sobald das Übungsblatt steht, verifizieren Sie die Konzepte im Simulator — ni
 - Linker-Skript verteilt Software auf physische Zonen
 
 ::: notes
-Damit ist Block 1 geschlossen. In Block 2 (Vorlesung 2) sehen wir, wie Caches die DRAM-Latenz verbergen. Vielen Dank für Ihre Aufmerksamkeit.
+Unterschiedliche Zellen bedienen unterschiedliche Anforderungen. Flash hält Daten ohne Versorgung und macht Updates teuer. SRAM hält Spannungen durch zwei Inverter und bleibt flüchtig. DRAM hält Ladung und braucht Refresh. Software legt Objekte in Sections, der Linker beschreibt Adressen, Startup kopiert und nullt. Drei Selbstfragen: Ist SRAM nichtflüchtig? Nein. Macht DDR jede Latenz halb so lang? Nein. Führt der Linker die .data-Kopie aus? Nein. Vorlesung 2 fragt, wie ein Cache Lokalität nutzt. Er beseitigt nicht jede DRAM-Latenz. Die neuen C- und Assemblerausschnitte dieser Vorlesung sind Lehrcode. Toolchain, Renode und TFLM wurden nicht ausgeführt. Halten Sie drei Ebenen auseinander: die Zelle oder das Bauelement, die Schnittstelle aus Adresse, Takt und Kommando, und die Softwareabbildung in C oder im Linker. Eine Zahl gilt nur mit ihrer Einheit und der genannten Annahme. Sie ist keine Messung und kein Laufzeitergebnis. Steht Code auf der Folie, ist er Lehrcode. Eine RISC-V-Toolchain, Renode und TFLM waren nicht verfügbar, deshalb wurde er nicht übersetzt und nicht ausgeführt. Prüfen Sie danach die offene Frage des Übergangs, bevor Sie die nächste Folie nur als Wiederholung lesen.
 :::
 

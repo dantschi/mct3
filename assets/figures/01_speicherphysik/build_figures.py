@@ -577,6 +577,47 @@ def fig_memmap():
     p.append(txt(16, 430, "static const uint32_t table[]={1,2};  uint32_t counter=3;  uint32_t buffer[16];", 16))
     save("memory-map.svg", p)
 
+def fig_ff():
+    p = svg_open(1100, 280)
+    p.append(txt(16, 24, "Positiv flankengesteuert. Master bei CLK=0 offen, Slave bei CLK=1.", 16))
+    labels = ["CLK", "Master", "Slave", "D", "Q"]
+    waves = [
+        [0,0,1,1,0,0,1,1],
+        [1,1,0,0,1,1,0,0],
+        [0,0,1,1,0,0,1,1],
+        [0,1,1,0,0,1,1,0],
+        [0,0,1,1,1,1,0,0],
+    ]
+    for i, (name, bits) in enumerate(zip(labels, waves)):
+        y = 50 + i * 42
+        p.append(txt(16, y + 16, name, 14, CTRL if i < 3 else DATA))
+        x = 120
+        for b in bits:
+            yy = y if b else y + 18
+            p.append(f'<line x1="{x}" y1="{yy}" x2="{x+70}" y2="{yy}" stroke="{INK}" stroke-width="2"/>')
+            x += 70
+    p.append(txt(16, 268, "Schematisch. Q uebernimmt D an der steigenden Flanke, nicht waehrend beide offen sind.", 14, MUTED, weight="400"))
+    save("ff-timing.svg", p)
+
+def fig_hold():
+    p = svg_open(900, 320)
+    p.append(txt(16, 24, "Hold: WL = 0. Zugriffstransistoren sperren. Q = 1, Qb = 0.", 16))
+    p.append(txt(16, 70, "Zwei CMOS-Inverter: vier Transistoren. Zwei Access-Transistoren. Zusammen 6T.", 16))
+    p.append(txt(16, 110, "Kreuzkopplung haelt die Spannungen. Kein dauerhafter VDD-GND-Pfad im Idealmodell.", 16))
+    p.append(txt(16, 150, "Reale Leckstroeme bleiben. Der Zustand ist ohne Refresh stabil, solange VDD anliegt.", 16))
+    p.append(txt(16, 200, "BL und BLb sind getrennt. WL steuert beide Access-Transistoren gemeinsam.", 16, CTRL))
+    p.append(txt(16, 260, "Gleiche Geometrie wie Lesen und Schreiben. Nur die Steuersignale aendern sich.", 14, MUTED, weight="400"))
+    save("sram-hold.svg", p)
+
+def fig_cells():
+    p = svg_open(1000, 220)
+    p.append(txt(16, 24, "1 MiB = 8388608 Bit. Nur Zellbauelemente, keine Flaeche und keine Kosten.", 16))
+    p.append(txt(16, 70, "20T-Vergleich: 167772160 Transistoren", 18, CTRL))
+    p.append(txt(16, 110, "6T-SRAM: 50331648 Transistoren", 18, DATA))
+    p.append(txt(16, 150, "1T1C: 8388608 Transistoren und 8388608 Kondensatoren", 18, STATE))
+    p.append(txt(16, 200, "Peripherie, Leitungen und ECC fehlen. 20T ist eine Lehrannahme.", 14, MUTED, weight="400"))
+    save("cell-count.svg", p)
+
 if __name__ == "__main__":
     fig_6t_states()
     fig_sram_read()
@@ -599,3 +640,6 @@ if __name__ == "__main__":
     fig_fifo()
     fig_floorplan()
     fig_memmap()
+    fig_ff()
+    fig_hold()
+    fig_cells()
