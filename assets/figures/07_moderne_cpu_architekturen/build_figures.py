@@ -67,7 +67,7 @@ def fig_a():
             if cyc < 9:
                 cell(p, x0 + cyc * bw + 2, y0 + i * bh + 2, bw - 6, bh - 6, name, C[i], 11)
     p.append(T(16, 250, "Stationaer ab Takt 5: ein WB je Takt. Davor Fuellung, danach Leerung.", 15))
-    p.append(T(16, 278, "Ein RAW-Stall ohne Forwarding zwischen I1 und I2: +1 Takt, 10 Takte, CPI = 2,0.", 15, ERR))
+    p.append(T(16, 278, "ALU-RAW ohne Forwarding, WB und ID im selben Takt: +2 Takte, 11 Takte, CPI = 2,2.", 15, ERR))
     p.append(T(16, 310, "IPC = retired ISA-Befehle / Takte des Fensters = 5/9. Nicht aus einem einzelnen WB schliessen.", 14))
     p.append(T(16, 342, "CPI = 1/IPC nur fuer denselben Zeitraum und dieselbe Zaehlbasis.", 14, MUTED, "400"))
     p.append(T(16, 374, "T = N * CPI / f gilt bei konstanter Frequenz. Ein Compiler kann N aendern.", 14, MUTED, "400"))
@@ -162,26 +162,26 @@ def fig_d():
 def fig_e():
     p = svg(1280, 520)
     p.append(T(16, 20, "Gleiches Programm, gleiche Latenzen. In-Order stoppt hier global hinter dem Load.", 15))
-    p.append(T(16, 42, "I1 lw Miss, Daten in Takt 4 bereit, Nutzer fruehestens Takt 5. ALU-Latenz 1. Retire-Breite OoO: 2.", 13, MUTED, "400"))
-    p.append(T(16, 70, "In-Order, Issue 1. 7 Takte, 4 Retires, IPC = 4/7 ca. 0,57.", 15, C[0]))
+    p.append(T(16, 42, "Issue-Breite 1, eine ALU, eine LSU, Retire-Breite 2. Load-Ende Takt 4, Nutzer ab Takt 5.", 13, MUTED, "400"))
+    p.append(T(16, 70, "In-Order: 8 Takte, IPC = 4/8 = 0,5.", 15, C[0]))
     rows = [
-        ("I1 lw", ["iss", "", "", "ret", "", "", ""]),
-        ("I2 add", ["", "", "", "", "iss/ret", "", ""]),
-        ("I3 sub", ["", "", "", "", "", "iss/ret", ""]),
-        ("I4 and", ["", "", "", "", "", "", "iss/ret"]),
+        ("I1 lw", ["iss", "", "", "cpl", "ret", "", "", ""]),
+        ("I2 add", ["", "", "", "", "iss", "ret", "", ""]),
+        ("I3 sub", ["", "", "", "", "", "iss", "ret", ""]),
+        ("I4 and", ["", "", "", "", "", "", "iss", "ret"]),
     ]
-    draw_grid(p, rows, 96, C[0])
-    p.append(T(16, 250, "OoO, Issue 2, zwei ALU, eine LSU. 6 Takte, IPC = 4/6 ca. 0,67.", 15, C[1]))
+    draw_grid(p, rows, 96, C[0], cycles=8)
+    p.append(T(16, 250, "OoO, gleiche Breite: 7 Takte, IPC = 4/7 ca. 0,57.", 15, C[1]))
     rows2 = [
-        ("I1 lw", ["iss", "wait", "wait", "cpl/ret", "", ""]),
-        ("I2 add", ["raw", "raw", "raw", "raw", "iss/ret", ""]),
-        ("I3 sub", ["iss/cpl", "fertig", "fertig", "wartet", "ret", ""]),
-        ("I4 and", ["", "iss/cpl", "fertig", "wartet", "wartet", "ret"]),
+        ("I1 lw", ["iss", "", "", "cpl", "ret", "", ""]),
+        ("I3 sub", ["", "iss", "", "", "", "ret", ""]),
+        ("I4 and", ["", "", "iss", "", "", "", "ret"]),
+        ("I2 add", ["", "", "", "", "iss", "ret", ""]),
     ]
-    draw_grid(p, rows2, 276, C[1], cycles=6)
-    p.append(T(16, 430, "I3 und I4 sind frueh fertig, duerfen vor I1 nicht retiren. Der Miss wird ueberlappt, nicht geloescht.", 14, ERR))
-    p.append(T(16, 456, "Takt 3: beide ALU ungenutzt. Ein voller ROB wuerde spaeter auch unabhaengige Arbeit stoppen.", 14))
-    p.append(T(16, 484, "Werte: mem=10, t2=1, t4=8, t5=3, t7=15, t8=3. Ergebnisse t0=10, t1=11, t3=5, t6=3.", 13, MUTED, "400"))
+    draw_grid(p, rows2, 276, C[1], cycles=7)
+    p.append(T(16, 430, "I3 und I4 sind frueh fertig. Retire bleibt in Programmreihenfolge.", 14, ERR))
+    p.append(T(16, 456, "Takt 4 hat kein Issue. Der Miss wird ueberlappt, nicht geloescht.", 14))
+    p.append(T(16, 484, "Werte: mem=10, t2=1, t4=8, t5=3, a0=15, a1=3. Ergebnisse t0=10, t1=11, t3=5, t6=3.", 13, MUTED, "400"))
     p.append(T(16, 508, "Dieses In-Order-Stauverhalten ist die Lehrannahme, nicht jeder reale In-Order-Kern.", 13, MUTED, "400"))
     save("ooo.svg", p)
 
@@ -206,7 +206,7 @@ def draw_grid(p, rows, y, col, cycles=7):
 def fig_f():
     p = svg(1200, 460)
     p.append(T(16, 20, "PRF-Modell. Map-Update beim Rename ist nicht der Commit. x0 bekommt kein Ziel.", 15))
-    p.append(T(16, 42, "Startmap: t0=P0 t1=P1=4 t2=P2=1 t3=P3 t4=P4=2 t5=P5=9 t6=P6=1. Frei: P10, P11, P13.", 13, MUTED, "400"))
+    p.append(T(16, 42, "Start: x0=P0, t0=P7. Frei mindestens P10 bis P14, Reihenfolge P10, P13, P11, P14, P12.", 13, MUTED, "400"))
     headers = ["Instr", "log. Q", "phys. Q", "neues Ziel", "Map danach", "Wert"]
     xs = [16, 200, 340, 500, 680, 900]
     for x, h in zip(xs, headers):
