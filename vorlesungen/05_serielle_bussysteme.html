@@ -228,7 +228,7 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 <li>Ziel: komplexe Daten mit externen Chips austauschen (Text, Messwerte, Konfiguration)</li>
 </ul>
 <aside class="notes">
-<p>Herzlich willkommen zurück! Speicher, Interrupts und Timer beherrschen Sie bereits. Moderne Systeme brauchen aber Sensoren, Displays und WLAN-Module. Wie transportieren wir Bits sicher über Kupferbahnen außerhalb des SoCs? Das ist das Thema heute.</p>
+<p>Willkommen zu Block 5 knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Ein Messwert braucht Bitfolge, Zeitraster und Bedeutung. PWM aus Block 4 kann Energie oder, beim Servo, Information tragen. HIGH allein überträgt keinen 16-Bit-Wert. Willkommen zur fünften Vorlesung in Mikrocomputertechnik 3. Bisher: Programmierung und Hardware weitgehend <em>innerhalb</em> des Chips. Verständnischeck: Reicht ein HIGH-Pegel für 16 Bit? Nein. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -260,7 +260,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>Von interner Steuerung zu On-Board-Kommunikation mit „smarten“ Peripheriebausteinen.</p>
+<p>Einordnung im Semester knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. CPU ist der Prozessor, RAM der Arbeitsspeicher, GPIO ein digitaler Pin. Interne Daten, Aktorik und Protokolle sind drei Schichten. Smart heißt hier eigene Register, nicht künstliche Intelligenz. On-Board ist kein Internet. Verständnischeck: Was kommt zum GPIO-Kommando hinzu? Vereinbarte Bits, Phasen und die Bedeutung von Adresse und Abschluss. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -277,17 +277,16 @@ flowchart LR
 <h2>Anknüpfung: PWM und Watchdog</h2>
 <p>Kurz-Recap aus Block 4 (Vertiefung im Übungsblatt):</p>
 <ul>
-<li>Hardware-PWM: ARR → Frequenz, CCR → Duty Cycle</li>
-<li>Signal läuft jitterarm in der Peripherie, CPU orchestriert</li>
-<li>Watchdog: Freeze erkennen, harter Reset als Selbsthilfe</li>
-<li>Leitprinzip: harte Pin-Arbeit in Hardware, nicht per Bit-Banging</li>
+<li>PWM-Frequenz folgt aus Timer-Takt, PSC, ARR und Zählmodus</li>
+<li>CCR setzt im Kernmodell den aktiven Anteil</li>
+<li>Feed nur nach frischer, plausibler Arbeit und fälligem Service</li>
+<li>Ein Reset schaltet einen extern versorgten Aktor nicht automatisch ab</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb1-1"><a aria-label="1"></a><span class="dt">void</span> main_loop<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb1-2"><a aria-label="2"></a>    fade_led<span class="op">();</span></span>
-<span id="cb1-3"><a aria-label="3"></a>    wdt_feed<span class="op">();</span></span>
-<span id="cb1-4"><a aria-label="4"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb1-1"><a aria-label="1"></a><span class="co">/* Lehrcode. Kein bedingungsloses Füttern. */</span></span>
+<span id="cb1-2"><a aria-label="2"></a><span class="cf">if</span> <span class="op">(</span>service_due <span class="op">&amp;&amp;</span> work_fresh_and_plausible<span class="op">())</span></span>
+<span id="cb1-3"><a aria-label="3"></a>    wdt_feed<span class="op">();</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Behalten Sie bei: Die CPU orchestriert; Echtzeit-Pinarbeit gehört in dedizierte Module. Heute gilt dasselbe für Kommunikations-Hardware (UART/SPI/I2C-Controller).</p>
+<p>Anknüpfung: PWM und Watchdog knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. ARR bestimmt die PWM-Frequenz nur mit Timer-Takt, PSC und Zählmodus. CCR setzt den aktiven Anteil. WDT ist der Watchdog. Feed nur nach frischer plausibler Arbeit. Ein Reset schaltet einen externen Aktor nicht automatisch ab. Der UART-Controller erzeugt und erkennt Bitzeiten. PWM-Frequenz folgt aus Timer-Takt, PSC, ARR und Zählmodus. CCR setzt im Kernmodell den aktiven Anteil. Verständnischeck: Was übernimmt der UART für die CPU? Framephasen und Bitzeiten, nicht die Bedeutung der Nutzdaten. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -311,7 +310,7 @@ flowchart LR
 <li>Wir brauchen ein physikalisches und zeitliches Regelwerk — ein Protokoll</li>
 </ul>
 <aside class="notes">
-<p>Innerhalb der CPU verschieben wir Worte über breite interne Busse. Zwischen zwei Chips zählen Laufzeiten, Störungen und gemeinsame Regeln.</p>
+<p>Die SoC-Grenze knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. IMU heißt inertiale Messeinheit. Hier werden nur die drei Beschleunigungsachsen gelesen, als 16-Bit-Zweierkomplement. ALU ist das Rechenwerk. 0x3B ist der Beginn der Rohwerte, kein Neigungswinkel. Die Bits laufen über Schnittstelle, Leitung und Controller. Beispiel: digitaler Beschleunigungssensor (IMU) auf der Platine. Der Sensor speichert Beschleunigungsrohwerte (X, Y, Z), hier als 16-Bit-Zweierkomplement. Verständnischeck: Enthält 0x3B einen Winkel? Im Beispiel nein. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -348,7 +347,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>Schematisch: zwei getrennte Silizium-Bausteine, verbunden über die Platine.</p>
+<p>SoC und Sensor — Schema knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. MMIO ist speicherabgebildete Peripherie. 0x3B ist der Sensorregisterzeiger, 0x68 die 7-Bit-Geräteadresse, die SoC-Adresse des Controllers ist ein dritter Zahlenraum. Ein Load liest 0x68 nicht direkt. GND ist der elektrische Bezug. Verständnischeck: Liest die CPU 0x68 mit einem gewöhnlichen Load? Nein, die Adresse ist Teil der I²C-Transaktion. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -374,7 +373,7 @@ flowchart LR
 <li>Bits nacheinander — mehr Takte, weniger Pins</li>
 </ul>
 <aside class="notes">
-<p>Intuitiv wirkt parallel schneller. Extern haben sich dennoch serielle Standards durchgesetzt (USB, PCIe, On-Board-Busse). Warum?</p>
+<p>Parallel vs.&nbsp;seriell knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Acht parallele Datenbits können in einem Transferfenster liegen. Ein Einbitpfad braucht acht Bitzeiten plus Protokoll. Das ist kein allgemeines Geschwindigkeitsgesetz. USB und PCIe haben weitere Modelle. Viele Leitungen (z. B. 32) — ein Wort in einem Takt. So arbeiten typische interne CPU–RAM-Pfade. Verständnischeck: Wie viele Bitzeiten braucht ein Byte seriell ohne Overhead? Acht. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -406,7 +405,7 @@ flowchart TD
 </div>
 </div>
 <aside class="notes">
-<p>Parallel: Breite. Seriell: Sequenz auf wenigen Leitungen.</p>
+<p>Parallel vs.&nbsp;seriell — Schema knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Links acht Leitungen und ein gültiges Fenster, rechts eine Leitung und acht Intervalle. Eine Takt- oder Referenzleitung kann zusätzlich nötig sein. Seriell spart Datenpins und kostet aufeinanderfolgende Bitzeiten. Laufzeit ist ausgeblendet. Verständnischeck: Was spart die serielle Variante? Datenpins. Sie braucht mehr Bitzeiten bei gleicher Symbolrate. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -430,7 +429,7 @@ flowchart TD
 <li>Mehrere serielle Lanes (USB, PCIe) sind ein anderes Modell als UART/SPI/I2C</li>
 </ul>
 <aside class="notes">
-<p>Bei hohen Frequenzen wirken parallele Bahnen problematisch (Störung, Laufzeitunterschiede). Seriell braucht mehr Takte, erlaubt aber oft höhere Bitraten am Ende.</p>
+<p>Warum sich Seriell durchgesetzt hat knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Crosstalk ist Einkopplung, Skew unterschiedlicher Ankunftszeitpunkt. Ein gemeinsames Abtastfenster ist die Grenze, nicht das Scheitern jeder Parallelleitung. Eine hohe Symbolrate ist keine Nutzdatenrate. Eine Lane ist ein serieller Pfad. USB und PCIe sind andere Modelle. Kosten und Platz: wenige Pins am Gehäuse sind günstiger. Crosstalk: viele parallele Bahnen stören sich gegenseitig. Verständnischeck: Warum reicht die Symbolrate nicht? Kodierung, Framing, Pausen und Lanes zählen mit. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -473,7 +472,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>UART-, SPI- und I2C-Controller basieren im Kern auf solchen Schieberegistern — parallel rein, seriell raus und umgekehrt.</p>
+<p>Das Schieberegister knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. MSB ist das höchstwertige, LSB das niederwertigste Bit. 0x53 ist binär 0101 0011. UART sendet LSB zuerst: 1, 1, 0, 0, 1, 0, 1, 0. Ein Rechts-Schiebe-Modell mit Nullen ergibt nach zwei Schritten 0x14. Der Empfänger legt d_i auf Bit i. Das ist ein Lehrschieber, keine UART-Innenschaltung. Wandlung: parallele CPU-Daten → serieller Bitstrom. Kern: Schieberegister (Kette von D-Flip-Flops, MCT1). Verständnischeck: Warum beginnt die Leitung mit 1, obwohl links 0 steht? Auf Papier steht b7 links, gesendet wird b0. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -499,7 +498,7 @@ flowchart LR
 <li>Beide Seiten brauchen vereinbarte Bitzeiten (Baudrate)</li>
 </ul>
 <aside class="notes">
-<p>Ohne Takt: Wie unterscheiden Sie drei Nullen von einer langen Null? Synchron: der Sender gibt den Schlag vor. Asynchron: gemeinsame „Stoppuhren“.</p>
+<p>Synchron vs.&nbsp;asynchron knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Synchron heißt gemeinsamer Takt, hier oft eine eigene SCK-Leitung. UART ist asynchron ohne Clock-Draht, aber mit vereinbarter Bitdauer. Drei Nullen bleiben durch das Raster unterscheidbar. Der gemeinsame Takt beseitigt keine Laufzeit. Eigene Taktleitung (Clock, z. B. SCK). Empfänger tastet bei klaren Taktflanken ab — robust und schnell. Verständnischeck: Erkennt der Empfänger drei Nullen ohne Zwischenflanke? Ja, mit Raster und Framebeginn. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -537,7 +536,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>Wahlkriterium: Bandbreite vs.&nbsp;Pinzahl. Gelegentliche Sensorwerte → Half-Duplex oft genug; hohe Last → Full-Duplex.</p>
+<p>Simplex, Half-Duplex, Full-Duplex knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Simplex ist eine Nutzdatenrichtung, Half-Duplex beide nacheinander, Full-Duplex gleichzeitig. GPS ist hier nur ein Ausgabekanal. Eine SDA-Leitung mit abwechselndem Write und Read ist Half-Duplex. Simplex: nur eine Richtung (z. B. GPS sendet Positionen). Half-Duplex: beide Richtungen, aber nicht gleichzeitig (ein Medium). Verständnischeck: Ist eine SDA-Leitung Full-Duplex? Nein. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -559,7 +558,7 @@ flowchart LR
 <li>Wie teilen sich viele Geräte wenige Pins, ohne Chaos und Kurzschluss?</li>
 </ul>
 <aside class="notes">
-<p>Netzwerk auf der Platine: Wer spricht wann? Wie vermeiden wir gleichzeitiges Treiben derselben Leitung?</p>
+<p>Die Leitfrage des Tages knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Drei Sensoren brauchen entweder weitere Punktverbindungen oder eine Auswahlregel. Zwei gegensätzliche Push-Pull-Treiber können einen elektrischen Konflikt erzeugen. Open-Drain funktioniert anders. Pins, Geschwindigkeit und Adressen zählen zusammen. Punkt-zu-Punkt ist einfach. Moderne Platinen: viele Sensoren/Chips an einer CPU. Verständnischeck: Welche zwei Regeln braucht eine geteilte Leitung? Wer sprechen darf und wie der Pegel entsteht. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -592,7 +591,7 @@ flowchart TD
 </div>
 </div>
 <aside class="notes">
-<p>Viele Teilnehmer, wenige Pins — das treibt UART vs.&nbsp;SPI vs.&nbsp;I2C.</p>
+<p>Leitfrage — Schema knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Die Pfeile zeigen Kommunikationsbedarf, keine Kabel. UART bleibt typischerweise ein Direktlink, SPI teilt Leitungen mit eigener CS, I²C teilt SDA und SCL. Dieselbe Sternzeichnung ist kein gemeinsamer Busplan. Verständnischeck: Warum kein I²C-Kabelplan? Pull-ups und die gemeinsamen Netze fehlen. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -656,7 +655,7 @@ flowchart TD
 </tbody>
 </table>
 <aside class="notes">
-<p>Alle drei finden Sie in typischen MCU-Datenblättern. Heute: wann welches Protokoll — Start mit UART.</p>
+<p>Agenda: Die „Big 3“ knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. UART im Voll-Duplex-Grundmodell: TX und RX. SPI für ein Target: SCK, MOSI, MISO, CS. Drei Targets: drei gemeinsame Signale plus drei CS, also sechs Pins, plus Bezug. I²C: SDA und SCL. GND und Versorgung zählen extra. 100 und 400 kHz sind der Fokus, nicht die Obergrenze. Verständnischeck: Wie viele Signalpins bei drei SPI-Targets? Sechs plus elektrischer Bezug. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -679,7 +678,7 @@ flowchart TD
 <li>Single-Ended vs.&nbsp;differenziell und EMI-Grundlagen einordnen</li>
 </ul>
 <aside class="notes">
-<p>Harris &amp; Harris sowie Datenblatt-Kapitel zu Serial I/O — Protokollwahl ist Systemdesign.</p>
+<p>Lernziele Block 5 knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Prüfbar sind UART-Dekodierung, SPI-Flanken, ein I²C-Read mit Rollen und elektrische Grenzen. CPOL ist die Idle-Polarität, CPHA die Abtastphase. ACK bestätigt, NACK lehnt ab oder beendet. EMI ist elektromagnetische Störung. Harris ergänzt, ersetzt die Erklärung nicht. UART, SPI und I2C nach Pins, Takt und Topologie einordnen. UART-Frame (Start/Stop/Parity) und Baudrate erklären. Verständnischeck: Was ist prüfbar? Start, Datenreihenfolge, Stop und Bytewert einer Zeitlinie benennen. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -703,7 +702,7 @@ flowchart TD
 <li>Heute oft: Debug/<code>printf</code> über einen Pegelwandler oder USB-UART</li>
 </ul>
 <aside class="notes">
-<p>Mindestens ein UART-Controller ist in MCUs üblich. Terminal-Ausgabe läuft typischerweise über UART-Hardware.</p>
+<p>Was ist UART knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. UART heißt Universal Asynchronous Receiver/Transmitter. Das Frameformat ist nicht der elektrische Standard. 3,3-V-Pins sind kein RS-232. Ein USB-UART-Adapter ist eine Brücke, kein passives Kabel. printf braucht eine Ausgabeanbindung. Mindestens ein UART ist ein Beispiel, kein RISC-V-Zwang. UART: Universal Asynchronous Receiver-Transmitter. Eher Schnittstelle/Direktverbindung als Multi-Drop-Bus. Verständnischeck: Darf 3,3 V direkt an RS-232? Nein. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -741,7 +740,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>Einfache Verkabelung, gleichzeitiges Senden möglich — aber keine dritte Station am selben Link.</p>
+<p>Punkt-zu-Punkt knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. TX ist der Ausgang, RX der Eingang des jeweiligen Geräts. TX1 geht an RX2. Der direkte Link hat keine galvanische Trennung. RTS und CTS sind optionaler Flusskontroll-Handshake. Ein drittes Gerät braucht eine andere Topologie. Typisch genau zwei Teilnehmer. TX (Transmit) und RX (Receive). Verständnischeck: Warum TX1 an RX2? Der Ausgang muss den Eingang erreichen. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -762,7 +761,7 @@ flowchart LR
 <li>Lösung: vereinbarte Bitdauer — gleiche Baudrate auf beiden Seiten</li>
 </ul>
 <aside class="notes">
-<p>Ohne Absprache der Bitzeit liest der Empfänger Müll. Die Baudrate ist die gemeinsame Stoppuhr.</p>
+<p>Die Asynchronität knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Fünf Einsen bleiben HIGH. Nur Bitdauer und Framegrenzen bestimmen die Zahl. Falsche Baudrate erzeugt falsche Daten oder einen Framefehler, nicht bloß unspezifischen Müll. Kein Taktkabel. Problem: Ist HIGH eine Eins oder fünf Einsen hintereinander?. Verständnischeck: Sind zwei dauerhafte HIGH-Leitungen dasselbe Byte? Nein, ohne Rahmen ist der Inhalt offen. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -784,7 +783,7 @@ flowchart LR
 <li>Prescaler/Baud-Generator aus Systemtakt in C konfigurieren</li>
 </ul>
 <aside class="notes">
-<p>Sender und Empfänger müssen dieselbe Baudrate nutzen — sonst wirre Zeichen. 115200 ist heute oft Standard für Konsolen.</p>
+<p>Die Baudrate knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Bei einem Bit je Symbol sind Baud und Leitungsbitrate gleich. 115200 Baud ergeben etwa 8,681 µs je Bit. 8N1 braucht zehn Symbole, höchstens 11520 Byte/s ohne Pausen. Ein realer Teiler kann abweichen. Baud: Symbole pro Sekunde; hier typisch 1 Bit pro Symbol → bps. Klassiker: 9600 oder 115200 Baud. Verständnischeck: Warum nicht 115200 Byte/s? Zehn Symbole je Byte ergeben 11520. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -842,7 +841,7 @@ flowchart LR
 </tbody>
 </table>
 <aside class="notes">
-<p>Jedes Byte wird eingerahmt. Das Start-Bit markiert den Paketbeginn im Bitstrom.</p>
+<p>Der UART-Frame knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. 8N1: acht Datenbits, keine Parität, ein Stop. Idle HIGH, Start LOW, Daten LSB zuerst, Stop HIGH. Zehn Symbole dauern etwa 86,806 µs. Even-Parity 0 gehört zur getrennten 8E1-Variante mit elf Symbolen. Idle: Leitung typisch HIGH. Frame-Aufbau:. Verständnischeck: Wie viele Symbole hat 8E1? Elf. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -864,7 +863,7 @@ flowchart LR
 <li>Danach Abtastung im Raster von 1 Bitzeit; nach dem Frame Uhr stoppen</li>
 </ul>
 <aside class="notes">
-<p>Die fallende Flanke ist der Startschuss. Abtastung in der Bitmitte gibt dem Signal Zeit zur Stabilisierung.</p>
+<p>Das Start-Bit knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Die Startflanke setzt die Phase, nicht die Baudrate. Die Mitte von d0 liegt bei 1,5 Bitzeiten, etwa 13,021 µs. d7 bei 8,5, Stop bei 9,5. Uhr stoppen meint das Ende dieser Frameabtastung, nicht zwingend das Abschalten des Generators. Start-Bit (LOW): Synchronisations-Trigger. Fallende Flanke Idle→Start startet die Baud-Uhr des Empfängers. Verständnischeck: Wann ist die ideale Mitte des ersten Datenbits? Nach etwa 13,021 µs. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -885,7 +884,7 @@ flowchart LR
 <li>Erhöht Robustheit bei gestörten Leitungen</li>
 </ul>
 <aside class="notes">
-<p>Ein einzelner Samplepunkt wäre anfällig für Störimpulse. Oversampling mittelt/wählt Mehrheiten in der kritischen Zone.</p>
+<p>Oversampling knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. 16-fach ist eine häufige Architektur, keine Norm. Drei Samples um die Mitte können mehrheitlich entscheiden. 1, 0, 1 ergibt 1. Das mittelt nicht alle 16 Punkte und beweist keine beliebige Störfestigkeit. Empfänger tastet oft mehrfach pro Bit ab (z. B. 16×). Mehrheitsentscheid um die Bitmitte filtert kurze Spikes. Verständnischeck: Was ergibt die Mehrheit 1, 0, 1? Datenbit 1. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -907,7 +906,7 @@ flowchart LR
 <li>Nächstes Start-Bit erzeugt wieder eine klare fallende Flanke</li>
 </ul>
 <aside class="notes">
-<p>Stop-Bits sind kein Luxus: Sie begrenzen Drift-Akkumulation auf Frame-Länge und sichern die nächste Synchronisation.</p>
+<p>Clock Drift und Stop-Bit knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Das Start-Bit richtet die Phase neu aus und kalibriert die Frequenz nicht. Das Stop-Bit prüft HIGH. Ein Empfänger mit 1,02-facher Bitzeit verschiebt die Stop-Probe um 0,19 Senderbitzeiten. Daraus folgt keine universelle Prozentgrenze. LOW im Stop ist ein Framing-Fehler, getrennt von Parität. Quarze weichen ab (Temperatur, Toleranz) → Clock Drift. Lange ununterbrochene Ströme würden Abtastpunkte verschieben. Verständnischeck: Was bedeutet Stop gleich LOW? Ein Framing-Fehler. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -957,7 +956,7 @@ flowchart LR
 </tbody>
 </table>
 <aside class="notes">
-<p>Parity erkennt ungerade Bitfehler; doppelte Kipper können unbemerkt bleiben. Für hohe Sicherheit: stärkere Prüfsummen in Software.</p>
+<p>Das Parity-Bit knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. 0x53 hat vier Einsen, Even-Parity ist 0, Odd ist 1. Bei 1010 0001 sind drei Einsen, Even ist 1. Zwei gekippte Bits ändern die Parität nicht. CRC wäre eine stärkere, hier nicht ausgeführte Schicht. Optional: Even oder Odd Parity über die Datenbits. Empfänger prüft; bei Fehler oft Status/Interrupt (Framing/Parity Error). Verständnischeck: Erkennt Even zwei gekippte Bits? Nein. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1000,7 +999,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>Erinnerung Block 1: FIFOs entkoppeln. Die CPU holt Burst-weise Bytes aus MMIO, statt jedes Zeichen einzeln zu bedienen.</p>
+<p>FIFOs im UART knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. FIFO heißt First In, First Out. Bei 8N1 und 115200 Baud kommt etwa alle 86,806 µs ein Byte, höchstens 11520 Byte/s. Acht freie Plätze sind grob 694 µs Spielraum, wenn der Strom nicht pausiert. Eine Watermark löst Bedienung aus, sie ist kein abgeschlossenes Lesen. Überlauf ist kein Paritätsfehler. Bei 115200 Baud und 8N1 (10 Bit/Frame): grob alle <span class="math inline">\(\approx 87\,\mu\mathrm{s}\)</span> ein Byte. Interrupt pro Byte belastet die CPU stark. Verständnischeck: Warum ist ein voller FIFO problematisch? Das nächste Byte kann nicht mehr aufgenommen werden. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1022,7 +1021,7 @@ flowchart LR
 <li>Für Displays/Kameras/viele Sensoren meist ungeeignet</li>
 </ul>
 <aside class="notes">
-<p>UART eignet sich hervorragend für Debug und einfache Module — nicht als Hochleistungs-Netzwerkbus.</p>
+<p>Nachteile von UART knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Ein Standardframe hat keine Geräteadresse. Höhere Protokolle können trotzdem adressieren. Autobaud existiert bei manchen Controllern. 100 kByte/s passen nicht in 11,52 kByte/s Nutzdaten. Keine Geräteadressen → schlecht skalierbar (kein Multi-Drop). Baudrate muss auf beiden Seiten übereinstimmen (starr konfiguriert). Verständnischeck: Passt ein Dauerstrom von 100 kByte/s? Nein. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1072,7 +1071,7 @@ flowchart LR
 </tbody>
 </table>
 <aside class="notes">
-<p>Merksatz: UART = asynchron, 2 Leitungen, 2 Teilnehmer. Als Nächstes: synchron mit Taktleitung — SPI.</p>
+<p>Zusammenfassung UART knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Im Direktmodell: TX, RX und Bezug, keine eigene Clock, zwei Endpunkte, Framing. GPS und Bluetooth sind Beispiele mit möglichen Zusatzleitungen. 11520 Byte/s gilt nur für 115200 Baud und 8N1. Die Nutzdatenrate ist kleiner als der Baudwert, weil Start und Stop Symbole belegen. Verständnischeck: Was unterscheidet Nutzdatenrate und Baud? Start, Stop und gegebenenfalls Parität. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1094,7 +1093,7 @@ flowchart LR
 <li>Even Parity: welches Parity-Bit entsteht?</li>
 </ul>
 <aside class="notes">
-<p>Lösung: die Folge ist d0 bis d7, also 0x53 = 0101 0011. Vier Einsen, Even Parity = 0. Ein einzelner Bitfehler wäre erkennbar, zwei Bitfehler nicht sicher. Framing- und Parity-Fehler sind getrennte Statusbits.</p>
+<p>Aufgabe — UART-Frame knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Die Folge 1, 1, 0, 0, 1, 0, 1, 0 hat die Gewichte 1, 2, 16 und 64, Summe 83, also 0x53. Schriftlich ist das 0101 0011. Even-Parity wäre 0, aber nur in einer 8E1-Frage. Als MSB zuerst gelesen wäre dieselbe Folge 0xCA. Sichtbare Datenbits nach dem Start: 1, 1, 0, 0, 1, 0, 1, 0. Welche schriftliche MSB-Darstellung hat das Byte?. Verständnischeck: Was ergäbe MSB-first? 0xCA. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1116,7 +1115,7 @@ flowchart LR
 <li>Wenig Framing-Overhead: Bits folgen dem Takt</li>
 </ul>
 <aside class="notes">
-<p>Der Controller gibt den Takt vor. Die Targets folgen dem Schlag. Eine gemeinsame Taktleitung verhindert die UART-Bauddrift, nicht jede beliebig hohe Frequenz.</p>
+<p>Was ist SPI knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. SPI ist Serial Peripheral Interface, eine Familie mit gerätespezifischem Timing. Ein Bit je Takt bei 10 MHz sind nominal 10 Mbit/s je Richtung, vor Pausen und Kommandos. Full-Duplex heißt nicht, dass jedes Empfangsbyte nützlich ist. 5 MHz Datenblattgrenze verbietet 20 MHz. SPI: Serial Peripheral Interface (u. a. Motorola, 1980er). Synchron: eigene Taktleitung — kein Baudraten-Drift wie bei UART. Verständnischeck: Darf ein 5-MHz-Target mit 20 MHz laufen? Nein. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1156,7 +1155,7 @@ flowchart LR
 </tbody>
 </table>
 <aside class="notes">
-<p>Eine gemeinsame Uhr für Controller und Target. Die Uhren laufen nicht wie bei UART auseinander; das Timingbudget beider Datenblätter bleibt.</p>
+<p>Die Synchronität (SCK) knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Eine Flanke bereitet Daten vor, die andere tastet ab. Setup ist die stabile Zeit davor, Hold danach. Der gemeinsame Takt verhindert UART-Drift, nicht Laufzeit. Ein fiktives Budget: 4 ns hin, 12 ns Antwort, 4 ns zurück, 5 ns Setup. Bei 10 MHz bleiben 25 ns, bei 25 MHz fehlen 5 ns. Das sind Annahmen. Taktleitung: SCK (Serial Clock). Empfänger braucht keinen eigenen Baud-Generator. Verständnischeck: Warum kommt ein Bit zu spät? Der Weg über das Target braucht endliche Zeit. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1204,7 +1203,7 @@ flowchart LR
 </tbody>
 </table>
 <aside class="notes">
-<p>MOSI des Controllers trifft den Dateneingang des Targets. SDO und SDI gehören immer zu einem Baustein: Controller-SDO ist Target-SDI. Gleichnamig verbinden ist keine Regel.</p>
+<p>Die 4-Draht-Architektur knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. MOSI ist Controller-Ausgang, MISO Controller-Eingang. SDO und SDI sind aus Sicht des Bausteins. Target-SDO geht an MISO. CS ist oft Active-Low. Vier Signale zählen Versorgung und GND nicht mit. Verständnischeck: Wohin gehört Target-SDO? Zum Controller-Dateneingang, klassisch MISO. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1227,7 +1226,7 @@ flowchart LR
 <li>Das Target sendet nicht unaufgefordert</li>
 </ul>
 <aside class="notes">
-<p>Keine Buskollision durch unaufgefordertes Senden: der Master saugt/schiebt Daten aktiv.</p>
+<p>Controller und Target knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Der Controller erzeugt SCK und CS. Das Target treibt MISO nur im passenden Transfer. Ein separater IRQ kann Bereitschaft melden, ohne den Transfer zu starten. Zwei aktive MISO-Treiber können trotzdem kollidieren. Controller (meist die MCU): erzeugt SCK, steuert CS, startet Transfers. Target: antwortet nur, wenn selektiert und getaktet. Verständnischeck: Wie kündigt ein Sensor Daten an? Zum Beispiel über eine eigene IRQ-Leitung. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1270,7 +1269,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>SPI ist immer Tausch. Schreiben erzeugt Empfangsbytes (oft ignorieren); Lesen braucht Dummy-Writes.</p>
+<p>Full-Duplex: Ringtausch knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Mode 0, MSB zuerst. 0x96 und 0x3C tauschen gleichzeitig ihre alten MSBs. Nach einem Takt stehen 0x2C und 0x79, nach vier 0x63 und 0xC9, nach acht 0x3C und 0x96. Das sind Modellregister, nicht garantiert lesbare Zwischenstände. Ein Read braucht Takte, oft durch Dummybytes. Pro Takt: Bit auf MOSI hinaus und Bit auf MISO herein. Nach <span class="math inline">\(n\)</span> Takten: Schieberegister getauscht. Verständnischeck: Warum Takte beim Lesen? Ohne SCK schiebt das Target nicht. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1291,7 +1290,7 @@ flowchart LR
 <li>Andere Slaves: Bus ignorieren, MISO hochohmig</li>
 </ul>
 <aside class="notes">
-<p>CS ist das „Scheinwerferlicht“: nur der selektierte Teilnehmer treibt MISO.</p>
+<p>Chip Select (CS) knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Ein aktives Target und hochohmige andere MISO-Ausgänge sind die Voraussetzung. CS rahmt oft das Kommando. Ignorieren von MOSI heißt nicht, dass MISO schweigt. Zwei gegensätzliche Push-Pull-Treiber sind ein Konflikt. SCK/MOSI/MISO parallel an mehrere Slaves möglich. CS wählt den aktiven Slave (meist Active-Low). Verständnischeck: Warum reicht Ignorieren nicht? Der MISO-Ausgang muss hochohmig sein. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1330,7 +1329,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>Geschwindigkeit hoch, Pinverbrauch ebenfalls — Alternative: Daisy-Chain oder anderer Bus (I2C).</p>
+<p>Star-Routing knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Der Stern teilt SCK, MOSI und MISO und gibt jedem Target eine CS. Zehn Targets brauchen drei gemeinsame Signale plus zehn CS, also 13 Signalpins, plus Bezug. Das ist ein Nachteil, keine starre Obergrenze. Jeder Slave: eigenes CS → eigener GPIO am Master. 10 Slaves ≈ 3 Busleitungen + 10 CS = viele Pins. Verständnischeck: Warum reichen drei gemeinsame Signale nicht? Die Auswahl braucht je Target einen CS-Pfad. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1374,7 +1373,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>CS-Pins sparen, aber Updates betreffen die ganze Kette — für einzelne Slaves oft ineffizient.</p>
+<p>Daisy-Chaining knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Die Kette führt Daten vom Controller durch geeignete Bausteine. Start 00, 00, 00 und Sendefolge 33, 22, 11 ergeben nach 8, 16 und 24 Takten 33/00/00, 22/33/00 und 11/22/33. Das fernste Byte 33 wird zuerst gesendet. Ein Latch kann danach übernehmen. Nicht jeder Sensor ist verkettbar. Ein CS für mehrere Schieberegister in Serie. MOSI → Slave1 → … → zurück MISO. Verständnischeck: Welches Byte zuerst für das ferne Register 33? 33. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1395,7 +1394,7 @@ flowchart LR
 <li>Ermöglicht hohe SCK-Frequenzen (je nach Layout und Slave)</li>
 </ul>
 <aside class="notes">
-<p>Im Kontrast dazu später I2C mit Open-Drain und Pull-ups — robuster für Multi-Drop, aber langsamer.</p>
+<p>Push-Pull und Geschwindigkeit knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Push-Pull treibt aktiv HIGH und LOW. Steile Flanken helfen kurzen Bits und können Störungen erhöhen. Open-Drain ist das spätere gemeinsame Prinzip, nicht pauschal robuster. Nicht gewählte MISO-Treiber müssen hochohmig sein. SPI-Treiber typisch Push-Pull: aktiv HIGH und aktiv LOW. Steile Flanken, schnelles Umladen der Leitungskapazität. Verständnischeck: Warum nicht zugleich HIGH und LOW? Zwei Treiber erzwingen verschiedene Pegel. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1459,7 +1458,7 @@ flowchart LR
 </tbody>
 </table>
 <aside class="notes">
-<p>Falscher Modus → Datenmüll trotz korrekter Verkabelung. Klassiker im Labor: alle vier Modi existieren; zwei Beispiele reichen nicht — Datenblatt lesen.</p>
+<p>CPOL und CPHA knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. CPOL ist der Idle-Pegel, CPHA die Abtastung an der ersten oder zweiten Flanke. Mode 0: Idle LOW, Sample steigend. Mode 1: Sample fallend. Mode 2: Idle HIGH, Sample fallend. Mode 3: Sample steigend. Bei CPHA 0 liegt das erste Bit vor der Sample-Flanke. Mode allein ersetzt Setup und Hold nicht. Vier SPI-Modi (0–3): Kombination aus Ruhepegel und Abtastflanke. CPOL: Idle LOW oder HIGH?. Verständnischeck: Welche Flanke tastet Mode 2 ab? Die fallende, weg vom Idle HIGH. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1481,7 +1480,7 @@ flowchart LR
 <li>Fehlende Slaves erkennt die Hardware nicht automatisch</li>
 </ul>
 <aside class="notes">
-<p>Software muss Plausibilität und Gerätepräsenz selbst prüfen.</p>
+<p>Nachteile von SPI knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Keine Adresse und kein ACK gelten für die Bitübertragung, nicht für jedes Geräteprotokoll. 0xFF kann gültig oder ein freier Pegel sein. Multi-Controller ist im Grundmodell nicht enthalten. Viele CS-Leitungen bei Star-Routing. Nur physikalisches Bit-Schieben: keine Adressen, kein ACK in der Grundschicht. Verständnischeck: Warum ist 0xFF kein universeller Fehler? Der Wert kann gültige Daten sein. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1502,7 +1501,7 @@ flowchart LR
 <li>Weniger ideal: dutzende langsame Sensoren (Pin-Overhead)</li>
 </ul>
 <aside class="notes">
-<p>SPI = Bandbreiten-Monster. Für viele kleine Sensoren kommt I2C.</p>
+<p>Typische Einsatzgebiete knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Große Datenmengen und wenige Targets sind ein häufiger Grund für SPI, keine Gerätezuordnung. SD und Quad-SPI haben weitere Modi. Ein kleines Display kann I²C nutzen, wenn der Datenbedarf passt. Große Datenmengen, wenige Teilnehmer. TFT-Displays, SD-Karten, externe Flash/EEPROM (auch Quad-SPI). Verständnischeck: Warum kann ein kleines Display I²C nutzen? Weniger Pins bei passender Datenmenge. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1556,7 +1555,7 @@ flowchart LR
 </tbody>
 </table>
 <aside class="notes">
-<p>Als Nächstes: zwei Leitungen, Takt behalten, viele Adressen — I2C.</p>
+<p>Zusammenfassung SPI knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Vier Signale gelten für ein Target. Ein Bit je Takt macht die Leitungsbitrate zahlenmäßig gleich dem SCK-Wert, nicht die Nutzdatenrate. 10 bis 50 MHz sind ein Beispiel. Für einen Transfer fehlen Modus, Bitreihenfolge, Rahmen und Timing. Verständnischeck: Was fehlt bei SPI 10 MHz? Modus, Reihenfolge, Kommando und Grenzen. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1577,7 +1576,7 @@ flowchart LR
 <li>Welcher Registerstand gilt nach vier Takten im Links-Schiebe-Modell?</li>
 </ul>
 <aside class="notes">
-<p>Lösung: Sample steigend, Wechsel fallend. Nach vier Takten 0x63 und 0xC9, nach acht Takten 0x3C und 0x96. CPHA = 0 verlangt das erste Bit schon vor der ersten Sample-Flanke.</p>
+<p>Aufgabe — SPI-Flanke knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Mode 0: Idle LOW, Sample steigend, Wechsel fallend. Das erste MSB liegt vorher an. Controller gibt 1, Target 0. Danach stehen 0x2C und 0x79. Beide Register werden aus den alten Zuständen gleichzeitig berechnet. Welche Flanke tastet ab, welche darf das nächste Bit setzen?. Welcher Registerstand gilt nach vier Takten im Links-Schiebe-Modell?. Verständnischeck: Welche ersten Bits? Controller 1, Target 0. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1600,7 +1599,7 @@ flowchart LR
 <li>Viele Bausteine an exakt zwei Signalen (+ GND)</li>
 </ul>
 <aside class="notes">
-<p>Auf Drohnen- oder Smartphone-Boards hängen Gyroskop, Barometer, Lade-IC und oft Touch am I2C — weil zwei Pins viele Geräte adressieren.</p>
+<p>Was ist I2C knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. I²C heißt Inter-Integrated Circuit. SCL ist der Takt, SDA die Datenleitung. Beide Richtungen nutzen SDA nacheinander, deshalb Half-Duplex. Der Controller bleibt Taktorganisator. GND und Versorgung kommen hinzu. I2C: Inter-Integrated Circuit (Philips/NXP, 1980er). Rückgrat vieler Sensor-Netzwerke auf der Platine. Verständnischeck: Warum Half-Duplex? Dieselbe Datenleitung wechselt die Richtung. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1640,7 +1639,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>Echter Multi-Drop-Bus: gemeinsame Straße, geteilte Leitungen. Ohne CS: Adressierung in Software.</p>
+<p>Ein echter Bus knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Der Bus sind zwei durchgehende Netze plus Pull-ups. Kein Push-Pull an SDA oder SCL. Dieselbe Adresse macht parallele identische Chips nicht unterscheidbar. Dutzende Teilnehmer sind keine Garantie. Kein SPI-Star-Routing mit vielen CS-Pins. <code>SCL</code> und <code>SDA</code> als gemeinsame Busleitungen über die Platine. Verständnischeck: Warum nicht drei identische Chips parallel? Sie können dieselbe Adresse haben. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1656,13 +1655,14 @@ flowchart LR
 <section id="adressierung-statt-cs-kabel" class="slide level2">
 <h2>Adressierung statt CS-Kabel</h2>
 <ul>
-<li>Jeder Chip: feste Adresse (meist 7 Bit, z. B. <code>0x68</code> für MPU6050)</li>
+<li>Geräte können eine oder mehrere wählbare 7-Bit-Adressen haben</li>
+<li><code>0x68</code> ist die Lehradresse dieses Sensors, nicht jede I²C-Adresse</li>
 <li>Master sendet Adresse auf SDA</li>
 <li>Nur der angesprochene Slave antwortet; andere ignorieren</li>
 <li>7 Bit <span class="math inline">\(\Rightarrow\)</span> theoretisch 128 Slots; praktisch weniger (reservierte Adressen); optional auch 10-Bit-Adressierung</li>
 </ul>
 <aside class="notes">
-<p>Hardware-Kabel durch Software-Adressen ersetzt — wie Namensaufruf im Klassenraum. Nicht jede 7-Bit-Kombination ist frei nutzbar; Details stehen im I2C-Spec und im Sensor-Datenblatt.</p>
+<p>Adressierung statt CS-Kabel knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. 0x68 links geschoben ist 0xD0 für Write und 0xD1 für Read. 0x3B wählt danach ein Register im schon adressierten Sensor. 128 Muster sind nicht 128 freie Geräte. Zwei gleiche Adressen trennt das Basisprotokoll nicht. Geräte können eine oder mehrere wählbare 7-Bit-Adressen haben. <code>0x68</code> ist die Lehradresse dieses Sensors, nicht jede I²C-Adresse. Verständnischeck: Wählt 0x3B ein anderes Gerät? Nein. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1702,7 +1702,7 @@ flowchart TD
 </div>
 </div>
 <aside class="notes">
-<p>Mehrere Geräte dürfen gleichzeitig LOW ziehen — Strom fließt nach Masse, ohne Push-Pull-Konflikt.</p>
+<p>Open-Drain knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Open-Drain zieht nach Masse oder gibt frei. HIGH kommt vom Pull-up. Open-Collector ist das verwandte Prinzip. Ohne Pull-up schwebt die Leitung, wenn alle Schalter offen sind. Problem: zwei Treiber gleichzeitig HIGH und LOW → bei Push-Pull Kurzschlussrisiko. I2C: Open-Drain / Open-Collector. Verständnischeck: Was passiert ohne Pull-up bei offenen Schaltern? Kein definierter HIGH-Pegel. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1731,7 +1731,7 @@ flowchart TD
 <li>Ein Chip zieht → Leitung LOW (logisch 0)</li>
 </ul>
 <aside class="notes">
-<p>Ohne Pull-ups funktioniert I2C physikalisch nicht. HIGH heißt „niemand zieht“; LOW heißt „jemand zieht“.</p>
+<p>Pull-Up-Widerstände knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. R minimum ist (3,3 minus 0,4) V geteilt durch 3 mA, etwa 967 Ohm. Bei 300 ns und 100 pF ist R maximum etwa 3,54 kOhm. 2,2 kOhm ergeben etwa 186 ns, 4,7 kOhm etwa 398 ns. Zwei 4,7 kOhm parallel sind 2,35 kOhm und etwa 199 ns. t_r ist der Anstieg von 30 auf 70 Prozent. Das ist eine RC-Lehrrechnung. Ohne aktives HIGH: je ein Pull-up an SDA und an SCL. „Wenige kΩ“ ist keine Dimensionierung: Kapazität, Rise Time und Sinkstrom begrenzen <span class="math inline">\(R_P\)</span>. Verständnischeck: Warum ist 4,7 kOhm hier zu groß? Der Anstieg liegt bei etwa 398 ns über 300 ns. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1752,7 +1752,7 @@ flowchart TD
 <li>Sender kann mitlesen: „Ich wollte 1, Bus ist 0“ → Überstimmt</li>
 </ul>
 <aside class="notes">
-<p>Wired-AND ist Grundlage für ACK und Arbitration bei Multi-Master.</p>
+<p>Dominantes LOW (Wired-AND) knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Alle frei ergibt HIGH, ein LOW zieht die Leitung auf LOW. Senden einer 1 heißt freigeben. LOW während Daten, ACK oder Stretching hat verschiedene Bedeutung. Nicht jedes gesehene LOW ist Arbitration-Verlust. LOW ist dominant, HIGH rezessiv. Gleichzeitig 1 und 0 → Leitung wird 0. Verständnischeck: Was liegt an, wenn einer zieht? LOW. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1786,7 +1786,7 @@ flowchart TD
 <tbody>
 <tr class="odd">
 <td>START</td>
-<td>Bus belegen, Slaves wecken</td>
+<td>Transferbeginn erkennen, nicht jedes Aufwecken</td>
 </tr>
 <tr class="even">
 <td>Adresse + R/W</td>
@@ -1803,7 +1803,7 @@ flowchart TD
 </tbody>
 </table>
 <aside class="notes">
-<p>START wirkt wie ein Gong: alle hören die Adresse; nur der Treffer bleibt aktiv.</p>
+<p>I2C-Nachrichtenaufbau knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. START ist fallende SDA bei SCL HIGH. Danach sieben Adressbits, R/W und der neunte ACK-Takt. Daten wechseln bei SCL LOW. START weckt nicht jeden Sleep-Zustand. ACK ist Protokollannahme, kein Messwertbeweis. Adresse plus ACK braucht neun Pulse. Verständnischeck: Wie viele Pulse für Adresse und ACK? Neun. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1831,7 +1831,7 @@ flowchart TD
 <li>Address-NACK: Gerät fehlt oder hört nicht. Data-NACK: unerwartete Ablehnung. Letzter Read-NACK: normaler Abschluss durch den Controller.</li>
 </ul>
 <aside class="notes">
-<p>Vorteil gegenüber SPI: die MCU erkennt fehlende Slaves auf Protokollebene.</p>
+<p>ACK und NACK knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Beim Write quittiert das Target. Der Controller taktet und gibt SDA für das ACK frei. Ein Address-NACK ist nicht eindeutig Gerät fehlt. Beim Read bestätigt der Controller die ersten Datenbytes und erzeugt nach dem letzten bewusst NACK. Das ist Erfolg, kein Fehler. Ein ACK beweist keinen physikalischen Wert. Nach jedem Byte: 9. Takt für Quittung. Sender lässt SDA los (Tendenz HIGH = NACK). Verständnischeck: Wer quittiert 0xD1 und wer die Daten? Das Target die Adresse, der Controller die Daten. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1856,7 +1856,7 @@ flowchart TD
 <li>Master sendet ACK/NACK für empfangene Bytes</li>
 </ul>
 <aside class="notes">
-<p>Half-Duplex: R/W wechselt die Richtung auf SDA; SCL bleibt beim Master (außer Stretching).</p>
+<p>Senden vs.&nbsp;Empfangen knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Controller und Target sind die Busrollen. Sender und Empfänger wechseln je Phase. Beim Read bleibt der Controller Taktorganisator. Stretching darf SCL verlängern, erzeugt aber keine freie Target-Clock. Adresse + R/W <span class="math inline">\(= 0\)</span> → ACK → Daten vom Master → ACK vom Slave. Adresse + R/W <span class="math inline">\(= 1\)</span> → ACK → Slave treibt SDA, Master taktet weiter SCL. Verständnischeck: Wird das Target zum Controller? Nein, es wird Datensender. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1877,7 +1877,7 @@ flowchart TD
 <li>Slaves gehen zurück in Idle</li>
 </ul>
 <aside class="notes">
-<p>Klare Start- und Stop-Signaturen strukturieren den Verkehr auf dem gemeinsamen Medium.</p>
+<p>STOP-Condition knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. STOP ist steigende SDA bei SCL HIGH. Ein Softwarebefehl ist nicht schon der elektrische Abschluss. Repeated START gibt den Bus nicht frei. Bei festgehaltenem SCL LOW gibt es keinen normalen STOP. Master beendet: bei SCL HIGH steigt SDA von LOW nach HIGH. Signal: Bus frei für neue Transaktionen. Verständnischeck: Kann man bei SCL LOW stoppen? Nicht als definierte STOP-Flanke. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1904,7 +1904,7 @@ flowchart TD
 <li>Slave lässt los → Transfer geht weiter</li>
 </ul>
 <aside class="notes">
-<p>Feature, das SPI so nicht hat: der Slave darf den Takt pausieren (z. B. interne Arbeit).</p>
+<p>Clock Stretching knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Stretching hält SCL LOW, bis alle Open-Drain-Ausgänge freigeben und der Pegel steigt. Der Controller muss die tatsächliche HIGH-Phase sehen. Eine Deadline begrenzt das Warten, ist aber keine I²C-Norm. Nicht jeder Stuck-LOW ist erlaubtes Stretching. Zu schneller Master-Takt? Slave kann SCL auf LOW halten. Master will HIGH, sieht aber LOW (Wired-AND) → wartet. Verständnischeck: Wann darf abgetastet werden? Erst nach ausreichendem HIGH und passendem Timing. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1925,7 +1925,7 @@ flowchart TD
 <li>Risiko: gleichzeitiger Buszugriff → Arbitration nötig</li>
 </ul>
 <aside class="notes">
-<p>I2C erlaubt Oligarchien mehrerer MCUs — SPI ist typisch Single-Master.</p>
+<p>Multi-Master knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Multi-Master ist die ältere Bezeichnung für mehrere Controller. Sie beobachten den freien Bus. SCL wird gemeinsam synchronisiert, SDA entscheidet die Datenkonkurrenz. Ein fremder Read darf nicht mit STOP beendet werden. Mehrere Master auf demselben Bus möglich. Beide können START generieren und Sensoren ansprechen. Verständnischeck: Darf ein zweiter Controller STOP senden? Nein, er besitzt die Transaktion nicht. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1946,7 +1946,7 @@ flowchart TD
 <li>Gewinner sendet weiter — Nachricht bleibt intakt</li>
 </ul>
 <aside class="notes">
-<p>Unblutige Kollisionsauflösung: Verlierer wechselt auf Empfang; Gewinner merkt oft nichts.</p>
+<p>Arbitration knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. A sendet 0xA0, B sendet 0xD0. Beide beginnen mit 1. Am zweiten Bit sendet A 0 und B 1, die Leitung ist 0. B verliert und darf den Gewinner nicht stören. Das ist Datenarbitration, kein ACK. Bei Kollision entscheidet dominantes LOW. Wer 1 senden will, aber 0 liest, verliert und bricht ab. Verständnischeck: Wer gewinnt? A, weil sein 0 bestehen bleibt. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1967,7 +1967,7 @@ flowchart TD
 <li>Buskapazität begrenzt Teilnehmerzahl und Kabellänge</li>
 </ul>
 <aside class="notes">
-<p>Netzwerkfähigkeit kostet Bandbreite. Ideal für Sensoren; Displays eher SPI.</p>
+<p>Nachteile von I2C knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. 100 und 400 kHz sind Standard- und Fast-Mode im Fokus, nicht die absolute Obergrenze. Mehr Kapazität und zusätzliche Pull-ups ändern Anstieg und Strom. Adressen können kollidieren. Open-Drain + Pull-up: langsamere Flanken als Push-Pull. Typisch Standard/Fast Mode: <span class="math inline">\(100\,\mathrm{kHz}\)</span> / <span class="math inline">\(400\,\mathrm{kHz}\)</span> (vs.&nbsp;SPI: SCK oft einige zehn MHz). Verständnischeck: Warum wird ein größeres Netz heikel? Kapazität, Pull-ups und Adressen. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2037,7 +2037,7 @@ flowchart TD
 </tbody>
 </table>
 <aside class="notes">
-<p>Auswahlkriterium: Pins vs.&nbsp;Bandbreite vs.&nbsp;Topologie.</p>
+<p>Zusammenfassung der Big 3 knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Debug oft UART, große Transfers mit wenigen Targets oft SPI, viele kleine Sensoren oft I²C. Keine Schnittstelle ist automatisch die beste. 115200 mal 8 geteilt durch 10 sind 92160 Nutzdatenbit/s. GND zählt extra. Verständnischeck: Welche ist die beste? Keine, der Bedarf entscheidet. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2058,7 +2058,7 @@ flowchart TD
 <li>Lehrannahme: <span class="math inline">\(V_{IO}=3{,}3\,\mathrm{V}\)</span>, <span class="math inline">\(C_B=100\,\mathrm{pF}\)</span>, <span class="math inline">\(3\,\mathrm{mA}\)</span> bei <span class="math inline">\(0{,}4\,\mathrm{V}\)</span>, <span class="math inline">\(t_r=0{,}8473\,R_P C_B\)</span>. Liegt <span class="math inline">\(2{,}2\,\mathrm{k}\Omega\)</span> im Fast-Mode-Fenster?</li>
 </ul>
 <aside class="notes">
-<p>Lösung: Write 0xD0, Read 0xD1. Das Target zieht ACK, der Controller erzeugt den letzten Read-NACK. Rp,min etwa 967 Ohm, Rp,max bei 300 ns etwa 3,54 kOhm. 2,2 kOhm liegt in diesem Rechenmodell dazwischen. Zwei vorhandene 4,7 kOhm parallel sind 2,35 kOhm. Datenblattgrenzen bleiben zu prüfen.</p>
+<p>Aufgabe — Adresse, ACK und Pull-up knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. 0x68 links plus Write-Bit ist 0xD0, Read ist 0xD1. Das Target quittiert Writes, der Controller beendet den Read mit NACK. R minimum etwa 967 Ohm, R maximum etwa 3,54 kOhm. 2,2 kOhm liegen dazwischen. Ein einzelner 4,7-kOhm-Widerstand verfehlt 300 ns, läge aber unter 1000 ns. Geräteadresse <code>0x68</code>. Welches Byte geht bei Write, welches bei Read auf den Bus?. Wer zieht SDA im neunten Takt eines Writes? Wer erzeugt den NACK nach dem letzten gelesenen Byte?. Verständnischeck: Ist 4,7 kOhm im 300-ns-Modell zulässig? Nein. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2079,7 +2079,7 @@ flowchart TD
 <li>Empfänger sieht verfälschte Spannungen → Bitfehler</li>
 </ul>
 <aside class="notes">
-<p>On-Board (Zentimeter) funktioniert Single-Ended gut. Meterweite Maschinenverkabelung braucht andere Physik.</p>
+<p>Grenzen von Single-Ended knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Single-Ended bewertet ein Signal gegen den Bezug des Empfängers. Verschobene Masse ändert den gesehenen Pegel. Eine Metergrenze ersetzt keine elektrische Prüfung. UART/SPI/I2C: Single-Ended — Pegel gegen gemeinsames GND. Lange Kabel / getrennte Massepotentiale → Referenz driftet. Verständnischeck: Warum kann HIGH falsch ankommen? Der Empfänger sieht eine andere Spannung gegen seinen Bezug. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2100,7 +2100,7 @@ flowchart TD
 <li>Single-Ended: Spike kann 0 als 1 erscheinen lassen</li>
 </ul>
 <aside class="notes">
-<p>Werkshallen und Motorraum sind elektromagnetisch laut — On-Board-Busse sind dafür nicht ausgelegt.</p>
+<p>Elektromagnetische Interferenzen (EMI) knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. EMI ist elektromagnetische Störung. Ein Stromwechsel kann in eine Datenleitung einkoppeln. Baudrate verhindert keine Pegelverfälschung. On-Board-Busse sind nicht automatisch für jedes lange Kabel gedacht. Lange Leitungen wirken als Antennen. Motoren/Wechselrichter induzieren Spikes. Verständnischeck: Warum reicht die Baudrate nicht? Sie korrigiert keinen gestörten Pegel. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2145,7 +2145,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>Logik aus dem Vorzeichen/der Differenz der beiden Adern — nicht aus absolutem Pegel gegen GND.</p>
+<p>Differentielle Übertragung knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. V_diff ist V_A minus V_B, V_cm der Mittelwert. 2,5 V und 0,5 V ergeben 2 V Differenz und 1,5 V Gleichtakt. Plus 0,8 V auf beiden lässt die Differenz bei 2 V und hebt den Gleichtakt auf 2,3 V. Der Eingangsbereich bleibt begrenzt. Rezessives CAN ist nicht einfach die invertierte zweite Leitung. Signal auf zwei Leitungen: normal und invertiert. Empfänger misst Differenz <span class="math inline">\(V_A - V_B\)</span>, nicht gegen GND. Verständnischeck: Was ändert die gleiche Störung? Den Gleichtakt, nicht die ideale Differenz. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2166,7 +2166,7 @@ flowchart LR
 <li>Differenz bleibt: <span class="math inline">\((V_A+\Delta)-(V_B+\Delta)=V_A-V_B\)</span></li>
 </ul>
 <aside class="notes">
-<p>Deshalb Ethernet und viele Feldbusse: Twisted Pair. Störungen heben sich in der Differenz auf.</p>
+<p>Twisted Pair knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Verdrillung macht die Einkopplung ähnlicher. Exakt gleiches Delta hebt sich in der Differenz auf. 0,8 V und 0,6 V lassen 0,2 V Differenzstörung. Die Leitung legt kein Protokoll fest. Adern eng verdrillt. Gleichtaktstörung hebt beide Adern ähnlich an. Verständnischeck: Was bleibt bei ungleicher Störung? 0,2 V zusätzliche Differenz. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2188,7 +2188,7 @@ flowchart LR
 <li>Häufig mit Protokollen wie Modbus</li>
 </ul>
 <aside class="notes">
-<p>Sie programmieren weiter UART-ähnlich; der Transceiver macht die robuste Leitung.</p>
+<p>RS-485 knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. RS-485 ist die physikalische Schnittstelle. UART bleibt das Framing, Modbus ein höheres Protokoll. Der Treiber-Enable bestimmt, wer sendet. Es gibt keine I²C-artige Arbitration. Reichweite und Bitrate gehören zusammen. Physikalische Schicht für lange Strecken (oft mit UART-Logik). Transceiver: Single-Ended TX/RX → differenziell A/B. Verständnischeck: Reicht der Transceiver für mehrere Sender? Nein, das Protokoll muss den Zugriff ordnen. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2210,7 +2210,7 @@ flowchart LR
 <li>Verbindet Steuergeräte über ein Twisted-Pair</li>
 </ul>
 <aside class="notes">
-<p>CAN kombiniert Bus-Ideen (wie I2C) mit differentieller Robustheit für die Fahrzeugumgebung.</p>
+<p>CAN-Bus knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. CAN ist Controller Area Network mit eigenem Controller und Transceiver. Dominant und rezessiv ähneln der Idee von LOW und Freigabe, sind aber nicht I²C. Ein UART plus CAN-Transceiver erzeugt keine CAN-Nachrichten. Controller Area Network (Bosch) — Standard im Fahrzeug. Differenziell (CAN_H / CAN_L). Verständnischeck: Erzeugt ein UART mit Transceiver CAN? Nein. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2231,7 +2231,7 @@ flowchart LR
 <li>Für die „letzte Meile“ auf dem Board: I2C oft die passende Wahl</li>
 </ul>
 <aside class="notes">
-<p>Der Exkurs erklärt Feldverkabelung. Zurück aufs Board: I2C-Sensor ansteuern.</p>
+<p>Warum im Labor I2C knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. I²C passt hier zum kurzen Link und kleinen Registerzugriff, wenn Adresse, Pegel und Pull-ups stimmen. Letzte Meile ist eine Metapher, keine Kilometerangabe. Der Laboraufbau ist optional. MCT3-Fokus: Sensoren wenige Zentimeter neben der MCU. Differentielle Transceiver: Platz, Strom, Kosten. Verständnischeck: Welche drei Bedingungen vor dem Read? Adresse, Elektrik und Registerformat. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2251,7 +2251,7 @@ flowchart LR
 <li><span class="math inline">\(V_A=2{,}5\,\mathrm{V}\)</span>, <span class="math inline">\(V_B=0{,}5\,\mathrm{V}\)</span>, danach <span class="math inline">\(+0{,}8\,\mathrm{V}\)</span> auf beiden Leitungen. Was bleibt gleich, was ändert sich?</li>
 </ul>
 <aside class="notes">
-<p>Lösung: X = 4096 = +0,25 g, Y = -8192 = -0,5 g, Z = 16384 = +1 g. Vdiff bleibt 2 V, Vcm steigt von 1,5 V auf 2,3 V. Ob 2,3 V erlaubt ist, steht im Transceiver-Datenblatt. Vertiefung: Multi-Controller, Daisy-Chain und die elektrische Auslegung.</p>
+<p>Aufgabe — Burst und Common Mode knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. 0x1000 ist 4096 und plus 0,25 g. 0xE000 ist vorzeichenbehaftet minus 8192 und minus 0,5 g, nicht plus 3,5 g. 0x4000 ist plus 1 g. g ist Fallbeschleunigung, kein Gramm. 16384 LSB/g gelten für plus minus 2 g. Bei 2,5 V und 0,5 V plus 0,8 V bleibt die Differenz 2 V. Bytes <code>10 00 E0 00 40 00</code> ab Register <code>0x3B</code>, Bereich <span class="math inline">\(\pm 2\,\mathrm{g}\)</span> mit 16384 LSB/g. Welche Werte in g entstehen?. <span class="math inline">\(V_A=2{,}5\,\mathrm{V}\)</span>, <span class="math inline">\(V_B=0{,}5\,\mathrm{V}\)</span>, danach <span class="math inline">\(+0{,}8\,\mathrm{V}\)</span> auf beiden Leitungen. Was bleibt gleich, was ändert sich?. Verständnischeck: Warum nicht plus 3,5 g? Weil das Zweierkomplement zuerst gilt. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2274,7 +2274,7 @@ flowchart LR
 <li>Read: Rohwerte X/Y/Z holen</li>
 </ul>
 <aside class="notes">
-<p>Details folgen im Übungsblatt. Ziel: eine vollständige I2C-Transaktion nachvollziehen.</p>
+<p>Ausblick Labor: IMU per I2C knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Die Folge ist Konfiguration, vollständiger Read, Status, Dekodierung, Skalierung. Aufwecken ist ein Sensorregister, kein allgemeiner I²C-Befehl. Ein gültiger Vektor braucht erfolgreichen Transfer und passenden Bereich. 3-Achsen-Beschleunigungssensor (IMU) am I2C-Bus. Master: SCL erzeugen, Adresse senden. Verständnischeck: Wann ist der Vektor verwendbar? Nach vollständigem Erfolg und passender Skalierung. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2296,7 +2296,7 @@ flowchart LR
 <li>Diese Register lesen wir per I2C</li>
 </ul>
 <aside class="notes">
-<p>Mechanik im Chip-Maßstab liefert Zahlen; der Bus transportiert sie zur MCU.</p>
+<p>MEMS kurz knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. MEMS sind mikroelektromechanische Systeme. Das Lehrbild ist eine Masse, deren Lage Kapazitäten ändert. I²C transportiert nur die digitalen Register. Eine fehlerfreie Übertragung korrigiert keinen Offset. MEMS: mikromechanische Strukturen im Silizium. Beschleunigung verbiegt Strukturen → Kapazität ändert sich. Verständnischeck: Warum kann der Wert trotzdem ungenau sein? Sensorfehler bleiben außerhalb des Busses. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2322,7 +2322,7 @@ flowchart LR
 <li>I2C: erst Geräteadresse, dann Registerzeiger, dann Daten</li>
 </ul>
 <aside class="notes">
-<p>Wie ein internes Regal: Adresse des Chips und Adresse des Fachs (Register).</p>
+<p>Registerkarte des Sensors knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. 0x6B, 0x1C und 0x3B bis 0x40 sind Sensorregister, nicht SoC-MMIO. 0x00 an 0x6B ist das Wake-Lehrbeispiel, keine vollständige Initialisierung. Die Skalierung muss zum Bereich passen. Der Registervertrag ist das Lehrmodell und hier nicht neu am Originaldatenblatt verifiziert. Sensor hat eigene Memory Map (Datenblatt!). Beispiele aus der MPU-6000/MPU-6050-Registerkarte, im Labor gegen das Datenblatt prüfen:. Verständnischeck: Warum muss der Bereich zur Dekodierung passen? Dieselbe Rohzahl bedeutet sonst eine andere Beschleunigung. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2351,7 +2351,7 @@ flowchart LR
 <li>Nicht 1:1 auf einen realen Chip übernehmen</li>
 </ul>
 <aside class="notes">
-<p>Wie Timer/PWM: Steuerung über MMIO. Enable-/Master-Bits hier nur zur Didaktik — im Labor die Referenz Ihres SoCs/Renode-Modells verwenden.</p>
+<p>C: I2C initialisieren knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. I2C_BASE 0x40010000 ist fiktiv. volatile macht den Zugriff sichtbar, ersetzt aber Breite und Registerregeln nicht. Das Oder-Gleich ist nur bei einem lesbaren Kontrollregister zulässig. Enable allein setzt weder Pin-Mux noch Pull-ups. Register-Offsets und Bitpositionen sind plattformspezifisch. Nicht 1:1 auf einen realen Chip übernehmen. Verständnischeck: Warum reicht das Enable-Bit nicht? Takt, Pins, Treiber und Timing fehlen. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2377,7 +2377,7 @@ flowchart LR
 <span id="cb3-5"><a aria-label="5"></a>    I2C_CLK_DIV <span class="op">=</span> <span class="dv">1000</span><span class="op">;</span></span>
 <span id="cb3-6"><a aria-label="6"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Prescaler allein ist keine universelle I2C-Formel. SCL-High, SCL-Low, Filter und die Anstiegszeit können getrennte Felder sein.</p>
+<p>C: Bus-Frequenz knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. 100 MHz geteilt durch 1000 sind 100 kHz nur in diesem Teilermodell. Der Peripherietakt muss nicht der CPU-Takt sein. 400 kHz wären hier Teiler 250, ohne reale Registerfelder. Der Pull-up-Anstieg bleibt zusätzlich nötig. Typisch <span class="math inline">\(100\,\mathrm{kHz}\)</span> oder <span class="math inline">\(400\,\mathrm{kHz}\)</span>. Aus Systemtakt (z. B. <span class="math inline">\(100\,\mathrm{MHz}\)</span>) Teiler setzen. Verständnischeck: Beweisen 400 kHz Fast-Mode? Nein, die Zeitbedingungen müssen passen. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2392,38 +2392,25 @@ flowchart LR
 </section>
 <section id="c-write-transaktion" class="slide level2">
 <h2>C: Write-Transaktion</h2>
-<p>Ablauf: START → Adresse+W → Reg → Daten → STOP</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb4-1"><a aria-label="1"></a><span class="kw">enum</span> <span class="op">{</span></span>
-<span id="cb4-2"><a aria-label="2"></a>    I2C_OK <span class="op">=</span> <span class="dv">0</span><span class="op">,</span></span>
-<span id="cb4-3"><a aria-label="3"></a>    I2C_NACK <span class="op">=</span> <span class="dv">1</span><span class="op">,</span></span>
-<span id="cb4-4"><a aria-label="4"></a>    I2C_TIMEOUT <span class="op">=</span> <span class="dv">2</span><span class="op">,</span></span>
-<span id="cb4-5"><a aria-label="5"></a>    I2C_ARB_LOST <span class="op">=</span> <span class="dv">3</span><span class="op">,</span></span>
-<span id="cb4-6"><a aria-label="6"></a>    I2C_BUS_ERR <span class="op">=</span> <span class="dv">4</span></span>
-<span id="cb4-7"><a aria-label="7"></a><span class="op">};</span></span>
-<span id="cb4-8"><a aria-label="8"></a></span>
-<span id="cb4-9"><a aria-label="9"></a><span class="dt">static</span> <span class="dt">int</span> i2c_fail<span class="op">(</span><span class="dt">int</span> st<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb4-10"><a aria-label="10"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_ARB_LOST <span class="op">&amp;&amp;</span> i2c_owns_bus<span class="op">())</span></span>
-<span id="cb4-11"><a aria-label="11"></a>        i2c_send_stop<span class="op">();</span></span>
-<span id="cb4-12"><a aria-label="12"></a>    <span class="cf">return</span> st<span class="op">;</span></span>
-<span id="cb4-13"><a aria-label="13"></a><span class="op">}</span></span>
-<span id="cb4-14"><a aria-label="14"></a></span>
-<span id="cb4-15"><a aria-label="15"></a><span class="dt">int</span> sensor_wakeup<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb4-16"><a aria-label="16"></a>    <span class="dt">int</span> st<span class="op">;</span></span>
-<span id="cb4-17"><a aria-label="17"></a>    i2c_send_start<span class="op">();</span></span>
-<span id="cb4-18"><a aria-label="18"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0xD0</span><span class="bu">u</span><span class="op">);</span></span>
-<span id="cb4-19"><a aria-label="19"></a>    st <span class="op">=</span> wait_phase<span class="op">();</span></span>
-<span id="cb4-20"><a aria-label="20"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
-<span id="cb4-21"><a aria-label="21"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x6B</span><span class="bu">u</span><span class="op">);</span></span>
-<span id="cb4-22"><a aria-label="22"></a>    st <span class="op">=</span> wait_phase<span class="op">();</span></span>
-<span id="cb4-23"><a aria-label="23"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
-<span id="cb4-24"><a aria-label="24"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x00</span><span class="bu">u</span><span class="op">);</span></span>
-<span id="cb4-25"><a aria-label="25"></a>    st <span class="op">=</span> wait_phase<span class="op">();</span></span>
-<span id="cb4-26"><a aria-label="26"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
-<span id="cb4-27"><a aria-label="27"></a>    i2c_send_stop<span class="op">();</span></span>
-<span id="cb4-28"><a aria-label="28"></a>    <span class="cf">return</span> I2C_OK<span class="op">;</span></span>
-<span id="cb4-29"><a aria-label="29"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Ablauf: START → Adresse+W → Reg → Daten → STOP. Status: OK, NACK, TIMEOUT, ARB_LOST, BUS_ERR.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb4-1"><a aria-label="1"></a><span class="co">/* Lehrcode — nicht kompiliert.</span></span>
+<span id="cb4-2"><a aria-label="2"></a><span class="co">   Jede Phase meldet Status und Deadline. */</span></span>
+<span id="cb4-3"><a aria-label="3"></a><span class="dt">int</span> sensor_wakeup<span class="op">(</span><span class="dt">uint64_t</span> deadline<span class="op">,</span> <span class="dt">uint64_t</span> cleanup<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-4"><a aria-label="4"></a>    <span class="dt">int</span> st <span class="op">=</span> i2c_start<span class="op">(</span>deadline<span class="op">);</span></span>
+<span id="cb4-5"><a aria-label="5"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_abort<span class="op">(</span>st<span class="op">,</span> cleanup<span class="op">);</span></span>
+<span id="cb4-6"><a aria-label="6"></a>    st <span class="op">=</span> i2c_tx_byte<span class="op">(</span><span class="bn">0xD0</span><span class="bu">u</span><span class="op">,</span> deadline<span class="op">);</span></span>
+<span id="cb4-7"><a aria-label="7"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_abort<span class="op">(</span>st<span class="op">,</span> cleanup<span class="op">);</span></span>
+<span id="cb4-8"><a aria-label="8"></a>    st <span class="op">=</span> i2c_tx_byte<span class="op">(</span><span class="bn">0x6B</span><span class="bu">u</span><span class="op">,</span> deadline<span class="op">);</span></span>
+<span id="cb4-9"><a aria-label="9"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_abort<span class="op">(</span>st<span class="op">,</span> cleanup<span class="op">);</span></span>
+<span id="cb4-10"><a aria-label="10"></a>    st <span class="op">=</span> i2c_tx_byte<span class="op">(</span><span class="bn">0x00</span><span class="bu">u</span><span class="op">,</span> deadline<span class="op">);</span></span>
+<span id="cb4-11"><a aria-label="11"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_abort<span class="op">(</span>st<span class="op">,</span> cleanup<span class="op">);</span></span>
+<span id="cb4-12"><a aria-label="12"></a>    st <span class="op">=</span> i2c_stop<span class="op">(</span>deadline<span class="op">);</span></span>
+<span id="cb4-13"><a aria-label="13"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_abort<span class="op">(</span>st<span class="op">,</span> cleanup<span class="op">);</span></span>
+<span id="cb4-14"><a aria-label="14"></a>    <span class="cf">return</span> I2C_OK<span class="op">;</span></span>
+<span id="cb4-15"><a aria-label="15"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Nach Arbitration-Verlust kein STOP. Erfolg erst nach abgeschlossenem STOP.</p>
 <aside class="notes">
-<p>Ein NACK, ein Timeout, ein Arbitration-Verlust und ein Busfehler sind verschiedene Statuswerte. <code>wait_phase</code> begrenzt Start, Byte, Empfang, Stretching und Stop. STOP nur, solange dieser Controller den Bus besitzt.</p>
+<p>C: Write-Transaktion knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Der Wake-Write ist START, 0xD0, 0x6B, 0x00, STOP. Jede Phase hat Status und Deadline. I2C_OK erst nach abgeschlossenem STOP. Nach ARB_LOST kein STOP und keine Recovery-Takte. NACK, Timeout und Busfehler bleiben erhalten. Die Adressen und Helfer sind Lehrplätze. Verständnischeck: Was ist am alten wait_phase-Kommentar zu klären? START und STOP brauchen denselben Statusvertrag wie die Bytes. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2445,30 +2432,31 @@ flowchart LR
 </figure>
 </div>
 <p>Zuerst Registerzeiger setzen (Write), dann Repeated START und Read:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb5-1"><a aria-label="1"></a><span class="dt">int</span> read_accel_xyz<span class="op">(</span><span class="dt">uint8_t</span> out<span class="op">[</span><span class="dv">6</span><span class="op">])</span> <span class="op">{</span></span>
-<span id="cb5-2"><a aria-label="2"></a>    <span class="dt">int</span> st<span class="op">;</span></span>
-<span id="cb5-3"><a aria-label="3"></a>    i2c_send_start<span class="op">();</span></span>
-<span id="cb5-4"><a aria-label="4"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0xD0</span><span class="bu">u</span><span class="op">);</span></span>
-<span id="cb5-5"><a aria-label="5"></a>    st <span class="op">=</span> wait_phase<span class="op">();</span></span>
-<span id="cb5-6"><a aria-label="6"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
-<span id="cb5-7"><a aria-label="7"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0x3B</span><span class="bu">u</span><span class="op">);</span></span>
-<span id="cb5-8"><a aria-label="8"></a>    st <span class="op">=</span> wait_phase<span class="op">();</span></span>
-<span id="cb5-9"><a aria-label="9"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
-<span id="cb5-10"><a aria-label="10"></a>    i2c_send_start<span class="op">();</span></span>
-<span id="cb5-11"><a aria-label="11"></a>    i2c_send_byte<span class="op">(</span><span class="bn">0xD1</span><span class="bu">u</span><span class="op">);</span></span>
-<span id="cb5-12"><a aria-label="12"></a>    st <span class="op">=</span> wait_phase<span class="op">();</span></span>
-<span id="cb5-13"><a aria-label="13"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
-<span id="cb5-14"><a aria-label="14"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> <span class="dv">5</span><span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
-<span id="cb5-15"><a aria-label="15"></a>        st <span class="op">=</span> i2c_read_ack<span class="op">(&amp;</span>out<span class="op">[</span>i<span class="op">]);</span></span>
-<span id="cb5-16"><a aria-label="16"></a>        <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
-<span id="cb5-17"><a aria-label="17"></a>    <span class="op">}</span></span>
-<span id="cb5-18"><a aria-label="18"></a>    st <span class="op">=</span> i2c_read_nack<span class="op">(&amp;</span>out<span class="op">[</span><span class="dv">5</span><span class="op">]);</span></span>
-<span id="cb5-19"><a aria-label="19"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_fail<span class="op">(</span>st<span class="op">);</span></span>
-<span id="cb5-20"><a aria-label="20"></a>    i2c_send_stop<span class="op">();</span></span>
-<span id="cb5-21"><a aria-label="21"></a>    <span class="cf">return</span> I2C_OK<span class="op">;</span></span>
-<span id="cb5-22"><a aria-label="22"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb5-1"><a aria-label="1"></a><span class="co">/* Lehrcode. out erst nach erfolgreichem STOP übernehmen. */</span></span>
+<span id="cb5-2"><a aria-label="2"></a><span class="dt">int</span> read_accel_xyz<span class="op">(</span><span class="dt">uint8_t</span> out<span class="op">[</span><span class="dv">6</span><span class="op">],</span> <span class="dt">uint64_t</span> deadline<span class="op">,</span></span>
+<span id="cb5-3"><a aria-label="3"></a>                   <span class="dt">uint64_t</span> cleanup<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb5-4"><a aria-label="4"></a>    <span class="dt">uint8_t</span> tmp<span class="op">[</span><span class="dv">6</span><span class="op">];</span></span>
+<span id="cb5-5"><a aria-label="5"></a>    <span class="dt">int</span> st <span class="op">=</span> i2c_start<span class="op">(</span>deadline<span class="op">);</span></span>
+<span id="cb5-6"><a aria-label="6"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_abort<span class="op">(</span>st<span class="op">,</span> cleanup<span class="op">);</span></span>
+<span id="cb5-7"><a aria-label="7"></a>    st <span class="op">=</span> i2c_tx_byte<span class="op">(</span><span class="bn">0xD0</span><span class="bu">u</span><span class="op">,</span> deadline<span class="op">);</span></span>
+<span id="cb5-8"><a aria-label="8"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_abort<span class="op">(</span>st<span class="op">,</span> cleanup<span class="op">);</span></span>
+<span id="cb5-9"><a aria-label="9"></a>    st <span class="op">=</span> i2c_tx_byte<span class="op">(</span><span class="bn">0x3B</span><span class="bu">u</span><span class="op">,</span> deadline<span class="op">);</span></span>
+<span id="cb5-10"><a aria-label="10"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_abort<span class="op">(</span>st<span class="op">,</span> cleanup<span class="op">);</span></span>
+<span id="cb5-11"><a aria-label="11"></a>    st <span class="op">=</span> i2c_restart<span class="op">(</span>deadline<span class="op">);</span></span>
+<span id="cb5-12"><a aria-label="12"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_abort<span class="op">(</span>st<span class="op">,</span> cleanup<span class="op">);</span></span>
+<span id="cb5-13"><a aria-label="13"></a>    st <span class="op">=</span> i2c_tx_byte<span class="op">(</span><span class="bn">0xD1</span><span class="bu">u</span><span class="op">,</span> deadline<span class="op">);</span></span>
+<span id="cb5-14"><a aria-label="14"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_abort<span class="op">(</span>st<span class="op">,</span> cleanup<span class="op">);</span></span>
+<span id="cb5-15"><a aria-label="15"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> <span class="dv">6</span><span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb5-16"><a aria-label="16"></a>        st <span class="op">=</span> i2c_rx_byte<span class="op">(&amp;</span>tmp<span class="op">[</span>i<span class="op">],</span> i <span class="op">&lt;</span> <span class="dv">5</span><span class="op">,</span> deadline<span class="op">);</span></span>
+<span id="cb5-17"><a aria-label="17"></a>        <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_abort<span class="op">(</span>st<span class="op">,</span> cleanup<span class="op">);</span></span>
+<span id="cb5-18"><a aria-label="18"></a>    <span class="op">}</span></span>
+<span id="cb5-19"><a aria-label="19"></a>    st <span class="op">=</span> i2c_stop<span class="op">(</span>deadline<span class="op">);</span></span>
+<span id="cb5-20"><a aria-label="20"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="cf">return</span> i2c_abort<span class="op">(</span>st<span class="op">,</span> cleanup<span class="op">);</span></span>
+<span id="cb5-21"><a aria-label="21"></a>    <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> <span class="dv">6</span><span class="op">;</span> i<span class="op">++)</span> out<span class="op">[</span>i<span class="op">]</span> <span class="op">=</span> tmp<span class="op">[</span>i<span class="op">];</span></span>
+<span id="cb5-22"><a aria-label="22"></a>    <span class="cf">return</span> I2C_OK<span class="op">;</span></span>
+<span id="cb5-23"><a aria-label="23"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Klassisches Muster: Pointer setzen, dann lesen — oft ohne STOP dazwischen (Repeated Start).</p>
+<p>C: Read mit Repeated Start knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Der Read setzt den Zeiger mit 0xD0 und 0x3B, macht Repeated START, sendet 0xD1 und liest sechs Bytes. Die ersten fünf werden bestätigt, das sechste mit NACK beendet. out wird erst nach STOP aus tmp kopiert. Neun Bytes mal neun Takte sind 81 Pulse, 810 µs bei 100 kHz und 202,5 µs bei 400 kHz reine Taktzeit. Auto-Increment ist eine Sensoreigenschaft. Verständnischeck: Warum NACK beim sechsten Byte? Es signalisiert das Ende, die ersten ACK fordern Fortsetzung. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2489,7 +2477,7 @@ flowchart LR
 <li><code>Sensors.MPU6050</code> und <code>FeedSample</code> sind hier nicht als vorhandene API geprüft</li>
 </ul>
 <aside class="notes">
-<p>Simulator ersetzt die physische IMU für Treiberentwicklung — Datenblattverhalten nachbilden.</p>
+<p>Renode: virtueller I2C-Sensor knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Renode könnte Register und ACK nachbilden. Es beweist keine RC-Kurve und keine Chip-Latenz. Sensors.MPU6050 und FeedSample sind nicht als vorhandene API geprüft. Ein späterer erfolgreicher Read beweist nur das konkrete Modell. Ein Registermodell kann ACK und Bursts nachbilden. Es beweist keine realen Flanken, keine RC-Zeit und keine zyklusgenaue Controllerlatenz. Verständnischeck: Was beweist ein virtuelles Read höchstens? Die Funktion im Modell, nicht die Platine. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2512,7 +2500,7 @@ flowchart LR
 <li>Fehlt das Modell, bleibt der Treiber ein Lehrmodell mit explizitem Registervertrag</li>
 </ul>
 <aside class="notes">
-<p>Die <code>.repl</code>-Datei beschreibt die virtuelle Verdrahtung — Ihr „Lötkolben“ in Textform.</p>
+<p>Platine beschreiben (<code>.repl</code>) knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. .repl wäre eine Plattformbeschreibung. Im Repository liegt keine geprüfte Datei, und der Typname ist ungeprüft. 0x68 ist die virtuelle Geräteadresse, nicht die CPU-Adresse. Ein plausibler Text ist kein Nachweis. Erst die installierte Renode-Version und das echte Peripheriemodell prüfen. Fehlt das Modell, bleibt der Treiber ein Lehrmodell mit explizitem Registervertrag. Verständnischeck: Warum ist der Ausschnitt kein Nachweis? Typ und Anschluss müssen in der Installation existieren. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2537,7 +2525,7 @@ flowchart LR
 <li>Sie beweisen keine Pull-up-Auslegung, keine RC-Flanke und keine Controllerlatenz</li>
 </ul>
 <aside class="notes">
-<p>Laboridee: eingespeiste Vektoren müssen nach korrektem I2C-Read in Ihrer Ausgabe erscheinen.</p>
+<p>Stimuli im Startskript (<code>.resc</code>) knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. .resc wäre ein Startskript, ELF ein Programmformat. FeedSample ist kein geprüfter Befehl. Der Bytevektor ist nicht automatisch drei Gleitkomma-Argumente. Es gibt keine ausgeführte Firmware. Virtuelle Registertransfers können Treiberfehler zeigen. Sie beweisen keine Pull-up-Auslegung, keine RC-Flanke und keine Controllerlatenz. Verständnischeck: Darf man die g-Werte direkt übergeben? Nein, ohne API-Vertrag ist die Kodierung offen. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2556,18 +2544,15 @@ flowchart LR
 <li>16-Bit-Werte oft als High- dann Low-Byte (Big-Endian am Sensor)</li>
 <li>In C zusammensetzen:</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb8-1"><a aria-label="1"></a><span class="dt">int16_t</span> decode_x<span class="op">(</span><span class="dt">const</span> <span class="dt">uint8_t</span> b<span class="op">[</span><span class="dv">6</span><span class="op">],</span> <span class="dt">int</span> st<span class="op">,</span> <span class="dt">int</span> <span class="op">*</span>ok<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb8-2"><a aria-label="2"></a>    <span class="dt">uint16_t</span> ux<span class="op">;</span></span>
-<span id="cb8-3"><a aria-label="3"></a>    <span class="cf">if</span> <span class="op">(</span>st <span class="op">!=</span> I2C_OK<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb8-4"><a aria-label="4"></a>        <span class="op">*</span>ok <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
-<span id="cb8-5"><a aria-label="5"></a>        <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
-<span id="cb8-6"><a aria-label="6"></a>    <span class="op">}</span></span>
-<span id="cb8-7"><a aria-label="7"></a>    ux <span class="op">=</span> <span class="op">(</span><span class="dt">uint16_t</span><span class="op">)(((</span><span class="dt">uint16_t</span><span class="op">)</span>b<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">&lt;&lt;</span> <span class="dv">8</span><span class="op">)</span> <span class="op">|</span> b<span class="op">[</span><span class="dv">1</span><span class="op">]);</span></span>
-<span id="cb8-8"><a aria-label="8"></a>    <span class="op">*</span>ok <span class="op">=</span> <span class="dv">1</span><span class="op">;</span></span>
-<span id="cb8-9"><a aria-label="9"></a>    <span class="cf">return</span> <span class="op">(</span><span class="dt">int16_t</span><span class="op">)</span>ux<span class="op">;</span> <span class="co">/* 0x1000 -&gt; 4096 */</span></span>
-<span id="cb8-10"><a aria-label="10"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb8-1"><a aria-label="1"></a><span class="co">/* Lehrcode. Bit 15 setzt das Zweierkomplement explizit. */</span></span>
+<span id="cb8-2"><a aria-label="2"></a><span class="dt">int32_t</span> decode_s16_be<span class="op">(</span><span class="dt">uint8_t</span> high<span class="op">,</span> <span class="dt">uint8_t</span> low<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb8-3"><a aria-label="3"></a>    <span class="dt">uint32_t</span> u <span class="op">=</span> <span class="op">((</span><span class="dt">uint32_t</span><span class="op">)</span>high <span class="op">&lt;&lt;</span> <span class="dv">8</span><span class="op">)</span> <span class="op">|</span> low<span class="op">;</span></span>
+<span id="cb8-4"><a aria-label="4"></a>    <span class="cf">if</span> <span class="op">((</span>u <span class="op">&amp;</span> <span class="bn">0x8000</span><span class="bu">u</span><span class="op">)</span> <span class="op">!=</span> <span class="dv">0</span><span class="bu">u</span><span class="op">)</span></span>
+<span id="cb8-5"><a aria-label="5"></a>        <span class="cf">return</span> <span class="op">(</span><span class="dt">int32_t</span><span class="op">)</span>u <span class="op">-</span> <span class="dv">65536</span><span class="op">;</span></span>
+<span id="cb8-6"><a aria-label="6"></a>    <span class="cf">return</span> <span class="op">(</span><span class="dt">int32_t</span><span class="op">)</span>u<span class="op">;</span></span>
+<span id="cb8-7"><a aria-label="7"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Häufiger Fehler: den Puffer trotz Fehlerstatus dekodieren. High-Byte liegt bei <code>b[0]</code>. Der Cast auf <code>int16_t</code> übernimmt das Zweierkomplement, nachdem die Bytes unsigned zusammengesetzt wurden. <code>0x00</code> bis <code>0xFF</code> bleiben gültige Messbytes.</p>
+<p>Endianness knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. High- dann Low-Byte ist das Sensorformat, nicht die CPU-Endianness und nicht die Bitreihenfolge auf dem Bus. Der Decoder bildet zuerst die vorzeichenlose Zahl. Ist Bit 15 gesetzt, wird 65536 subtrahiert. 0x0000, 0x7FFF, 0x8000 und 0xFFFF sind 0, 32767, minus 32768 und minus 1. Null bleibt ein gültiger Messwert. Ein Fehler steht im Status. 16-Bit-Werte oft als High- dann Low-Byte (Big-Endian am Sensor). In C zusammensetzen:. Verständnischeck: Was ist 0xFFFF? Minus 1, kein automatischer Transferfehler. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2588,7 +2573,7 @@ flowchart LR
 <li>Jede Warteschleife braucht eine Deadline. Ein CPU-Reset setzt den extern versorgten Sensor nicht zurück</li>
 </ul>
 <aside class="notes">
-<p>Erinnerung Block 3: Polling blockiert; Interrupts entlasten die CPU bei längeren Transfers.</p>
+<p>Polling vs.&nbsp;Interrupt knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Blockierendes Warten, kurzes Zustandspolling und IRQ oder DMA sind drei Wege. Nichtblockierendes Polling kann andere Arbeit zulassen. Beim PLIC ist mcause die Klasse, die Claim-ID die Quelle. DMA-Ende ist nicht automatisch I²C-Ende. Ein CPU-Reset setzt das weiter versorgte Target nicht zuverlässig zurück. Blockierendes Polling, Zustands-Polling und IRQ/DMA sind drei Implementierungen. Ein I2C-IRQ ist auf RISC-V eine externe Quelle, bei einem PLIC die Claim-ID, keine eigene <code>mcause</code>-Gerätekennung. Verständnischeck: Kann Zustandspolling andere Arbeit zulassen? Ja, wenn jeder Aufruf schnell zurückkehrt. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2609,10 +2594,10 @@ flowchart LR
 <li>SPI: synchron, schnell, CS-intensiv</li>
 <li>I2C: adressierter Open-Drain-Bus auf zwei Leitungen</li>
 <li>Differenziell (RS-485, CAN): lange, gestörte Strecken</li>
-<li>Treiber: MMIO, Adresse|R/W, Registerzeiger, Bit-Shifting</li>
+<li>Treiber: MMIO, Busbyte <code>(addr7 &lt;&lt; 1) | rw</code>, Registerzeiger, Status vor der Dekodierung</li>
 </ul>
 <aside class="notes">
-<p>Damit kann Ihr SoC Module ansprechen, Sensoren lesen und Konsolen nutzen — Grundlage für vernetzte Embedded-Systeme.</p>
+<p>Zusammenfassung Block 5 knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Seriell spart im Modell Pins und ist nicht automatisch schneller. UART braucht passende Physik, SPI Modus und Budget, I²C Adresse, Open-Drain und Pull-ups. Differenzielle Leitungen haben Gleichtaktgrenzen. Das Busbyte ist (Adresse links um 1) oder Lese-Bit. Vier Ebenen: Pegel, Protokoll, Registerformat, Anwendung. Seriell ersetzt parallel extern: Pins, Crosstalk, Skew. UART: asynchron, Punkt-zu-Punkt, Debug. Verständnischeck: Welche vier Ebenen? Physik, Bus, Sensorformat und Interpretation. Die nächste Folie nimmt die noch offene Frage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -2628,12 +2613,12 @@ flowchart LR
 <section id="ausblick-und-abschluss" class="slide level2">
 <h2>Ausblick und Abschluss</h2>
 <ul>
-<li>Übungsblatt: I2C in Renode Schritt für Schritt</li>
-<li>Ziel: erste virtuelle Beschleunigungswerte auslesen</li>
+<li>Geplanter späterer Ausblick, hier nicht ausgeführt</li>
+<li>Dieselbe Bytefolge, ACK-Rollen und Dekodierung lassen sich ohne Simulator nachrechnen</li>
 </ul>
 <p>Vielen Dank — viel Erfolg im Labor.</p>
 <aside class="notes">
-<p>Firmware-Entwicklung heißt: Protokollregeln in Registerzugriffe und Timing übersetzen. Viel Erfolg beim Experimentieren.</p>
+<p>Ausblick und Abschluss knüpft an den bisherigen Weg von Bits, Zeit und Teilnehmern an. Renode bleibt ein späterer Ausblick ohne vorliegenden Lauf. Dieselbe Bytefolge lässt sich auf Papier prüfen. Sechs Bytes genügen nicht: Status, Vollständigkeit, Vorzeichen, Skalierung und Aktualität müssen stimmen. Die Ausschnitte sind Lehrcode. Geplanter späterer Ausblick, hier nicht ausgeführt. Dieselbe Bytefolge, ACK-Rollen und Dekodierung lassen sich ohne Simulator nachrechnen. Verständnischeck: Warum reichen sechs Bytes nicht? Format, Status und Skalierung fehlen noch. Ein späterer Versuch braucht eine passende Umgebung. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
