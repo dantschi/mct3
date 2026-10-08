@@ -18,7 +18,7 @@ format: revealjs
 - Praxis: Theorie zu MESI/Atomics, danach Wrap-Up und Klausurvorbereitung
 
 ::: notes
-Letzter Baustein: zweiter (und weiterer) Prozessorkern — und wie Software damit sicher umgeht.
+Der bisherige Weg hat Werte im Speicher, Bewegung über Caches und Busse, Entlastung durch DMA (Direct Memory Access) und Interrupts sowie begrenzte Instruktionsparallelität durch OoO (Out of Order) verbunden. Heute greifen mehrere Harts, also Hardware-Threads, auf gemeinsame Adressen zu. TLP (Thread-Level Parallelism) ist diese gleichzeitige Arbeit. MESI (Modified, Exclusive, Shared, Invalid) koordiniert Kopien, eine atomare RMW (Read-Modify-Write) macht ein zusammengesetztes Update unteilbar, Acquire/Release ordnet weitere Zugriffe. Ein zweiter Kern stellt trotz schneller Caches eine neue Frage, weil mehrere gültige Kopien und konkurrierende Updates koordiniert werden müssen. Als Nächstes trennt die Agenda diese drei Fragen. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Agenda und Lernziele
@@ -36,7 +36,7 @@ Lernziele:
 - Systemwissen der Blöcke 1–8 für die Klausur strukturieren
 
 ::: notes
-Zwei Probleme: Hardware-Kohärenz der Caches; Software-Atomizität bei Shared-Updates.
+Cache-Kohärenz betrifft die Beobachtung derselben Adresse. MESI ist das Zustandsmodell dafür, Snooping das Mithören fremder Transaktionen. Eine Race Condition ist ein zeitabhängiges Ergebnis. RMW, LR/SC (Load-Reserved/Store-Conditional) und AMO (Atomic Memory Operation) betreffen Unteilbarkeit. Amdahl begrenzt den Speedup, also die Beschleunigung gegenüber einem Kern. Drei Fragen am Zähler x: Welche Kopie gilt? Ist x++ unteilbar? Werden zugehörige Daten mit einem Flag sichtbar? Kohärenz allein beantwortet die zweite Frage nicht. Die Lernziele sind eine Zustandstabelle, ein Lost-Update-Ablauf, der SC-Status, ein Lock-/ISR-Ablauf und eine Amdahlrechnung. Das ist Orientierung im Kurs, keine neue Prüfungszusage. Danach knüpft der Rückblick an Daten- und Aufgabenparallelität an. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Anknüpfung: Edge-AI-Labor
@@ -49,7 +49,7 @@ Kurz-Recap aus Block 8 (Vertiefung im Übungsblatt):
 - TLP und DLP schließen sich nicht aus
 
 ::: notes
-OS-Tasks sind ein TLP-Beispiel. Auch Datenarbeit kann Threads nutzen. Matrizen können zusätzlich DLP verwenden.
+TFLM (TensorFlow Lite for Microcontrollers) und eine Renode-Plattform liegen hier nicht als ausgeführtes Labor vor. Die Memory Wall, also die Begrenzung durch Speicherbandbreite, wurde nicht gemessen. TLP verteilt Arbeit auf Threads, DLP (Data-Level Parallelism) bearbeitet viele Werte ähnlich, etwa mit SIMD oder RVV. Ein Thread kann selbst Vektoroperationen ausführen. Mehrere Kerne erhöhen die Speicherbandbreite nicht automatisch. Das Beispiel bleibt konzeptionell. Als Nächstes steht der Entwurfsanreiz für mehrere Kerne. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Erinnerung: Taktraten-Mauer
@@ -60,7 +60,7 @@ OS-Tasks sind ein TLP-Beispiel. Auch Datenarbeit kann Threads nutzen. Matrizen k
 - Ausweg: mehr Kerne statt immer höherer GHz
 
 ::: notes
-Plan B der Industrie nach dem GHz-Wettrennen: Parallelität auf Thread-Ebene.
+Die Power Wall bezeichnet den Leistungsanstieg bei höherer Frequenz. Unter konkreten Bedingungen gilt näherungsweise P_dyn ungefähr alpha mal C mal V zum Quadrat mal f: Aktivitätsfaktor, Kapazität, Spannung, Frequenz. Leakage und Kühlung kommen hinzu. Mehr Kerne sind kein kostenloser Ersatz und keine Pflicht für jede MCU (Microcontroller Unit). Ein zweiter Kern spart nicht automatisch Energie, weil Aktivität, Kommunikation und ungenutzte Ressourcen in der Bilanz bleiben. Als Nächstes wird TLP als Arbeitsform definiert. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Multi-Core: Thread-Level Parallelism
@@ -71,7 +71,7 @@ Plan B der Industrie nach dem GHz-Wettrennen: Parallelität auf Thread-Ebene.
 - Mehr Kerne sparen nicht stets Energie und beschleunigen einen einzelnen Thread nicht
 
 ::: notes
-Zweiter Arbeiter statt einen zu überhitzen — aber Kommunikation wird zum Problem.
+Ein Softwarethread ist ein Ablauf, eine Task die schedulbare Einheit, ein Hart der Hardware-Thread, der Kern das Rechenwerk. Im Lehrmodell hat jeder Kern einen Hart. UI (User Interface) und Hintergrundarbeit sind Beispiele, keine feste Affinity, also keine erzwungene Kernbindung. Zwei Threads laufen nur gleichzeitig, wenn Scheduler, freie Harts und Abhängigkeiten das erlauben. Mehr Kerne beschleunigen einen einzelnen Thread nicht. Gemeinsame Daten brauchen Synchronisation. Als Nächstes beschreibt SMP eine mögliche Organisation. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Symmetric Multiprocessing (SMP)
@@ -84,7 +84,7 @@ Zweiter Arbeiter statt einen zu überhitzen — aber Kommunikation wird zum Prob
 - AMP und heterogene Kerne bleiben abgegrenzt
 
 ::: notes
-Klassisches PC-/Phone-Modell: gleichberechtigte Kerne, Scheduler verteilt.
+SMP (Symmetric Multiprocessing) bedeutet im Lehrmodell ein Betriebssystem und gleichberechtigten Zugriff auf gemeinsamen Speicher. AMP (Asymmetric Multiprocessing) organisiert Software und Ownership getrennt. Private L1-Caches und ein geteiltes L2 sind ein Beispiel, keine Definition. Migration, also das Verlagern einer Task, braucht Scheduler, Port und Affinity. Nicht jedes FreeRTOS kann SMP. Ein gemeinsames L2 definiert SMP nicht. Als Nächstes zeigt das Schema die Speicherpfade. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Architektur eines SMP-SoC
@@ -101,11 +101,14 @@ flowchart TD
   L10 <--> L2[Shared L2]
   L11 <--> L2
   L2 <--> RAM[(DRAM)]
+  DMA[DMA, Vertrag offen] -.-> L2
   style L2 fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
 ```
 
+![Kohärente Harts und ein DMA-Pfad, der nicht automatisch zur Domäne gehört.](../assets/figures/09_paralleles_rechnen_multicore/v_domain.png)
+
 ::: notes
-Private L1 für Tempo — darunter treffen sich die Kerne. Dort lauert die Kohärenzfrage.
+L1-I hält Befehle, L1-D Daten. Die folgenden Beispiele betreffen Datenlines. Der Interconnect transportiert Anfragen und Datenantworten. Geteiltes L2 und DRAM sind gewählte Ebenen, keine Pflicht jeder MCU. Ein DMA-Gerät gehört nicht automatisch zur Kohärenzdomäne. CPU-Kohärenz, DMA-Maintenance, atomare RMW und MMIO-Ordnung (Memory-Mapped Input/Output) sind verschiedene Pflichten. Als Nächstes erzeugt Write-Back eine neue gültige Kopie bei möglicherweise altem unterem Stand. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Die Leitfrage des Tages
@@ -113,10 +116,10 @@ Private L1 für Tempo — darunter treffen sich die Kerne. Dort lauert die Kohä
 - Write-Back (Block 2): Writes oft nur im privaten L1 — RAM kann veraltet sein
 - Core 0 schreibt `score = 10` in seinen L1
 - Core 1 will `score` lesen
-- Woher weiß Core 1, dass die Wahrheit im L1 von Core 0 liegt — nicht im alten RAM?
+- Woher kommt der aktuelle Wert, wenn Core 0 eine Modified-Line hält und der untere Stand noch alt ist?
 
 ::: notes
-Eine CPU: Write-Back genial. Zwei CPUs: ohne Kohärenz zerbricht die Semantik.
+Write-Back schreibt den neuen Wert zuerst in die private Line. Dirty bedeutet verändert gegenüber dem unteren Stand. Owner ist die berechtigte exklusive Kopie, kein Software-Mutex. Eine M-Line mit 5 bei RAM 0 ist im Modell korrekt, solange ein kohärenter Read den Owner fragt und nicht blind den alten Stand verwendet. Ein alter RAM-Wert ist also kein Fehler, wenn das Protokoll den aktuellen Wert liefert. Unkoordiniertes cachebares Sharing ist das Problem. Non-cacheable Speicher und Ownership bleiben Alternativen. Als Nächstes werden die drei Fragen getrennt. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Kohärenzverlust (Stale Data)
@@ -129,7 +132,7 @@ Eine CPU: Write-Back genial. Zwei CPUs: ohne Kohärenz zerbricht die Semantik.
 - Non-cacheable Speicher und Ownership bleiben möglich, besonders in AMP
 
 ::: notes
-Konsistenz beschreibt Beobachtungsreihenfolgen mehrerer Zugriffe. Atomizität schützt eine Operation vor Teilbeobachtung.
+Stale Data ist eine veraltete, aber noch als gültig benutzte Kopie. Write-Through ohne Invalidation kann den RAM auf 5 setzen und eine fremde Cachekopie bei 0 lassen. Beim Lost Update sehen zwei Harts die 0, rechnen je 1 und schreiben 1. Ein atomarer Flagstore macht nur den Flag unteilbar. Ohne passende Ordnung kann die Payload fehlen. Kohärenz, Atomizität und Konsistenz über mehrere Zugriffe sind verschiedene Fragen. Das Hardwarebild ist Motivation, keine Ergebnisliste eines C-Data-Race. Als Nächstes reicht Cachemaintenance nicht als Ersatz. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Warum Software-Flush scheitert
@@ -139,7 +142,7 @@ Konsistenz beschreibt Beobachtungsreihenfolgen mehrerer Zugriffe. Atomizität sc
 - Hardware-Kohärenz kann für die Anwendung unsichtbar sein und kostet trotzdem Traffic
 
 ::: notes
-Write-Through aktualisiert den unteren Speicher und invalidiert allein keine fremde Cache-Kopie.
+Clean schreibt dirty Daten nach unten. Invalidate entzieht die lokale Gültigkeit. Write-Through aktualisiert den unteren Stand und invalidiert allein keine fremde Kopie. DMA-Maintenance kann häufig sein und braucht Ownership sowie einen Plattformvertrag. Hardwarekohärenz automatisiert bestimmte Kopienarbeit und kostet Traffic. Clean einer Line ersetzt nicht die atomare Übernahme eines Schlosses. Als Nächstes erkennt Snooping fremde Transaktionen. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Bus Snooping
@@ -149,7 +152,7 @@ Write-Through aktualisiert den unteren Speicher und invalidiert allein keine fre
 - Große Systeme oft directory-basiert statt reinem Broadcast-Snoop
 
 ::: notes
-Idee bleibt: Caches koordinieren die „Wahrheit“ einer Adresse — Implementierung variiert.
+Bus Snooping bedeutet, dass Cache-Controller relevante Transaktionen ihrer Lineadresse prüfen. Ein Fremdread auf M braucht aktuelle Daten. Ein Fremdwrite braucht Übergabe oder Invalidierung, nicht dieselbe Reaktion. Broadcast ist das vereinfachte Modell. Ein Directory merkt sich Kopien oder Owner und leitet gezielter weiter. Jede fremde Lesetransaktion muss die lokale Line nicht invalidieren. Im klassischen Fremdread kann sie nach S wechseln. Als Nächstes benennt MESI die stabilen Rechte. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## MESI-Protokoll
@@ -159,7 +162,7 @@ Idee bleibt: Caches koordinieren die „Wahrheit“ einer Adresse — Implementi
 - Basis vieler kohärenter Multicore-Designs (Varianten: MOESI, …)
 
 ::: notes
-Konzept der vier Buchstaben zählt — nicht jede Transitionstabelle auswendig.
+M ist dirty und allein gültig, E clean und allein gültig, S clean und teilbar, I lokal nicht nutzbar. Der Zustand gilt für die ganze Cacheline. 64 Byte sind eine Lehrannahme. MOESI ergänzt Owned. Dieses Modell verwendet kein dirty Shared. Transiente Zwischenzustände sind ausgeblendet. Eine Line kann mehrere Variablen enthalten, die dann dieselbe Ownership teilen. Die Klausurorientierung ist die des Kurses, keine neue Festlegung. Als Nächstes verbindet der Automat Rechte und Ereignisse. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## MESI: Zustandsübersicht
@@ -178,11 +181,11 @@ stateDiagram-v2
   S --> M: Write + Invalidate
   S --> I: Invalidate empfangen
   M --> S: Fremd-Read (Intervention)
-  M --> I: Fremd-Write / Flush
+  M --> I: Fremd-Ownership, Daten uebergeben
 ```
 
 ::: notes
-Die Pfeile sind die klausurrelevanten Übergänge. Merken Sie sich besonders: Write auf Shared braucht Invalidate; Read-Miss auf Modified liefert der Owner.
+Lokale Ereignisse und fremde Transaktionen sind getrennt. I plus lokaler Read wird E, wenn keine andere Kopie existiert, sonst S. Ein lokaler Write auf E wird still M. S wird M erst nach Ownership und Bestätigungen. E wird bei einem Fremdread zu S. M liefert bei einem Fremdread aktuelle Daten und wird S. Ein fremder Ownershiprequest kann E, S oder M nach I bringen. Bei dirty M müssen die Daten übergeben werden. Eine überlebende S-Kopie kann S bleiben, weil der Controller nicht sicher weiß, dass alle anderen verworfen wurden. Flush ohne Definition ist hier kein eigener Übergang. Als Nächstes steht M für sich. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Zustand M (Modified)
@@ -192,7 +195,7 @@ Die Pfeile sind die klausurrelevanten Übergänge. Merken Sie sich besonders: Wr
 - Klassischer Write-Back-„Boss“-Zustand
 
 ::: notes
-Monopol auf die Wahrheit dieser Adresse.
+M bedeutet gültig, verändert und exklusiv. Andere gültige Kopien sind ausgeschlossen. Alte Bits in I dürfen existieren, sind aber kein Hit. Der untere Stand kann 0 sein, während die Line 5 hält. Lokale Reads und Writes treffen die eigene Line. Ein Fremdread braucht die aktuellen Daten. M ist kein vom Programm gehaltenes Lock. Als Nächstes ist E exklusiv, aber noch clean. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Zustand E (Exclusive)
@@ -202,7 +205,7 @@ Monopol auf die Wahrheit dieser Adresse.
 - Write → oft still zu M, ohne Broadcast
 
 ::: notes
-Sauber und allein — Schreiben ohne Netzwerk-Meeting.
+E stimmt mit dem kohärenten unteren Stand überein und ist allein gültig. Ein lokaler Write darf still nach M gehen, weil keine fremde gültige Kopie invalidiert werden muss. Clean meint diese Ebene, nicht jeden DRAM-Takt. Ein Fremdread führt nach S. Ein fremder Ownershiprequest kann E invalidieren. E ist eine Optimierung dieses Modells. Als Nächstes fehlt bei S das exklusive Schreibrecht. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Zustand S (Shared)
@@ -212,7 +215,7 @@ Sauber und allein — Schreiben ohne Netzwerk-Meeting.
 - Vor lokalem Write: andere Kopien invalidieren
 
 ::: notes
-Read-only-Sharing effizient — Write braucht Kohärenzaktion.
+S erlaubt Lesen. Eine oder mehrere gültige Kopien können bestehen und müssen im stabilen Modell dieselben Daten halten. Vor einem Write übernimmt der Schreiber Ownership und wartet auf Invalidates und Bestätigungen. Core 0 darf seine S-Line nicht heimlich ändern, auch wenn Core 1 gerade nichts tut. S ist kein dauerhafter Nur-Lese-Status des Programms. Als Nächstes darf I nicht als Hit dienen. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Zustand I (Invalid)
@@ -222,7 +225,7 @@ Read-only-Sharing effizient — Write braucht Kohärenzaktion.
 - Daten müssen neu geholt werden
 
 ::: notes
-Leerer Eimer — nicht verwenden.
+I ist lokale Ungültigkeit, nicht zwingend das Löschen der Bits. Reset, Eviction oder Invalidate können dorthin führen. Ein Read braucht einen neuen Datenpfad, ein Write einen Ownershippfad. Eine noch sichtbare 0 in einer I-Line darf nicht gelesen werden, weil der aktuelle Wert beim Owner liegen kann. Als Nächstes entscheidet der Read-Miss über Lieferant und neuen Zustand. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## MESI: Read-Miss
@@ -235,7 +238,7 @@ Core 0 liest `x`, lokal I:
 - Anderer Kern hat `x` Modified → der Owner liefert (Write-Back/Intervention), Zustände typisch → S
 
 ::: notes
-Snooping/Directory entscheidet: allein, geteilt oder Owner-Supply bei Modified.
+Beim Read-Miss gibt es drei Fälle. Keine andere Kopie: der untere Stand liefert, der Leser wird E. Eine saubere andere Kopie: beide werden S. Ein dirty Owner M: der aktuelle Wert kommt vom Owner, der untere Stand wird im vereinfachten Modell aktualisiert, beide werden S. Existiert M:5 bei RAM 0, darf die alte RAM-Antwort nicht ungeprüft gelten. Das ist keine Zyklengarantie und keine Pflicht, dass jeder reale DRAM-Chip sofort 5 enthält. Als Nächstes fordert ein Write auf Shared exklusives Recht. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## MESI: Write auf Shared
@@ -248,7 +251,7 @@ Snooping/Directory entscheidet: allein, geteilt oder Owner-Supply bei Modified.
 - Danach im Modell schreiben und nach M gehen. Der Broadcast allein ist nicht der Abschluss
 
 ::: notes
-Geteilte Ressource nie heimlich ändern.
+Start ist S:0 und S:0. Core 0 fordert Ownership für den Write 5. Core 1 invalidiert. Erst nach der nötigen Bestätigung ist der stabile Abschluss M:5 und I. Der gesendete Invalidatebroadcast allein genügt nicht. Der untere Stand bleibt in diesem Write-Back-Schritt 0. Spekulative Puffer sind ausgeblendet. Als Nächstes verliert der andere Kern die Leseberechtigung. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Reaktion: Invalidate
@@ -257,7 +260,7 @@ Geteilte Ressource nie heimlich ändern.
 - Späteres Lesen → Miss → frische Kopie (Wert 5) von Core 0 / Memory-Pfad
 
 ::: notes
-Konsistenz: erzwungenes Verwerfen, dann Nachladen der Wahrheit.
+Invalidate ist eine Kohärenzaktion, keine Speicherordnung. Core 1 verwirft die Gültigkeit der alten x-Line, nicht zwingend die Bits. Der spätere Read ist ein Miss und erhält im Beispiel 5. Eine Fence und ein Invalidate haben verschiedene Aufgaben. Invalidate löscht nicht zwingend die alten Datenbytes. Als Nächstes steht die ganze Folge mit Werten. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## MESI-Beispiel: Zustandsfolge
@@ -277,7 +280,7 @@ Zwei Kerne, Variable `x`, Start beide Invalid:
 - Der folgende Read erhält 5. Beide Lines werden S, der untere Stand wird 5
 
 ::: notes
-Typische Klausurfrage: Tabelle ausfüllen. Üben Sie die Sequenz Read-Miss → Shared → Write → Invalidate → erneutes Lesen.
+Start beide I, RAM 0. Core 0 liest: E:0, I, RAM 0. Core 1 liest: S:0, S:0, RAM 0. Core 0 schreibt 5: M:5, I, RAM 0. Core 1 liest: S:5, S:5, RAM 5. Nach dem Write kann der RAM noch 0 sein, während Core 0 gültig 5 hält. Höchstens eine exklusive gültige Kopie, S-Werte gleich, I kein Hit. Die letzte 5 im RAM gilt nur für dieses vereinfachte Write-Back-Modell. Als Nächstes kostet die Koordination Verkehr. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Overhead von MESI
@@ -287,7 +290,7 @@ Typische Klausurfrage: Tabelle ausfüllen. Üben Sie die Sequenz Read-Miss → S
 - Große Server: Ringe/Meshes statt einfachem Broadcast-Bus
 
 ::: notes
-Skalierung: Verwaltungslast kann Datenbandbreite fressen.
+Request, Datenantwort und Bestätigung sind mögliche Verkehrsarten. Ring und Mesh sind Topologien, Directory und Broadcast Organisationsformen. Ein Kern, der M schon besitzt, muss nicht bei jedem lokalen Write neu broadcasten. Die Kernzahl allein bestimmt den Aufwand nicht. Zugriffsmuster, Ownershipwechsel und Datenmenge entscheiden mit. Als Nächstes entsteht Aufwand sogar bei verschiedenen Variablen. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## False Sharing
@@ -298,10 +301,12 @@ Skalierung: Verwaltungslast kann Datenbandbreite fressen.
 - Liegen in derselben Cache-Line → Write invalidiert den Partner
 - Ping-Pong trotz verschiedener Variablen
 - Padding trennt nur bei passender Basis, Objektgröße und echter Line
+
+![Ein auf 64 ausgerichtetes Array mit Abstand 4 bleibt in einer Line. Abstand 64 trennt die Lines.](../assets/figures/09_paralleles_rechnen_multicore/v_stride.png)
 - Es kostet Speicher und kann die Lokalität verschlechtern. Ein Simulator ohne Kohärenzzeit misst das nicht
 
 ::: notes
-64 Byte sind die angenommene Line, keine universelle Größe. True Sharing wäre der gemeinsame Zähler.
+False Sharing heißt, logisch unabhängige Variablen teilen eine Line. True Sharing ist eine gemeinsam bearbeitete Variable. Basis 0x20001000, Line 64 Byte, int 4 Byte: Offsets 0 und 4 liegen in 0x20001000 bis 0x2000103F. Offset 64 liegt bei 0x20001040. Wechselnde Writes holen die Ownership der ganzen Line. Ein Write des bereits besitzenden M-Kerns erzeugt nicht jedes Mal Ping-Pong. Padding kostet Platz und kann Lokalität verschlechtern. Es repariert keinen Data Race eines gemeinsamen Zählers. Eine Ausrichtung nur der Arraybasis genügt bei Abstand 4 nicht. Keine gemessene Verlangsamung. Als Nächstes prüft die Aufgabe den Wertpfad. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Aufgabe — MESI-Zeile
@@ -309,7 +314,7 @@ Skalierung: Verwaltungslast kann Datenbandbreite fressen.
 Core0 hat nach seinem Write den Zustand M und den Wert 5. Welchen Wert hat der RAM in diesem Modell noch, und was sieht Core1 beim folgenden Read?
 
 ::: notes
-Der RAM kann noch 0 sein. Core1 erhält 5, beide werden S, der untere Stand wird 5. S heißt nicht, dass vorher mehrere Kopien nachgewiesen wurden. Siehe die Zustandsfolge.
+Vor dem Folge-Read hält Core 0 M:5, Core 1 ist I, der RAM kann 0 sein. Core 1 liest und erhält 5 über den Ownerpfad. Danach sind beide S:5, und der untere Stand wird in diesem Modell 5. Eine gültige 0 bei Core 1 nach dem abgeschlossenen Read wäre unzulässig. S bedeutet nicht, dass vorher mehrere Kopien nachgewiesen wurden. In einer echten Mehrstufenhierarchie kann die saubere Ebene ein L2 sein. Das ist keine DRAM-Pflicht. Als Nächstes kann ein zusammengesetztes Update trotzdem verloren gehen. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Software: gemeinsamer Zähler
@@ -319,7 +324,7 @@ Der RAM kann noch 0 sein. Core1 erhält 5, beide werden S, der untere Stand wird
 - Beide Kerne: `zaehler++` auf globalem `int` — Erwartung: $+2$
 
 ::: notes
-Einfachste Aufgabe — parallel gefährlich.
+Der Zähler startet bei 0. Zwei Inkremente sollen 2 ergeben. Ein normales C-int mit konkurrierendem i++ ist ein Data Race. Unter C11 (Sprachstandard 2011) ist das undefiniertes Verhalten, keine zugesicherte Ergebnisliste. MESI ordnet Einzelwrites und hat keinen Vertrag für die Gruppe Load, Add, Store. Im Hardwarebild können beide aus 0 die 1 berechnen. Der Endwert 1 ist dann möglich. Ein atomarer Zähler schützt nicht beliebige andere Daten. Ein _Atomic-Integer hat für den Inkrementzugriff selbst andere Semantik. Als Nächstes zerlegt der Assembler das nichtatomare Update. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Anatomie von `i++`
@@ -335,7 +340,7 @@ sw   t0, 0(s1)   # Write
 - Drei Schritte — können sich zwischen Kernen überlappen
 
 ::: notes
-Dieses Interleaving motiviert das Problem. Ein konkurrierendes normales C-int ist ein Data Race und in C11 undefiniert, nicht nur manchmal 1.
+Der Ausschnitt ist RV32I-Lehrcode, nicht ein Compileroutput. s1 zeigt auf ein gültiges, vier-Byte-ausgerichtetes Wort. lw lädt nach t0, addi erhöht nur das Register, sw schreibt zurück. Zwischen lw und sw kann der andere Hart dieselbe alte 0 gelesen haben. MESI schützt diese lokale Rechnung nicht. Für ein nichtatomares int bleibt das in C ein Data Race. Bei einem passenden _Atomic-Integer ist der C11-Inkrementzugriff selbst atomar. Eine einzelne Instruktion ohne Atomizitätsvertrag beweist das umgekehrt nicht. Als Nächstes zeigt ein Interleaving den verlorenen Beitrag. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Race Condition
@@ -350,23 +355,25 @@ Dieses Interleaving motiviert das Problem. Ein konkurrierendes normales C-int is
 Im Hardwarebild endet der Speicher bei 1. Das ist keine garantierte Semantik des fehlerhaften C-Programms.
 
 ::: notes
-Wettlauf: beide rechnen auf demselben Startwert.
+Hart 0 liest 0, Hart 1 liest 0, beide addieren lokal 1, beide speichern 1. Der gemeinsame Wert endet bei 1, weil beide Stores dieselbe berechnete 1 enthalten. Die Reihenfolge der Stores rettet das verlorene Inkrement nicht. Zwei atomare RMW ab 0 liefern alte Werte 0 und 1 und enden bei 2. Race Condition ist der weitere Timingbegriff. Data Race ist der Sprachbegriff. Das Bild ist kein ausgeführtes C-Programm. Als Nächstes soll ein Schloss den Abschnitt ausschließen. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Naive Software-Locks
 
 ```c
-/* ohne volatile: Compiler darf den Spin-Loop wegoptimieren */
+/* Absichtlich falsch. volatile wuerde den Spin nicht zur atomaren Uebernahme machen. */
 while (lock == 1) { }
 lock = 1;
 zaehler++;
 lock = 0;
 ```
 
+![Beide lesen frei und betreten den Abschnitt. Die atomare Übernahme lässt nur einen eintreten.](../assets/figures/09_paralleles_rechnen_multicore/v_check.png)
+
 Idee: Mutual Exclusion — aber Check und Set sind getrennt.
 
 ::: notes
-Schloss-Metapher stimmt logisch — atomar nicht. `volatile` verhindert Compiler-Optimierung des Spins, macht Check+Set aber nicht atomar.
+Der C-Ausschnitt ist absichtlich falsch. Check und Set sind getrennt. volatile betrifft gekennzeichnete Zugriffe nach Compilervertrag. Es stoppt nicht jede Optimierung, macht die Gruppe nicht atomar und ordnet keine Payload. Ein volatile int lock ist keine korrekte Reparatur. Im Hardwaremotiv können beide 0 sehen, 1 schreiben und gleichzeitig eintreten. Das ist keine definierte C11-Ergebnisliste. Als Nächstes wird die fehlende Eigenschaft benannt. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Warum diese Check-then-Set-Schleife scheitert
@@ -376,17 +383,17 @@ Schloss-Metapher stimmt logisch — atomar nicht. `volatile` verhindert Compiler
 - Korrekte Software-Locks nutzen atomare Primitive und Ordnung, sie sind nicht unmöglich
 
 ::: notes
-Rein algorithmische Verfahren bleiben eine angenommene, fortgeschrittene Alternative.
+Unteilbar entschieden werden muss, ob das Schloss frei ist und wer es übernimmt. Korrekte Locks kombinieren zugesicherte Primitive mit Ordnung. Peterson und ähnliche Verfahren brauchen Atomic-, Ordering- und Teilnehmerbedingungen. Sie sind kein naiver Ersatz aus gewöhnlichen C-Loads. In einer ISR (Interrupt Service Routine) kommen weitere Fortschrittsbedingungen hinzu. Als Nächstes stellt RISC-V Instruktionsfamilien bereit, wenn Kern und Region sie unterstützen. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## RISC-V A-Extension
 
 - A oder Zalrsc/Zaamo, ausgerichtet, nur in unterstützten Regionen
 - LR/SC und AMO gelten für eine Adresse in ihrer Domäne, nicht für den ganzen Bus
-- DMA gehört nur dazu, wenn die Reservationsdomäne das festlegt
+- DMA gehört nur dazu, wenn die Reservationsdomäne das festlegt. Ohne A-Erweiterung ist ein korrektes System nicht unmöglich, es braucht dann andere zugesicherte Primitive
 
 ::: notes
-Ohne Atomics kein korrektes Multicore-OS auf Shared Memory. DMA braucht eigene Sync-Disziplin.
+Die A-Erweiterung der Unprivileged ISA 20240411 enthält LR/SC und AMO. Zalrsc und Zaamo sind Teilmengennamen, keine Register. Nicht jeder Kern unterstützt sie. Für .w gelten hier vier Byte Ausrichtung und eine unterstützte gewöhnliche Speicherregion. AMO ist kein globaler Bus-Lock. Ohne A kann ein System andere zugesicherte Primitive nutzen. Beobachtete Gerätewrites auf die vom LR gelesenen Bytes dürfen den SC nicht ignorieren. Andere Bytes einer größeren Reservation und nichtkohärente Geräte haben eigene Verträge. Die Erweiterung allein genügt nicht für jedes MMIO-Register. Als Nächstes trennt LR das Lesen von der späteren bedingten Speicherung. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## LR/SC
@@ -396,7 +403,7 @@ Ohne Atomics kein korrektes Multicore-OS auf Shared Memory. DMA braucht eigene S
 - Die Reservation ist kein gehaltenes Mutex
 
 ::: notes
-Überwachungszaun um die Adresse zwischen Load und Store.
+lr.w liest den Wert und setzt eine Reservation auf eine implementierungsabhängige Granule. Das ist kein Mutex und kein 64-Byte-Lock. sc.w schreibt nur bei Erfolg und liefert im Zielregister 0. Bei Fehlschlag gibt es keinen Datenstore und einen Status ungleich 0, nicht nur die Zahl 1. Danach ist die eigene Reservation beendet. Mehrere Harts dürfen gleichzeitig 0 lesen. Ein Fehlschlag beweist keinen fremden Write. Die gelesene 0 ist nicht der spätere Erfolgscode. Als Nächstes vollendet ein erfolgreicher SC die Übernahme. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## LR/SC: Erfolg
@@ -405,7 +412,7 @@ Ohne Atomics kein korrektes Multicore-OS auf Shared Memory. DMA braucht eigene S
 - Lock exklusiv übernommen
 
 ::: notes
-Erfolgspfad: wie RMW, Monitor still.
+Das Schloss ist 0. LR liest 0. Bleibt die Reservation gültig, schreibt SC die 1 und liefert Status 0. Erst danach beginnt der kritische Abschnitt. Die Reservation ist beendet. Das Schloss bleibt 1 bis zum Release. Ein anderer Hart, der 1 liest, darf nicht auf 2 inkrementieren. Neben der Atomizität braucht der geschützte Datenzugriff eine passende Acquire-Ordnung. Es gibt keine Zeitzahl und keinen garantierten ersten Erfolg. Der Code erkennt die Übernahme am Status 0. Als Nächstes führen zwei gelesene Nullen nicht zu zwei Erfolgen. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## LR/SC: Fehlschlag
@@ -418,7 +425,7 @@ Erfolgspfad: wie RMW, Monitor still.
 - Software von Core 1 wiederholt die Schleife
 
 ::: notes
-Zweiter Kern prallt ab — Zustand bleibt konsistent.
+Beide LR lesen 0. Hart 0 schreibt mit SC die 1 und Status 0. Hart 1 scheitert mit Status ungleich 0, der Speicher bleibt 1. Ein neuer LR von Hart 1 liest 1, verzweigt als belegt und führt keinen SC aus. Nach dem Release auf 0 kann Hart 1 erneut LR 0 und SC 1 mit Status 0 ausführen. Werte bleiben 0 oder 1. Ein Retry, der 2 speichert, wäre ein Zähler, nicht dieses Schloss. Kein Hart hat eine Fairnessgarantie. Liest der neue LR 1, wird der Abschnitt nicht betreten. Als Nächstes zeigt der Assembler die drei Phasen. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## LR/SC: Spinlock in Assembler
@@ -432,6 +439,7 @@ acquire:
   li      t1, 1
   sc.w    t2, t1, (a0)
   bnez    t2, acquire
+  # kritischer Abschnitt: geschuetzte Daten, Lehrcode
 release:
   fence rw, w
   sw    zero, 0(a0)
@@ -441,7 +449,7 @@ release:
 - Im kritischen Abschnitt nicht schlafen und keine blockierende Arbeit ausführen
 
 ::: notes
-Ohne die Release-Fence publiziert der Store das Schloss, nicht zuverlässig die vorherigen Daten. Ein ISR-Spin auf dasselbe Schloss kann sich selbst blockieren.
+a0 ist die Lockadresse, t0 der gelesene Wert, t1 die Konstante 1, t2 der SC-Status. lr.w.aq liest mit Acquire: nachfolgende Memoryzugriffe werden nicht vor diesem Zugriff beobachtet. bnez auf t0 wartet, wenn das Schloss belegt ist. sc.w versucht die 1. bnez auf t2 wiederholt bei Fehlschlag. Der Kommentar dazwischen ist der kritische Abschnitt. fence rw,w ordnet vorherige Reads und Writes vor nachfolgenden Writes, insbesondere vor sw zero. Das ist kein Cacheflush. Alle Zugreifer brauchen denselben Vertrag für gewöhnlichen Speicher. Als Inline-Assembler in C fehlt hier noch der Compilervertrag. Nicht schlafen, nicht blockierend warten. Das Unlock braucht Ordnung, damit der neue Besitzer die geschützten Daten sieht. Als Nächstes drückt eine AMO einfache Updates direkt aus. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## AMO-Befehle
@@ -452,10 +460,12 @@ Ohne die Release-Fence publiziert der Store das Schloss, nicht zuverlässig die 
 - Das ist kein globaler Bus-Lock. Ohne aq/rl fehlt die zusätzliche Ordnung
 
 ::: notes
-Ein Befehl statt explizitem LR/SC-Loop für einfache Ops.
+amoadd.w rd, rs2, (rs1) addiert atomar. Speicher 10, Addend 3: rd erhält 10, der Speicher wird 13. Zwei Inkremente ab 0 enden bei 2. Die Zuordnung der alten Werte 0 und 1 zu den Harts bleibt offen. Ohne aq/rl bleibt die RMW atomar, die Ordnung um andere Objekte fehlt. Das ist keine Ein-Takt-Garantie. C11-atomic_fetch_add ohne explizites memory_order-Argument ist seq_cst, nicht „ohne Ordnung“. seq_cst serialisiert nicht das ganze Programm. Als Nächstes beschreibt C die Sprachebene. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## C11: `<stdatomic.h>`
+
+![Relaxed kann ready 1 bei data 0 erlauben. Release und Acquire sichern die 42 ab.](../assets/figures/09_paralleles_rechnen_multicore/v_flag.png)
 
 ```c
 #include <stdatomic.h>
@@ -472,7 +482,7 @@ void hart_increment(void) {
 - Ein blockierender Fallback gehört nicht in eine ISR
 
 ::: notes
-Modernes C trifft RISC-V-A — Brücke Software/Hardware.
+Der Header stellt die C11-Atomics bereit. zaehler ist vor der konkurrierenden Nutzung 0. atomic_fetch_add gibt den alten Wert zurück. Hier wird er ignoriert. Alle Benutzer müssen den atomaren Typ verwenden. Ohne _explicit gilt seq_cst. Für einen reinen Zähler ohne Datenpublikation kann relaxed reichen. Der Endwert 2N gilt erst nach Abschluss beider Worker. Die Übersetzung kann AMO, LR/SC oder ein Bibliotheksfallback sein und ist hier nicht geprüft. Atomic ist nicht automatisch lock-free, lock-free nicht wait-free und nicht automatisch ISR-sicher. Ein atomarer Zähler publiziert nicht nebenbei andere Daten. Das Flag-Bild zeigt: relaxed ready 1 bei data 0 kann unter schwacher Ordnung erlaubt sein. Release auf ready und Acquire, der genau diese 1 liest, sichert data 42. Als Nächstes bleibt ein Wartezyklus möglich. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Deadlocks
@@ -484,15 +494,17 @@ Modernes C trifft RISC-V-A — Brücke Software/Hardware.
 - Hardware rettet nicht — Reihenfolge der Lock-Hierarchie in Software
 
 ::: notes
-Atomics schützen Daten, nicht vor schlechter Lock-Ordnung.
+Deadlock ist zirkuläres Warten. Core 0 hält A und will B, Core 1 hält B und will A. Die Reihenfolge A vor B verhindert diesen Zyklus, nicht jedes Deadlockproblem. Starvation ist fehlender Fortschritt ohne Zyklus. Livelock ist Aktivität ohne nützlichen Abschluss. Timeout darf das fremde Schloss nicht auf 0 setzen, während der Besitzer noch schreibt. Atomics ändern Scheduling und Prioritätsinversion nicht. Als Nächstes verbindet die Aufgabe den naiven Lock mit dem Interruptkontext. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Aufgabe — Schloss und ISR
 
 Warum genügt `volatile` nicht für das Check-then-Set? Was passiert, wenn die ISR auf das Schloss spinnt, das der unterbrochene Kontext hält?
 
+![Derselbe Hart: Halter, IRQ, ISR-Spin, kein Resume und kein Release.](../assets/figures/09_paralleles_rechnen_multicore/v_isr.png)
+
 ::: notes
-`volatile` erzwingt Zugriffe und schafft keine Atomizität und keine Ordnung. Die ISR und der unterbrochene Kontext warten aufeinander: Selbstdeadlock. Muster: Acquire mit `lr.w.aq`, Erfolgscode 0, Release mit `fence rw,w` vor dem Store.
+volatile macht Test und Set nicht unteilbar und ordnet keine gewöhnliche Payload. Der naive C-Fall bleibt ein Data Race. Auf demselben Hart hält ein Kontext L. Die ISR spinnt auf L. Der Halter kann bis zum ISR-Ende nicht freigeben. Das ist Selbstdeadlock. Zusätzliche Atomizität löst ihn nicht. Eine IRQ-Sperre hält andere Harts nicht fern. Konzeptuell hilft eine kurze IRQ-sichere Disziplin oder das Verschieben der Arbeit. Das Assemblerpattern ist kein universelles ISR-Rezept. Erfolg bleibt Status 0, danach der Abschnitt, Release mit fence rw,w vor dem Store 0. Als Nächstes begrenzen serieller Anteil und Kommunikation den Nutzen weiterer Kerne. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Amdahls Gesetz
@@ -507,7 +519,7 @@ $$
 - Grenze für $N \to \infty$: $S_{\max} = 1/s$
 
 ::: notes
-Mehr Kerne helfen nur dem parallelen Anteil. 10 % seriell → maximal 10× Speedup — egal wie viele Kerne.
+s ist der serielle Anteil der Ein-Kern-Laufzeit, p gleich 1 minus s der parallel verteilbare Anteil. T(1) ist 1. T(N) ist s plus p/N bei fester Arbeit, gleichen Kernen, idealer Balance und ohne Overhead. S(N) ist T(1)/T(N). Für s größer 0 ist die Grenze 1/s. s gleich 0 ergibt ideal S gleich N. s gleich 0,2 bedeutet zwanzig Prozent der Ein-Kern-Zeit, nicht der verkürzten Multicorezeit. Kommunikation und Locks liegen außerhalb, solange kein h(N) benannt ist. Eine größere Aufgabe ist ein anderer Vertrag. Als Nächstes folgen die Zahlen. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Amdahl: Zahlenbeispiel
@@ -520,10 +532,12 @@ Mehr Kerne helfen nur dem parallelen Anteil. 10 % seriell → maximal 10× Speed
 - Die Effizienz $S(100)/100$ ist nur etwa 4,8 Prozent. Overhead ist in dieser Rechnung noch 0
 
 ::: notes
-Feste Arbeit, ideale Balance, kein o(N). Eine größere Aufgabe ist eine andere Frage. 4,8 ist nicht weit unter 5.
+Bei s 0,2 und p 0,8 ist S(1) gleich 1, S(2) etwa 1,6667, S(4) gleich 2,5, S(8) etwa 3,3333, S(16) gleich 4 und S(100) gleich 4,807692. Die Grenze ist 5. Mit T(1) gleich 100 Zeiteinheiten bleiben 20 seriell und 80/N parallel. T(4) ist 40, T(100) ist 20,8. Die Effizienz S/N ist bei 4 gleich 62,5 Prozent und bei 100 etwa 4,8077 Prozent. Der Speedup liegt nahe an 5, die Kernnutzung ist trotzdem klein, weil zusätzliche Kerne nur den restlichen parallelen Anteil verkürzen. h ist 0. Die N-Achse des Bildes ist nicht linear. Keine Messung. Als Nächstes ordnet der Rückblick die Bausteine. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Unser fertiges SoC (Rückblick)
+
+![Konzeptplan: behandelt, optional oder im Target nicht belegt.](../assets/figures/09_paralleles_rechnen_multicore/v_soc.png)
 
 Dual-Core-Idee mit Bausteinen aus MCT3:
 
@@ -532,7 +546,7 @@ Dual-Core-Idee mit Bausteinen aus MCT3:
 - Optional und nicht im Repository nachgewiesen: RVV, NPU, kohärentes SMP
 
 ::: notes
-Vom Addierer zum überblickbaren Microcontroller-SoC.
+Das Bild ist ein Konzept-SoC (System on Chip), kein Laborgerät. Caches, CLINT (Core Local Interruptor) und PLIC (Platform-Level Interrupt Controller) sind Kursbeispiele, nicht die Pflicht jedes Chips. UART, SPI, I2C, DMA und Timer wurden behandelt. OoO, MESI als vorhandenes Target, RVV und NPU sind nicht belegt. Ein Sample läuft vom Bus in einen Puffer und in die CPU-Rechnung. Ein Interrupt meldet, DMA bewegt Daten, MESI würde Kopien koordinieren. Die Kursbehandlung einer NPU beweist nicht, dass sie im Labor-SoC vorhanden ist. Als Nächstes fragt die Tabelle nach dem passenden Hebel. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Drei Flaschenhälse — Lösungen
@@ -544,7 +558,7 @@ Vom Addierer zum überblickbaren Microcontroller-SoC.
 | CPU blockiert durch I/O | Interrupts, DMA |
 
 ::: notes
-Optimierung heißt: welchen der drei Feinde treffe ich?
+Die Memory Wall wird nicht dadurch beseitigt, dass mehr ALUs rechnen. Tiling und Lokalität können Transferbytes senken, die Bandbreite aber nicht heben. DLP schafft Rechenmöglichkeiten, nicht automatisch weniger Verkehr. Ein Branch Predictor hilft nur bei bestimmten Sprüngen. Unrolling darf die Semantik nicht ändern. Ein IRQ (Interrupt Request) kann Busywaiting vermeiden, DMA den Transfer übernehmen. Setup, Ownership und Speicher bleiben. RAW-Abhängigkeiten und Locks sind weitere Grenzen. Als Nächstes müssen diese Bedingungen im C-Code erkennbar sein. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## C-Code vs. Hardware
@@ -558,7 +572,7 @@ Ohne Hardwareblick typisch:
 Mit Systemblick: Caches, Pipeline, DMA und Kohärenz mitdenken.
 
 ::: notes
-Röntgenblick: eine C-Zeile kann harmlos oder systemtötend sein.
+C-Arrays sind row-major: der letzte Index liegt benachbart. Die innere Schleife sollte dazu passen, sonst springt der Zugriff über Lines. Polling, also wiederholtes Statuslesen, kann bei kurzer Wartezeit sinnvoll sein. Busywaiting ist nicht immer falsch. Ein geteiltes normales int braucht Synchronisation. volatile ersetzt sie nicht. _Atomic schützt das bezeichnete Objekt, nicht automatisch mehrere gekoppelte Invarianten. Der Systemblick ist eine Diagnose, kein Speeduprezept. Als Nächstes strukturiert der Klausurhinweis die Wiederholung. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Infos zur Klausur
@@ -568,18 +582,21 @@ Röntgenblick: eine C-Zeile kann harmlos oder systemtötend sein.
 - Fokus der Vorlesung: Konzepte, kleine Rechnungen, Skizzen, kurze C-Ausschnitte
 
 ::: notes
-Problemlösung vor Auswendiglernen von Datenblatt-Adressen.
+Dauer und Hilfsmittel stehen nur in der autorisierten Ankündigung. Hier wird nichts Neues festgelegt. Sinnvolle Vorbereitung ist eine Zustandsfolge, eine kleine Rechnung und ein fehlerhafter Schnipsel. Benannte Annahmen machen die Zählgrenze prüfbar. Es gibt keine Zusage über exakte Aufgaben. Als Nächstes wiederholt der Speicherblock Adresse und Zugriffszeit. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Klausurfokus: Speicher
 
+- Lehrcache: 4 KiB direct-mapped, Line 64 B, 32-Bit-Adresse. 64 Sätze, Offset 6, Index 6, Tag 20
+- Adresse 0x20001084: Offset 4, Index 2, Tag 0x20001, Linebasis 0x20001080
+- AMAT: Hitzeit 2 Takte, Hitrate 0,9, zusätzliche Misspenalty 40. Ergebnis 6 Takte, bei 100 MHz 60 ns
 - AMAT bei Hit-Rate und Miss-Penalty
 - Direct-Mapped vs. satzassoziativ; Thrashing
 - Cache-Line: Tag, Index, Offset, Valid, Dirty
 - Write-Back + DMA; MESI bei Multicore
 
 ::: notes
-Adresse zerlegen und Hierarchiekosten rechnen können.
+AMAT (Average Memory Access Time) ist Hitzeit plus Missrate mal zusätzlicher Misspenalty. Bei Hitzeit 2, Hitrate 0,9 und Penalty 40 sind das 2 plus 0,1 mal 40 gleich 6 Takte. Bei fiktiven 100 MHz dauert ein Takt 10 ns, also 60 ns. Ein Direct-Mapped-Datencache mit 4 KiB und 64-Byte-Lines hat 64 Sätze. Offset und Index haben je 6 Bit, der Tag 20. Die Adresse 0x20001084 hat Offset 4, Index 2, Tag 0x20001 und Linebasis 0x20001080. Valid und Dirty sind Metadaten, keine Nutzbytes. Satzassoziativität mildert Konflikte, hebt die Kapazitätsgrenze aber nicht auf. DMA-Maintenance und MESI bleiben verschiedene Verträge. Keine Boardmessung. Als Nächstes entscheidet hardwarenahes C über die Zugriffsverträge. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Klausurfokus: Hardwarenahes C
@@ -590,19 +607,20 @@ Adresse zerlegen und Hierarchiekosten rechnen können.
 - Races erkennen; `_Atomic` / `stdatomic` als Lösung
 
 ::: notes
-„Warum ist dieser Schnipsel gefährlich?“
+Ein kleines int a[2][3] liegt zeilenweise. Der Laufindex der innersten Schleife sollte die benachbarten Elemente treffen. MMIO verlangt die dokumentierte Zugriffsbreite. volatile verhindert nicht jede Optimierung und liefert keine Ordnung gegenüber DMA. Nicht jedes volatile Register wird durch _Atomic ersetzt. Geräte und atomare Speicherregionen haben verschiedene Verträge. Eine ISR ist nicht automatisch ein C11-Thread. Ein fehlerhafter Schnipsel ist while(lock==1); lock=1; auf einem gewöhnlichen int: Data Race und getrennte Übernahme. Die konzeptionelle Korrektur ist eine atomare RMW mit passender Ordnung, nicht volatile. Als Nächstes verbindet der Systemblock Peripherie und Zeitbasis. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Klausurfokus: System
 
 - Polling vs. IRQ; CLINT vs. PLIC
+- Lehrtimer: 1 MHz, Teiler 10, 1000 Zählertakte je Periode ergeben 100 Hz. Zähler 0–249 high sind 25 Prozent
 - Timer/Prescaler, PWM Duty Cycle; WDT
 - UART/SPI/I2C-Eigenschaften
 - DMA: SRC, DST, Increment
 - OoO: Renaming, ROB (Grundidee)
 
 ::: notes
-Display: SPI oder I2C — und warum?
+Polling fragt aktiv, ein IRQ meldet. CLINT und PLIC sind Beispiele lokaler und plattformweiter Interruptcontroller. Der Lehrtimer hat 1 MHz Eingang, Teiler 10 und 1000 Zählertakte je Periode, also 100 Hz. Die Zähler 0 bis 249 high sind 250 von 1000, also 25 Prozent Duty Cycle. Das ist kein Registerlayout. Der WDT (Watchdog Timer) überwacht Fortschritt. UART ist asynchron, SPI synchron mit Takt und Auswahl, I2C ein adressierter Bus. Es gibt keine universelle Displaywahl. DMA braucht Quelle, Ziel, Inkrement, Ownership und Completion. OoO-Renaming löst falsche Namensabhängigkeiten. Der ROB (Reorder Buffer) hält die Abschlussordnung. Eine echte RAW-Kette bleibt. Als Nächstes grenzt der Umfang die Wiederholung ab. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Was nicht im Fokus steht
@@ -612,7 +630,7 @@ Display: SPI oder I2C — und warum?
 - Keine Halbleiterphysik/Leckstrom-Formeln
 
 ::: notes
-Konzepte und Prinziprechnungen — keine Datenblatt-Trivia.
+Auswendig gelernte Basisadressen sind nicht der Fokus. Eine gegebene Registerbeschreibung muss trotzdem gelesen und angewandt werden. Kurze Folgen zu RMW und LR/SC können konzeptionell wichtig sein, lange Assemblerprogramme nicht. Halbleiterphysik ist nicht dieser Block. Das ist die vorhandene Kursabgrenzung, keine neue Garantie über Nichtprüfbarkeit. Als Nächstes können offene Punkte an konkreten Größen festgemacht werden. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Offene Fragerunde
@@ -621,32 +639,28 @@ Konzepte und Prinziprechnungen — keine Datenblatt-Trivia.
 - Was soll wiederholt werden?
 
 ::: notes
-Nutzen Sie die Gelegenheit vor der Klausurphase.
+Drei Diagnosen: Bei M:5 und RAM 0 ist der RAM alt, der Owner aktuell. SC-Erfolg ist Status 0, nicht der gelesene Schlosswert. S(100) nahe 5 kann mit etwa 4,8 Prozent Effizienz zusammenfallen. Bei einem falschen Wert ist zu fragen, ob die Kopie ungültig ist, eine RMW verloren ging, die Ordnung fehlt oder der Gerätevertrag nicht passt. Keine neue Pflichtübung. Als Nächstes bindet die Zusammenfassung die drei Fragen zurück. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Zusammenfassung Block 9
 
-- SMP: private L1, gemeinsamer Speicher → Kohärenz nötig
-- MESI: M/E/S/I; Write auf Shared → Invalidate
-- Race: `i++` ist RMW — MESI reicht nicht; Atomics (LR/SC, AMO)
+- SMP ist gemeinsame Software und gleicher Zugriff, nicht die Formel privates L1 plus L2
+- MESI verwaltet Lines. Ein normales `i++` wird dadurch nicht atomar
+- Atomare RMW und Acquire/Release sind verschiedene Fragen. Ein Schloss ist kein Zähler
 - Amdahl: serieller Anteil begrenzt den Multicore-Speedup
 - Klausur: AMAT, Mapping, IRQ/Timer, PWM, DMA, OoO-Idee, MESI
 
 ::: notes
-Kohärenz hält Caches ehrlich; Atomics halten Updates unteilbar; Amdahl hält Erwartungen realistisch.
+SMP ist nicht durch private L1 definiert. MESI verwaltet Lines und Schreibrechte. Ein normales i++ wird dadurch nicht atomar. Ein binäres Schloss bleibt 0 oder 1. Acquire/Release publiziert zugehörige Daten, ein Cacheflush ersetzt das nicht. Amdahl gilt unter fester Arbeit und ohne Overhead, nicht als gemessener Speedup. AMAT, IRQ, PWM und DMA bleiben getrennte Werkzeuge. Korrektes Sharing beantwortet drei Fragen: gültige Kopien, unteilbare Updates und passende Ordnung. Als Nächstes trennt der Abschluss Konzept und späteres Experiment. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::
 
 ## Abschluss und Ausblick
 
 - Theorie MCT3 abgeschlossen
-- Labor-Finale: Probeaufgaben, Renode, offene Fragen
+- Geplant bleibt die Wiederholung. Ein kohärentes Dual-Core-Labor liegt hier nicht vor
 
 Vielen Dank für Ihre Mitarbeit im Semester!
 
 ::: notes
-Quellen: RISC-V A-Extension und RVWMO, C11-Atomics, Kernel-Hinweis zu False Sharing. Kein kohärenter Multicore-Simulator und keine RISC-V-Toolchain wurden für Zeit oder Assemblat verwendet.
-:::
-
-::: notes
-Freude, Sie durch die SoC-Ebenen begleitet zu haben — viel Erfolg in der Klausur.
+Geprüft sind Zustandsfolgen, Schlossablauf, Ordnung und die Rechnungen zu Amdahl, Adresse, AMAT und PWM. Nicht geprüft sind RISC-V-Kompilierung, Renode und ein Kohärenz-Zeitmodell. Eine manuell korrekte MESI-Tabelle beweist die Konsistenz des Lehrmodells, keine vorhandene Hardware und keine Zykluszeit. Quellen sind die Unprivileged ISA 20240411, der C11-Draft N1570, die GCC-Volatile-Beschreibung und die Kernelnotiz zu False Sharing. Ein späteres Experiment bräuchte Plattform, Toolchain und ein Zeitmodell. Damit endet der fachliche Bogen dieses Blocks. Zahlen und Zeitfolgen sind Lehrannahmen. Assembler und C sind Lehrcode und wurden nicht kompiliert oder auf kohärenter Hardware ausgeführt.
 :::

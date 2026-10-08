@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400">
+<rect width="1200" height="400" fill="#fff"/>
+<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>
+<text x="16" y="22" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">data und ready sind _Atomic int, Start 0. Ein Schreiber, kein spaeterer Payloadwrite.</text>
+<rect x="16" y="50" width="560" height="140" fill="#fff" stroke="#1565C0" stroke-width="1.4"/>
+<text x="28" y="78" font-size="16" font-weight="600" fill="#1565C0" text-anchor="start">Producer</text>
+<text x="28" y="108" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">data = 42 relaxed</text>
+<text x="28" y="136" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">ready = 1 relaxed</text>
+<text x="28" y="168" font-size="13" font-weight="600" fill="#B71C1C" text-anchor="start">Programmreihenfolge, keine Sync-Kante</text>
+<rect x="620" y="50" width="540" height="140" fill="#fff" stroke="#E65100" stroke-width="1.4"/>
+<text x="632" y="78" font-size="16" font-weight="600" fill="#E65100" text-anchor="start">Consumer relaxed</text>
+<text x="632" y="108" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">liest ready, dann data</text>
+<text x="632" y="136" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">ready 1 und data 0 moeglich</text>
+<text x="632" y="168" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">racefrei, aber nicht publiziert</text>
+<rect x="16" y="220" width="1140" height="100" fill="#fff" stroke="#1B5E20" stroke-width="1.4"/>
+<text x="28" y="250" font-size="15" font-weight="600" fill="#1B5E20" text-anchor="start">Mit Ordnung: ready-Store release, ready-Load acquire liest genau diese 1.</text>
+<text x="28" y="282" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Dann ist data 42 sichtbar. Bei ready 0 die Daten nicht verwenden.</text>
+<text x="16" y="360" font-size="14" font-weight="600" fill="#B71C1C" text-anchor="start">Gewoehnliches non-atomic data plus relaxed Flag waere wieder ein Data Race.</text>
+<text x="16" y="388" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">Kein gemessener RISC-V-Lauf. Schwache Ordnung erlaubt das Lehr-Outcome, erzwingt es nicht.</text>
+</svg>

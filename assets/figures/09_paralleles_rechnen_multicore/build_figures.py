@@ -31,6 +31,13 @@ def R(x, y, w, h, stroke=INK, fill="#fff"):
     )
 
 
+def L(x1, y1, x2, y2, stroke=INK, sw=1.6):
+    return (
+        f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{stroke}" '
+        f'stroke-width="{sw}"/>'
+    )
+
+
 def save(name, p):
     (OUT / name).write_text("\n".join(p) + "\n</svg>\n", encoding="utf-8")
     print(name)
@@ -187,7 +194,7 @@ def fig_g():
 
 
 def fig_h():
-    p = svg(1200, 380)
+    p = svg(1200, 480)
     p.append(T(16, 20, "LR setzt eine Reservation auf eine Granule, kein gehaltenes Mutex. SC-Erfolg liefert 0.", 14))
     headers = ["Hart", "Gelesen", "Reservation", "SC", "Speicher"]
     xs = [16, 160, 360, 620, 860]
@@ -196,18 +203,21 @@ def fig_h():
     rows = [
         ("0 LR", "0", "gesetzt", "-", "0"),
         ("1 LR", "0", "gesetzt", "-", "0"),
-        ("0 SC", "0", "endet", "0", "1"),
-        ("1 SC", "0", "ungueltig", "nicht 0", "1"),
-        ("1 Retry", "1", "neu", "0", "2"),
+        ("0 SC", "0", "endet", "Status 0", "1"),
+        ("1 SC", "0", "endet", "Status ungleich 0", "1"),
+        ("1 LR neu", "1", "gesetzt", "kein SC", "1"),
+        ("0 Release", "-", "keine", "-", "0"),
+        ("1 LR/SC", "0", "endet", "Status 0", "1"),
     ]
     for i, row in enumerate(rows):
         y = 84 + i * 32
         for x, val in zip(xs, row):
             p.append(T(x, y, val, 15, C0 if "0" in row[0] else C1))
-    p.append(T(16, 270, "Ein SC darf auch scheitern, wenn kein anderer Hart geschrieben hat.", 15, ERR))
-    p.append(T(16, 300, "Interrupt, Kontextwechsel und fremder Store koennen die Reservation loeschen.", 14))
-    p.append(T(16, 330, "DMA gehoert nur dazu, wenn die Plattform dieselbe Reservationsdomaene definiert.", 14))
-    p.append(T(16, 360, "Constrained Loops haben Fortschritt unter Spec-Bedingungen, keine unbegrenzte Fairness.", 13, MUTED, "400"))
+    p.append(T(16, 340, "Schlosswerte nur 0 oder 1. Status 0 ist Erfolg, ungleich 0 ist Fehlschlag ohne Store.", 15, ERR))
+    p.append(T(16, 372, "Liest der neue LR 1, gibt es keinen SC. Nach Release 0 kann Hart 1 erneut erwerben.", 14))
+    p.append(T(16, 404, "Ein SC darf auch ohne fremden Write scheitern. Keine Fairness je Hart.", 14))
+    p.append(T(16, 436, "Beobachtete Geraetewrites auf die gelesenen Bytes duerfen nicht ignoriert werden.", 13, MUTED, "400"))
+    p.append(T(16, 464, "Granule ist nicht automatisch eine 64-Byte-Line. Kritischer Abschnitt erst nach Status 0.", 13, MUTED, "400"))
     save("lrsc.svg", p)
 
 
@@ -229,7 +239,7 @@ def fig_i():
 
 def fig_j():
     p = svg(1200, 380)
-    p.append(T(16, 20, "atomic_fetch_add ist ohne Ordnung sequentially consistent. Das serialisiert nicht das ganze Programm.", 14))
+    p.append(T(16, 20, "Ohne explizites memory_order-Argument gilt seq_cst. Das serialisiert nicht das ganze Programm.", 14))
     p.append(T(16, 52, "Ziel kann AMO, LR/SC oder ein Library-Fallback sein. ABI und Typ entscheiden.", 15))
     p.append(T(16, 88, "amoadd.w: Speicher 10, Addend 3. Rd bekommt 10, Speicher wird 13.", 16, C0))
     p.append(T(16, 124, "Zwei Fetch-Adds um 1 ab 0: alte Werte 0 und 1, Ende 2.", 16, MEM))
@@ -262,18 +272,150 @@ def fig_k():
 
 
 def fig_l():
-    p = svg(1200, 360)
-    p.append(T(16, 20, "Analytisch, fester Workload, kein Overhead. s=0,2 p=0,8.", 16))
-    p.append(T(16, 52, "S(4) = 1/0,4 = 2,5", 18, C0))
-    p.append(T(16, 84, "S(100) = 1/0,208 = 4,8077", 18, C1))
-    p.append(T(16, 116, "Grenze 1/s = 5. Effizienz S(100)/100 = 4,81 Prozent.", 16, MEM))
-    p.append(T(16, 156, "4,8 liegt nahe an 5. Die Parallel-Effizienz ist trotzdem sehr klein.", 15, ERR))
-    p.append(T(16, 190, "Ideal ohne seriellen Anteil waere S(N)=N. Die Kurve ist keine Messung.", 15))
-    p.append(T(16, 224, "Optional T(N)/T(1)=s+p/N+o(N). Ohne genannte o(N) bleibt der Overhead draussen.", 14))
-    p.append(T(16, 258, "Eine groessere Aufgabe ist eine andere Frage und widerlegt Amdahl nicht.", 14))
-    p.append(T(16, 292, "Annahmen: feste Arbeit, serieller Anteil der Ein-Kern-Zeit, ideale Balance.", 13, MUTED, "400"))
-    p.append(T(16, 324, "Mehr DLP loest die Memory Wall nicht allein. Lokalitaet und Transfers bleiben.", 13, MUTED, "400"))
+    p = svg(1200, 420)
+    p.append(T(16, 22, "Analytisch, s=0,2, p=0,8, h=0. Keine Messung. Grenze 5.", 15))
+    ns = [1, 2, 4, 8, 16, 100]
+    ss = [1 / (0.2 + 0.8 / n) for n in ns]
+    xs = [80, 200, 320, 460, 620, 980]
+    def y_of(s):
+        return 300 - (s / 5.5) * 240
+    p.append(L(60, 300, 1100, 300, MUTED, 1))
+    p.append(L(60, 40, 60, 300, MUTED, 1))
+    p.append(L(60, y_of(5), 1100, y_of(5), ERR, 1.2))
+    p.append(T(1110, y_of(5) + 4, "5", 12, ERR))
+    pts = []
+    for x, n, s in zip(xs, ns, ss):
+        y = y_of(s)
+        pts.append((x, y))
+        p.append(R(x - 5, y - 5, 10, 10, C0, C0))
+        p.append(T(x, 322, str(n), 12, MUTED, "400", "middle"))
+        p.append(T(x, y - 12, f"{s:.2f}", 12, C0, "600", "middle"))
+    for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+        p.append(L(x1, y1, x2, y2, C0, 2))
+    p.append(T(16, 360, "N auf der Achse ist nicht linear: 100 steht rechts, damit die Grenze sichtbar bleibt.", 14))
+    p.append(T(16, 388, "T1=100 Zeiteinheiten: 20 seriell plus 80/N. T4=40, T100=20,8. Effizienz bei 100 etwa 4,81 Prozent.", 14, ERR))
     save("amdahl.svg", p)
+
+
+def fig_v1():
+    p = svg(1200, 360)
+    p.append(T(16, 22, "Kohaerente Harts links. DMA nur mit Plattformvertrag in der Domaene.", 15))
+    p.append(R(40, 70, 200, 70, C0))
+    p.append(T(52, 100, "Hart 0", 16, C0))
+    p.append(T(52, 124, "L1-D privat", 13, MUTED, "400"))
+    p.append(R(40, 180, 200, 70, C1))
+    p.append(T(52, 210, "Hart 1", 16, C1))
+    p.append(T(52, 234, "L1-D privat", 13, MUTED, "400"))
+    p.append(R(360, 120, 220, 80, BUS))
+    p.append(T(372, 154, "Koordinator", 16, BUS))
+    p.append(T(372, 178, "Snoop oder Directory", 13, MUTED, "400"))
+    p.append(L(240, 105, 360, 150, C0, 2))
+    p.append(L(240, 215, 360, 170, C1, 2))
+    p.append(R(700, 120, 180, 80, MEM))
+    p.append(T(712, 154, "Memory", 16, MEM))
+    p.append(T(712, 178, "unterer Stand", 13, MUTED, "400"))
+    p.append(L(580, 160, 700, 160, MEM, 2))
+    p.append(R(960, 70, 200, 70, ERR))
+    p.append(T(972, 100, "DMA", 16, ERR))
+    p.append(T(972, 124, "Vertrag offen", 13, MUTED, "400"))
+    p.append(L(1060, 140, 880, 160, ERR, 1.4))
+    p.append(T(16, 290, "CPU-Kohaerenz, DMA-Maintenance, atomare RMW und MMIO-Ordnung sind verschiedene Pflichten.", 14))
+    p.append(T(16, 322, "Gemeinsames L2 allein beweist die Domaene nicht. L1-I ist hier nicht der Datenpfad.", 14, MUTED, "400"))
+    save("v_domain.svg", p)
+
+
+def fig_v2():
+    p = svg(1200, 400)
+    p.append(T(16, 22, "data und ready sind _Atomic int, Start 0. Ein Schreiber, kein spaeterer Payloadwrite.", 14))
+    p.append(R(16, 50, 560, 140, C0))
+    p.append(T(28, 78, "Producer", 16, C0))
+    p.append(T(28, 108, "data = 42 relaxed", 15))
+    p.append(T(28, 136, "ready = 1 relaxed", 15))
+    p.append(T(28, 168, "Programmreihenfolge, keine Sync-Kante", 13, ERR))
+    p.append(R(620, 50, 540, 140, C1))
+    p.append(T(632, 78, "Consumer relaxed", 16, C1))
+    p.append(T(632, 108, "liest ready, dann data", 15))
+    p.append(T(632, 136, "ready 1 und data 0 moeglich", 15, ERR))
+    p.append(T(632, 168, "racefrei, aber nicht publiziert", 13, MUTED, "400"))
+    p.append(R(16, 220, 1140, 100, MEM))
+    p.append(T(28, 250, "Mit Ordnung: ready-Store release, ready-Load acquire liest genau diese 1.", 15, MEM))
+    p.append(T(28, 282, "Dann ist data 42 sichtbar. Bei ready 0 die Daten nicht verwenden.", 15))
+    p.append(T(16, 360, "Gewoehnliches non-atomic data plus relaxed Flag waere wieder ein Data Race.", 14, ERR))
+    p.append(T(16, 388, "Kein gemessener RISC-V-Lauf. Schwache Ordnung erlaubt das Lehr-Outcome, erzwingt es nicht.", 13, MUTED, "400"))
+    save("v_flag.svg", p)
+
+
+def fig_v3():
+    p = svg(1200, 280)
+    p.append(T(16, 22, "Lehrline 64 B. int hier 4 B. Basis 0x20001000 ist ausgerichtet.", 14))
+    p.append(R(16, 50, 520, 48, ERR))
+    p.append(R(16, 50, 32, 48, C0))
+    p.append(R(48, 50, 32, 48, C1))
+    p.append(T(16, 130, "a[0] und a[1] liegen beide in 0x20001000-3F.", 14, ERR))
+    p.append(R(620, 50, 250, 48, C0))
+    p.append(R(900, 50, 250, 48, C1))
+    p.append(T(620, 130, "Records bei +0 und +64: Lines 0x20001000 und 0x20001040.", 14, MEM))
+    p.append(T(16, 180, "Sprachlich getrennte Variablen koennen trotzdem dieselbe Ownership teilen.", 15))
+    p.append(T(16, 212, "Padding trennt Layout. Es ersetzt keine Atomizitaet eines gemeinsamen Zaehlers.", 15, ERR))
+    p.append(T(16, 248, "Keine gemessene Verlangsamung. 64 Byte sind keine universelle Line.", 14, MUTED, "400"))
+    save("v_stride.svg", p)
+
+
+def fig_v4():
+    p = svg(1200, 320)
+    p.append(T(16, 22, "Hardwaremotiv, keine C11-Ergebnisliste. volatile aendert die Teilung nicht.", 14))
+    p.append(T(16, 60, "Hart 0", 14, C0))
+    p.append(T(120, 60, "liest 0", 15, C0))
+    p.append(T(280, 60, "schreibt 1", 15, C0))
+    p.append(T(480, 60, "Abschnitt", 15, ERR))
+    p.append(T(16, 100, "Hart 1", 14, C1))
+    p.append(T(120, 100, "liest 0", 15, C1))
+    p.append(T(280, 100, "schreibt 1", 15, C1))
+    p.append(T(480, 100, "Abschnitt", 15, ERR))
+    p.append(T(16, 150, "Beide sind gleichzeitig im Abschnitt, weil Check und Set getrennt sind.", 15, ERR))
+    p.append(R(16, 180, 1140, 70, MEM))
+    p.append(T(28, 210, "Atomare Uebernahme: nur ein SC mit Status 0 betritt den Abschnitt.", 15, MEM))
+    p.append(T(28, 236, "Der andere liest 1 und wartet bis zum Release auf 0.", 15, MEM))
+    p.append(T(16, 290, "Das ist kein Zaehler-RMW. Der Schlosswert bleibt 0 oder 1.", 14, MUTED, "400"))
+    save("v_check.svg", p)
+
+
+def fig_v5():
+    p = svg(1200, 260)
+    p.append(T(16, 22, "Ein Hart. Die ISR unterbricht den Halter desselben Schlosses.", 15))
+    steps = ["Haelt L", "IRQ", "ISR spinnt", "kein Resume", "kein Release"]
+    for i, name in enumerate(steps):
+        p.append(R(16 + i * 230, 60, 200, 44, ERR if i >= 2 else C0))
+        p.append(T(28 + i * 230, 88, name, 14))
+        if i < 4:
+            p.append(L(216 + i * 230, 82, 246 + i * 230, 82, INK, 1.6))
+    p.append(T(16, 150, "IRQ-Sperre auf diesem Hart haelt andere Harts nicht fern.", 15))
+    p.append(T(16, 182, "Konzept: kurze Meldung, Arbeit spaeter. Keine konkrete RTOS-Funktion.", 15, MEM))
+    p.append(T(16, 220, "Zusaetzliche Atomizitaet loest den Selbstdeadlock nicht. Timeout gibt L nicht frei.", 14, ERR))
+    save("v_isr.svg", p)
+
+
+def fig_v6():
+    p = svg(1200, 360)
+    p.append(T(16, 22, "Konzept-SoC. Behandelt, optional oder im Target nicht belegt.", 15))
+    boxes = [
+        (16, 50, "Harts", "behandelt als Idee", C0),
+        (230, 50, "Cache/MESI", "Lehrmodell", BUS),
+        (460, 50, "Memory", "behandelt", MEM),
+        (690, 50, "DMA", "behandelt", C1),
+        (920, 50, "UART SPI I2C", "behandelt", INK),
+        (16, 160, "CLINT/PLIC", "Beispiel, nicht jeder SoC", MUTED),
+        (360, 160, "Timer/PWM", "Lehrrechnung", C0),
+        (680, 160, "RVV/NPU", "optional, nicht belegt", ERR),
+    ]
+    for x, y, a, b, col in boxes:
+        p.append(R(x, y, 200, 70, col))
+        p.append(T(x + 10, y + 30, a, 14, col))
+        p.append(T(x + 10, y + 54, b, 12, MUTED, "400"))
+    p.append(T(16, 270, "Ein Sample: Bus, Puffer, CPU-Rechnung, Completion. Interrupt meldet, DMA bewegt.", 15))
+    p.append(T(16, 304, "OoO, kohaerentes SMP, RVV und NPU sind hier keine vorhandene Laborplattform.", 14, ERR))
+    p.append(T(16, 338, "AMAT und PWM stehen auf den Wiederholungsfolien, nicht als Boardmessung.", 14, MUTED, "400"))
+    save("v_soc.svg", p)
 
 
 if __name__ == "__main__":
@@ -282,6 +424,6 @@ if __name__ == "__main__":
     assert abs(s4 - 2.5) < 1e-12
     assert abs(s100 - 4.807692307692) < 1e-9
     assert abs(s100 / 100 - 0.048076923) < 1e-9
-    for fn in (fig_a, fig_b, fig_c, fig_d, fig_e, fig_f, fig_g, fig_h, fig_i, fig_j, fig_k, fig_l):
+    for fn in (fig_a, fig_b, fig_c, fig_d, fig_e, fig_f, fig_g, fig_h, fig_i, fig_j, fig_k, fig_l, fig_v1, fig_v2, fig_v3, fig_v4, fig_v5, fig_v6):
         fn()
     print("checks", round(s100, 4), round(100 * s100 / 100, 2))
