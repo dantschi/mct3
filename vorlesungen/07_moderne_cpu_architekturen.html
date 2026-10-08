@@ -243,7 +243,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>Caches und DMA haben externe Engpässe entschärft. Zurück zum Prozessorkern: Warum reicht die MCT1-Pipeline für Desktop-/Smartphone-CPUs nicht?</p>
+<p>Willkommen zu Block 7 knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. DMA entlastet Kopierarbeit, beseitigt aber nicht jeden Speicherwartezustand. Heute geht es um mehrere Befehle im Kern. Nicht jede CPU derselben Klasse ist gleich breit oder OoO. Willkommen zur siebten Vorlesung in Mikrocomputertechnik 3. Bisher: RAM, Caches, Interrupts, Busse, DMA — das SoC ist ausgestattet. Verständnischeck: Wartet die CPU trotz DMA nie? Nein, eigene Loads können warten. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -256,8 +256,8 @@ flowchart LR
           display:block!important;
       }</style></aside>
 </section>
-<section id="anknüpfung-dma-labor" class="slide level2">
-<h2>Anknüpfung: DMA-Labor</h2>
+<section id="anknüpfung-dma-lehrszenario" class="slide level2">
+<h2>Anknüpfung: DMA-Lehrszenario</h2>
 <p>Kurz-Recap aus Block 6 (Vertiefung im Übungsblatt):</p>
 <ul>
 <li>DMA kopiert Arrays autonom; Polling blockiert die CPU stark</li>
@@ -270,7 +270,7 @@ flowchart LR
 <span id="cb1-3"><a aria-label="3"></a>DMA_CH1<span class="op">-&gt;</span>DST_ADDR <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)&amp;</span>UART_TX<span class="op">;</span></span>
 <span id="cb1-4"><a aria-label="4"></a>DMA_CH1<span class="op">-&gt;</span>CONTROL <span class="op">=</span> DMA_ENABLE<span class="op">;</span>  <span class="co">/* fiktiv, kein blindes |= */</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>DMA befreit von Kopierarbeit. Als Nächstes: Wie schnell rechnet die CPU selbst auf Befehlsebene?</p>
+<p>Anknüpfung: DMA-Lehrszenario knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Die drei Zuweisungen sind ein unvollständiger Lehrausschnitt: Quelle, festes UART-Ziel, Enable. Länge, Breite, Inkrement, Request, Besitz und Abschluss fehlen. Der uint32_t-Cast ist keine DMA-Adresse. Ein Heartbeat zeigt Fortschritt, keine Null-Last. DMA kopiert Arrays autonom; Polling blockiert die CPU stark. Ein Heartbeat aus <code>main()</code> kann weiterlaufen. Das beweist keine Last von null. Verständnischeck: Reichen Quelle, Ziel und Enable? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -288,11 +288,11 @@ flowchart LR
 <ul>
 <li>Fokus: Ausführungsgeschwindigkeit im Kern</li>
 <li>Weg von Systembus, MMIO und Peripherie-IRQs</li>
-<li>Rein: Pipeline, ALU, Assembler auf Befehlsebene</li>
+<li>Fokus auf den Kern; Cache-Misses bleiben in den Zeitbeispielen ausdrücklich drin</li>
 <li>Metriken und Hardware-Parallelität innerhalb eines Kerns</li>
 </ul>
 <aside class="notes">
-<p>Alles außerhalb des L1 blenden wir didaktisch aus — Takte, Gatter, Instruktionsstrom.</p>
+<p>Zurück in die CPU knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Der Fokus liegt auf dem Kern, Cache-Misses bleiben in den Zeitbeispielen. Assembler nennt einen ISA-Befehl. Pipeline und physische Register sind Implementierung. Gleiche Programme können verschieden viele Takte brauchen. Fokus: Ausführungsgeschwindigkeit im Kern. Weg von Systembus, MMIO und Peripherie-IRQs. Verständnischeck: Warum später ein Cache-Miss? Er bestimmt, wann der Operand bereit ist. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -310,7 +310,7 @@ flowchart LR
 <div class="quarto-figure quarto-figure-center">
 <figure>
 <p><img data-src="../assets/figures/07_moderne_cpu_architekturen/pipe.png"></p>
-<figcaption>Fünf ALU-Befehle, neun Takte, CPI 1,8. Ein Stall ohne Forwarding macht zehn Takte.</figcaption>
+<figcaption>Fünf ALU-Befehle, neun Takte, CPI 1,8. Benachbarter ALU-RAW ohne Forwarding: elf Takte, CPI 2,2.</figcaption>
 </figure>
 </div>
 <p>Klassische RISC-Pipeline (Harris/Harris):</p>
@@ -352,7 +352,7 @@ flowchart LR
 </table>
 <p>Nach dem Füllen strebt der Durchsatz gegen ein Retire je Takt. Fünf Befehle brauchen im Modell ohne Stall <span class="math inline">\(N+k-1 = 9\)</span> Takte, mittleres CPI <span class="math inline">\(= 1{,}8\)</span>.</p>
 <aside class="notes">
-<p>Stand MCT1: Fließband mit fünf Stufen — Grundlage für alles Weitere heute.</p>
+<p>Refresher MCT1: 5-Stufen-Pipeline knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. IF holt, ID dekodiert und liest, EX rechnet, MEM ist der Speicherplatz, WB schreibt zurück. Fünf unabhängige ALU-Befehle brauchen neun Takte: CPI 9/5 = 1,8, IPC 5/9. Stationär ist ein Befehl je Takt. Ohne Forwarding schreibt I1 in WB Takt 5, I2 liest erst dann und startet EX in Takt 6. Das sind zwei Zusatzstalls, elf Takte, CPI 2,2. Verständnischeck: Warum CPI 1,8 statt 1? Das kurze Fenster enthält Füllen und Leeren. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -378,7 +378,7 @@ flowchart LR
 T = N \times \mathrm{CPI} / f
 \]</span></p>
 <aside class="notes">
-<p>Ein Compiler kann N ändern. Höheres IPC allein verkürzt die Laufzeit nicht. Mittelwerte verschiedener Läufe nicht ungewichtet invertieren. Kurze Sequenzen enthalten Füllung und Leerung.</p>
+<p>Metriken: IPC und CPI knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. IPC zählt retired ISA-Instruktionen je Takt, CPI die Takte je retired Instruktion, nur im selben Fenster Kehrwerte. Completion ist nicht Retire. 100 Befehle mit CPI 1 brauchen 100 Takte, 150 mit CPI 0,8 brauchen 120. Höheres IPC kann trotzdem länger dauern. IPC: retired ISA-Instruktionen pro Core-Takt im betrachteten Fenster. Execution-Completion und Retire können in verschiedenen Takten liegen. Verständnischeck: Sind CPI und IPC immer Kehrwerte? Nur bei gleicher Basis und gleichem Fenster. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -400,7 +400,7 @@ T = N \times \mathrm{CPI} / f
 <li>Realität oft schlechter (<span class="math inline">\(\mathrm{CPI} &gt; 1\)</span>) durch Bubbles und Hazards</li>
 </ul>
 <aside class="notes">
-<p>Mauer der MCT1-Architektur: IPC höchstens 1 im Ideal — oft darunter.</p>
+<p>Limit der skalaren Pipeline knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Eine skalare Pipeline überlappt Stufen, startet hier aber höchstens einen neuen Befehl je Takt. Ideal 1 gilt stationär ohne Warten. Ein späterer Retire-Burst ist kein dauerhaftes IPC über 1. Ideal ohne Stalls/Hazards/Misses: <span class="math inline">\(\mathrm{IPC} = 1\)</span>, <span class="math inline">\(\mathrm{CPI} = 1\)</span>. Eine skalare Ein-Issue-Pipeline: strukturell kein <span class="math inline">\(\mathrm{CPI} &lt; 1\)</span>. Verständnischeck: Laufen bei IPC 1 nur einzelne Befehle? Nein, mehrere Stufen sind zugleich belegt. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -422,7 +422,7 @@ T = N \times \mathrm{CPI} / f
 <li>CPI verbessern ist ein Weg, kein kostenloser Ersatz für Takt</li>
 </ul>
 <aside class="notes">
-<p>Pentium-4-Ära: Hoffnung auf extrem hohe GHz — Physik und Kühlung setzen Grenzen.</p>
+<p>Die Taktraten-Mauer (Power Wall) knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. P_dyn ist etwa alpha mal C mal V quadrat mal f.&nbsp;C ist Kapazität. Bei festem alpha und C ergibt 1,5-fache Frequenz und 1,1-fache Spannung den Faktor 1,815 nur für die dynamische Leistung. Leckstrom ist getrennt. Die Formel liefert keine feste Gigahertz-Grenze. Idee der 2000er: Frequenz massiv erhöhen (GHz-Wettrennen). Vereinfacht <span class="math inline">\(P_{dyn} \approx \alpha C V^{2} f\)</span>. Leckleistung ist davon getrennt. Verständnischeck: Liefert die Formel eine maximale Taktzahl? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -451,7 +451,7 @@ T = N \times \mathrm{CPI} / f
 </ul>
 <p>Das Zeitdiagramm oben ersetzt die Ein-Takt-Skizze. IPC wird über das ganze Fenster gerechnet.</p>
 <aside class="notes">
-<p>Nicht schneller takten — breiter und smarter schedulen.</p>
+<p>Die Leitfrage des Tages knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Im verkürzten Modell M2 sind vier unabhängige Befehle bereit. Skalar: Issue in 1 bis 4, Retire in 2 bis 5, IPC 4/5 = 0,8. Zweifach: zwei Issue-Paare, Retire in Takt 2 und 3, IPC 4/3. Ein Doppeltakt ist nicht das mittlere IPC 2. Dieses Fenster ist nicht das Fünf-Stufen-Modell. Taktfrequenz: physikalisch begrenzt. Skalare Pipeline: Ideal <span class="math inline">\(\mathrm{CPI} = 1\)</span> (mit Stalls oft <span class="math inline">\(&gt; 1\)</span>). Verständnischeck: Warum 4/3 und nicht 2? Vier Retires verteilen sich auf drei Takte. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -475,7 +475,7 @@ T = N \times \mathrm{CPI} / f
 <li>Labor-Ausblick (Compiler / Godbolt)</li>
 </ol>
 <aside class="notes">
-<p>Von skalarer Pipeline über OoO und Prediction bis Spekulation und Compiler.</p>
+<p>Agenda knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Die Agenda fragt nach unabhängigen Befehlen, passenden Ressourcen, korrektem Zustand, Fetch am Branch, bleibenden Spuren und dem Compiler. Ein Laborlauf liegt nicht vor. Der ROB kommt vor dem Seitenkanal, weil er Recovery erklärt. Verständnischeck: Warum der ROB vor Security? Er trennt Architekturzustand und interne Spuren. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -498,7 +498,7 @@ T = N \times \mathrm{CPI} / f
 <li>Rolle von Compiler-Scheduling (<code>-O3</code>)</li>
 </ul>
 <aside class="notes">
-<p>Ziel: Datenblätter moderner Kerne architektonisch lesen können — nicht nur Takt und Kerne zählen.</p>
+<p>Lernziele Block 7 knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Prüfbar sind Kanten, ein benanntes IPC-Fenster, der physische Quelltag, der präzise Exception-Zustand und die Vorhersage vor dem Update. IPC 2 ohne Programm und Zählbasis ist unvollständig. -O3 ist kein garantierter Gewinn. Skalare vs.&nbsp;superskalare Pipeline erklären. Datenabhängigkeiten RAW, WAW, WAR unterscheiden. Verständnischeck: Welche Angaben fehlen bei IPC 2? Programm, Fenster und Zählbasis. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -523,7 +523,7 @@ T = N \times \mathrm{CPI} / f
 <li>Unabhängige Operationen → auf getrennten Execution Units im selben Takt denkbar</li>
 </ul>
 <aside class="notes">
-<p>Viele Programme haben unabhängige Teilrechnungen — das ist der Hebel für IPC &gt; 1.</p>
+<p>Instruction-Level Parallelism (ILP) knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. ILP ist vorhandene Unabhängigkeit. Zwei C-Zeilen sind nicht automatisch zwei parallele ISA-Befehle. Pointer und Loads können weitere Kanten erzeugen. Units können verschiedene Latenzen haben. ILP: wie viele Befehle eines Programms <em>theoretisch</em> parallel laufen könnten. Beispiel ohne Abhängigkeit:. Verständnischeck: Sind zwei C-Zeilen automatisch parallel? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -554,7 +554,7 @@ T = N \times \mathrm{CPI} / f
 <li>Forwarding verkürzt die Wartezeit und hebt die RAW-Kante nicht auf</li>
 </ul>
 <aside class="notes">
-<p>Bekannt aus MCT1: echte Datenabhängigkeit — Hardware kann Mathematik nicht „wegoptimieren“.</p>
+<p>Datenabhängigkeiten: RAW knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. RAW heißt Read After Write. Der Verbraucher braucht das Ergebnis des Produzenten. Forwarding liefert es früher, erzeugt es aber nicht vor der Rechnung. Ein RAW-Paar hat keine gleichzeitige unabhängige Ausführung. WAR und WAW sind Namenskonflikte und folgen später. True Dependency / Read-After-Write (RAW): Befehl 2 braucht Ergebnis von Befehl 1. Dieses Paar hat ILP 1. Das ist keine Aussage über das ganze Programm. Verständnischeck: Löscht Forwarding die Abhängigkeit? Nein, es kann nur die Wartezeit kürzen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -575,7 +575,7 @@ T = N \times \mathrm{CPI} / f
 <li>Compiler kennt u. a. Cache-Misses zur Laufzeit nicht → dynamisches Scheduling oft mächtiger</li>
 </ul>
 <aside class="notes">
-<p>Beide Ansätze ergänzen sich; High-End-Kerne verlassen sich stark auf Hardware-Scheduling.</p>
+<p>Statisches vs.&nbsp;dynamisches Scheduling knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Statisches Scheduling legt die ISA-Reihenfolge vorher fest. Dynamisches Issue reagiert auf aktuelle Bereitschaft. Der Compiler kennt nicht jede Miss-Folge. Hardware sieht nur ein endliches Fenster. Beides ergänzt sich. Statisch (Compiler): Befehle vorab umordnen, Abhängigkeiten auseinanderziehen. Dynamisch (Hardware): zur Laufzeit unabhängige Befehle finden und an die Units ausgeben (Issue). Verständnischeck: Warum hilft dynamisches Scheduling bei wechselnden Loads? Es nutzt gerade bereite unabhängige Befehle. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -597,7 +597,7 @@ T = N \times \mathrm{CPI} / f
 <li>Pipeline wird „breiter“: mehrspurige Autobahn statt einspurigem Fließband</li>
 </ul>
 <aside class="notes">
-<p>Erster Schritt zu CPI &lt; 1: Execution Units und Issue-Breite vervielfachen.</p>
+<p>Superskalare Architekturen knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Superskalar heißt Multiple Issue und setzt OoO nicht voraus. Fetch, Decode, Issue und Retire können verschieden breit sein. Zwei ALU machen einen Kern nicht automatisch OoO. Ein Port bedient nur bestimmte Operationen. Skalar: typisch ein Issue pro Takt. Superskalar: Multiple Issue. Das ist noch nicht Out-of-Order. Verständnischeck: Sind zwei ALU automatisch OoO? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -623,7 +623,7 @@ T = N \times \mathrm{CPI} / f
 <li>Ein pipelinierter Multiplizierer trennt Latenz und Initiationsintervall</li>
 </ul>
 <aside class="notes">
-<p>Drei Units reichen nicht für IPC 3. Im Bild begrenzt die Retire-Breite 2 den nachhaltigen Durchsatz, wenn alles andere passt.</p>
+<p>Mehrere Execution Units knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Das Ressourcenbild ist fiktiv: Fetch bis 16 Byte, Decode und Issue bis 3, zwei ALU, eine LSU, Retire bis 2. Drei Starts können den Retire-Engpass von 2 überholen, dann staut der Puffer. Ein Multiplizierer mit Latenz 3 und Intervall 1 startet unabhängige Operationen jeden Takt. MUL braucht die M-Erweiterung, nicht reines RV32I. Zwei Integer-ALU und eine LSU sind das vereinfachte Modell aus der Abbildung. Ein pipelinierter Multiplizierer trennt Latenz und Initiationsintervall. Verständnischeck: Kann Latenz 3 trotzdem jeden Takt starten? Bei Intervall 1 ja, der Nutzer wartet trotzdem. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -644,7 +644,7 @@ T = N \times \mathrm{CPI} / f
 <li>Aufwand der Abhängigkeitsprüfung wächst stark mit der Issue-Width</li>
 </ul>
 <aside class="notes">
-<p>Breites Back-End nützt wenig ohne breites Front-End — Decode wird oft zum Flaschenhals.</p>
+<p>Multi-Issue Fetch und Decode knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. 16 Fetch-Byte sind vier Befehle nur bei durchgängig 32-Bit-Instruktionen. Die C-Erweiterung meint komprimierte Befehle, nicht die Sprache C. Decode erkennt Befehle. Nicht jede Bereitschaftsprüfung liegt im Decode. Fetch holt zum Beispiel 16 Byte. Mit der C-Erweiterung ist das keine feste Instruktionszahl. Decode prüft Abhängigkeiten <em>zwischen</em> den Kandidaten und verteilt auf Units. Verständnischeck: Sind 16 Byte stets vier Befehle? Nein, mit komprimierten Befehlen variiert die Zahl. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -665,7 +665,7 @@ T = N \times \mathrm{CPI} / f
 <li>Stoppt ein früher Befehl (Hazard/Miss), stauen dahinter auch Unabhängige</li>
 </ul>
 <aside class="notes">
-<p>Breit, aber starr: ein Stau vorne blockiert freie Units hinten.</p>
+<p>In-Order Superskalar knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. In-order Issue wählt in Programmreihenfolge. Ein blockierter älterer Befehl kann jüngere Starts verhindern. Schon ausgegebene Befehle müssen nicht in derselben Reihenfolge fertig werden. Das globale Stoppen hinter dem Load ist die Lehrannahme von M3. Start-Reihenfolge = Programmreihenfolge (z. B. ältere In-Order-Kerne). Unabhängige Nachbarn können gemeinsam starten. Verständnischeck: Heißt In-Order gleiche Fertigreihenfolge? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -683,19 +683,20 @@ T = N \times \mathrm{CPI} / f
 <div class="quarto-figure quarto-figure-center">
 <figure>
 <p><img data-src="../assets/figures/07_moderne_cpu_architekturen/ooo.png"></p>
-<figcaption>Dieselben vier Befehle: in-order 7 Takte, OoO 6 Takte. Der Miss bleibt, Retire wartet.</figcaption>
+<figcaption>Gleiche Breite: in-order 8 Takte, OoO 7 Takte. Der Miss bleibt, Retire wartet.</figcaption>
 </figure>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb4-1"><a aria-label="1"></a>lw  t0<span class="op">,</span> <span class="dv">0</span><span class="op">(</span>s1<span class="op">)</span>    <span class="op">#</span> Miss → viele Wartezyklen</span>
-<span id="cb4-2"><a aria-label="2"></a><span class="bu">add</span> t1<span class="op">,</span> t0<span class="op">,</span> t2   <span class="op">#</span> RAW auf t0 → muss warten</span>
-<span id="cb4-3"><a aria-label="3"></a><span class="bu">sub</span> t4<span class="op">,</span> t5<span class="op">,</span> t6   <span class="op">#</span> unabhängig — trotzdem oft blockiert</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb4-1"><a aria-label="1"></a>lw  t0<span class="op">,</span> <span class="dv">0</span><span class="op">(</span>s1<span class="op">)</span>     <span class="op">#</span> I1<span class="op">,</span> Ergebnis am Ende von Takt <span class="dv">4</span></span>
+<span id="cb4-2"><a aria-label="2"></a><span class="bu">add</span> t1<span class="op">,</span> t0<span class="op">,</span> t2    <span class="op">#</span> I2<span class="op">,</span> RAW auf t0</span>
+<span id="cb4-3"><a aria-label="3"></a><span class="bu">sub</span> t3<span class="op">,</span> t4<span class="op">,</span> t5    <span class="op">#</span> I3<span class="op">,</span> unabhängig</span>
+<span id="cb4-4"><a aria-label="4"></a><span class="bu">and</span> t6<span class="op">,</span> a0<span class="op">,</span> a1    <span class="op">#</span> I4<span class="op">,</span> unabhängig</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li>Lehrannahme hier: der In-Order-Kern gibt hinter dem wartenden Load nichts weiter aus</li>
 <li>Reale In-Order-Kerne dürfen davon abweichen</li>
 <li>Der Miss bleibt auch bei OoO bestehen. Unabhängige Befehle können ihn nur überlappen</li>
 </ul>
 <aside class="notes">
-<p>Cache-Misses sind Gift für strikte Programmreihenfolge trotz freier ALUs.</p>
+<p>Problem: Cache-Miss in-order knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. M3: lw t0, add t1, sub t3, and t6 mit a0 und a1. Speicher 10, t2 1, t4 8, t5 3, a0 15, a1 3. Ergebnisse 10, 11, 5 und 3. Nur I1 nach I2 ist RAW. Beide Varianten haben Issue 1, eine ALU, eine LSU und Retire 2. In-order acht Takte, IPC 0,5. OoO sieben Takte, IPC 4/7. I3 und I4 starten früh, retiren aber nach I2. Laufzeit sinkt um 12,5 Prozent, der Faktor ist 8/7. Lehrannahme hier: der In-Order-Kern gibt hinter dem wartenden Load nichts weiter aus. Reale In-Order-Kerne dürfen davon abweichen. Verständnischeck: Warum startet I2 erst in Takt 5? t0 ist erst am Ende von Takt 4 bereit. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -715,10 +716,11 @@ T = N \times \mathrm{CPI} / f
 <span id="cb5-2"><a aria-label="2"></a><span class="bu">sub</span> t0<span class="op">,</span> t4<span class="op">,</span> t5   <span class="op">#</span> schreibt ebenfalls t0</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li>Keine RAW-Abhängigkeit der Operanden</li>
-<li>Dennoch: Schreibreihenfolge muss erhalten bleiben — sonst falscher Endwert in <code>t0</code></li>
+<li>Der architektonisch bestätigte Endwert muss vom späteren Schreiber stammen</li>
+<li>Physische Abschlüsse dürfen nach Renaming überholen</li>
 </ul>
 <aside class="notes">
-<p>Konflikt nur wegen wiederverwendeten Zielregisters — „falsche“ Abhängigkeit.</p>
+<p>Falsche Abhängigkeit: WAW knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. WAW sind zwei Schreiber auf denselben ISA-Namen. Der spätere Schreiber bestimmt den architektonischen Endwert. Nach Renaming haben sie getrennte physische Ziele und dürfen fertig werden, bevor der Commit die richtige Version sichert. Keine RAW-Abhängigkeit der Operanden. Der architektonisch bestätigte Endwert muss vom späteren Schreiber stammen. Verständnischeck: Dürfen WAW-Schreiber in umgekehrter Reihenfolge fertig werden? Ja, mit getrennten Zielen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -741,7 +743,7 @@ T = N \times \mathrm{CPI} / f
 <li>Verhindert unkritische Überholvorgänge ohne weitere Maßnahmen</li>
 </ul>
 <aside class="notes">
-<p>Wieder Register-Recycling: mathematisch unabhängig, architektonisch verkoppelt.</p>
+<p>Falsche Abhängigkeit: WAR knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. WAR: der ältere Leser braucht den alten Wert, der jüngere Schreiber erzeugt einen neuen. Der Leser speichert den alten physischen Quelltag. Das ist kein RAW, weil er das neue Ergebnis nicht braucht. <code>sub</code> darf <code>t0</code> nicht zu früh überschreiben, bevor <code>add</code> gelesen hat. Verhindert unkritische Überholvorgänge ohne weitere Maßnahmen. Verständnischeck: Warum bleibt der Leser korrekt? Sein Tag zeigt weiter auf die alte Version. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -762,7 +764,7 @@ T = N \times \mathrm{CPI} / f
 <li>Wiederverwendung erzeugt WAR/WAW. Erweiterungen bringen weitere Registerdateien</li>
 </ul>
 <aside class="notes">
-<p>Zu wenige Namen erzeugen falsche Abhängigkeiten. Wie viele physische Register ein Kern hat, steht nicht in der ISA.</p>
+<p>Engpass: 32 ISA-Register knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. RV32I hat 32 Integernamen, x0 ist fest null, 31 sind beschreibbar. RV32 und RV64 sind die Bitbreite, nicht die Anzahl. t0 ist ein ABI-Alias, kein Extra-Register. Mehr physische Register ändern die sichtbare Anzahl nicht und lösen kein RAW. RV32I und RV64I: 32 Integerregister <code>x0</code>–<code>x31</code>. <code>x0</code> ist fest 0. Das sind Architektur-Namen, keine physischen Kisten. RV32E hat ein anderes Registerprofil. Verständnischeck: Wie viele beschreibbare Integerregister hat RV32I? 31. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -779,7 +781,7 @@ T = N \times \mathrm{CPI} / f
 <h2>Aufgabe — RAW und Breite</h2>
 <p>Warum bleibt die Kante von I1 nach I2 bestehen, obwohl I3 und I4 unabhängig sind? Warum folgt aus zwei ALU nicht IPC 2?</p>
 <aside class="notes">
-<p>I2 liest t0, das I1 erst liefert. Das ist RAW. I3 und I4 können den Miss nur überlappen. Die Retire-Breite und der älteste unfertige Befehl begrenzen den Durchsatz. Siehe Abhängigkeitsbild und das OoO-Zeitdiagramm.</p>
+<p>Aufgabe — RAW und Breite knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. I2 braucht t0 aus dem Load. I3 und I4 sind unabhängig, dürfen aber nicht vor I2 retiren. Zwei ALU garantieren weder zwei Starts noch zwei Retires. M3 nutzt bewusst eine ALU. IPC ist 4/8 und 4/7. Verständnischeck: Warum reicht die ALU-Zahl nicht für IPC? Programm, Fenster und Retire-Grenze fehlen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -800,7 +802,7 @@ T = N \times \mathrm{CPI} / f
 <li>Issue in datenabhängiger, dynamisch gewählter Reihenfolge. Der Kern bleibt getaktet</li>
 </ul>
 <aside class="notes">
-<p>Modern: nicht mehr nur „nächster PC“ — freie Units mit bereiten Operanden füttern.</p>
+<p>Out-of-Order Execution (OoO) knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. OoO ändert die Issue-Reihenfolge. Der PC holt weiter den vorhergesagten Strom. Rename und Dispatch bleiben geordnet, Retire auch. M3 zeigt OoO schon bei Issue-Breite eins. Dynamisches Scheduling: blockierte Befehle „parken“. Unabhängige spätere Befehle dürfen vorgezogen werden. Verständnischeck: Geht OoO mit Issue eins? Ja. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -821,7 +823,7 @@ T = N \times \mathrm{CPI} / f
 <li>„Nur Abhängige warten“ gilt nicht ohne diese Grenzen</li>
 </ul>
 <aside class="notes">
-<p>Paradigmenwechsel: vom starren Befehlszeiger zum datengetriebenen Issue.</p>
+<p>Datenfluss-Maschine knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Bereite Operanden genügen nicht. Unit, Port und Issue-Slot müssen passen. Ein voller ROB stoppt weitere Arbeit, auch wenn Befehle unabhängig sind. Instruktion „feuert“, wenn Operanden da sind — nicht nur wenn der PC sie erreicht. Der Miss blockiert die Nutzer des Load. Unabhängige Befehle können vorbeilaufen, bis Issue-Queue oder ROB voll sind. Verständnischeck: Reichen zwei bereite Operanden? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -849,10 +851,10 @@ T = N \times \mathrm{CPI} / f
 <div>
 <pre class="mermaid mermaid-js">%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
 flowchart LR
-  A[In-Order\nFetch/Decode] --&gt; B[(Instruction\nQueue)]
-  B --&gt; C[Out-of-Order\nExecute]
-  C --&gt; D[(Reorder\nBuffer)]
-  D --&gt; E[In-Order\nCommit]
+  A[In-Order Fetch/Decode] --&gt; B[Instruction Queue]
+  B --&gt; C[Out-of-Order Execute]
+  C --&gt; D[Reorder Buffer]
+  D --&gt; E[In-Order Commit]
   style C fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
 </pre>
 </div>
@@ -861,7 +863,7 @@ flowchart LR
 </div>
 </div>
 <aside class="notes">
-<p>Vorne geordnet lesen, Mitte ausnutzen, hinten Ordnung für Software/OS wiederherstellen.</p>
+<p>Drei Phasen der OoO-Pipeline knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Vorne werden Befehle geholt, dekodiert und umbenannt. In der Mitte entstehen Werte in der PRF. Hinten bestätigt der ROB die Ordnung. Der Eintrag entsteht beim Dispatch, nicht erst wenn die ALU fertig ist. Der ROB speichert hier keinen Zahlwert. Verständnischeck: Entsteht der ROB-Eintrag erst bei Fertigstellung? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -882,7 +884,7 @@ flowchart LR
 <li>Architektur-Register der ISA ≠ physische Registerdatei</li>
 </ul>
 <aside class="notes">
-<p>32 ISA-Namen bleiben die Illusion für den Compiler — Hardware mappt um.</p>
+<p>Front-End und Renaming knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Das Front-End liest die aktuelle Map und reserviert ein neues Ziel. Ein jüngerer Befehl im selben Bündel sieht das gerade vergebene Ziel des älteren Produzenten. 32 Namen sind die Schnittstelle, keine Täuschung. Mehrere Befehle aus dem I-Cache holen und dekodieren. Vor dem Chaos: Register Renaming gegen WAW/WAR. Verständnischeck: Welche Version sieht der jüngere Befehl? Die neue physische Version des älteren Produzenten. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -903,7 +905,7 @@ flowchart LR
 <li>Befehle ohne Ziel und <code>x0</code> sind Ausnahmen</li>
 </ul>
 <aside class="notes">
-<p>Genialer Trick: WAW/WAR verschwinden, weil Schreibziele physisch getrennt werden.</p>
+<p>Register Renaming knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Quellen zuerst lesen, altes Ziel merken, neues Ziel aus der Freiliste nehmen, Map aktualisieren, Ready löschen. x0 bekommt kein Ziel. Die alte Version bleibt, bis der Lebensdauervertrag sie freigibt. RAW bleibt als Tagabhängigkeit. Die ISA-Namen werden auf eine größere physische Datei abgebildet. Eine Zahl über 100 ist kein allgemeines Minimum. Jeder Befehl mit Ziel außer der festen Null bekommt typisch ein neues physisches Register. Verständnischeck: Warum bleibt P10 belegt, wenn t0 schon auf P11 zeigt? Ein älterer Leser kann P10 noch brauchen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -921,19 +923,17 @@ flowchart LR
 <div class="quarto-figure quarto-figure-center">
 <figure>
 <p><img data-src="../assets/figures/07_moderne_cpu_architekturen/rename.png"></p>
-<figcaption>A schreibt P10, B liest P10, C schreibt P11. E/F zeigen das WAR-Muster.</figcaption>
+<figcaption>A bis E: Ziele P10, P13, P11, P14, P12. B liest P10, D liest P11.</figcaption>
 </figure>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb7-1"><a aria-label="1"></a><span class="bu">add</span> t0<span class="op">,</span> t1<span class="op">,</span> t2</span>
-<span id="cb7-2"><a aria-label="2"></a><span class="bu">sub</span> t0<span class="op">,</span> t4<span class="op">,</span> t5</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Hardware (schematisch):</p>
-<ul>
-<li><code>add</code> → schreibt <code>P10</code> (Mapping <code>t0</code> → <code>P10</code>)</li>
-<li><code>sub</code> → schreibt <code>P11</code> (neues Mapping <code>t0</code> → <code>P11</code>)</li>
-</ul>
-<p>Getrennte Ziele erlauben unabhängige Ausführung. Zwei belegte ALU-Ports können das Issue trotzdem verhindern.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb7-1"><a aria-label="1"></a># Lehrfolge A–E<span class="op">,</span> nicht ausgeführt</span>
+<span id="cb7-2"><a aria-label="2"></a><span class="bu">add</span> t0<span class="op">,</span> t1<span class="op">,</span> t2   <span class="op">#</span> A<span class="op">,</span> Ziel P10</span>
+<span id="cb7-3"><a aria-label="3"></a><span class="bu">add</span> t3<span class="op">,</span> t0<span class="op">,</span> t4   <span class="op">#</span> B<span class="op">,</span> Quelle P10</span>
+<span id="cb7-4"><a aria-label="4"></a><span class="bu">sub</span> t0<span class="op">,</span> t5<span class="op">,</span> t6   <span class="op">#</span> C<span class="op">,</span> Ziel P11</span>
+<span id="cb7-5"><a aria-label="5"></a><span class="bu">add</span> t1<span class="op">,</span> t0<span class="op">,</span> t2   <span class="op">#</span> D<span class="op">,</span> Quelle P11</span>
+<span id="cb7-6"><a aria-label="6"></a><span class="bu">sub</span> t0<span class="op">,</span> t4<span class="op">,</span> t5   <span class="op">#</span> E<span class="op">,</span> Ziel P12</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Namen werden recycelt, physische Kisten sind frisch — ILP gerettet.</p>
+<p>Renaming am Beispiel (WAW) knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. A bis E schreiben P10, P13, P11, P14 und P12. Start: x0 ist P0, t0 ist P7. Frei sind mindestens P10 bis P14 in der Reihenfolge P10, P13, P11, P14, P12. Ergebnisse später 5, 7, 8, 9 und minus 7. B liest P10 gleich 5, nicht P11 gleich 8. D liest P11. A, C und E sind WAW, A nach B und C nach D sind RAW. Verständnischeck: Liest B den Wert 8? Nein, B hat P10 gespeichert. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -954,7 +954,7 @@ flowchart LR
 <li>Operand bereit reicht nicht: Unit, Port und Auswahlregel müssen passen</li>
 </ul>
 <aside class="notes">
-<p>Wartehalle: Bordkarte = physische Register; Abflug = Operanden komplett.</p>
+<p>Reservation Stations knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Eine Reservation Station hält Operation, Quelltags, Ready, Zieltag und Alter. Verteilte Stationen und eine gemeinsame Queue sind Varianten. Zwei bereite Adds und eine ALU starten nicht zugleich. Nach Renaming: Befehle in Reservation Stations / Issue Queue. Klassisch Reservation Stations, alternativ eine gemeinsame Issue Queue. Ein einzelner Common Data Bus ist nur das Lehrbild. Verständnischeck: Was verhindert den Doppeltstart? Die eine ALU und das Issue-Budget. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -975,7 +975,7 @@ flowchart LR
 <li>Scheduler gibt bereite Befehle in freie Units — Reihenfolge <span class="math inline">\(\neq\)</span> Programmzeile</li>
 </ul>
 <aside class="notes">
-<p>Wer Daten hat, rechnet; wer auf Memory wartet, bleibt in der Queue.</p>
+<p>Out-of-Order Issue knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Completion markiert den Zieltag bereit. Der Scheduler wählt passende Kandidaten. Der Wert kommt aus der PRF oder einem Bypass, der Status geht an den ROB. Nicht jeder geweckte Nutzer startet sofort. Ergebnisse erscheinen auf dem Common Data Bus / Wakeup-Netz. Wartende Einträge greifen Werte ab; bereite Befehle melden sich. Verständnischeck: Starten alle Nutzer sofort? Nur wenn sie ausgewählt sind und eine Unit frei ist. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -996,7 +996,7 @@ flowchart LR
 <li>Ohne Schutz: RAM/Register könnten „Zukunft“ schon enthalten — inkonsistent für OS</li>
 </ul>
 <aside class="notes">
-<p>Betriebssysteme erwarten präzise, geordnete Architektursicht — nicht Zwischenchaos.</p>
+<p>Problem: Interrupts im Chaos knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Ein jüngerer PRF-Wert ist noch kein Architekturzustand. Der Handler sieht die committed Map. Eine Exception gehört zu einem Befehl, ein Interrupt ist asynchron. Präzise heißt passende Programmsicht, keine feste Latenz. Frühe Befehle noch nicht fertig, spätere schon executed. Interrupt / Exception: architektonisch sichtbarer Zustand muss konsistent sein. Verständnischeck: Ist ein fertiger PRF-Wert für den Handler sichtbar? Nur wenn er committed ist. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1023,7 +1023,7 @@ flowchart LR
 </ul>
 <p>Fertige jüngere Befehle stehen in physischen Registern, bis der Head retiriert.</p>
 <aside class="notes">
-<p>Netz mit doppeltem Boden: rechnen darf chaotisch sein — sichtbar werden geordnet.</p>
+<p>Reorder Buffer (ROB) knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Im Modell hält die PRF den Zahlwert, der ROB Ordnung, Fertigstatus und Zielmetadaten. Die Exception-Variante ersetzt I2 durch lw t1, 0(s2) mit Zugriffsfehler. I1 hat t0 gleich 10 retired. I2 committet nicht. I3 und I4 werden verworfen. Ihre physischen Werte können bleiben, gelten aber nicht. In diesem PRF-Modell schreibt die ALU in ein physisches Register, nicht in den ROB. Der ROB führt Reihenfolge, Completion, Exception und Zielmetadaten. Ein result-holding ROB wäre ein anderes, hier nicht verwendetes Modell. Verständnischeck: Was speichert der ROB über ein add? Status und Metadaten, nicht den Zahlwert. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1051,7 +1051,7 @@ flowchart LR
 <li>Spätere fertige Einträge warten, auch wenn ihre PRF-Werte schon stehen</li>
 </ul>
 <aside class="notes">
-<p>Programmierer und OS sehen geordnete Semantik — trotz OoO im Back-End.</p>
+<p>In-Order Commit (Retire) knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Ein Store kann in der Queue vorbereitet, beim Commit freigegeben und erst danach geschrieben werden. Andere Kerne sehen ihn nach dem Speichermodell, nicht automatisch in Retire-Reihenfolge. Gleiche Adresse braucht Weiterleitung oder Warten. Unbekannte Adresse kann warten oder später wiederholt werden. MMIO ist kein normaler zurückrollbarer Wert. Retire nur am ältesten noch nicht retired Befehl, bis zur Retire-Breite. Dadurch wird der Architektur-Registerzustand sichtbar. Ein Store darf danach noch im Puffer stehen. Verständnischeck: Ist ein committed Store sofort für alle Kerne sichtbar? Nicht zwingend. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1072,7 +1072,7 @@ flowchart LR
 <li>Recovery stellt das gültige Mapping wieder her</li>
 </ul>
 <aside class="notes">
-<p>Der Architekturzustand wird präzise. Ein verworfener Store ist nicht dasselbe wie ein unsichtbarer Cache-Seiteneffekt.</p>
+<p>Exceptions und ROB knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Beim Load-Fehler bleibt der Zustand vor I2: t0 gleich 10, die anderen Ziele alt. Branch-Recovery betrifft den falschen jüngeren Pfad. Exception-Recovery geht zum committed Zustand. Cachezeilen werden nicht automatisch gelöscht. Synchrone Exception: ältere Instruktionen dürfen committen. Die fehlerhafte Instruktion committet ihren normalen Effekt nicht. Jüngere Effekte werden verworfen. Ein asynchroner Interrupt hat keinen fehlerhaften Befehl. Er wird an einer zulässigen präzisen Grenze angenommen. Verständnischeck: Was heißt präzise Exception hier? Der Handler sieht den Zustand unmittelbar vor I2. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1090,11 +1090,11 @@ flowchart LR
 <p>Warum viele Cortex-M / MCU-Kerne ohne OoO bleiben:</p>
 <ul>
 <li>Transistoren: Renaming, Stations, ROB sind teuer</li>
-<li>Energie: ständiges Wakeup/Scheduling kostet — oft Watt statt µW/mW-Regime</li>
+<li>Mehr Puffer und Vergleichsnetze kosten Fläche und Schaltaktivität. Watt statt Milliwatt ist keine allgemeine Grenze</li>
 <li>Determinismus: Laufzeiten schwerer vorherzusagen (Hard Real-Time)</li>
 </ul>
 <aside class="notes">
-<p>Königsklasse für Desktop/Phone — für Knopfzellen-Sensoren oft ungeeignet.</p>
+<p>Grenzen von OoO knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Größere Dateien, Ports und Puffer kosten Fläche und Energie. Watt statt Milliwatt ist keine Familienregel. Eine einfache Pipeline ist mit Caches nicht automatisch taktfest. OoO erschwert Worst-Case-Zeiten, macht harte Echtzeit nicht unmöglich. Transistoren: Renaming, Stations, ROB sind teuer. Mehr Puffer und Vergleichsnetze kosten Fläche und Schaltaktivität. Watt statt Milliwatt ist keine allgemeine Grenze. Verständnischeck: Garantiert die Fünf-Stufen-Pipeline feste Laufzeit? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1136,7 +1136,7 @@ flowchart LR
 </tbody>
 </table>
 <aside class="notes">
-<p>Anatomie eines High-End-Kerns in einem Satz: geordnet rein, parallel rechnen, geordnet raus.</p>
+<p>Drei Phasen — Kurzfazit knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Geordnetes Umbenennen, dynamisches Issue, geordnetes Commit. Die Ausführungsreihenfolge darf vom Programm abweichen. Die sichtbare Bestätigung nicht. Verständnischeck: Welche Reihenfolge darf abweichen? Vor allem Issue und Abschluss, nicht das Commit. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1153,7 +1153,7 @@ flowchart LR
 <h2>Aufgabe — Version und Exception</h2>
 <p>Welche physische Version liest Befehl B? Was bleibt architektonisch gültig, wenn I2 eine synchrone Exception auslöst, nachdem nur I1 retiriert wurde?</p>
 <aside class="notes">
-<p>B liest P10, nicht P11. Nach Retire von I1 ist t0 = 10. I2 committet nicht, I3 und I4 werden verworfen. Ein Interrupt ist davon getrennt: er hat keinen fehlerhaften Befehl. Siehe Rename-Tabelle und ROB-Bild.</p>
+<p>Aufgabe — Version und Exception knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Zwei Beispiele: B liest P10 gleich 5, obwohl C schon P11 gleich 8 erzeugt hat. In der Exception-Variante ist nur I1 committed, t0 gleich 10. I2 ist der fehlerhafte Load, nicht das normale add. Die PRF muss nicht auf null gesetzt werden. Verständnischeck: Muss die PRF gelöscht werden? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1175,7 +1175,7 @@ flowchart LR
 <li>Entscheidung oft erst nach dem Vergleich in EX (oder später in tiefen Pipelines)</li>
 </ul>
 <aside class="notes">
-<p>Die Pipeline braucht jeden Takt neuen Nachschub — an der Weggabelung fehlt das Vergleichsergebnis noch.</p>
+<p>Control Hazards knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. beq vergleicht zwei Register. Das Ziel ist PC plus Offset. Bei 32-Bit-Befehlen ist der Geradeausweg PC plus 4. Fetch braucht Richtung und Ziel, bevor der Vergleich fertig ist. Renaming beseitigt diese Kontrollabhängigkeit nicht. WAR und WAW kann Renaming entfernen. RAW bleibt. Kontrollfluss ist ein eigener Engpass. Neuer Engpass: Kontrollfluss (<code>beq</code> und andere Branches). Verständnischeck: Warum eine Vorhersage? Der Fetch muss wählen, bevor der Vergleich fertig ist. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1197,7 +1197,7 @@ flowchart LR
 <li>Misprediction Penalty: oft im Bereich vieler Takte — teuer für IPC</li>
 </ul>
 <aside class="notes">
-<p>Tiefe Pipelines erhöhen die Branch Penalty: falsch geraten heißt viele Arbeitseinheiten verwerfen.</p>
+<p>Kosten eines Pipeline-Flush knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Bei einer Fehlvorhersage werden jüngere Befehle des falschen Pfads verworfen. Ältere gültige Arbeit bleibt. Die Strafe hängt von Auflösung und Nachfüllen ab, nicht nur von der Stufenzahl. Pipeline-Flush ist nicht das Löschen einer Cachezeile. Warten auf die ALU: wenige Bubbles — bei 5 Stufen oft erträglich. Moderne High-Performance-Kerne: deutlich tiefere Pipelines (Größenordnung: viele Stufen), u. a. für hohe Taktraten. Verständnischeck: Wird der ganze Kern geleert? Nein, vor allem der falsche jüngere Pfad. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1227,7 +1227,7 @@ flowchart LR
 <li>Der Durchsatz sinkt auf <span class="math inline">\(1/1{,}30 \approx 0{,}769\)</span>, also rund 23,1 Prozent</li>
 </ul>
 <aside class="notes">
-<p>Modell ohne Überlappung: Anteil mal Fehlrate mal Penalty. 1,30 CPI bedeutet 30 Prozent mehr Laufzeit und etwa 23 Prozent weniger Durchsatz. Nicht 23 Prozent länger.</p>
+<p>Misprediction: Zahlenbeispiel knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Basis-CPI 1, Branchanteil 0,20, Fehlrate 0,10 der Branches, Strafe 15 Takte. Zusatz 0,30, gesamt 1,30. 100 retired Befehle, 20 Branches, zwei Fehler, 30 Zusatztakte, 130 statt 100. Laufzeit plus 30 Prozent. Durchsatz 1/1,30 etwa 0,769, also etwa 23,1 Prozent weniger Durchsatz, nicht 23 Prozent längere Laufzeit. Falsche Pfade zählen nicht als N. <span class="math inline">\(20\,\%\)</span> der Befehle sind Branches. Misprediction-Rate <span class="math inline">\(10\,\%\)</span>, Penalty <span class="math inline">\(15\)</span> Takte. Verständnischeck: Warum 20 Prozent mal 10 Prozent? Das erste bezieht sich auf alle Befehle, das zweite nur auf Branches. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1250,7 +1250,7 @@ flowchart LR
 <li>Ziel: hohe Accuracy (in der Praxis oft deutlich über 90 %)</li>
 </ul>
 <aside class="notes">
-<p>Glaskugel der Architektur: richtig geraten → Pipeline bleibt voll; falsch → teurer Rollback.</p>
+<p>Branch Prediction knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Eine Vorhersage ist ein früher Kandidat für den nächsten PC. Eine Trefferquote beschreibt Branches, nicht IPC. 90 Prozent sind hier keine garantierte Eigenschaft. Nicht warten — spekulativ den wahrscheinlichen Weg füllen. Vorhersage typisch schon beim Fetch. Verständnischeck: Beweist 90 Prozent Branchtreffer IPC 0,9? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1272,7 +1272,7 @@ flowchart LR
 </ul>
 <p>Hilfreich, aber für sehr tiefe Pipelines oft zu ungenau.</p>
 <aside class="notes">
-<p>90er-Heuristik: hinten = Schleife, vorne = seltenes <code>if</code> — gut, aber nicht genug für 15+ Stufen.</p>
+<p>Statische Vorhersage knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Rückwärts oft taken und vorwärts oft nicht genommen ist eine Heuristik, kein Gesetz. Ein Vorwärtssprung kann häufig genommen werden. Eine pauschale 90-Prozent- und 15-Stufen-Grenze gilt nicht. Rückwärtssprung oft „taken“ (typisch Schleifenende). Vorwärtssprung oft „not taken“ (häufig seltene Fehlerpfade). Verständnischeck: Kann ein Vorwärtssprung oft genommen werden? Ja. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1293,7 +1293,7 @@ flowchart LR
 <li>Lange Schleifen: nach wenigen Iterationen fast immer korrektes „taken“</li>
 </ul>
 <aside class="notes">
-<p>Maschinenlernen auf unterster Ebene: pro Sprungstelle Historie im Silizium.</p>
+<p>Dynamische Vorhersage knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Der Zustand wird gelesen, die Richtung gesagt, danach mit dem Ergebnis aktualisiert. Ein- und Zweibitregeln sind feste Automaten, kein allgemeines Lernen. Der Prädiktor kennt das Ergebnis beim Raten noch nicht. Lernen zur Laufzeit aus der Branch-Historie. Muster: was zuletzt passierte, passiert oft wieder. Verständnischeck: Kennt er das Ergebnis schon? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1320,7 +1320,7 @@ flowchart LR
 <li>Parallel zum Fetch: Eintrag liefert Taken/Not-Taken-Historie</li>
 </ul>
 <aside class="notes">
-<p>Notizbuch der if-Abfragen: Hausnummer = PC, Eintrag = letztes Verhalten.</p>
+<p>Branch History Table (BHT) knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. BHT oder PHT hält den Richtungszustand, der BTB ein Ziel. Beide werden vom PC gespeist, nicht zwingend seriell. Bei acht Einträgen und festen 32-Bit-Befehlen ist der Index PC Bits 4 bis 2. 0x04 und 0x24 ergeben beide Index 1. Mit komprimierten Befehlen darf Bit 1 nicht pauschal entfallen. Aliasing ist hier eine Tabellenkollision. Kleiner schneller Speicher (oft SRAM) für Predictions. Index: typisch untere PC-Bits der Branch-Adresse. Verständnischeck: Warum teilen 0x04 und 0x24 den Index? Ihre Bits 4 bis 2 sind beide 001. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1342,7 +1342,7 @@ flowchart LR
 <li>Zwei Fehlprognosen pro äußerem Durchlauf sind typisch</li>
 </ul>
 <aside class="notes">
-<p>Zu reaktiv: ein Abbruch überschreibt die „Schleifen-Meinung“ zu aggressiv.</p>
+<p>1-Bit-Prädiktor knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Start T, Folge T T T T NT zweimal: Fehler an den Schritten 5, 6 und 10, also drei von zehn. Danach irrt das Einbitmodell zweimal je weiterem Fünferblock. Nach NT sagt es beim nächsten T zunächst falsch NT. Ein Bit: zuletzt Taken (1) oder Not Taken (0). Schwachpunkt: verschachtelte Schleifen. Verständnischeck: Was sagt es nach einem NT? Zunächst NT. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1397,7 +1397,7 @@ flowchart LR
 </table>
 <p>Taken: <span class="math inline">\(+1\)</span> (Sättigung bei <span class="math inline">\(11\)</span>); Not Taken: <span class="math inline">\(-1\)</span> (Sättigung bei <span class="math inline">\(00\)</span>). Die Selbstschleifen an <span class="math inline">\(00\)</span> und <span class="math inline">\(11\)</span> stehen im Diagramm.</p>
 <aside class="notes">
-<p>Start im schwachen Not-Taken <span class="math inline">\(01\)</span>, erstes Ergebnis Taken: Vorhersage Not Taken, Folgezustand <span class="math inline">\(10\)</span>. Ab stark Taken kostet die Folge T T T T N einen Miss.</p>
+<p>2-Bit saturierender Zähler knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. 00 und 01 sagen NT, 10 und 11 sagen T. Der Zustand vor dem Update zählt. Start 11, dieselbe Zehnerfolge: Fehler bei 5 und 10. Start 01 und tatsächliches T: Vorhersage NT, danach Zustand 10. Das ist ein Lehrautomat, kein Industriegesetz. Verständnischeck: Welche Vorhersage gilt in 01 bei T? Zunächst NT, danach wird der Zustand 10. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1419,7 +1419,7 @@ flowchart LR
 <li>Aus einem starken Zustand braucht der Wechsel zwei widersprechende Ergebnisse. Aus einem schwachen Zustand genügt eines</li>
 </ul>
 <aside class="notes">
-<p>Trägheit spart Fehlprognosen bei typischen Schleifenabbrüchen.</p>
+<p>Hysterese des 2-Bit-Zählers knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Aus 11 führt ein NT nach 10, die Richtung bleibt T. Aus 10 führt ein NT nach 01, die Richtung wechselt sofort. Zwei Fehler bis zum Wechsel gelten nur für den starken Zustand. Lange Schleife → oft <span class="math inline">\(11\)</span> (Strongly Taken). Einmaliges Ende: <span class="math inline">\(11 \rightarrow 10\)</span> — Vorhersage bleibt Taken. Verständnischeck: Warum kippt 10 schon bei einem NT? Der nächste Zustand 01 sagt bereits NT. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1441,7 +1441,7 @@ flowchart LR
 <li>IF: Prediction + bei Taken sofortiger Target aus dem BTB</li>
 </ul>
 <aside class="notes">
-<p>GPS-Gedächtnis: nicht nur links/rechts, sondern die Zielkoordinaten ohne Wartezeit.</p>
+<p>Branch Target Buffer (BTB) knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Der BTB speichert Ziele erkannter Branches. Taken braucht die Adresse. Ein Fehltreffer im BTB kann kosten, obwohl die Richtung stimmte. Der Offset eines direkten beq ist nicht dasselbe wie ein indirektes Ziel. Taken allein reicht nicht — Zieladresse muss früh bekannt sein. Decode/Add für Offset oft zu spät für den nächsten Fetch. Verständnischeck: Kann die Richtung stimmen und der Fetch trotzdem warten? Ja, wenn das Ziel fehlt. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1463,7 +1463,7 @@ flowchart LR
 <li>Erkennt Muster über einzelne Sprungstellen hinweg</li>
 </ul>
 <aside class="notes">
-<p>Nicht nur „dieser <code>beq</code>“, sondern „was tat das Programm kurz davor?“.</p>
+<p>Globale Historie (Korrelation) knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. gshare verknüpft hier den PC-Index 0101 mit der globalen Historie 0011 per XOR zu 0110. Das ist eine eigene Tabelle mit 16 Einträgen, nicht die Acht-Eintrag-Tabelle. Global ist die Historie verschiedener Branches, lokal die einer Stelle. Branches korrelieren oft im C-Kontrollfluss. Global History Register (GHR): Bitmuster der letzten <span class="math inline">\(N\)</span> Outcomes. Verständnischeck: Kombiniert gshare lokal und global? Nein, hier PC und globale Historie. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1479,12 +1479,12 @@ flowchart LR
 <section id="fortgeschrittene-prädiktoren" class="slide level2">
 <h2>Fortgeschrittene Prädiktoren</h2>
 <ul>
-<li>TAGE und Perceptron-Prädiktoren sind veröffentlichte Beispiele, nicht die Angabe jedes Kerns</li>
-<li>Lernen von Gewichtungen aus der Historie in Hardware</li>
-<li>Praxis: sehr hohe Accuracy bei vielen Workloads — selten, aber teuer bei Misses</li>
+<li>TAGE nutzt markierte Tabellen mit verschieden langen Historien</li>
+<li>Ein Perceptron gewichtet Historieneingaben und bildet eine Summe</li>
+<li>Das sind verschiedene veröffentlichte Ansätze, keine gemeinsame Gewichtungsregel</li>
 </ul>
 <aside class="notes">
-<p>Die Analogie zum Lernen bleibt im festen Hardware-Modell. Das ist keine allgemeine KI.</p>
+<p>Fortgeschrittene Prädiktoren knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. TAGE wählt unter markierten Tabellen mit verschieden langen Historien. Ein Perceptron gewichtet Eingaben und summiert. Das sind verschiedene Strukturen. Eine hohe Trefferquote wird nicht als Herstellerwert behauptet. TAGE nutzt markierte Tabellen mit verschieden langen Historien. Ein Perceptron gewichtet Historieneingaben und bildet eine Summe. Verständnischeck: Speichert TAGE dieselben Gewichte? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1501,7 +1501,7 @@ flowchart LR
 <h2>Aufgabe — CPI und schwacher Zustand</h2>
 <p>Was bedeuten CPI 1,30 für Laufzeit und Durchsatz? Der 2-Bit-Zähler steht auf 01, das nächste Ergebnis ist T. Welche Vorhersage gilt?</p>
 <aside class="notes">
-<p>Laufzeitfaktor 1,30, also 30 Prozent länger. Durchsatzfaktor etwa 0,769, also rund 23 Prozent weniger Durchsatz. Zustand 01 sagt Not Taken voraus und geht nach T auf 10. Siehe CPI-Bild und den Automaten.</p>
+<p>Aufgabe — CPI und schwacher Zustand knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. CPI 1,30 bedeutet bei gleichem N und f 30 Prozent mehr Laufzeit und etwa 23,1 Prozent weniger Durchsatz. Zustand 01 sagt NT. Das T ist die Fehlprognose, danach steht 10. Verständnischeck: Warum NT und nicht T? Die Vorhersage kommt aus 01, bevor das Update nach 10 geht. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1518,11 +1518,11 @@ flowchart LR
 <h2>Spekulative Ausführung</h2>
 <ul>
 <li>Spekulativer Fetch braucht kein OoO. Im High-Performance-Modell kommen Prediction und OoO zusammen</li>
-<li>Predictor sagt z. B. „Taken“ → spekulativer Pfad wird gestartet (Issue)</li>
+<li>Der vorhergesagte PC steuert zuerst Fetch. Issue folgt erst nach Decode, Rename und Bereitschaft</li>
 <li>ALUs rechnen und laden bereits — bevor der Branch architektonisch bestätigt ist</li>
 </ul>
 <aside class="notes">
-<p>Zenit der Performance: rechnen auf Pfaden, die logisch noch unsicher sind.</p>
+<p>Spekulative Ausführung knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Taken steuert zuerst den Fetch. Issue braucht Decode, Rename und eine freie passende Unit. Auflösung und Retire des Branches sind verschiedene Zeiten. Ein jüngerer falscher Befehl darf nicht committen. Spekulativer Fetch braucht kein OoO. Im High-Performance-Modell kommen Prediction und OoO zusammen. Der vorhergesagte PC steuert zuerst Fetch. Issue folgt erst nach Decode, Rename und Bereitschaft. Verständnischeck: Startet die ALU im Takt der Vorhersage? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1538,12 +1538,12 @@ flowchart LR
 <section id="rechnen-auf-verdacht" class="slide level2">
 <h2>Rechnen auf Verdacht</h2>
 <ul>
-<li>Best Case: Prediction korrekt → Arbeit schon (fast) fertig im ROB</li>
+<li>Bei korrekter Vorhersage kann das PRF-Ergebnis bereit sein; der ROB hält nur Status und Reihenfolge</li>
 <li>Speicherlatenzen werden hinter Spekulation versteckt</li>
 <li>IPC kann stark steigen, wenn Units nicht idle auf den Branch warten</li>
 </ul>
 <aside class="notes">
-<p>Während der Branch noch „unterwegs“ ist, läuft der vorhergesagte Pfad schon.</p>
+<p>Rechnen auf Verdacht knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Das Zahlenergebnis liegt im physischen Register. Der ROB merkt Fertigstatus und Reihenfolge. Ein jüngeres add kann fertig sein, während der ältere Branch offen ist. Das garantiert keine feste IPC-Steigerung. Bei korrekter Vorhersage kann das PRF-Ergebnis bereit sein; der ROB hält nur Status und Reihenfolge. Speicherlatenzen werden hinter Spekulation versteckt. Verständnischeck: Wo liegt die Zahl? In der PRF, nicht als Wert im ROB. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1560,11 +1560,11 @@ flowchart LR
 <h2>Rollback bei Misprediction</h2>
 <ul>
 <li>Falscher Pfad: spekulative Loads/Rechnungen verwerfen</li>
-<li>ROB hält Ergebnisse zurück — kein vorzeitiges Commit in Architekturzustand</li>
+<li>Werte liegen in der PRF. Der ROB bestätigt sie erst in Programmreihenfolge</li>
 <li>Squash des spekulativen ROB-Teils, dann korrekten Pfad nachfüllen</li>
 </ul>
 <aside class="notes">
-<p>Sicherheitsnetz aus Teil 1: spekulieren darf, sichtbar wird erst nach Bestätigung.</p>
+<p>Rollback bei Misprediction knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Beim Fehlpfad bleiben ältere gültige Befehle. Jüngere Zuordnungen werden zurückgenommen. Ein Cache kann trotzdem verändert sein. Das ist kein Löschen der ganzen PRF und nicht dieselbe Recovery wie bei einer Exception. Falscher Pfad: spekulative Loads/Rechnungen verwerfen. Werte liegen in der PRF. Der ROB bestätigt sie erst in Programmreihenfolge. Verständnischeck: Warum reicht architektonisches Verwerfen nicht? Mikroarchitektonische Spuren können bleiben. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1586,7 +1586,7 @@ flowchart LR
 <li>Gemeinsam: Architekturzustand wird zurückgerollt — Cache-/Timing-Spuren können bleiben</li>
 </ul>
 <aside class="notes">
-<p>Zwei verwandte, aber unterschiedliche Klassen: Privilege-Bypass (Meltdown) vs.&nbsp;Branch-/Predictor-Missbrauch (Spectre).</p>
+<p>Spectre und Meltdown (2018) knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Spectre-v1 ist eine Fehlvorhersage eines erlaubten Kontrollflusses. Der ursprüngliche Meltdown betrifft bestimmte Implementierungen, in denen privilegierte Daten transient wirken, obwohl der Zugriff architektonisch scheitert. OoO allein beweist keine Verwundbarkeit jeder CPU. Lange Annahme: Fehlspekulation sei für Software unsichtbar. Meltdown: spekulativ über Privilege-Grenzen (z. B. Kernel-Daten) — vor allem bestimmte ältere Designs. Verständnischeck: Sind beide Mechanismen gleich? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1615,7 +1615,7 @@ flowchart LR
 <li>Squash verwirft den Architekturzustand. Die Cache-Spur kann bleiben</li>
 </ol>
 <aside class="notes">
-<p>Ein schneller Hit ist ein verrauschtes Indiz, kein automatischer Beweis und keine Messung aus dieser Vorlesung.</p>
+<p>Seitenkanal über den Cache knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Die Bounds-Prüfung bleibt architektonisch korrekt. Der falsche Pfad kann einen abhängigen Probe-Zugriff auslösen und eine Cachezeile hinterlassen. Das ist kein committed Registerwert. Es werden keine echten Zeiten oder Geheimnisse behauptet. Verständnischeck: Was kann bleiben? Eine Cachebelegung, kein committed Zielregister. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1637,7 +1637,7 @@ flowchart LR
 <li>Klassischer mikroarchitektonischer Side Channel</li>
 </ul>
 <aside class="notes">
-<p>Stoppuhr statt direktem Leserecht — Architektur verbietet, Mikroarchitektur leakt.</p>
+<p>Timing als Orakel knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Ein schneller Zugriff ist ein verrauschtes Indiz. Prefetch und andere Zugriffe können denselben Effekt haben. Flush einer Cachezeile ist nicht der Pipeline-Flush. Ein einzelner Treffer beweist keinen geheimen Wert. Angreifer misst Zugriffszeiten (Flush+Reload / ähnliche Muster). Schneller Hit <span class="math inline">\(\Rightarrow\)</span> Zeile war im Cache. Verständnischeck: Beweist ein schneller Zugriff den geheimen Wert? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1659,7 +1659,7 @@ flowchart LR
 <li>Spectre ist damit nicht vollständig gelöst</li>
 </ul>
 <aside class="notes">
-<p>Patches und Fences kosten Performance; langfristig hilft Silizium-Design.</p>
+<p>Mitigationen knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. KPTI ist Kernel Page-Table Isolation und betrifft den ursprünglichen Meltdown-Fall, nicht generell Spectre-v1. Eine RISC-V-FENCE ordnet spezifizierte Zugriffe und ist keine allgemeine Spekulationsbarriere. Maßnahmen hängen von Variante und Plattform ab. KPTI zielt vor allem auf den ursprünglichen Meltdown-Mechanismus. Passendes Bounds-Masking oder eine geeignete Barriere kann bestimmte Spectre-v1-Fälle treffen. Nicht jede Fence ist auf jeder ISA eine Spekulationsbarriere. Verständnischeck: Warum ist KPTI keine Spectre-v1-Lösung? Es ändert Mappings, nicht jede Fehlvorhersage. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1680,7 +1680,7 @@ flowchart LR
 <li>Ziel: bessere IPC, weniger Stalls und teure Control Hazards</li>
 </ul>
 <aside class="notes">
-<p>Kein direkter ROB-Zugriff — aber Maschinencode so formen, dass die Pipeline „glücklich“ wird.</p>
+<p>Ausblick Labor: Compiler hilft der Pipeline knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Der Compiler formt die ISA-Folge. Er sieht ROB und Prädiktor nicht direkt. Weniger Befehle können trotz niedrigerem IPC schneller sein, weil N mal CPI kleiner wird. -O3 ist keine garantierte Beobachtung. Hardware kompensiert viel (OoO, BHT) — Compiler kann Hazards und Branches reduzieren. GCC/Clang: Optimierungsstufen <code>-O0</code> … <code>-O3</code>. Verständnischeck: Warum kann weniger IPC schneller sein? Weil N ausreichend sinken kann. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1701,7 +1701,7 @@ flowchart LR
 <li>Ob eine Schleife ausgerollt wird, hängt von Compiler, Version, <code>-march</code> und dem Code ab</li>
 </ul>
 <aside class="notes">
-<p>Derselbe Algorithmus, anderer Assembler — Laufzeit kann stark differieren.</p>
+<p>Was <code>-O3</code> typisch tut knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. -O0 ist keine zeilengetreue Übersetzung. -O3 erlaubt zusätzliche Umformungen, garantiert weder Unrolling noch kürzere Laufzeit. -march, -mtune und -mabi sind verschiedene Optionen. Ohne Toolchain gibt es hier keine Compilerausgabe. <code>-O0</code> ist zum Debuggen gedacht und keine garantierte Zeile-für-Zeile-Übersetzung. <code>-O2</code> und <code>-O3</code> erlauben mehr Analysen. <code>-O3</code> garantiert weder Unrolling noch weniger Branches noch kürzere Laufzeit. Verständnischeck: Beweisen weniger Assemblerzeilen kürzere Laufzeit? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1722,7 +1722,7 @@ flowchart LR
 <li>C-Reihenfolge <span class="math inline">\(\neq\)</span> optimale Maschinenreihenfolge</li>
 </ul>
 <aside class="notes">
-<p>Blasen in der Pipeline mit nützlicher Arbeit füllen.</p>
+<p>Trick: Instruction Scheduling knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Lehrreihenfolge, nicht GCC-Ausgabe: Load, Nutzer, unabhängige Subtraktion gegen Load, Subtraktion, Nutzer. Im kleinen Modell ist der Loadwert am Ende von Takt 2 da, der Nutzer frühestens in Takt 3. Die unabhängige Operation füllt Takt 2. Der Nutzer darf nicht vor den Load. Problem: <code>lw</code> → abhängiger Nutzer → Load-Use-Stall. Compiler schiebt unabhängige Instruktionen in die Lücke (statisches Scheduling). Verständnischeck: Warum nicht den Nutzer nach vorn? Das würde die RAW-Kante verletzen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1743,7 +1743,7 @@ flowchart LR
 <li>Trade-off: größere Code-Größe (I-Cache) vs.&nbsp;weniger Control Hazards</li>
 </ul>
 <aside class="notes">
-<p>Kontrolle gegen Branches — Flash/I-Cache zahlen den Preis.</p>
+<p>Trick: Loop Unrolling knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Unrolling verringert Schleifenkontrolle. Ein einzelner Summenakkumulator behält seine RAW-Kette. Vier Teilsummen wären zusätzliche ILP und ein anderes Beispiel. uint32_t addiert modulo 2 hoch 32. Bei n gleich 5 verarbeitet der Viererschritt vier Elemente, der Rest eines. n gleich 0 greift nicht zu. Enge Schleifen: viele Branches relativ zur Nutzarbeit. Unrolling: Iterationen ausrollen → weniger <code>beq</code>, mehr gerader Code. Verständnischeck: Beseitigt vierfaches Unrolling die Summenabhängigkeit? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1764,7 +1764,7 @@ flowchart LR
 <li>Ideal, um <code>-O1</code> vs.&nbsp;<code>-O3</code> und RISC-V-Output zu vergleichen</li>
 </ul>
 <aside class="notes">
-<p>Röntgenblick für Embedded- und Performance-Entwicklung.</p>
+<p>Tool: Compiler Explorer (Godbolt) knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Compiler Explorer zeigt gegebenenfalls Assembler, kein OoO-Timing. Farbe im Quelltext ist keine Eins-zu-eins-Abbildung. Ein Lauf liegt hier nicht vor. Web-Tool: C links, Assembler rechts (live). Farbzuordnung C-Zeile → Instruktionen. Verständnischeck: Was misst Godbolt nicht? Reale Stall- und Branch-Zyklen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1787,7 +1787,7 @@ flowchart LR
 <li>Flags, Compilerversion und ABI gehören zur Beobachtung. Siehe Übungsblatt</li>
 </ul>
 <aside class="notes">
-<p>Sehen (Assembler) und messen (Zyklen) — derselbe C-Algorithmus, andere Pipeline-Last.</p>
+<p>Laboridee: Godbolt und Messung knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Assembleransicht, ein Ripes-Modell und ein OoO-Zeitnachweis sind drei verschiedene Dinge. Renode ohne passendes Mikroarchitekturmodell belegt keine Stall-Zyklen. Ein korrektes Funktionsergebnis ist kein Speedup-Nachweis. Godbolt zeigt die Übersetzung, kein OoO-Timing. Ein Ripes-Vergleich gilt nur für das dort gewählte Pipeline-Modell, nicht für eine Desktop-OoO-CPU. Verständnischeck: Genügt ein funktionaler Simulator? Nein, für Zeit braucht es ein passendes Modell oder Hardware. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1811,7 +1811,7 @@ flowchart LR
 <li>Compiler (<code>-O3</code>): Scheduling und Unrolling unterstützen die Hardware</li>
 </ul>
 <aside class="notes">
-<p>Moderne Kerne: vorhersagend, spekulativ, superskalar — Semantik nach außen dennoch „geordnet“.</p>
+<p>Zusammenfassung Block 7 knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Breite erlaubt passende Mehrfachstarts. OoO ändert die Auswahl. Renaming entfernt Namenskonflikte. Die PRF hält Werte, der ROB die Ordnung. Richtung und Ziel sind verschiedene Vorhersagen. Spekulation kann Cachespuren hinterlassen. -O3 garantiert kein Scheduling. Fertig muss man nachfragen: Abschluss oder Retire. Skalare Pipeline: Ideal oft <span class="math inline">\(\mathrm{IPC} \le 1\)</span>. Superskalar: mehrere Units / Issues pro Takt. Verständnischeck: Welche zwei Bedeutungen hat fertig? Ausführungsabschluss oder architektonisches Retire. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1833,7 +1833,7 @@ flowchart LR
 <li>Brücke zur realen High-Performance- und zur energieeffizienten MCU-Welt</li>
 </ul>
 <aside class="notes">
-<p>Vom Addierer zum spekulativen Kern — Konzepte von Grund auf aufgebaut.</p>
+<p>Evolution: MCT1 → MCT3 knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Unabhängigkeit kann schon im Programm stecken. OoO ändert die interne Durchführung, nicht die Bedeutung von add. Caches und DMA bleiben eigene Systempfade. MCU und Hochleistungskern sind verschiedene Abwägungen. MCT1: klare In-Order-Pipeline, begrenztes ILP. MCT3 bisher: Caches, DMA, Bus-Mastering. Verständnischeck: Ändert OoO die Bedeutung von add? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1854,7 +1854,7 @@ flowchart LR
 </ul>
 <p>Vielen Dank — viel Erfolg beim Experimentieren.</p>
 <aside class="notes">
-<p>Quellen, Stand der Vorlesung: RISC-V ISA und RVWMO; BOOM-Pipeline, ROB und LSU als dokumentiertes OoO-Beispiel, nicht als Laborplattform; GCC Optimize-Options; Spectre- und Meltdown-Paper; Ripes und Renode nur in den dort genannten Grenzen. Adressen und Breiten dieser Folien sind das Lehrmodell.</p>
+<p>Ausblick und Abschluss knüpft an die bisherige Frage nach Ausführung und sichtbarem Zustand an. Die Zeitdiagramme zeigen Folgen der genannten Annahmen, keine gemessene Firmware. Geprüft sind Quellen, Semantik und synthetische Rechnungen. Nicht geprüft sind Kompilierung, Emulation und Seitenkanalmessung. Übungsblatt: Godbolt — <code>-O0</code>/<code>-O3</code>, Scheduling, Unrolling. Optional: Zyklusvergleich in der Simulation. Verständnischeck: Was wurde nachgewiesen? Die Konsequenz der Lehrannahmen, keine Messreihe. Der nächste Block setzt auf dieser ISA-Semantik auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
