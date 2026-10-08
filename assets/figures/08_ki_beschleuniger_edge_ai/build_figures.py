@@ -157,10 +157,10 @@ def fig_f():
     p.append(T(28, 100, "1000 Elemente: 250 mal VL=4, Rest 0", 14))
     p.append(R(600, 48, 560, 90, W))
     p.append(T(612, 74, "VLEN 1024 Bit, VLMAX 32", 16, W))
-    p.append(T(612, 100, "31 mal VL=32 und einmal VL=8", 14))
+    p.append(T(612, 100, "Eine Policy: 30 mal 32, dann 32+8", 14))
     p.append(T(16, 170, "31*32+8 = 1000. Zusammen 32 Schleifen, nicht 31.", 16, ERR))
-    p.append(T(16, 202, "vsetvli liefert nicht blind min(AVL, VLMAX), wenn VLMAX &lt; AVL &lt; 2*VLMAX.", 15))
-    p.append(T(16, 234, "Hier ist der Rest 8 &lt;= VLMAX, also VL=8 erlaubt und in diesem Modell gewaehlt.", 14))
+    p.append(T(16, 202, "vsetvli liefert nicht immer min(AVL, VLMAX), wenn AVL zwischen VLMAX und 2*VLMAX liegt.", 15))
+    p.append(T(16, 234, "Ist der Rest 8 und VLMAX 32, ist VL genau 8, nicht frei gewaehlt.", 14))
     p.append(T(16, 270, "Eine physische Lane-Gruppe kann VLMAX Elemente ueber mehrere Takte rechnen.", 15, MEM))
     p.append(T(16, 302, "Ein Binary braucht passende ISA, Erweiterung, ABI und einen RVV-Kern.", 15))
     p.append(T(16, 334, "Pointer += VL * 4 Byte. Zaehler -= VL. Ende bei AVL 0.", 15, ACC))
@@ -170,18 +170,36 @@ def fig_f():
 
 
 def fig_g():
-    p = svg(1200, 340)
-    p.append(T(16, 22, "Lehrlatenzen: Mul 2 Takte, Add 1. Vier Elemente, eine Lane. Keine RVV-Hardwarezeit.", 14))
-    p.append(T(16, 52, "Getrennt: Mul fertig ab Takt 2, Add erst danach. Alles fertig Takt 6.", 15, ACT))
-    p.append(T(16, 80, "Chaining: Element 0 geht nach Mul-Latenz in den Add. Folgeelemente ueberlappen.", 15, ACC))
-    p.append(T(16, 108, "Erstes Ergebnis Takt 3. Letztes Takt 6. Bandbreite kann vorher begrenzen.", 15, W))
-    for i, lab in enumerate(["e0 mul", "e1 mul", "e0 add", "e2 mul", "e1 add", "e3/e2"]):
-        p.append(R(16 + i * 160, 140, 140, 36, ACC if "add" in lab else ACT))
-        p.append(T(24 + i * 160, 164, lab, 13))
-    p.append(T(16, 210, "Annahme: Initiationsintervall 1, eine Lane, Forwarding nur im Chaining-Fall.", 14))
-    p.append(T(16, 238, "RVV garantiert Chaining nicht. FMA ist zusaetzlich eine andere Rundung.", 15, ERR))
-    p.append(T(16, 266, "Weniger Fetch spart nicht automatisch Gesamtenergie. Speicher bleibt im Budget.", 14))
-    p.append(T(16, 300, "Registerbreite allein erklaert grosse Modelle nicht.", 14, MUTED, "400"))
+    p = svg(1200, 430)
+    x0, cw = 230, 100
+    p.append(T(16, 22, "Gleiche Achse Takte 1-9. Mul-Latenz 2, Add-Latenz 1, II 1. Keine RVV-Messung.", 14))
+    for c in range(1, 10):
+        x = x0 + (c - 1) * cw
+        p.append(T(x + cw / 2, 52, str(c), 13, MUTED, "600", "middle"))
+        p.append(L(x, 60, x, 330, MUTED, 0.6, "3 4"))
+    p.append(L(x0 + 9 * cw, 60, x0 + 9 * cw, 330, MUTED, 0.6, "3 4"))
+
+    def bar(row_y, start, span, label, color):
+        x = x0 + (start - 1) * cw + 6
+        p.append(R(x, row_y, span * cw - 12, 28, color))
+        p.append(T(x + 8, row_y + 19, label, 12))
+
+    p.append(T(16, 92, "Ohne, Mul", 13, ACT))
+    p.append(T(16, 142, "Ohne, Add", 13, ACC))
+    for i in range(4):
+        bar(74, i + 1, 2, f"e{i}", ACT)
+        bar(124, i + 6, 1, f"e{i}", ACC)
+    p.append(T(16, 214, "Mit, Mul", 13, ACT))
+    p.append(T(16, 264, "Mit, Add", 13, W))
+    for i in range(4):
+        bar(196, i + 1, 2, f"e{i}", ACT)
+        bar(246, i + 3, 1, f"e{i}", W)
+    # e0: Mul endet Ende Takt 2, Add mit Chaining startet Takt 3
+    xfwd = x0 + 2 * cw
+    p.append(L(xfwd, 102, xfwd, 246, ERR, 1.8))
+    p.append(T(xfwd + 6, 180, "e0 weiter", 12, ERR))
+    p.append(T(16, 370, "Ohne Chaining letztes Ergebnis Ende Takt 9. Mit Chaining erstes Ende Takt 3, letztes Ende Takt 6.", 14))
+    p.append(T(16, 398, "Vier Mul und vier Add bleiben. RVV garantiert das nicht. Zwei Instruktionen sind keine FMA.", 14, ERR))
     save("chain.svg", p)
 
 
