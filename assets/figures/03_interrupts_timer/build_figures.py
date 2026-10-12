@@ -1,160 +1,175 @@
 #!/usr/bin/env python3
-"""Lehrfiguren VL03. Adressen und IDs sind das RV32-Referenzmodell, kein SoC-Datenblatt."""
+"""VL03-Lehrmodelle als SVG; --png rendert dieselben Quellen mit Chromium."""
 from pathlib import Path
-OUT = Path(__file__).resolve().parent
-INK, MUTED = "#1D1D1F", "#5F6368"
-LOCAL, EXT, HW, SW = "#E65100", "#1565C0", "#6A1B9A", "#1B5E20"
+from html import escape
+import argparse
 
-def svg(w, h):
-    return [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">',
-            f'<rect width="{w}" height="{h}" fill="#fff"/>',
-            '<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>']
+OUT=Path(__file__).resolve().parent
+INK,MUTED,HAIR,BG,RED="#1D1D1F","#86868B","#E5E5EA","#F5F5F7","#E2001A"
+FIGURES=[]
 
-def T(x, y, s, size=16, fill=INK, anchor="start", w="600"):
-    return f'<text x="{x}" y="{y}" font-size="{size}" font-weight="{w}" fill="{fill}" text-anchor="{anchor}">{s}</text>'
+def text(x,y,value,size=24,anchor="start",color=INK):
+    return f'<text x="{x}" y="{y}" font-size="{size}" text-anchor="{anchor}" fill="{color}">{escape(str(value))}</text>'
 
-def box(x, y, w, h, stroke=INK, fill="#fff"):
-    return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="6" fill="{fill}" stroke="{stroke}"/>'
+def box(x,y,w,h,stroke=HAIR):
+    return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="{BG}" stroke="{stroke}" stroke-width="2"/>'
 
-def save(name, p):
-    (OUT / name).write_text("\n".join(p) + "\n</svg>\n", encoding="utf-8")
-    print(name)
+def line(x1,y1,x2,y2,color=MUTED):
+    return f'<path d="M{x1},{y1} H{x2} V{y2}" fill="none" stroke="{color}" stroke-width="2"/>'
 
-def fig_poll():
-    p = svg(1100, 320)
-    p += [T(16, 22, "Modell. Ereignis bei 1,2 ms. Wartezeit bis dahin 0,8 ms.", 15, MUTED, w="400")]
-    lanes = [
-        (40, "Busy-Wait", "#FFEBEE", "CPU belegt bis 1,2 ms"),
-        (110, "Periodisch", "#FFF3E0", "Fragen 0 / 1 / 2 ms"),
-        (180, "Interrupt", "#E8F5E9", "Latenz, ISR, weiter Main"),
-    ]
-    for y, name, fill, cap in lanes:
-        p += [box(16, y, 160, 52, INK, fill), T(28, y + 32, name, 16)]
-        p += [box(200, y, 860, 52, INK, "#fff"), T(220, y + 32, cap, 16)]
-    p += [T(200, 268, "Markierung Ereignis", 14, "#B71C1C")]
-    p += [f'<line x1="520" y1="40" x2="520" y2="232" stroke="#B71C1C" stroke-width="2"/>']
-    p += [T(16, 300, "0,8 ms ist die angenommene Zeit bis zum Ereignis, nicht die Interruptlatenz.", 15, MUTED, w="400")]
-    save("poll-vs-irq.svg", p)
+def arrow(x1,y1,x2,y2):
+    return line(x1,y1,x2,y2).replace('/>', ' marker-end="url(#arrow)"/>')
 
-def fig_mtvec():
-    p = svg(1100, 280)
-    p += [T(16, 20, "BASE 0x80000100. Vectored-Registerwert 0x80000101.", 15)]
-    labels = ["Exc", "d", "d", "MSI", "d", "d", "d", "MTI", "d", "d", "d", "MEI"]
-    for i, lab in enumerate(labels):
-        col = "#E8F5E9" if lab != "d" else "#F5F5F7"
-        p += [box(16 + i * 88, 40, 80, 44, INK, col), T(24 + i * 88, 68, f"{i} {lab}", 13)]
-    p += [T(16, 120, "Cause 3 -> +12 = 0x8000010C", 16)]
-    p += [T(16, 150, "Cause 7 -> +28 = 0x8000011C", 16)]
-    p += [T(16, 180, "Cause 11 -> +44 = 0x8000012C", 16)]
-    p += [T(16, 220, "Abstand 4 Byte bleibt auch bei komprimierten Befehlen fest.", 16)]
-    p += [T(16, 252, "Exceptionen gehen an BASE, nicht in einen Cause-Slot.", 16)]
-    save("mtvec.svg", p)
+def save(name,h,p,description):
+    head=[f'<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="{h}" viewBox="0 0 1000 {h}" role="img">',
+          f'<title>{escape(description)}</title>',
+          '<style>text{font-family:Inter,Arial,sans-serif;font-weight:400}</style>',
+          f'<rect width="1000" height="{h}" fill="#FFFFFF"/>',
+          f'<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="{MUTED}"/></marker></defs>']
+    (OUT/f"{name}.svg").write_text("\n".join(head+p+["</svg>"])+"\n",encoding="utf-8")
+    FIGURES.append((name,h))
 
-def fig_levels():
-    p = svg(1100, 300)
-    p += [T(16, 22, "Lehr-Modell, ein Hart. Cause-Code und PLIC-ID sind verschiedene Zahlen.", 15, MUTED, w="400")]
-    p += [box(16, 40, 320, 110, LOCAL, "#FFF3E0"), T(28, 68, "Lokal: mtime, mtimecmp, msip", 15, LOCAL)]
-    p += [T(28, 96, "MSI Cause 3, MTI Cause 7", 16, LOCAL), T(28, 124, "CSRs im Hart: mip, mie, MIE", 15)]
-    p += [box(360, 40, 360, 110, EXT, "#E3F2FD"), T(372, 68, "UART ID1, I2C ID2, GPIO ID3", 15, EXT)]
-    p += [T(372, 96, "alle nach MEI, Cause 11", 16, EXT), T(372, 124, "Claim liefert die Geraete-ID", 15)]
-    p += [box(750, 40, 320, 110, HW), T(762, 78, "ID 7 ist nicht Cause 7", 16, HW)]
-    p += [T(762, 110, "Timer bleibt Cause 7", 15)]
-    p += [T(16, 190, "Prioritaet der Kategorien im klassischen M-Mode: MEI vor MSI vor MTI.", 16)]
-    p += [T(16, 220, "Der Timer ist nicht automatisch der hoechstpriore VIP.", 16)]
-    p += [T(16, 250, "O(1) waehlt nur die Kategorie. Die ISR-Laufzeit bleibt workloadabhaengig.", 15, MUTED, w="400")]
-    p += [T(16, 280, "Lokal heisst dem Hart zugeordnet, nicht automatisch kuerzere Leitung.", 15, MUTED, w="400")]
-    save("two-levels.svg", p)
+def poll():
+    # Common time scale: x=200+375*t with t in milliseconds.
+    p=[text(20,30,"Modell: Ereignis 1,2 ms · ISR-Eintritt 1,3 ms · Ende 1,5 ms",24)]
+    p += [text(20,90,"Busy-Wait",23),box(200,60,450,45),text(425,90,"wiederholt prüfen",23,"middle")]
+    p += [text(20,165,"Periodisch",23),line(200,155,950,155)]
+    for t in (0,1,2):
+        x=200+375*t
+        p += [f'<circle cx="{x}" cy="155" r="6" fill="{INK}"/>']
+    p += [text(20,240,"Interrupt",23),box(200,210,450,45),text(425,240,"Hauptprogramm",23,"middle"),
+          box(687.5,210,75,45,RED),text(725,240,"ISR",22,"middle"),
+          box(762.5,210,187.5,45),text(855,240,"Main",23,"middle")]
+    p += [line(650,45,650,260,RED),text(650,290,"1,2",22,"middle",RED),
+          text(200,290,"0",22,"middle"),text(575,290,"1",22,"middle"),text(950,290,"2 ms",22,"end")]
+    save("poll-vs-irq",315,p,"Alternative Abläufe auf derselben Millisekundenachse.")
 
-def fig_trap():
-    p = svg(1100, 240)
-    p += [T(16, 22, "Einfacher M-Mode-Trap. Hardware rettet nicht alle Register.", 15, MUTED, w="400")]
-    p += [T(16, 58, "Vorher: Main-PC, MIE=1", 16)]
-    p += [T(16, 90, "Hardware: mepc=Ruecksprung-PC, mcause=Ursache, MPIE=altes MIE, MIE=0, MPP=alter Modus", 15)]
-    p += [T(16, 124, "Software: Prolog auf dem Stack, Handler, Epilog", 16, SW)]
-    p += [T(16, 158, "mret: PC aus mepc, MIE aus MPIE, Privileg aus MPP", 16, HW)]
-    p += [T(16, 198, "MIE=0 sperrt die betrachteten maskierbaren M-Interrupts, keine synchronen Exceptions.", 15)]
-    p += [T(16, 226, "Ein BUTTON-Vergleich ohne Interrupt-Bit und ohne Claim-ID trifft weder Cause noch Geraet.", 14, MUTED, w="400")]
-    save("trap-state.svg", p)
+def trap():
+    p=[]
+    stages=[(20,150,"Main"),(220,300,"Hardware"),(570,240,"Software"),(860,120,"mret")]
+    for x,w,label in stages:
+        p += [box(x,40,w,135),text(x+w/2,75,label,26,"middle")]
+    p += [text(35,116,"MIE = 1",23),text(235,112,"mepc · mcause · MPP",23),
+          text(235,151,"MPIE ← MIE; MIE ← 0",23),
+          text(590,112,"Prolog · Handler",23),text(590,151,"Epilog",23),
+          text(920,117,"Rückkehr",21,"middle")]
+    for start,end in [(170,220),(520,570),(810,860)]:p.append(arrow(start,100,end,100))
+    p += [text(20,220,"Hardware hält Trap-Zustand; Software erhält weitere Register.",25)]
+    save("trap-state",245,p,"Arbeitsteilung beim Trap-Eintritt und bei der Rückkehr.")
 
-def fig_timer():
-    p = svg(1100, 250)
-    p += [T(16, 20, "mtime steigt, mtimecmp ist die Deadline. MTIP, sobald mtime >= mtimecmp.", 16)]
-    p += [T(16, 56, "Pending allein reicht nicht. Zusaetzlich MTIE und, im M-Mode, MIE.", 16, LOCAL)]
-    p += [T(16, 96, "Deadline offen | erreicht, MTIE=0 | erreicht, MIE=0 | beide an | Compare in der Zukunft", 15)]
-    p += [T(16, 136, "mret quittiert den Timer nicht. Ein ueberfaelliger Vergleich kann erneut trappen.", 16)]
-    p += [T(16, 176, "MTIP faellt nach dem Schreiben nicht garantiert sofort. Kein Busy-Wait auf MTIP.", 15)]
-    p += [T(16, 216, "Reihenfolge: Stack und mtvec, Zeit lesen, Compare setzen, MTIE, dann MIE.", 16, SW)]
-    save("timer-gates.svg", p)
+def levels():
+    p=[]
+    for y,label in [(20,"Timer: mtime / mtimecmp"),(110,"Software: msip")]:
+        p += [box(20,y,320,65),text(40,y+40,label,24)]
+    p += [box(20,205,320,85),text(40,238,"UART 1 · Sensor 2 · Taster 3",23),
+          text(40,271,"externe Geräte-IDs",22)]
+    p += [box(400,215,200,65),text(500,255,"PLIC",27,"middle")]
+    p += [box(760,50,220,240),text(870,92,"Hart",28,"middle"),
+          text(780,142,"Kategorie 7",24),text(780,198,"Kategorie 3",24),text(780,254,"Kategorie 11",24)]
+    p += [arrow(340,52,700,138),arrow(700,138,760,138),
+          arrow(340,142,660,194),arrow(660,194,760,194),
+          arrow(340,247,400,247),arrow(600,247,760,247)]
+    p += [text(20,330,"Cause-Code der Kategorie ≠ Geräte-ID aus Claim",25)]
+    save("two-levels",355,p,"Lokale Kategorien und externes PLIC-Sammelsignal zum Hart.")
 
-def fig_hilo():
-    p = svg(1100, 250)
-    p += [T(16, 20, "RV32, zwei 32-Bit-Haelften. Kein einzelner atomarer 64-Bit-Load.", 15, MUTED, w="400")]
-    p += [T(16, 56, "Vorher 0x00000001_FFFFFFFF, nachher 0x00000002_00000000", 16)]
-    p += [T(16, 90, "HI=1 vor dem Uebergang und LO=0 danach ergibt faelschlich 0x00000001_00000000", 16, "#B71C1C")]
-    p += [T(16, 130, "Lesen: HI, LO, HI noch einmal. Nur gleiche HI-Werte akzeptieren.", 16, SW)]
-    p += [T(16, 170, "Compare schreiben, Little Endian: LO=0xFFFFFFFF, dann HI, dann neues LO.", 16, LOCAL)]
-    p += [T(16, 210, "32-Bit-Ticks bei 1 MHz: ca. 71,6 min. 32-Bit-Millisekunden: ca. 49,7 Tage.", 15, MUTED, w="400")]
-    save("hi-lo.svg", p)
+def mtvec():
+    p=[text(20,30,"BASE 0x80000100 · mtvec 0x80000101 · ausgewählte Slots",24)]
+    for j,(kind,offset,address) in enumerate([
+        ("Exception",0,"0x80000100"),("MSI, Cause 3",12,"0x8000010C"),
+        ("MTI, Cause 7",28,"0x8000011C"),("MEI, Cause 11",44,"0x8000012C")]):
+        y=60+j*62
+        p += [text(20,y+37,kind,25),text(340,y+37,f"+{offset} Byte",25),
+              box(560,y,420,50),text(770,y+34,address,27,"middle")]
+    save("mtvec",315,p,"Adressbildung für ausgewählte Kategorien und Exception-Basis.")
 
-def fig_drift():
-    p = svg(1100, 250)
-    p += [T(16, 20, "Timer 10 MHz: 10000 Ticks/ms. CPU 100 MHz: 100000 Zyklen/ms.", 16)]
-    p += [T(16, 58, "Soll 10,0 ms, ISR bei 10,2 ms. now+1 ms ergibt 11,2 ms statt Phase 11,0 ms.", 16, LOCAL)]
-    p += [T(16, 100, "Ueberlast: naechste Sollzeit 10 ms, Service bei 15,3 ms, Periode 1 ms.", 16)]
-    p += [T(16, 136, "k = floor((15,3-10)/1)+1 = 6 faellige Deadlines. Naechste Zukunft: 16 ms.", 16, SW)]
-    p += [T(16, 176, "Ein Pending-Bit zaehlt nicht alle vergangenen Perioden.", 16)]
-    p += [T(16, 210, "Optional: 500 Zyklen bei 100 MHz = 5 us, bei 1 kHz = 0,5 Prozent. Nur Modell.", 15, MUTED, w="400")]
-    save("tick-drift.svg", p)
+def timer():
+    p=[text(20,30,"Im Machine-Mode-Modell müssen alle Bedingungen gelten.",25)]
+    for x,w,label,detail in [(20,350,"mtime ≥ mtimecmp","MTIP: pending"),
+                             (420,220,"MTIE = 1","Kategorie frei"),
+                             (710,260,"MIE = 1","global frei")]:
+        p += [box(x,65,w,100),text(x+w/2,105,label,27,"middle"),text(x+w/2,143,detail,23,"middle")]
+    p += [arrow(370,115,420,115),arrow(640,115,710,115),
+          text(840,225,"Timer-Trap möglich",25,"middle"),arrow(840,165,840,195)]
+    save("timer-gates",250,p,"Vergleichsbedingung und getrennte Freigaben für den Timer-Trap.")
 
-def fig_plic():
-    p = svg(1100, 240)
-    p += [T(16, 20, "Kontext 0, Threshold 5. Benachrichtigung nur bei Prioritaet strikt groesser 5.", 15, MUTED, w="400")]
-    p += [T(16, 56, "ID1 Prio 3 pending enabled: keine Meldung", 16, MUTED)]
-    p += [T(16, 90, "ID2 Prio 7 und ID3 Prio 7: ID2 gewinnt, kleinere ID", 16, EXT)]
-    p += [T(16, 130, "Claim liest ID2 und loescht ihr PLIC-Pending. Threshold filtert Claim nicht.", 16)]
-    p += [T(16, 170, "Kontext ist Hart plus Privileg, nicht einfach der Kern. Nummern sind Lehrwerte.", 15)]
-    p += [T(16, 210, "Ein Pending-Bit ist keine unbegrenzte Ereigniswarteschlange.", 16, HW)]
-    save("plic-table.svg", p)
+def hilo():
+    p=[text(20,30,"Zählerübergang:",25),text(250,30,"0x00000001_FFFFFFFF → 0x00000002_00000000",24)]
+    for x,label,value in [(20,"HI vorher","1"),(375,"LO danach","0"),(730,"HI nochmals","2")]:
+        p += [box(x,70,250,100),text(x+125,110,label,26,"middle"),text(x+125,151,value,28,"middle")]
+    p += [arrow(270,120,375,120),arrow(625,120,730,120)]
+    p += [text(20,225,"HI 1 + LO 0 wäre falsch: 0x00000001_00000000",25,color=RED),
+          text(20,270,"HI vorher ≠ HI nochmals → Leseversuch wiederholen",25)]
+    save("hi-lo",295,p,"Überlauf zwischen Zugriffen und Erkennung durch einen zweiten HI-Wert.")
 
-def fig_claim():
-    p = svg(1100, 250)
-    p += [T(16, 20, "Geraet, PLIC, Hart. Claim ist nicht die Quittung im UART.", 15, MUTED, w="400")]
-    p += [T(16, 56, "1 Quelle aktiv  2 Pending  3 MEI Cause 11  4 Claim liest ID", 16, EXT)]
-    p += [T(16, 96, "5 Geraetursache loeschen  6 dieselbe ID als Complete schreiben", 16, SW)]
-    p += [T(16, 136, "ID 0: kein Tabellenzugriff und kein Complete.", 16, "#B71C1C")]
-    p += [T(16, 176, "Level bleibt aktiv: nach Complete erneut Pending. Sonst bleibt es aus.", 16)]
-    p += [T(16, 214, "Zwei Harts: eine Quelle wird einmal geclaimt. Der andere Hart liest 0, wenn nichts bleibt.", 15)]
-    save("claim.svg", p)
+def drift():
+    # x=375+250*(t-10); only marked times are represented.
+    p=[text(20,30,"Solltermin 10,0 ms · tatsächlicher Eintritt 10,2 ms",25)]
+    p += [text(20,115,"Relativ",25),box(425,80,250,55),text(550,116,"1 ms ab Eintritt",24,"middle"),
+          text(675,165,"11,2 ms",25,"middle",RED)]
+    p += [text(20,230,"Sollraster",25),box(375,195,250,55),text(500,231,"1 ms ab Sollwert",24,"middle"),
+          text(625,280,"11,0 ms",25,"middle")]
+    p += [line(425,45,425,65,RED),text(375,320,"10,0",23,"middle"),text(875,320,"12,0 ms",23,"middle"),
+          line(375,295,875,295)]
+    save("tick-drift",345,p,"Relativer Termin verschiebt die Phase, absolutes Raster erhält sie.")
 
-def fig_nest():
-    p = svg(1100, 250)
-    p += [T(16, 20, "Konzeptionell, keine gepruefte sichere ISR-Vorlage.", 15, "#B71C1C")]
-    p += [T(16, 56, "Main, aeussere ISR, innere ISR, zurueck, Main. Je ein Frame und ein Ruecksprung-PC.", 16)]
-    p += [T(16, 100, "Fehler: einziges mepc ueberschrieben. t0/t1 im alten Prolog verloren.", 16, "#B71C1C")]
-    p += [T(16, 140, "Ein Frame rettet benutzte GPRs, noetige CSRs und geaenderte Masken.", 16, SW)]
-    p += [T(16, 176, "ILP32: Stack 16-Byte-ausgerichtet, sobald C aufgerufen wird. 8 Byte genuegen nicht.", 16)]
-    p += [T(16, 214, "MIE=1 erlaubt nicht nur hoeherpriore Quellen. Externe Quellen extra maskieren.", 15, MUTED, w="400")]
-    save("nesting.svg", p)
+def plic():
+    p=[]
+    for j,label in enumerate(["UART · ID 1","Sensor · ID 2","Taster · ID 3"]):
+        y=20+j*80
+        p += [box(20,y,250,55),text(145,y+36,label,25,"middle"),arrow(270,y+27,400,y+27)]
+    p += [box(400,20,260,215),text(530,60,"PLIC",29,"middle"),
+          text(420,105,"Pending",24),text(420,145,"Priorität",24),text(420,185,"Kontext-Enable",24)]
+    p += [box(790,65,190,120),text(885,105,"Hart 0",27,"middle"),text(885,147,"M-Mode",25,"middle"),
+          arrow(660,120,790,120),text(780,260,"MEI · Cause 11",24,"middle")]
+    save("plic-table",285,p,"Externe Quellen über PLIC zum Machine-Mode-Kontext.")
 
-def fig_ipi():
-    p = svg(1100, 200)
-    p += [T(16, 22, "Zwei Harts. msip ist ein Pending-Bit, keine Nachrichtenwarteschlange.", 15, MUTED, w="400")]
-    p += [box(16, 50, 220, 60, LOCAL), T(28, 86, "Hart A schreibt", 16, LOCAL)]
-    p += [box(280, 50, 260, 60, HW), T(292, 86, "msip von Hart B = 1", 16, HW)]
-    p += [box(580, 50, 480, 60, SW), T(592, 86, "Hart B: MSI Cause 3, dann msip=0", 16, SW)]
-    p += [T(16, 150, "Die Nutzdaten liegen in einer eigenen Shared-Memory-Struktur mit passender Ordnung.", 16)]
-    p += [T(16, 182, "MSI ist nicht automatisch niedriger als der Timer. Kategorien: MEI, MSI, MTI.", 15)]
-    save("ipi.svg", p)
+def claim():
+    p=[text(20,30,"Normaler Lebenszyklus einer bekannten Gerätequelle",25)]
+    stages=[(20,160,"Gerät aktiv"),(215,155,"Pending"),(405,155,"Claim ID"),
+            (595,180,"Gerät bedienen"),(810,170,"Complete ID")]
+    for x,w,label in stages:
+        p += [box(x,65,w,95),text(x+w/2,116,label,22,"middle")]
+    for a,b in [(180,215),(370,405),(560,595),(775,810)]:p.append(arrow(a,110,b,110))
+    p += [text(410,210,"PLIC-Pending gelöscht",22),text(20,255,"Geräteursache bearbeiten, danach dieselbe ID abschließen.",25)]
+    save("claim",285,p,"Claim, getrennte Gerätebearbeitung und Complete in Reihenfolge.")
 
-def fig_fg():
-    p = svg(1100, 220)
-    p += [T(16, 22, "Timer-ISR aktualisiert kurz. Main liest einen Snapshot und prueft die LED-Deadline.", 16)]
-    p += [T(16, 64, "last=0xFFFFFFF0, now=0x00000020, uint32_t(now-last)=48", 18, SW)]
-    p += [T(16, 104, "Nur gueltig, wenn kein voller Zaehlerumlauf zwischen den Vergleichen liegt.", 15)]
-    p += [T(16, 144, "volatile erzwingt im Modell die Zugriffe. Es ist kein atomares RMW und kein SMP-Schloss.", 16)]
-    p += [T(16, 184, "Renode-Zeit ist virtuell. PerformanceInMips ist keine Zyklen- oder Latenzgarantie.", 15, MUTED, w="400")]
-    save("foreground.svg", p)
+def foreground():
+    p=[text(20,30,"Ein Hart: ISR und Hauptprogramm laufen nacheinander.",25)]
+    p += [box(20,80,240,80),text(140,128,"Main vorher",26,"middle"),
+          box(330,80,200,80,RED),text(430,128,"kurze ISR",26,"middle"),
+          box(650,80,330,80),text(815,114,"Main später:",25,"middle"),
+          text(815,148,"Nutzarbeit",25,"middle")]
+    p += [arrow(260,120,330,120),arrow(530,120,650,120),
+          line(275,50,275,180,RED),text(275,220,"Ereignis",23,"middle",RED),
+          text(590,220,"zusätzliche Wartezeit",23,"middle")]
+    save("foreground",255,p,"Sofortige kurze Behandlung und spätere Hauptprogramm-Nutzarbeit.")
 
-if __name__ == "__main__":
-    fig_poll(); fig_levels(); fig_mtvec(); fig_trap(); fig_timer()
-    fig_hilo(); fig_drift(); fig_plic(); fig_claim(); fig_nest(); fig_ipi(); fig_fg()
+def nesting():
+    p=[text(20,30,"Ein Hardware-mepc, getrennte Softwareframes bei Nesting",25)]
+    p += [box(20,60,440,105),text(40,100,"äußerer Eintritt: mepc 0x80001000",24),
+          text(40,144,"innerer Eintritt: mepc 0x80002040",24,color=RED)]
+    p += [box(570,65,410,75),text(590,96,"äußerer Frame:",24),text(590,125,"Rückkehr 0x80001000",24)]
+    p += [box(570,185,410,75,RED),text(590,216,"innerer Frame:",24),text(590,245,"Rückkehr 0x80002040",24)]
+    p += [arrow(775,185,775,140),text(20,220,"Ohne Sicherung ist die",25),text(20,253,"ursprüngliche Adresse verloren.",25)]
+    p += [text(20,310,"Rückkehr: innen → außen → Main; Register und Status ebenfalls erhalten.",24)]
+    save("nesting",335,p,"Überschriebenes mepc und die nötigen getrennten Sicherungsrahmen.")
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--png",action="store_true")
+    parser.add_argument("--chromium",default="/usr/bin/chromium")
+    args=parser.parse_args()
+    for build in (poll,trap,levels,mtvec,timer,hilo,drift,plic,claim,foreground,nesting):build()
+    if args.png:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser=p.chromium.launch(executable_path=args.chromium,headless=True,args=["--no-sandbox"])
+            page=browser.new_page(device_scale_factor=2)
+            for name,h in FIGURES:
+                page.set_viewport_size({"width":1000,"height":h})
+                page.set_content('<body style="margin:0">'+(OUT/f"{name}.svg").read_text(encoding="utf-8")+'</body>')
+                page.locator("svg").screenshot(path=str(OUT/f"{name}.png"))
+            browser.close()
+    print(f"{len(FIGURES)} SVGs"+(" und PNGs" if args.png else ""))
+
+if __name__=="__main__":main()

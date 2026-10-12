@@ -1,10 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 250" width="1100" height="250">
-<rect width="1100" height="250" fill="#fff"/>
-<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>
-<text x="16" y="20" font-size="16" font-weight="600" fill="#1D1D1F" text-anchor="start">mtime steigt, mtimecmp ist die Deadline. MTIP, sobald mtime >= mtimecmp.</text>
-<text x="16" y="56" font-size="16" font-weight="600" fill="#E65100" text-anchor="start">Pending allein reicht nicht. Zusaetzlich MTIE und, im M-Mode, MIE.</text>
-<text x="16" y="96" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Deadline offen | erreicht, MTIE=0 | erreicht, MIE=0 | beide an | Compare in der Zukunft</text>
-<text x="16" y="136" font-size="16" font-weight="600" fill="#1D1D1F" text-anchor="start">mret quittiert den Timer nicht. Ein ueberfaelliger Vergleich kann erneut trappen.</text>
-<text x="16" y="176" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">MTIP faellt nach dem Schreiben nicht garantiert sofort. Kein Busy-Wait auf MTIP.</text>
-<text x="16" y="216" font-size="16" font-weight="600" fill="#1B5E20" text-anchor="start">Reihenfolge: Stack und mtvec, Zeit lesen, Compare setzen, MTIE, dann MIE.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="250" viewBox="0 0 1000 250" role="img">
+<title>Vergleichsbedingung und getrennte Freigaben für den Timer-Trap.</title>
+<style>text{font-family:Inter,Arial,sans-serif;font-weight:400}</style>
+<rect width="1000" height="250" fill="#FFFFFF"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#86868B"/></marker></defs>
+<text x="20" y="30" font-size="25" text-anchor="start" fill="#1D1D1F">Im Machine-Mode-Modell müssen alle Bedingungen gelten.</text>
+<rect x="20" y="65" width="350" height="100" rx="10" fill="#F5F5F7" stroke="#E5E5EA" stroke-width="2"/>
+<text x="195.0" y="105" font-size="27" text-anchor="middle" fill="#1D1D1F">mtime ≥ mtimecmp</text>
+<text x="195.0" y="143" font-size="23" text-anchor="middle" fill="#1D1D1F">MTIP: pending</text>
+<rect x="420" y="65" width="220" height="100" rx="10" fill="#F5F5F7" stroke="#E5E5EA" stroke-width="2"/>
+<text x="530.0" y="105" font-size="27" text-anchor="middle" fill="#1D1D1F">MTIE = 1</text>
+<text x="530.0" y="143" font-size="23" text-anchor="middle" fill="#1D1D1F">Kategorie frei</text>
+<rect x="710" y="65" width="260" height="100" rx="10" fill="#F5F5F7" stroke="#E5E5EA" stroke-width="2"/>
+<text x="840.0" y="105" font-size="27" text-anchor="middle" fill="#1D1D1F">MIE = 1</text>
+<text x="840.0" y="143" font-size="23" text-anchor="middle" fill="#1D1D1F">global frei</text>
+<path d="M370,115 H420 V115" fill="none" stroke="#86868B" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M640,115 H710 V115" fill="none" stroke="#86868B" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="840" y="225" font-size="25" text-anchor="middle" fill="#1D1D1F">Timer-Trap möglich</text>
+<path d="M840,165 H840 V195" fill="none" stroke="#86868B" stroke-width="2" marker-end="url(#arrow)"/>
 </svg>

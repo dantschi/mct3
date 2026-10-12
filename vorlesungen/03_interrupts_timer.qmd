@@ -1,1134 +1,872 @@
 ---
 title: "03 · Interrupts & Timer"
-subtitle: "Mikrocomputertechnik 3 · Vom Hardware-Tick zur Ereignissteuerung"
+subtitle: "Mikrocomputertechnik 3 · Zeit und Ereignisse im RISC-V-System"
 author: "Prof. Dr.-Ing. Daniel Klünder"
-lang: de
-# Vortrag:  quarto preview vorlesungen/03_interrupts_timer.qmd
-#           (Notizen nur mit Taste S)
-# Handout:  quarto render vorlesungen/03_interrupts_timer.qmd --profile handout --to pdf
-#           → _handout/vorlesungen/03_interrupts_timer.pdf
 format: revealjs
+title-slide-attributes:
+  data-visibility: hidden
+lang: de
+# Vortrag: quarto render vorlesungen/03_interrupts_timer.qmd --to revealjs
+# Skript: quarto render vorlesungen/03_interrupts_timer.qmd --profile handout --to pdf
 ---
 
-## Willkommen zu Block 3!
+## Vom Speicher zum Ereignis
 
-- Willkommen zur dritten Vorlesung in Mikrocomputertechnik 3
-- Rückblick Block 1 und 2: Speicherphysik und Caches
-- Bisher: Daten möglichst schnell zur CPU bringen
-- Heute: Zeit und asynchrone Ereignisse
-- Ein System-Timer ist oft eine Zeitquelle, aber kein Pflicht-Tick jedes Betriebssystems
-
-::: notes
-Willkommen zu Block 3 setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. CPU heißt Central Processing Unit, SoC System on Chip, OS Operating System. Speicherphysik und Caches beschleunigen Datenzugriffe, entscheiden aber nicht, wann ein Sensor beachtet wird. Asynchron heißt unabhängig vom gerade laufenden Befehl, zeitbezogen heißt mit Frist oder Zeitpunkt. Ein System-Timer ist häufig eine Zeitquelle, aber kein Beweis für einen obligatorischen periodischen Tick. Willkommen zur dritten Vorlesung in Mikrocomputertechnik 3. Rückblick Block 1 und 2: Speicherphysik und Caches. Bisher: Daten möglichst schnell zur CPU bringen. Heute: Zeit und asynchrone Ereignisse. Verständnischeck: Kann ein schneller Prozessor ein Ereignis übersehen? Ja, wenn Software oder Hardware es nicht erkennt oder speichert. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Einordnung im Semester
-
-```{mermaid}
-%%| fig-width: 4.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[Block 1 und 2: Speicher] --> B[Block 3: Zeit und Ereignisse]
-  B --> C[Block 4: Aktorik]
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+- Vorlesung 1: Speicher und Geräteadressen
+- Vorlesung 2: Cache-Kopien und Zugriffskosten
+- Heute: Wann muss das Programm auf ein Ereignis reagieren?
+- Ziel: Zeit erfassen, Ursachen unterscheiden, Arbeit passend aufteilen
 
 ::: notes
-Einordnung im Semester setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Echtzeit meint die Einhaltung geforderter Reaktionszeiten, nicht bloß eine hohe Taktfrequenz. Speicher ist die Datenbasis, dieser Block die Ereignis- und Zeitbasis, der spätere Atomikblock die Grundlage korrekter geteilter Zugriffe. Eine ISR, die Interrupt Service Routine, und das Hauptprogramm können dieselbe Variable zu verschiedenen Zeiten benutzen. Verständnischeck: Welche neue Schwierigkeit bringt eine ISR? Hauptprogramm und ISR teilen sich Zustand. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Ein schneller Speicherzugriff beantwortet noch nicht, wann ein Programm einen Sensor oder einen Zeitpunkt beachten soll. Vorlesung 1 hat Memory-Mapped Input/Output, Ein- und Ausgabe über Geräteadressen, eingeführt. Vorlesung 2 erklärte, wie Caches Kopien gewöhnlicher Speicherblöcke verwalten. Nun verbinden wir die laufende Programmausführung mit Ereignissen aus Geräten und einer Hardware-Zeitquelle.
+
+Ein Interrupt ist eine asynchrone Unterbrechungsanforderung: Sie entsteht unabhängig davon, welcher Befehl gerade bearbeitet wird. Ein Timer liefert eine zeitbezogene Bedingung. Beide benötigen einen vereinbarten Weg von der Anforderung über die Behandlung bis zur Fortsetzung des unterbrochenen Programms. Eine hohe Taktfrequenz allein garantiert keine rechtzeitige Reaktion. Wir betrachten deshalb auch Freigaben, Wartezeiten und die Aufgabenverteilung zwischen Handler und Hauptprogramm. Der rote Faden führt von einem einzelnen Ereignis zu mehreren Quellen und schließlich zu gemeinsam genutztem Zustand.
 :::
 
-## Anknüpfung: Cache und Lokalität
+## Vorkenntnisse und Lehrmodell
 
-Kurz-Recap aus Block 2 (Labor folgt mit dem Übungsblatt):
-
-- Spaltenweiser Zugriff kann den Cache durch schlechte Lokalität belasten
-- Zeilenweiser Zugriff kann räumliche Lokalität verbessern; die Hit Rate hängt vom Modell ab
-- Software und Hardware sind untrennbar verbunden
-
-```c
-/* Lehrcode — nicht kompiliert. Großer Ausschnitt, kein Stack-Rezept. */
-for (int row = 0; row < 1000; row++) {
-    for (int col = 0; col < 1000; col++) {
-        bild[row][col] = 0; /* Store, keine reine Load-Spur */
-    }
-}
-```
+- Adresse, C-Zeiger, Binärbits und einfache Schleifen
+- RV32: RISC-V mit $32$-Bit-Integerregistern
+- Ein Hart im Machine Mode; keine Delegation, zunächst kein Nesting
+- Klassischer Timer-/PLIC-Pfad; Ausstattung und Adressen sind plattformabhängig
 
 ::: notes
-Anknüpfung: Cache und Lokalität setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Hit Rate zählt Treffer einer betrachteten Zugriffsspur. In C liegen die Elemente einer Zeile hintereinander, Row-Major. Die innere col-Schleife kann räumliche Lokalität verbessern. Compiler, Schreibstrategie und Datengröße ändern das Ergebnis. Stores sind keine reine Load-Spur. Ripes ist ein geplantes Labor, keine vorliegende Messung. Der Ausschnitt ist Lehrcode. Spaltenweiser Zugriff kann den Cache durch schlechte Lokalität belasten. Zeilenweiser Zugriff kann räumliche Lokalität verbessern; die Hit Rate hängt vom Modell ab. Software und Hardware sind untrennbar verbunden. Verständnischeck: Warum ist bild[row][col+1] räumlich nah? Die Zeilenelemente folgen aufeinander. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Ein Hart ist ein Hardware-Thread, ein Ausführungskontext eines RISC-V-Prozessors. RV32 bezeichnet die Variante mit zweiunddreißig Bit breiten Integerregistern. Machine Mode, kurz M-Mode, ist die höchste normale Privilegstufe. Unser Modell führt Hauptprogramm und Handler dort auf einem Hart aus. Es leitet Traps nicht an andere Privilegstufen weiter und verschachtelt Interrupts zunächst nicht.
+
+PLIC steht für Platform-Level Interrupt Controller, Plattform-Interrupt-Controller für externe Geräte. Den lokalen Timer betrachten wir in einem CLINT-artigen Modul; CLINT bedeutet Core Local Interruptor. Diese klassische Organisation ist ein Lehrmodell und keine Behauptung über jeden RISC-V-Chip. Neuere Interrupt-Architekturen oder andere Plattformmodule können anders aussehen.
+
+Erforderlich sind Zeiger und einfache C-Schleifen sowie die Unterscheidung zwischen Adresse und Inhalt aus den vorherigen Vorlesungen. Register und neue Abkürzungen werden erneut erklärt. Alle Zahlen, Geräte-IDs und gegebenenfalls genannten Adressen sind explizite Lehrannahmen. Es liegt keine ausgeführte RISC-V-Firmware vor. Damit lassen sich die Regeln auf Papier nachvollziehen, ohne eine bestimmte Laborplatine vorauszusetzen.
 :::
 
-## Von Daten zu Ereignissen
+## Vier Schulstunden: Ablauf
 
-- 3 GHz ist eine illustrative CPU-Frequenz, nicht der Kurs-MCU-Takt
-- Die Außenwelt (Taster, Sensoren) ist vergleichsweise langsam
-- Eine enge Warteschleife verbraucht Ausführungszeit; die Energie hängt vom Betriebszustand ab
-- Ziel: nützliche Arbeit, während auf Peripherie gewartet wird
-- Ausweg: asynchrone, ereignisgesteuerte Systeme
+| Stunde | Vorlesungsphase | Arbeitsphase |
+|--------|-----------------|--------------|
+| 1 | Ereignisse und Traps: 35 min | Aufgabe 1: 10 min |
+| 2 | Vektoren und Timer: 30 min | Aufgaben 2–3: 15 min |
+| 3 | Zeitraster und PLIC: 30 min | Aufgaben 4–5: 15 min |
+| 4 | Kontext und Hauptprogramm: 15 min | Aufgabe 6: 15 min; Quiz: 15 min |
 
 ::: notes
-Von Daten zu Ereignissen setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. 3 GHz ist eine illustrative CPU-Frequenz, nicht der Takt der Kurs-MCU. Gigahertz bedeutet eine Milliarde Takte je Sekunde. Eine enge Abfrageschleife verbraucht Ausführungszeit. Ob dabei Energie gespart wird, hängt von Takt, Last und Idle-Zustand ab. Ein Interrupt ermöglicht Zwischenarbeit oder Ruhe, garantiert sie aber nicht. 3 GHz ist eine illustrative CPU-Frequenz, nicht der Kurs-MCU-Takt. Die Außenwelt (Taster, Sensoren) ist vergleichsweise langsam. Eine enge Warteschleife verbraucht Ausführungszeit; die Energie hängt vom Betriebszustand ab. Ziel: nützliche Arbeit, während auf Peripherie gewartet wird. Verständnischeck: Muss die CPU zwischen Tastendrücken untätig sein? Nein, sie kann rechnen oder geeignet ruhen. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Vier Schulstunden bedeuten hier viermal fünfundvierzig, insgesamt hundertachtzig Minuten Unterricht; Pausen sind zusätzlich zu planen. Der Plan enthält hundertzehn Minuten Erklärung, kurze Denkfragen und gemeinsame Aufgabenbesprechungen, fünfundfünfzig Minuten angeleitete Papierübungen und fünfzehn Minuten Quiz.
+
+Die erste Phase führt vom Ereignis zum Trap, dem gemeinsamen Eintritt in die Behandlung von Interrupts und Exceptions. Die zweite erklärt Einsprungadressen und die Zeitquelle. In der dritten werden verspätete Termine und externe Geräte bearbeitet. PLIC bedeutet Platform-Level Interrupt Controller, der externe Quellen sammelt. Die letzte Phase untersucht Kontext und gemeinsam benutzte Variablen. Die Arbeitsphasen folgen den sechs Aufgaben des Übungsblatts. Für das vollständige selbstständige Bearbeiten darf mehr Zeit als in den angeleiteten Phasen benötigt werden. Die fünfzig Folien verteilen sich nicht gleichmäßig auf die Minuten: Ein Zustandsbeispiel braucht Diskussion, eine Orientierungsfolie meist nur einen kurzen Übergang.
 :::
 
-## CPU-Zeit sinnvoll nutzen
+## Polling: selbst nachfragen
 
-| Phase | Inhalt (schematisch) |
-|-------|----------------------|
-| Main | nützliche Arbeit |
-| ISR | kurzes Event-Handling |
-| Main | weiterrechnen |
-
-*Interrupt unterbricht nur kurz — kein Dauer-Polling.*
+- Polling: Gerätezustand per Software prüfen
+- Busy Waiting: wiederholt prüfen und dabei warten
+- Periodisches Polling: zwischen Abfragen andere Arbeit
+- Kurze ungespeicherte Ereignisse können zwischen Abfragen verschwinden
 
 ::: notes
-CPU-Zeit sinnvoll nutzen setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Die Zeitachse zeigt Ereignis, Eintrittslatenz, kurze ISR und Wiederaufnahme. Kontext sind die Register und Daten, die zum Fortsetzen gebraucht werden. Im Ein-Hart-Modell laufen Main und ISR nacheinander, nicht auf zwei Prozessoren zugleich. Kurz ist ein Softwareziel. ISR-Aufwand verkürzt die übrige Arbeit. Verständnischeck: Was folgt nach der ISR? Der gesicherte Kontext wird hergestellt und die Ausführung geht weiter. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Polling bedeutet Abfragen. Software liest beispielsweise ein Statusregister eines Geräts und prüft, ob Daten bereitliegen. Busy Waiting, beschäftigtes Warten, ist eine enge Wiederholung dieser Prüfung ohne andere nützliche Arbeit. Periodisches Polling fragt dagegen nur gelegentlich nach und bearbeitet zwischenzeitlich andere Aufgaben.
+
+Ein lesbares Gerätestatusregister stammt aus dem Konzept der Geräteadressen in Vorlesung 1. Es muss nicht dieselben Eigenschaften wie gewöhnlicher Arbeitsspeicher besitzen: Lesen kann Seiteneffekte haben. Für ein korrektes Programm sind die Gerätereigenschaften zu beachten.
+
+Polling ist nicht grundsätzlich falsch. Bei einer dauerhaft sichtbaren Bereitschaft und tolerierbarer Verzögerung kann es einfach und passend sein. Ein kurzer Impuls, der weder im Gerät noch in weiterer Hardware gespeichert wird, kann dagegen zwischen zwei Prüfungen liegen und vollständig übersehen werden. Ein Interrupt ist ein anderer Benachrichtigungsweg, aber auch dort müssen Ereignisse erfasst und gegebenenfalls gespeichert werden. Die nächste Abbildung vergleicht ausdrücklich modellierte Reaktionswege, nicht pauschal Energieverbrauch oder Laufzeit.
 :::
 
-## Refresher MCT1: Polling vs. Interrupts
+## Reaktionswege auf einer Zeitachse
 
-- Dauer-Polling (Busy Waiting) und gelegentliches Abfragen sind verschieden
-- Interrupt: Ereignissignal, Freigabe, Handler, Rückkehr — keine gespeicherte Klingel für jede Flanke
-- Hardware signalisiert Ereignis → CPU unterbricht die laufende Arbeit
-- Danach Rückkehr in den unterbrochenen Kontext
+![](../assets/figures/03_interrupts_timer/poll-vs-irq.png){fig-alt="Ereignis bei 1,2 ms; periodisches Polling entdeckt es bei 2 ms, Interruptbehandlung beginnt im Modell bei 1,3 ms."}
+
+- Periodische Abfrage: Modellwartezeit $0{,}8$ ms
+- Interrupt: eigene Eintrittslatenz und Behandlungszeit
 
 ::: notes
-Refresher MCT1: Polling vs. Interrupts setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Polling ist Abfragen. Busy Waiting ist eine blockierende Dauerschleife. Gelegentliches Abfragen zwischen anderer Arbeit ist ein anderer Fall. Die Klingelanalogie meint Signal, Freigabe, Handler und Rückkehr. Nicht jede elektrische Flanke wird automatisch gespeichert. Interrupts haben eigenen Aufwand und können bei hoher Rate ungünstig werden. Dauer-Polling (Busy Waiting) und gelegentliches Abfragen sind verschieden. Interrupt: Ereignissignal, Freigabe, Handler, Rückkehr — keine gespeicherte Klingel für jede Flanke. Hardware signalisiert Ereignis → CPU unterbricht die laufende Arbeit. Danach Rückkehr in den unterbrochenen Kontext. Verständnischeck: Wann ist gelegentliches Polling brauchbar? Wenn die Quelle lange genug sichtbar bleibt und die Abfragelatenz tolerierbar ist. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Die gemeinsame horizontale Achse der Abbildung ist Zeit in Millisekunden. Die senkrechte rote Linie markiert das Ereignis bei $1{,}2$ ms. Die obere Bahn zeigt Dauer-Polling, das den Prozessor zum wiederholten Prüfen belegt. Die mittlere zeigt Abfragen bei null, eins und zwei Millisekunden. Unter der Annahme eines bis zur Behandlung gespeicherten Ereignisses entdeckt sie es bei zwei Millisekunden, also $2-1{,}2=0{,}8$ ms später.
+
+Die untere Bahn zeigt ein getrenntes Interruptmodell. Main bezeichnet dort das Hauptprogramm. Nach einer angenommenen Eintrittslatenz von $0{,}1$ ms beginnt bei $1{,}3$ ms die ISR, Interrupt Service Routine, Unterbrechungsbehandlung. Im gezeichneten Beispiel endet sie nach weiteren $0{,}2$ ms; anschließend läuft das Hauptprogramm weiter. Diese Zeiten sind Lehrwerte. Die Eintrittslatenz ist nicht dieselbe Größe wie die Wartezeit auf das Ereignis.
+
+Die Bahnen sind alternative Abläufe, keine gleichzeitig laufenden Prozessoren. Ein Interrupt kann durch Maskierung noch länger warten. Wird in seiner kurzen Behandlung nur Arbeit vorgemerkt, kommt bis zur eigentlichen Bearbeitung im Hauptprogramm eine weitere Verzögerung hinzu. Deshalb muss für jede Reaktionsanforderung der relevante Anfangs- und Endpunkt benannt werden.
 :::
 
-## Polling vs. Interrupt — Schema
+## Welche Strategie passt zum Ereignis?
 
-![Modell: Polling-Wartezeit 0,8 ms. Interrupt mit Latenz, kurzer ISR und optionalem Flag.](../assets/figures/03_interrupts_timer/poll-vs-irq.png)
+| Situation | Zu prüfende Bedingung |
+|-----------|----------------------|
+| Bereitschaft bleibt sichtbar | zulässige Abfrageperiode |
+| Kurzer Impuls | Erfassung oder Speicherung |
+| Sehr viele Ereignisse | Behandlungsaufwand und Puffer |
+| Feste Reaktionsfrist | gesamte Verzögerung |
 
 ::: notes
-Polling vs. Interrupt — Schema setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Drei Bahnen: Dauer-Polling, periodische Abfrage, Interrupt. 0,8 ms ist die angenommene Zeit bis zum Ereignis, nicht die Interruptlatenz. Eine periodische Abfrage kann ein kurzes, nicht gespeichertes Signal verpassen. Auch der Interrupt wartet auf Freigabe und Latenz. Ein Flag verschiebt Nutzarbeit in die Hauptschleife. Verständnischeck: Ist eine kurze ISR schon die Nutzarbeit? Nein, bei Deferred Handling kommt die Latenz der Hauptschleife hinzu. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Die Tabelle ist eine Entscheidungshilfe, keine feste Zuordnung eines Geräts zu einer einzigen Programmiertechnik. Bleibt ein Zustand bis zur Bearbeitung sichtbar, kann Polling, regelmäßiges Abfragen, ihn finden. Die maximale Zeit bis zur nächsten Abfrage muss dann zur Reaktionsfrist passen. Ein kurzer Impuls erfordert dagegen eine Erfassung, etwa ein gespeichertes Statusbit oder einen passenden Eingang.
+
+Auch ein Pending-Bit, eine Markierung für eine wartende Anforderung, ist noch keine beliebig lange Ereigniswarteschlange. Mehrere Ereignisse können zusammenfallen. Bei vielen eingehenden Daten braucht das Gerät oder die Software möglicherweise einen Puffer. Die Behandlung jedes einzelnen Ereignisses als Interrupt kann zusätzlich erheblichen Aufwand erzeugen.
+
+Eine Reaktionsfrist ist eine späteste zulässige Zeit für die gewünschte Wirkung. Zu prüfen sind Erfassung, Wartezeit, Eintritt und Nutzarbeit. Der Vorteil einer ereignisgesteuerten Behandlung liegt darin, andere Arbeit zwischen Ereignissen zuzulassen; kurze Reaktion ist dennoch eine Eigenschaft des ganzen Ablaufs. Nun untersuchen wir, wie der Prozessor tatsächlich in eine Behandlung eintritt.
 :::
 
-## Refresher MCT1: Das CSR-System
+## Interrupt, Exception und Trap
 
-- Control and Status Registers: spezielle Maschinenregister
-- `mstatus`: globaler Interrupt-Schalter (u. a. MIE)
-- `mcause`: Grund der Unterbrechung (Interrupt/Exception-Code)
-- `mepc`: Rücksprungadresse des unterbrochenen Programms
-- `mret`: Rückkehr anhand von `mepc`
-
-```riscv
-# Typische Aktion in einer ISR (Kontext lesen)
-csrr t0, mcause    # Warum wurde ich geweckt?
-csrr t1, mepc      # Wo muss ich später wieder hin?
-```
+- Interrupt: asynchrone Anforderung, etwa vom Timer
+- Exception: synchron zum ausgeführten Befehl, etwa ein ungültiger Befehl
+- Trap: gemeinsamer Übergang in die Behandlung
+- Gleicher Einsprungmechanismus bedeutet nicht gleiche Ursache
 
 ::: notes
-Refresher MCT1: Das CSR-System setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. CSR heißt Control and Status Register. MIE ist Machine Interrupt Enable, MPIE der gemerkte vorherige Zustand. mepc hält die Rücksprung- oder Fehleradresse, mcause die Ursache, mstatus den Status, mret die Trap-Rückkehr. csrr liest ein CSR. Hardware schreibt diesen Trapzustand, sichert aber nicht alle allgemeinen Register. Bei Exceptions gibt es kein pauschales mepc plus 4. Der gezeigte csrr-Ausschnitt ist isolierter Lehrcode. Control and Status Registers: spezielle Maschinenregister. `mstatus`: globaler Interrupt-Schalter (u. a. MIE). `mcause`: Grund der Unterbrechung (Interrupt/Exception-Code). `mepc`: Rücksprungadresse des unterbrochenen Programms. Verständnischeck: Worin unterscheidet sich mret von ret? mret nutzt Trap-CSRs, ret die normale Aufrufkonvention. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Ein Interrupt entsteht unabhängig vom gerade ausgeführten Befehl, etwa weil die Hardware-Zeitquelle einen Vergleichswert erreicht hat. Eine Exception, Ausnahme, entsteht synchron aus der Befehlsausführung, beispielsweise wenn der Prozessor einen nicht unterstützten Befehl erkennt. Trap ist der Oberbegriff für den Übergang in die zuständige Behandlung.
+
+Die beiden Fälle können denselben Eintrittsmechanismus und dieselben Register benutzen. Trotzdem müssen sie unterschieden werden. Nach einem Interrupt wird gewöhnlich die unterbrochene Ausführung fortgesetzt. Bei einer Exception muss die Software dagegen entscheiden, ob und wie der auslösende Fehler behoben wird. Eine Rückkehr ohne geeignete Behandlung kann denselben Fehler erneut auslösen.
+
+Interruptfreigaben sperren im folgenden Modell die betrachteten maskierbaren Interrupts, nicht automatisch synchrone Exceptions. Wer global Interrupts deaktiviert, kann also weiterhin durch einen ungültigen Speicherzugriff oder Befehl einen Trap erzeugen. Diese Unterscheidung erklärt das zusätzliche Interrupt-Bit im Ursachenregister und begrenzt später die Aussage, während einer ISR könne nichts mehr dazwischenkommen.
 :::
 
-## Der rudimentäre MCT1-Trap-Handler
+## Kontext und spezielle Register
 
-![Hardware setzt mepc, mcause, MPIE und MIE. Software sichert den Stack. mret stellt den Status zurück.](../assets/figures/03_interrupts_timer/trap-state.png)
+| Zustand | Bedeutung |
+|---------|-----------|
+| Allgemeine Register | laufende Werte und Adressen |
+| `mepc` | gespeicherte Fortsetzungsadresse |
+| `mcause` | Trap-Ursache |
+| `mstatus` | Status und Interruptfreigaben |
 
-- In MCT1 oft ein einziger Einsprung über `mtvec`
-- Alle Quellen landen an derselben Adresse
-- Software muss per `mcause` verzweigen (`if`/`else`)
-- Direct mit Claim und Tabelle skaliert; eine lineare Statussuche ist das langsame Verfahren
-
-```c
-uint32_t raw = read_csr(mcause);
-int is_irq = (raw >> 31) & 1;          /* RV32: Interrupt-Bit */
-uint32_t code = raw & 0x7fffffffu;     /* Cause-Code */
-if (is_irq && code == 7) handle_timer();
-else if (is_irq && code == 11) {
-    uint32_t id = plic_claim();        /* UART=1, nicht Cause 7 */
-    if (id == 1) handle_uart();
-    if (id != 0) plic_complete(id);
-}
-```
+CSR: Control and Status Register.
 
 ::: notes
-Der rudimentäre MCT1-Trap-Handler setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. RV32 meint hier 32-Bit-Integerregister. Bit 31 von mcause kennzeichnet einen Interrupt, die Maske 0x7fffffff isoliert den Cause. Cause 7 ist Machine Timer, Cause 11 Machine External. Die UART-ID 1, Universal Asynchronous Receiver/Transmitter, kommt erst vom PLIC-Claim. 0x8000000B ist Interrupt plus Cause 11, keine UART-ID. Hardware setzt mepc, mcause, MPIE und MIE. Software rettet Register. Hilfsfunktionen sind Lehrcode. In MCT1 oft ein einziger Einsprung über `mtvec`. Alle Quellen landen an derselben Adresse. Software muss per `mcause` verzweigen (`if`/`else`). Direct mit Claim und Tabelle skaliert; eine lineare Statussuche ist das langsame Verfahren. Verständnischeck: Ist 0x8000000B eine UART-ID? Nein, auf RV32 ist es Interrupt plus External Cause 11. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Kontext bezeichnet den Zustand, der zum korrekten Fortsetzen einer Ausführung nötig ist. Dazu gehören allgemeine Register mit Zwischenergebnissen und Adressen sowie besondere Statusinformationen. CSR bedeutet Control and Status Register, Steuer- und Statusregister. Ein CSR wird durch dafür vorgesehene Prozessorbefehle angesprochen und ist nicht dasselbe wie ein Gerät an einer Speicheradresse.
+
+`mepc` heißt Machine Exception Program Counter und speichert die Rückkehradresse eines Traps. PC steht für Program Counter, Befehlsadresszähler. `mcause`, Machine Cause, enthält die Ursache. `mstatus`, Machine Status, enthält unter anderem Interruptfreigaben. Das Präfix m kennzeichnet hier den Machine Mode, die Maschinenprivilegstufe.
+
+Die Hardware aktualisiert beim Trap einige dieser speziellen Register. Sie sichert jedoch nicht automatisch sämtliche allgemeinen Register auf dem Softwarestack. Der Stack ist ein Speicherbereich für Aufruf- und Sicherungsrahmen. Benutzt der Handler Register der unterbrochenen Ausführung, müssen diese passend erhalten werden. Deshalb reicht ein Sprung zur richtigen Funktion noch nicht für einen vollständigen, korrekten Interruptpfad.
 :::
 
-## Agenda für den heutigen Tag
+## Trap-Eintritt: Hardware und Software
 
-1. Grenzen des einfachen Traps
-2. Vektorisierte Interrupts (Vectored Mode)
-3. RISC-V CLINT — lokale Timer und Software-Interrupts
-4. RISC-V PLIC — Dirigent für externe Peripherie
-5. Nested Interrupts
-6. Brückenschlag zum Labor (System-Ticks, z. B. in Renode)
+![](../assets/figures/03_interrupts_timer/trap-state.png){fig-alt="Die Hardware sichert Rückkehradresse und Ursache, sperrt M-Interrupts; Software erhält weitere Register, behandelt die Ursache und kehrt mit mret zurück."}
+
+- Hardwarezustand und Software-Sicherung ergänzen sich
+- `mret` ersetzt keine Wiederherstellung allgemeiner Register
 
 ::: notes
-Agenda für den heutigen Tag setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. CLINT heißt Core Local Interruptor, PLIC Platform-Level Interrupt Controller. Die Agenda trennt Kategorie, Termin, Gerät und Verschachtelung. Vectored Mode wählt den Kategorie-Einsprung, nicht jede Geräte-ID. Renode ist ein optionaler späterer Laborrahmen ohne vorliegenden Lauf. Verständnischeck: Warum Vectored Mode und PLIC getrennt? Der eine wählt die Kategorie, der andere identifiziert Geräte. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Die Abbildung liest sich von links nach rechts als Ablauf. Vor dem Trap läuft das Hauptprogramm. Die Hardware schreibt die Fortsetzungsadresse nach `mepc`, Machine Exception Program Counter, und die Ursache nach `mcause`, Machine Cause. Sie kopiert das alte MIE-Bit, Machine Interrupt Enable, globale Maschinen-Interruptfreigabe, in MPIE, Machine Previous Interrupt Enable, und setzt MIE auf null. MPP, Machine Previous Privilege, hält die vorherige Privilegstufe; im Modell ist das Machine Mode.
+
+Danach erhält die Software im Prolog, dem Eintrittsteil, die benötigten allgemeinen Register auf einem Stackrahmen. Der Handler bearbeitet die Ursache. Im Epilog, dem Austrittsteil, stellt die Software ihre Sicherungen wieder her. `mret`, Machine Return, verwendet `mepc` als Rückkehradresse und stellt unter anderem MIE aus MPIE sowie die vorherige Privilegstufe her.
+
+Die Kästen unterscheiden Hardwareaktionen von Softwareaufgaben; die Pfeile zeigen zeitliche Reihenfolge, keine gemessenen Dauern. `mret` lädt nicht automatisch den Softwarestack. Fehlt eine Registerwiederherstellung, kann das Hauptprogramm mit falschen Werten weiterlaufen, obwohl die Rückkehradresse stimmt. Ein normaler Funktionsrücksprung ist ebenfalls kein Ersatz für die Trap-Rückkehr.
 :::
 
-## Lernziele Block 3
+## Pending ist nicht Freigabe
 
-- Grenzen linearer Statusabfragen bewerten; Direct plus Claim bleibt zulässig
-- Vektor-Tabelle und Vectored Mode in RISC-V verstehen
-- CLINT (lokal) und PLIC (global) unterscheiden
-- Mathematik hinter dem 64-Bit-System-Timer (`mtime`) beherrschen
-- Gefahren und Lösungen bei Nested Interrupts kennen
-
-::: notes
-Lernziele Block 3 setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Lernziel ist, lineare Statusabfragen zu bewerten, nicht Direct pauschal abzulehnen. Pending, Freigabe und Trap sind verschieden, ebenso ISR-Zähler und vergangene Zeit. Für BASE 0x80000100 und Timer Cause 7 ist der Einsprung 0x8000011C. Nesting wird in Voraussetzungen erklärt, nicht als fertiger Prolog. Grenzen linearer Statusabfragen bewerten; Direct plus Claim bleibt zulässig. Vektor-Tabelle und Vectored Mode in RISC-V verstehen. CLINT (lokal) und PLIC (global) unterscheiden. Mathematik hinter dem 64-Bit-System-Timer (`mtime`) beherrschen. Verständnischeck: Prüfziel: BASE 0x80000100 und Cause 7 ergeben 0x8000011C, nicht eine Geräte-ID. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Die Leitfrage des Tages
-
-- Moderne MCUs: dutzende Peripheriegeräte können Interrupts auslösen
-- Theoretisch sogar im selben Taktzyklus
-- Wer darf zuerst? Was passiert mit den anderen?
-- Leitfrage: Wie managt die CPU viele Alarme ohne Suchaufwand und ohne den Wichtigen zu verpassen?
-- Antwort: spezialisierte Interrupt-Controller-Hardware
-
-::: notes
-Die Leitfrage des Tages setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. MCU heißt Microcontroller Unit. UART-Daten und ein fälliger Timer können zugleich bereitstehen. Auswahl, Freigabe, blockierende ISR und die Speichertiefe der Quelle bestimmen, was ankommt. Ein Pending-Bit kennt nur wartend oder nicht. Hohe PLIC-Priorität ist nicht automatisch die höchste CPU-Kategorie. Moderne MCUs: dutzende Peripheriegeräte können Interrupts auslösen. Theoretisch sogar im selben Taktzyklus. Wer darf zuerst? Was passiert mit den anderen?. Leitfrage: Wie managt die CPU viele Alarme ohne Suchaufwand und ohne den Wichtigen zu verpassen?. Verständnischeck: Bleiben zehn Ereignisse in einem Bit einzeln erhalten? Nein, das Bit hat nur zwei Zustände. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Viele Quellen — ein Problem
-
-![Cause 3 und 7 lokal, externe Geräte gemeinsam auf Cause 11. Die Claim-ID ist eine andere Zahl.](../assets/figures/03_interrupts_timer/two-levels.png)
-
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[Timer] --> CPU[CPU]
-  B[UART Rx] --> CPU
-  C[Not-Aus] --> CPU
-  D[Sensoren] --> CPU
-  style C fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Viele Quellen — ein Problem setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. MSI, MTI und MEI sind Machine Software, Timer und External Interrupt, Causes 3, 7 und 11. Timer und Software gehen im Modell direkt an den Hart. UART und Sensor gehen über den PLIC nach Cause 11. Geräte-IDs und Causes sind verschiedene Namensräume. Ein Not-Aus ist hier nur ein Beispiel, keine Sicherheitsarchitektur. Verständnischeck: Warum können zwei UART-Geräte denselben mcause haben? Sie teilen den External-Pfad, Claim unterscheidet sie. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Das Skalierungsproblem
-
-- MCT1: wenige Quellen (z. B. Taster, ein Timer)
-- Echte SoCs: dutzende Interrupt-Quellen
-- RISC-V-Kern: nur wenige feste Interrupt-Leitungen (u. a. Timer, Software, External)
-- Folge: viele Geräte teilen sich typischerweise den External-Interrupt-Pfad
-
-::: notes
-Das Skalierungsproblem setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Das klassische CLINT/PLIC-Modell bündelt viele Geräte auf wenige Kategorien. Das ist kein Pinplan jedes RISC-V-Kerns. Viele Geräte erzwingen nicht schon eine lineare Statussuche. MCT1: wenige Quellen (z. B. Taster, ein Timer). Echte SoCs: dutzende Interrupt-Quellen. RISC-V-Kern: nur wenige feste Interrupt-Leitungen (u. a. Timer, Software, External). Folge: viele Geräte teilen sich typischerweise den External-Interrupt-Pfad. Verständnischeck: Was fehlt nach Cause 11? Die Quellen-ID aus dem PLIC-Claim. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Der Software-Flaschenhals
-
-- Alle teilen sich „External“ → `mcause` sagt oft nur die Kategorie
-- Software muss Quellen abfragen: „Warst du das?“
-- Lange `if`/`else`-Ketten kosten viele Takte
-
-```c
-// Problematisch für Echtzeit
-void isr(void) {
-    if (check(SPI)) handle_spi();
-    else if (check(I2C)) handle_i2c();
-    /* ... viele weitere Abfragen ... */
-}
-```
-
-::: notes
-Der Software-Flaschenhals setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. SPI ist Serial Peripheral Interface, I2C Inter-Integrated Circuit. Der gezeigte if/else-Lehrcode behandelt nur die erste wahre Bedingung. Die Reihenfolge ist eine Softwareauswahl. Langsam ist diese Suche, nicht jede gemeinsame Trapadresse. Alle teilen sich „External“ → `mcause` sagt oft nur die Kategorie. Software muss Quellen abfragen: „Warst du das?“. Lange `if`/`else`-Ketten kosten viele Takte. Verständnischeck: SPI und I2C beide bereit: Der gezeigte Eintritt bedient SPI. I2C braucht einen weiteren Weg. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Latenz-Explosion
-
-- Latenz: Zeit vom Signal bis zur nützlichen ISR
-- Best Case: Quelle steht oben in der Kette
-- Worst Case: viele falsche Abfragen zuvor
-- $\mathcal{O}(n)$ beschreibt die Skalierung der gezeigten Suche, keine Nanosekunden und kein ABS-Nachweis
-
-::: notes
-Latenz-Explosion setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. O(n) beschreibt, wie die Suchzeit mit der Zahl der Prüfungen wächst, nicht eine Nanosekunde. Harte Echtzeit braucht eine obere Schranke des ganzen Wegs: Maskierung, Trap, Rettung, Suche, Service. WCET heißt Worst-Case Execution Time, falls als Schranke gemeint. ABS ist Motivation, kein Beleg einer realen Architektur. Acht Abfragen zu 2 µs sind 16 µs Scanzeit und nur ein Teilbudget. Latenz: Zeit vom Signal bis zur nützlichen ISR. Best Case: Quelle steht oben in der Kette. Worst Case: viele falsche Abfragen zuvor. $\mathcal{O}(n)$ beschreibt die Skalierung der gezeigten Suche, keine Nanosekunden und kein ABS-Nachweis. Verständnischeck: Kann 16 µs Scan in eine 100-µs-Frist passen? Als Teilbudget ja, als vollständiger Nachweis nein. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Das Prioritäten-Problem
-
-- Gleichzeitige Events: wer gewinnt?
-- Reine Software-Kette: Priorität oft „wer steht oben im Code“
-- Schwer zur Laufzeit flexibel umzupriorisieren
-- Wunsch: Hardware entscheidet den Gewinner automatisch
-
-::: notes
-Das Prioritäten-Problem setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Code-Reihenfolge, PLIC-Priorität und CPU-Kategorie sind drei Auswahlstufen. Eine if/else-Kette wählt lokal. Hardware-Arbitration kann ohne alle Statusreads wählen. Hohe Priorität unterbricht bei MIE gleich 0 keine laufende ISR. Gleichzeitige Events: wer gewinnt?. Reine Software-Kette: Priorität oft „wer steht oben im Code“. Schwer zur Laufzeit flexibel umzupriorisieren. Wunsch: Hardware entscheidet den Gewinner automatisch. Verständnischeck: Kann hohe PLIC-Priorität bei MIE gleich 0 unterbrechen? Nein, Freigabe und Politik fehlen. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Die RISC-V-Architektur-Lösung
-
-- Arbeitsteilung: CPU rechnet, Controller managen Alarme
-- Externe Module sammeln, priorisieren und melden den Gewinner
-- Direkter Kategorie-Einsprung oder Claim plus Tabelle; der PLIC springt nicht selbst in jede Gerätefunktion
-- Trennung: lokale vs. globale Ereignisse
-
-::: notes
-Die RISC-V-Architektur-Lösung setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Der Controller verwaltet Pending und Prioritäten, der Kern den Trap, die Software Kontext und Gerätebedienung. Der PLIC springt nicht in jede Gerätefunktion. Nach Cause 11 folgen Claim und Handlerwahl. Arbeitsteilung: CPU rechnet, Controller managen Alarme. Externe Module sammeln, priorisieren und melden den Gewinner. Direkter Kategorie-Einsprung oder Claim plus Tabelle; der PLIC springt nicht selbst in jede Gerätefunktion. Trennung: lokale vs. globale Ereignisse. Verständnischeck: Wer wählt den UART-Handler? Die Software nach der Claim-ID. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Interrupt-Controller vor der CPU
-
-```{mermaid}
-%%| fig-width: 4.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[Sensoren] -->|Sammeln und Sortieren| B[Interrupt-Controller]
-  B -->|Wichtigster gewinnt| CPU[CPU]
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Interrupt-Controller vor der CPU setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. IRQ, falls als Label genutzt, heißt Interrupt Request. Die Benachrichtigung ist kein Paket mit UART-ID. Sensoren gehen zum Controller, die CPU sieht die Kategorie und claimt per MMIO. Es gibt keinen Latenzwert ohne Plattformmodell. Verständnischeck: Kennt die CPU das Gerät sofort nach der Notification? Im klassischen PLIC erst nach Claim. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Lokale vs. globale Interrupts
-
-Lokale Interrupts (core-nah):
-
-- Beispiele: System-Timer, Software-Interrupts
-- Eigene Leitungen in den RISC-V-Kern
-- Eigener Kategoriepfad, ohne Garantie kürzerer Leitung oder höchster Priorität
-
-Globale Interrupts (Peripherie):
-
-- UART, SPI, Taster, …
-- Über den External-Interrupt-Pfad gebündelt
-
-::: notes
-Lokale vs. globale Interrupts setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Lokal meint im Modell den hartbezogenen Software- und Timerpfad. mtime kann außerhalb des Kerns liegen. MMIO, Memory-Mapped Input/Output, kann Buskosten haben. Global heißt Zustellung an einen Hartkontext, nicht geringere Wichtigkeit. Im klassischen M-Mode gilt MEI vor MSI vor MTI. Beispiele: System-Timer, Software-Interrupts. Eigene Leitungen in den RISC-V-Kern. Eigener Kategoriepfad, ohne Garantie kürzerer Leitung oder höchster Priorität. UART, SPI, Taster, …. Verständnischeck: Ist lokal gleich höchste Priorität? Nein, External steht vor Software vor Timer. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Die zwei Giganten: CLINT und PLIC
-
-- CLINT (Core Local Interruptor): lokale Timer- und Software-Interrupts
-- PLIC (Platform-Level Interrupt Controller): Dirigent für externe Geräte
-- PLIC → External Interrupt an die CPU
-
-::: notes
-Die zwei Giganten: CLINT und PLIC setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. CLINT liefert Timer- und Softwarezustand, PLIC die externen Quellen. Beides ist ein verbreitetes Beispiel, keine universelle Chipintegration. Geräteprioritäten gehören nicht zum CLINT. CLINT (Core Local Interruptor): lokale Timer- und Software-Interrupts. PLIC (Platform-Level Interrupt Controller): Dirigent für externe Geräte. PLIC → External Interrupt an die CPU. Verständnischeck: Wer liefert die UART-ID? Der PLIC. Wer setzt den Timerzustand? Die Timerlogik des CLINT-Modells. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## CLINT und PLIC — Schema
-
-```{mermaid}
-%%| fig-width: 4.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  T[Timer] --> CLINT
-  SW[Software] --> CLINT
-  CLINT -->|lokal| CPU[CPU]
-  U[UART] --> PLIC
-  S[SPI] --> PLIC
-  PLIC -->|External| CPU
-  style CLINT fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-  style PLIC fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-CLINT und PLIC — Schema setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Die Leitungen tragen Cause 7, 3 und 11. Durchgezogene Pfeile sind Interruptsignale, gestrichelte wären MMIO-Zugriffe der Software. Ein Signal meldet Zustand, ein Zugriff liest oder schreibt Register. Vectored Mode löst damit nicht die Gerätesuche. Verständnischeck: Warum unterscheiden sich die Pfeile? Signal und Registerzugriff haben verschiedene Richtung und Bedeutung. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Fragen? — Motivation
-
-- Skalierungsproblem klar?
-- Warum sind lineare `if`/`else`-Ketten in ISRs riskant für Echtzeit?
-- Lokal vs. global?
-
-::: notes
-Fragen? — Motivation setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Eine lineare Gerätestatussuche macht die Zeit von der Codeposition abhängig. Ein Direct-Handler mit Claim ist eine andere Lösung. Lokal und global sind Pfade, keine Kritikalitätsordnung. UART-ID 7 und Timer Cause 7 sind verschiedene Schnittstellen. Skalierungsproblem klar?. Warum sind lineare `if`/`else`-Ketten in ISRs riskant für Echtzeit?. Lokal vs. global?. Verständnischeck: Sind UART-ID 7 und Timer Cause 7 dasselbe? Nein, gleiche Zahl, anderer Namensraum. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Das Register `mtvec` im Detail
-
-- `mtvec`: Basisadresse der Trap-/Interrupt-Behandlung
-- In MCT1 oft vereinfacht als reine Handler-Adresse gesetzt
-- Unterste 2 Bits sind MODE — keine Adressbits
-- Obere Bits: BASE-Adresse
-
-| Bits 31:2 | Bits 1:0 |
-|-----------|----------|
-| BASE | MODE |
-
-::: notes
-Das Register `mtvec` im Detail setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. mtvec ist die Machine Trap-Vector Base-Address, der PC der Program Counter. Im RV32-Beispiel stehen in den Bits 31:2 die oberen Basisbits, die unteren zwei Adressbits sind null. Bits 1:0 sind MODE. Der Wert 0x80000101 hat BASE 0x80000100 und MODE 1. BASE ist nicht der Registerwert inklusive Mode. `mtvec`: Basisadresse der Trap-/Interrupt-Behandlung. In MCT1 oft vereinfacht als reine Handler-Adresse gesetzt. Unterste 2 Bits sind MODE — keine Adressbits. Obere Bits: BASE-Adresse. Verständnischeck: mtvec gleich 0x80000101: BASE ist 0x80000100, MODE ist 1. Die Ziele werden von der BASE aus gerechnet. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Das MODE-Feld in `mtvec`
-
-- MODE = 0 (Direct): alle Traps zur Adresse BASE (MCT1-Verhalten)
-- MODE = 1 (Vectored): Interrupts springen versetzt; Exceptions weiter zu BASE
-- MODE 2 und 3: im Standard reserviert
-
-::: notes
-Das MODE-Feld in `mtvec` setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Direct ist MODE 0, Vectored MODE 1. Reservierte Werte 2 und 3 sind kein freier Extra-Modus. Eine Implementierung kann Vectored oder das Alignment einschränken. Vectored wählt Kategorien, nicht eine PLIC-ID. Eine synchrone Exception geht auch in MODE 1 an die BASE. MODE = 0 (Direct): alle Traps zur Adresse BASE (MCT1-Verhalten). MODE = 1 (Vectored): Interrupts springen versetzt; Exceptions weiter zu BASE. MODE 2 und 3: im Standard reserviert. Verständnischeck: Wohin geht eine Exception in Mode 1? An die BASE, unabhängig vom Exception-Code. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Direct Mode (MODE = 0)
-
-- Hardware setzt PC = BASE
-- Alle Quellen landen an derselben Stelle
-- Software liest `mcause` und verzweigt
-
-::: notes
-Direct Mode (MODE = 0) setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Im Direct Mode setzt der Kern bei einem angenommenen Trap die CSRs und den PC auf die BASE. Software wertet mcause aus. Direct sagt nichts über if/else. Claim plus Tabelle ist ein schneller Direct-Dispatch. Hardware setzt PC = BASE. Alle Quellen landen an derselben Stelle. Software liest `mcause` und verzweigt. Verständnischeck: Kann Direct Geräte schnell wählen? Ja, mit Claim und indexierter Tabelle. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Direct Mode — Schema
-
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[Timer] --> B["PC = BASE"]
-  C[UART] --> B
-  D[Exception] --> B
-  B --> E[Software: if/else]
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Direct Mode — Schema setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Timer, External und Exception treffen dieselbe BASE. Danach wertet Software mcause aus. External braucht zusätzlich Claim. Ein gemeinsamer Eintritt heißt nicht, alle Gerätestatusregister zu lesen. Verständnischeck: Was reicht für den Timerpfad? Interruptbit und Cause 7. External braucht danach die ID. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Vectored Mode (MODE = 1)
-
-- Jede Interrupt-Kategorie erhält einen Slot, nicht jede Peripheriequelle
-- Hardware nutzt den Cause-Code ohne das Interrupt-Bit
-- Keine Software-Kategorieauswahl vor dem Slot; Claim bleibt bei External nötig
-- Der Slotabstand ist fest 4 Byte, unabhängig von der Befehlslänge
-
-::: notes
-Vectored Mode (MODE = 1) setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Jeder Interrupt-Cause erhält einen Slot. UART, I2C und GPIO, General-Purpose Input/Output, teilen Cause 11. Es entfällt die Software-Kategorieauswahl vor dem Slot, nicht Claim und Dispatch. Konstante Slotrechnung ist keine konstante Gesamtlatenz. Jede Interrupt-Kategorie erhält einen Slot, nicht jede Peripheriequelle. Hardware nutzt den Cause-Code ohne das Interrupt-Bit. Keine Software-Kategorieauswahl vor dem Slot; Claim bleibt bei External nötig. Der Slotabstand ist fest 4 Byte, unabhängig von der Befehlslänge. Verständnischeck: Landen UART und I2C in zwei mtvec-Slots? Nein, beide über Cause 11. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Vectored Mode — Schema
-
-```{mermaid}
-%%| fig-width: 4.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[Timer] -->|Hardware| B["PC = BASE + Offset_Timer"]
-  C[UART, I2C, GPIO] -->|Cause 11| D["PC = BASE + 44, dann Claim"]
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Vectored Mode — Schema setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Software Cause 3 liegt bei BASE plus 12, Timer Cause 7 bei plus 28, External Cause 11 bei plus 44. Exceptions bleiben an der BASE. Alle External-Geräte teilen den Slot, danach Claim, ID, Handler. Verständnischeck: Welche Stufe trennt UART-ID 1 von SPI-ID 3? Claim und Dispatch nach dem gemeinsamen Slot. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Wie Vectored Mode rechnet
-
-![BASE 0x80000100. MSI 0x8000010C, MTI 0x8000011C, MEI 0x8000012C.](../assets/figures/03_interrupts_timer/mtvec.png)
-
-Bei MODE = 1 und Interrupt:
+Im betrachteten Machine Mode:
 
 $$
-\mathrm{PC} = \mathrm{BASE} + 4 \times \mathrm{mcause.ExceptionCode}
+\text{Interruptnahme}:\quad \text{Pending}\land\text{Quellenfreigabe}\land\mathrm{MIE}
 $$
 
-- Faktor 4: fester Slotabstand, nicht die aktuelle Befehlslänge
-- Beispiel: Timer Cause 7 ergibt BASE + 28 = 0x8000011C
+- `mip`: Machine Interrupt Pending
+- `mie`: Machine Interrupt Enable, Kategorienfreigaben
+- `mstatus.MIE`: globale Freigabe der betrachteten M-Interrupts
 
 ::: notes
-Wie Vectored Mode rechnet setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. MSI, MTI und MEI sind die drei Kategorien. Die Formel PC gleich BASE plus 4 mal Cause gilt nur für Interrupts in Mode 1. Das höchstwertige Interrupt-Bit von mcause wird nicht mitmultipliziert. Der Abstand 4 Byte ist architektonisch fest, auch bei RVC, den komprimierten Befehlen. Die Architektur definiert das Ergebnis, nicht einen bestimmten Multiplizierer. Mit BASE 0x80000100 folgen 0x8000010C, 0x8000011C und 0x8000012C. Faktor 4: fester Slotabstand, nicht die aktuelle Befehlslänge. Beispiel: Timer Cause 7 ergibt BASE + 28 = 0x8000011C. Verständnischeck: Bleibt der Abstand bei 16-Bit-Kompression 4 Byte? Ja, Slotbreite und Befehlslänge sind getrennt. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Pending bedeutet, dass eine Unterbrechungsanforderung wartet. `mip`, Machine Interrupt Pending, zeigt solche Zustände für die Kategorien. `mie`, Machine Interrupt Enable, enthält deren einzelne Freigaben. Das MIE-Bit in `mstatus`, Machine Interrupt Enable im Statusregister, ist zusätzlich die globale Freigabe. Registername `mie` und Statusbit MIE sind daher zwei unterschiedliche Dinge.
+
+Die Formel gilt für unser Modell: ein Hart, ein Hardware-Ausführungskontext, läuft bereits im Machine Mode ohne Delegation. Das logische Und, $\land$, verlangt alle drei Bedingungen. Ein pending Timer bei deaktivierter Timerfreigabe wird nicht genommen. Ein freigegebener Timer ohne Pending ebenfalls nicht. Ist MIE null, bleiben die betrachteten maskierbaren Maschinen-Interrupts trotz Pending zurückgestellt.
+
+Das Sperren der Freigabe muss die Ursache nicht löschen. Nach Wiederfreigabe kann eine erhaltene Anforderung wirksam werden. Umgekehrt ist ein einziges Pending-Bit kein Zähler für alle während der Sperrzeit eingetroffenen Ereignisse. Synchrone Exceptions, Ausnahmen aus Befehlen, sind durch diese Formel nicht beschrieben. Die Trennung wird bei Timer und externen Geräten jeweils konkretisiert.
 :::
 
-## Die Vektor-Tabelle
+## `mcause` auf RV32 lesen
 
-- An BASE liegt eine Tabelle aus Sprungbefehlen (`j` / `jal`)
-- Eintrag $k$ bei Offset $4k$
-- Beispiel: bei Offset 28 der Sprung zur Timer-ISR
+$$
+I=(\text{raw}\gg31)\mathbin{\&}1,\qquad
+c=\text{raw}\mathbin{\&}\texttt{0x7FFFFFFF}
+$$
 
-```riscv
-# Lehrcode — nicht assembliert. Slots 0–11, je 4 Byte.
-.option push
-.option norvc
-.option norelax
-.balign 4
-vector_table_base:
-    jal x0, exc_entry      # 0
-    jal x0, default_entry  # 1
-    jal x0, default_entry  # 2
-    jal x0, msi_entry      # 3  Offset 12
-    jal x0, default_entry  # 4
-    jal x0, default_entry  # 5
-    jal x0, default_entry  # 6
-    jal x0, mti_entry      # 7  Offset 28
-    jal x0, default_entry  # 8
-    jal x0, default_entry  # 9
-    jal x0, default_entry  # 10
-    jal x0, mei_entry      # 11 Offset 44
-.option pop
+| Rohwert | Interpretation |
+|---------|----------------|
+| `0x80000007` | Interrupt, Kategorie $7$ |
+| `0x8000000B` | Interrupt, Kategorie $11$ |
+| `0x00000002` | Exception, Code $2$ |
+
+::: notes
+`mcause`, Machine Cause, ist das Ursachenregister eines Traps. RV32 bedeutet zweiunddreißig Bit breite Integerregister. Das höchste Bit, Bit einunddreißig, unterscheidet einen Interrupt von einer Exception. Der Rohwert raw ist der vollständige Registerinhalt. Die Rechtsverschiebung $\gg31$ und bitweises Und $\&1$ gewinnen das Interrupt-Bit $I$. Die Maske `0x7FFFFFFF` entfernt es; $c$ ist der verbleibende Ursachencode. Hexadezimale Werte tragen `0x`.
+
+`0x80000007` hat $I=1$ und $c=7$, Machine Timer Interrupt. `0x8000000B` hat $I=1$ und $c=11$, Machine External Interrupt, externe Kategorie. `0x00000002` hat $I=0$ und $c=2$, Illegal Instruction, ungültiger Befehl. Der Begriff Exception Code in der Spezifikation benennt das Codefeld auch dann, wenn das Interrupt-Bit gesetzt ist.
+
+Eine Geräte-ID wird daraus nicht gewonnen. Auch ein Timer und eine externe Quelle mit zufällig gleicher Zahlen-ID wären verschiedene Ebenen. Wer nur die niedrigen Bits vergleicht, ohne Interrupt und Exception zu unterscheiden, kann die falsche Behandlung wählen. Die nächste Folie zeigt daher die zweite Identifikationsebene.
+:::
+
+## Kategorie und Geräte-ID
+
+![](../assets/figures/03_interrupts_timer/two-levels.png){fig-alt="Lokaler Software-Interrupt hat Cause 3, Timer Cause 7; mehrere PLIC-Geräte teilen Cause 11 und werden per Claim-ID unterschieden."}
+
+- `mcause` benennt die Interrupt-Kategorie
+- PLIC-Claim benennt eine externe Quelle
+- Geräte-ID $7$ wäre nicht automatisch Timer-Cause $7$
+
+::: notes
+Die Abbildung unterscheidet zwei Wege zum Hart, dem Hardware-Ausführungskontext. CLINT, Core Local Interruptor, bezeichnet im Modell die lokale Timer- und Software-Interruptorganisation. Die Register mtime, Machine Time, liefern die Zeit, mtimecmp, Machine Time Compare, den Vergleich und msip, Machine Software Interrupt Pending, die Software-Wartemarkierung. Machine Software Interrupt hat Cause, Ursachencode, drei; Machine Timer Interrupt sieben. PLIC, Platform-Level Interrupt Controller, sammelt dagegen externe Geräte und meldet gemeinsam Machine External Interrupt mit Cause elf.
+
+Die rechte Seite zeigt die angenommenen Geräte-IDs, Identifikationsnummern: UART eins, Sensor zwei und Taster drei. UART bedeutet Universal Asynchronous Receiver/Transmitter, serielle Sende- und Empfangsschnittstelle. Claim ist das Abholen einer konkreten wartenden Quelle beim PLIC. Erst dieser Zugriff liefert die Geräte-ID. Alle drei Geräte verwenden zuvor dieselbe externe Kategorie.
+
+Die Pfeile beschreiben Signal- und Auswahlwege, keine feste Leitungslänge oder Reaktionszeit. Eine Zahl sieben in der PLIC-Quellliste wäre die siebte externe Quelle und bliebe im Ursachenregister Kategorie elf. Der lokale Timer bleibt dagegen Kategorie sieben. Dadurch wird verständlich, warum eine Vektortabelle für Kategorien die Geräteauswahl nicht ersetzt.
+:::
+
+## Ein Direct-Handler kann sauber verzweigen
+
+Konzeptioneller Dispatcher, kein vollständiger Trap-Prolog:
+
+```text
+Rohwert aus mcause lesen
+Interrupt-Bit und Cause-Code trennen
+bei Exception: Ausnahmebehandlung
+sonst bei Cause 7: Timerbehandlung
+sonst bei Cause 11: externe Quelle per Claim abholen
+sonst: definierte Behandlung der übrigen Kategorien
 ```
 
 ::: notes
-Die Vektor-Tabelle setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Die Lehrtabelle hat zwölf Slots zu 4 Byte. jal x0 springt ohne Link, damit ra, die Return Address, nicht vor der Rettung verändert wird. .option norvc unterbindet Kompression, .option norelax eine Relaxation, .balign 4 die minimale Ausrichtung. Das ist GNU-as-Lehrsyntax, kein geprüftes Binärlayout. Vor Cause 7 liegen sieben Slots, der Timer beginnt bei Offset 28. An BASE liegt eine Tabelle aus Sprungbefehlen (`j` / `jal`). Eintrag $k$ bei Offset $4k$. Beispiel: bei Offset 28 der Sprung zur Timer-ISR. Verständnischeck: Wie viele 4-Byte-Slots liegen vor Cause 7? Sieben, der Sprung beginnt bei BASE plus 28. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Direct bedeutet, dass Traps zuerst an einer gemeinsamen Adresse eintreten. Der gezeigte Pseudocode beschreibt danach die Auswahl der Behandlung. `mcause`, Machine Cause, liefert den Rohwert; Interrupt-Bit und Code werden wie zuvor getrennt. Eine Exception ist eine synchrone Ausnahme und benötigt eine eigene Fehlerbehandlung. Kategorie sieben ruft im Modell den lokalen Timerpfad, elf den externen PLIC-Pfad auf. PLIC bedeutet Platform-Level Interrupt Controller; Claim holt dort die Geräte-ID.
+
+Eine lineare Suche durch viele Gerätestatusregister kann mit deren Zahl länger werden. Das ist aber keine notwendige Eigenschaft jedes Direct-Handlers. Er kann Kategorien direkt unterscheiden und anschließend die vom Controller ausgewählte ID für eine Tabelle nutzen. Die Komplexitätsaussage $\mathcal{O}(n)$, mit der Zahl $n$ der Abfragen wachsend, betrifft die lineare Suche, nicht pauschal diesen Modus.
+
+Der Dispatcher setzt bereits gesicherten Kontext, einen gültigen Stack und festgelegte Behandlungen voraus. Er ist keine ausführbare Firmware und enthält nicht den vollständigen Ein- und Austritt. Eine konkrete Implementierung muss auch unerwartete Ursachen beherrschen. Nun können Sie die Zustände des Eintritts unabhängig von der Geräteauswahl prüfen.
 :::
 
-## Memory Layout einer Vektor-Tabelle
+## Verständnisfrage: wartet oder verschwindet?
 
-- Oft früh im Flash (nahe Boot-Code), Section z. B. `.vectors`
-- RISC-V: an `BASE + 4k` steht ein Befehl, kein geladener Zeiger
-- Cortex-M speichert u. a. Stackanfang und besondere Einträge, nicht nur Handlerzeiger
-- Eine `.vectors`-Section markiert Inhalt; der Linker legt Ort und Ausführbarkeit fest
+Ein Timer ist pending, aber `mstatus.MIE` ist $0$.
 
-Die vollständige Sprungtabelle steht auf der vorigen Folie. Kommentare ersetzen keine Slots.
+1. Wird `mtime` dadurch angehalten?
+2. Wird sofort ein Timer-Trap genommen?
+3. Garantiert das Pending-Bit eine Behandlung pro verstrichener Periode?
 
 ::: notes
-Memory Layout einer Vektor-Tabelle setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Eine Section .vectors markiert Inhalt. Der Linker entscheidet Ort und Ausführbarkeit. Flash ist möglich, nicht Pflicht. Der Kern lädt kein Tabellenwort als Zeiger, sondern führt die Instruktion am Slot aus. Bei Cortex-M gehören auch Stackanfang und Sondereinträge zur Tabelle, nicht nur Handlerzeiger. Oft früh im Flash (nahe Boot-Code), Section z. B. `.vectors`. RISC-V: an `BASE + 4k` steht ein Befehl, kein geladener Zeiger. Cortex-M speichert u. a. Stackanfang und besondere Einträge, nicht nur Handlerzeiger. Eine `.vectors`-Section markiert Inhalt; der Linker legt Ort und Ausführbarkeit fest. Verständnischeck: Warum reicht ein C-Array von Adressen nicht? Der Kern beginnt mit der Ausführung am Slot. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+`mtime`, Machine Time, ist die im folgenden Abschnitt erläuterte Hardware-Zeitquelle. MIE bedeutet Machine Interrupt Enable, globale Freigabe der betrachteten Maschinen-Interrupts. Ein Timer ist pending, wenn seine Anforderung wartet. Die drei Fragen trennen Zeitfortschritt, Prozessorfreigabe und Ereigniszählung.
+
+Die erste Antwort lautet nein: Das MIE-Bit steuert die Interruptnahme, nicht den Timeroszillator. Der Zähler läuft im festgelegten Modell weiter. Zweitens wird bei MIE null kein betrachteter maskierbarer Timer-Trap genommen, auch wenn die Kategorie freigegeben ist. Die Anfrage kann nach Wiederfreigabe weiterhin anstehen. Drittens ist das Pending-Bit keine Warteschlange für einzelne Perioden. Fünf vergangene Solltermine bedeuten nicht automatisch fünf erhaltene Handler-Aufrufe.
+
+Die Lösung erklärt, weshalb verstrichene Zeit aus einer Zeitquelle und nicht allein aus der Anzahl der ISR-Aufrufe abgeleitet werden sollte. ISR bedeutet Interrupt Service Routine, Unterbrechungsbehandlung. Die Frage eignet sich für eine kurze Partnerdiskussion und bereitet Aufgabe 1 des Übungsblatts vor. Danach präzisieren wir, wohin ein freigegebener Trap tatsächlich springt.
 :::
 
-## Alignment-Vorgaben
+## `mtvec`: Basis und Modus
 
-- Unterste 2 Bits von `mtvec` = MODE
-- BASE muss an den unteren Bits 0 sein (sonst Mode-Kollision)
-- Tabelle mindestens 4-Byte-aligned; je nach System strengere Grenzen
-- In Assembler: `.align`
+- Machine Trap-Vector Base Address
+- Untere zwei Bits: MODE; übrige Bits bilden BASE
+- Direct: MODE $0$; Vectored: MODE $1$
+- Unterstützte Modi und strengere Ausrichtung prüfen
+
+Beispiel: BASE `0x80000100`, Vectored-Wert `0x80000101`.
 
 ::: notes
-Alignment-Vorgaben setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Ausgerichtet heißt, die unteren zwei Bits sind 00. Auch eine gerade Adresse mit Bits 10, etwa 0x80000102, ist unpassend. In GNU-as ist .align potenzbezogen, .balign 4 benennt Bytes. Vectored kann auf einer Plattform strenger sein. .balign 4 ist der klare Lehrwert, keine universelle Garantie. Unterste 2 Bits von `mtvec` = MODE. BASE muss an den unteren Bits 0 sein (sonst Mode-Kollision). Tabelle mindestens 4-Byte-aligned; je nach System strengere Grenzen. In Assembler: `.align`. Verständnischeck: Ist 0x80000102 ausgerichtet? Nein, die unteren zwei Bits sind nicht beide null. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+`mtvec` heißt Machine Trap-Vector Base Address, Register für die Maschinen-Trap-Basis und den Modus. BASE ist die Basisadresse des Einsprungs. MODE legt fest, wie die Hardware diese Basis verwendet. Die unteren zwei Bits des Registerwerts tragen MODE, nicht zwei frei nutzbare Adressbits. Die Basis selbst ist mindestens auf vier Byte ausgerichtet; die konkrete Implementierung kann für den vektorisierten Modus strengere Ausrichtung verlangen.
+
+Bei der hexadezimalen Basis `0x80000100` ergibt Direct mit MODE null den Registerwert `0x80000100`. Vectored mit MODE eins ergibt `0x80000101`. Die Hardware springt nicht zur ungeraden Registeradresse: Sie trennt Modus und Basis. Reservierte oder nicht unterstützte Werte dürfen nicht als zusätzliche Standardmodi angenommen werden.
+
+Ein Linker, der Programmteile platziert, muss eine ausführbare, geeignet ausgerichtete Tabelle beziehungsweise Eintrittsfunktion ermöglichen. `mtvec` einzustellen ersetzt weder Stackinitialisierung noch Kontextsicherung. Die nächste Unterscheidung betrifft die Adressbildung bei Interrupts gegenüber Exceptions.
 :::
 
-## Der Performance-Gewinn
+## Direct und Vectored
 
-- Die gezeigte lineare Suche skaliert mit der Position, nicht jeder Direct-Handler
-- Vectored wählt den Kategorie-Slot unabhängig von der Scanposition
-- Gerät 50 hat keine eigene mtvec-Adresse; Claim bleibt nötig
-- $\mathcal{O}(1)$ ist keine Nanosekunden- oder Echtzeitgarantie
+$$
+a_\text{Trap}=
+\begin{cases}
+\mathrm{BASE} & \text{Direct}\\
+\mathrm{BASE}+4c & \text{Vectored, Interrupt}\\
+\mathrm{BASE} & \text{Vectored, Exception}
+\end{cases}
+$$
+
+$c$: Cause-Code ohne Interrupt-Bit.
 
 ::: notes
-Der Performance-Gewinn setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. O(n) gilt für die gezeigte Suche, nicht für jeden Direct-Handler. Vectored macht die Kategorie unabhängig von der Scanposition. Gerät 50 bleibt ein PLIC-Gerät und braucht Claim. O(1) ist keine Nanosekundengarantie und kein harter Echtzeitnachweis. Die gezeigte lineare Suche skaliert mit der Position, nicht jeder Direct-Handler. Vectored wählt den Kategorie-Slot unabhängig von der Scanposition. Gerät 50 hat keine eigene mtvec-Adresse; Claim bleibt nötig. $\mathcal{O}(1)$ ist keine Nanosekunden- oder Echtzeitgarantie. Verständnischeck: Kann derselbe Claim aus Direct kommen? Ja, Dispatch und mtvec-Modus sind getrennt. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+$a_\text{Trap}$ ist die Adresse, an der die Hardware die Trap-Behandlung beginnt. Direct ist der gemeinsame Einsprung: Alle betrachteten Traps gehen zu BASE, der Basisadresse. Vectored ist der kategorienabhängige Einsprung für Interrupts: Der Cause-Code $c$, Ursachencode ohne höchstes Interrupt-Bit, wird mit vier Byte multipliziert und zur Basis addiert. Eine synchrone Exception, Ausnahme aus einem Befehl, geht auch in diesem Modus zur Basis.
+
+Die vier Byte sind ein festgelegter Slotabstand, der Abstand zwischen Kategorienplätzen. Er hängt nicht davon ab, welche Befehlslängen die Implementierung unterstützt. Auch mit komprimierten Befehlen bleibt die Hardwareformel dieselbe. Komprimierte RISC-V-Befehle können zwei Byte lang sein; sie ändern deshalb die Tabellenplanung, nicht den Abstand der Einsprungadressen.
+
+Vectored wählt die Interrupt-Kategorie, nicht jede externe Geräte-ID. Ein PLIC, Platform-Level Interrupt Controller, liefert weiterhin per Claim die konkrete externe Quelle. Direct mit einem passenden Dispatcher bleibt eine korrekte Alternative. Aus der Adressformel allein folgt keine gemessene Latenz oder Echtzeitgarantie.
 :::
 
-## Fragen? — Vectored Mode
+## Einsprungadressen selbst berechnen
 
-- Direct vs. Vectored klar?
-- Warum $\times 4$?
-- Vektor-Tabelle verstanden?
+![](../assets/figures/03_interrupts_timer/mtvec.png){fig-alt="BASE 0x80000100; im Vectored-Modus liegen die Kategorieplätze 3, 7 und 11 bei den Versätzen 12, 28 und 44 Byte."}
+
+Wo landet eine Exception mit Code $2$? Wo landet der Timer im Direct-Modus?
 
 ::: notes
-Fragen? — Vectored Mode setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Direct: alle Traps an die BASE. Vectored: Interrupt an BASE plus 4 mal Cause, Exception an die BASE. Der Faktor 4 ist der Slotabstand. Cause 11 mal 4 ist 44 oder 0x2C, Summe 0x8000012C. Die ID kommt erst per Claim. UART-ID 7 ist nicht der Timer. Direct vs. Vectored klar?. Warum $\times 4$?. Vektor-Tabelle verstanden?. Verständnischeck: BASE 0x80000100 und Cause 11 ergeben 0x8000012C. Die konkrete ID folgt dem Claim. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Die Abbildung zeigt ausgewählte Adressen der Vektortabelle von oben nach unten. BASE ist die Basis `0x80000100`. Für den Vectored-Modus enthält `mtvec` den Wert `0x80000101`, weil MODE eins in den unteren Bits steht. MSI bedeutet Machine Software Interrupt mit Cause drei, MTI Machine Timer Interrupt mit Cause sieben, MEI Machine External Interrupt mit Cause elf.
+
+Die Versätze sind $4\cdot3=12=\texttt{0x0C}$ Byte, $4\cdot7=28=\texttt{0x1C}$ Byte und $4\cdot11=44=\texttt{0x2C}$ Byte. Addition ergibt `0x8000010C`, `0x8000011C` und `0x8000012C`. Die Kästen sind Kategorieplätze für Befehle, keine Geräte-ID-Tabelle. Zwischenplätze bleiben in einer vollständigen Tabelle ebenfalls berücksichtigt.
+
+Die Exception mit Code zwei geht zur Basis `0x80000100`, nicht zu Basis plus acht, weil nur Interrupts vektorisiert werden. Im Direct-Modus landet auch der Timer an dieser Basis. Das Interrupt-Bit des vollständigen `mcause`-Werts wird nie als Teil von $c$ mitmultipliziert. Diese Rechnungen und ihre Begründung sind klausurtauglich und werden in Aufgabe 2 aufgegriffen.
 :::
 
-## Was ist der CLINT?
+## An einem Slot steht ein Befehl
 
-- CLINT = Core Local Interruptor
-- Verbreitetes Plattformmodul, keine ISA-weit feste Memory Map
-- Kein generischer ISA-Befehl, sondern Systembaustein
-- Aufgabe: lokale Zeit (Timer) und Software-Interrupts
-- Typische Codes: Machine Timer (7), Machine Software (3)
+Strukturtabelle, kein vollständiges Assemblerprogramm:
+
+| Slot | Versatz | Beispielbefehl |
+|------|---------|----------------|
+| $0$ | $0$ Byte | `jal x0, exception_entry` |
+| $3$ | $12$ Byte | `jal x0, software_entry` |
+| $7$ | $28$ Byte | `jal x0, timer_entry` |
+| $11$ | $44$ Byte | `jal x0, external_entry` |
 
 ::: notes
-Was ist der CLINT setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. ALU heißt Arithmetic Logic Unit, ISA Instruction Set Architecture. Der CLINT ist ein verbreiteter Baustein für Timer- und Software-Interrupts, kein Befehl und keine feste Adresse 0x02000000 für jedes System. mtime, mtimecmp und msip kommen als Register. Causes 3 und 7 sind CPU-Kategorien. CLINT = Core Local Interruptor. Verbreitetes Plattformmodul, keine ISA-weit feste Memory Map. Kein generischer ISA-Befehl, sondern Systembaustein. Aufgabe: lokale Zeit (Timer) und Software-Interrupts. Verständnischeck: Muss jedes RISC-V-System dieses Modul an 0x02000000 haben? Nein, das ist plattformspezifisch. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Ein Slot ist ein vier Byte breiter Kategorienplatz der Vektortabelle. In RISC-V steht dort ein auszuführender Befehl, kein vom Prozessor automatisch geladener Funktionszeiger. `jal` bedeutet Jump And Link, Sprung mit möglicher Rücksprungsicherung. Mit Zielregister `x0`, dem konstanten Nullregister, wird die Sicherung verworfen: Der Befehl springt zur angegebenen Eintrittsroutine. Die Namen `exception_entry`, `software_entry`, `timer_entry` und `external_entry` bezeichnen hier nur die jeweiligen Zieladressen der Strukturtabelle.
+
+Die Darstellung lässt Zwischenplätze sichtbar als nicht aufgeführte Tabellenzeilen aus und ist ausdrücklich kein vollständiges Assemblerprogramm. Ein realer Aufbau muss alle benötigten Slots samt geeigneten Standardbehandlungen, Sprungreichweiten und Ausrichtung berücksichtigen. Werden Befehle durch Kompression oder Relaxation kürzer oder anders angeordnet, darf der nächste Slot nicht versehentlich verrutschen. Beispielsweise erlauben GNU-Assemblerdirektiven `.option norvc` und `.option norelax`, diese Umformungen für die betreffende Region auszuschließen.
+
+Auch ein gültiger Sprung führt zunächst zu einem Eintritt, der Kontext erhält; er ist nicht schon der vollständige Handler. Die Tabelle klärt eine räumliche Beziehung und keine gemessenen Hardwarezeiten.
 :::
 
-## Warum „Local“?
+## Lokale Pfade und externe Quellen
 
-- Timer-Interrupts sind oft kritisch für OS (Scheduler, Context Switch)
-- Sollen nicht hinter UART/SPI auf einem gemeinsamen Bus warten
-- Der Timer wartet nicht auf eine PLIC-Gerätewahl; MEI hat im Modell Vorrang vor MSI vor MTI
+- Timer und Software-Interrupt: eigene Kategorien
+- PLIC-Geräte: gemeinsam über Machine External
+- CLINT ist ein verbreitetes Plattformmodul
+- Lokal bedeutet Zuordnung zum Hart, keine garantierte Mindestlatenz
 
 ::: notes
-Warum „Local“ setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Der Timer wartet nicht auf die PLIC-Gerätearbitration. MMIO kann trotzdem Bus- und Taktdomänenkosten haben. Bei gleichzeitig freigegebenen Kategorien gewinnt MEI vor MSI vor MTI. Bei MIE gleich 0 läuft der Timer nicht sofort. Zugriffslatenz, Auswahl und ISR-Zeit sind verschiedene Größen. Timer-Interrupts sind oft kritisch für OS (Scheduler, Context Switch). Sollen nicht hinter UART/SPI auf einem gemeinsamen Bus warten. Der Timer wartet nicht auf eine PLIC-Gerätewahl; MEI hat im Modell Vorrang vor MSI vor MTI. Verständnischeck: Timer und External zugleich: Wer gewinnt? MEI, nicht automatisch der Tick. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+CLINT bedeutet Core Local Interruptor und bezeichnet die klassische Organisation lokaler Timer- und Software-Interrupts. Ein Hart ist ein Hardware-Ausführungskontext. Lokale Anforderungen werden ihm zugeordnet und nehmen im betrachteten Modell nicht an der PLIC-Geräteauswahl teil. PLIC, Platform-Level Interrupt Controller, sammelt externe Peripheriequellen.
+
+Diese Zuordnung sagt weder eine bestimmte Leitungslänge noch einen universellen Prioritätsvorrang des Timers voraus. Die Hardware muss die passenden Kategorie-Pending- und Freigabebits mit dem globalen Status verbinden. Konkrete Registeradressen und Timerfrequenz stammen von der Plattform, nicht allein vom Namen des RISC-V-Befehlssatzes.
+
+Das zentrale Timerregister und Software-Interruptregister werden typischerweise über Geräteadressen erreicht. Sie sind nicht mit den Steuer- und Statusregistern des Prozessors zu verwechseln. Die Unterscheidung nutzt die Memory Map aus Vorlesung 1: Software adressiert ein Systemmodul, während der Hart seine Kategorieinformation in eigenen Registern abbildet. Wir öffnen jetzt zuerst die lokale Zeitquelle und danach den externen Controller.
 :::
 
-## Getrennte lokale und externe Pfade
+## `mtime` ist die Zeitquelle
 
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  CLINT[CLINT Timer] -->|lokal| CPU[CPU]
-  PLIC[PLIC] -->|External| CPU
-  style CLINT fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+- Machine Time: $64$-Bit-Zähler, auch auf RV32
+- Frequenz der Zeitquelle von der Plattform bestimmen
+- Kein notwendiger Gleichlauf mit dem Prozessortakt
+- Zeit seit Start: Differenz zum gespeicherten Startwert
 
 ::: notes
-Getrennte lokale und externe Pfade setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Drei Kategorien, keine Überholspur mit garantierter Chipnähe. Für den Timer entfällt der PLIC-Claim, nicht Freigabe und Kontextrettung. Kürzere Pfeile sind keine kürzere gemessene Zeit. Verständnischeck: Braucht der Timer einen PLIC-Claim? Im Modell nein, eine Freigabe schon. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+`mtime` heißt Machine Time und ist ein vierundsechzig Bit breiter Zähler der Plattformzeit. RV32, die Variante mit zweiunddreißig Bit breiten Integerregistern, verkürzt seine Registerbreite nicht. Der Zähler schreitet mit einer von der Plattform angegebenen konstanten Frequenz fort und kann bei Überlauf umlaufen. Er ist nicht automatisch ein Zähler seit dem Start dieses C-Programms.
+
+Ein Programm kann einen Startwert $t_0$ speichern und vergangene Ticks durch eine Differenz zu `mtime` bestimmen. Ein Tick bedeutet hier einen Zählschritt der Hardware-Zeitquelle; derselbe Ausdruck wird später auch für periodische Softwaretermine benutzt. Wir unterscheiden diese Bedeutungen ausdrücklich.
+
+`mtime` wird über MMIO, Memory-Mapped Input/Output, Ein- und Ausgabe durch Geräteadressen, erreicht. Das im privilegierten Befehlssatz beschriebene `time`-CSR, Control and Status Register, kann eine lesbare Spiegelung der Zeit bieten; es ist aber nicht dasselbe Register wie die Speicheradresse `mtime`. Unser Modell verwendet MMIO. Ein variabler Prozessortakt muss nicht dieselbe Frequenz wie die Zeitquelle haben, weshalb deren Einheit separat festgelegt wird.
 :::
 
-## Das Herz der Zeit: `mtime`
+## Timer-Ticks in Zeit umrechnen
 
-- Register `mtime` (Machine Time) im CLINT
-- Zählt mit dem Takt eines Hardware-Oszillators
-- Startwert und Betriebszustand sind plattformspezifisch, nicht automatisch Uptime seit Einschalten
-- Zeit seit Softwarestart ist eine Differenz zu einem gespeicherten Startwert
+Lehrannahmen: Timer $f_T=10$ MHz, Prozessor $f_C=100$ MHz.
+
+$$
+\Delta=f_T\cdot1\,\mathrm{ms}=10000\ \text{Timer-Ticks}
+$$
+
+$$
+t=\frac{n}{f_T},\qquad
+2^{32}/10^6\ \mathrm{s}\approx71{,}58\ \mathrm{min}
+$$
 
 ::: notes
-Das Herz der Zeit: `mtime` setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. mtime ist ein 64-Bit-Zähler einer plattformspezifischen Zeitbasis, nicht automatisch der CPU-Takt. Resetwert und Start sind nicht als null seit Einschalten garantiert. Zeit seit Softwarestart ist eine Differenz zum gemerkten Startwert. Schreibbarkeit im M-Mode macht den Zähler nicht zu einer unaufhaltsamen API. Register `mtime` (Machine Time) im CLINT. Zählt mit dem Takt eines Hardware-Oszillators. Startwert und Betriebszustand sind plattformspezifisch, nicht automatisch Uptime seit Einschalten. Zeit seit Softwarestart ist eine Differenz zu einem gespeicherten Startwert. Verständnischeck: mtime gleich 100000 bei 10 MHz sind 10 ms ab dem Zählnullpunkt, nicht automatisch seit Programmstart. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+$f_T$ ist die Frequenz der Hardware-Zeitquelle, $f_C$ die des Prozessors. MHz bedeutet Megahertz, eine Million Schritte beziehungsweise Taktperioden pro Sekunde. Bei zehn Megahertz Timerfrequenz dauert ein Zählschritt $0{,}1$ Mikrosekunden. Ein Millisekundenintervall benötigt $\Delta=10^7\cdot10^{-3}=10000$ Timer-Ticks. Der angenommene Prozessor mit hundert Megahertz hat dagegen hunderttausend Taktperioden pro Millisekunde.
+
+$n$ ist eine Anzahl von Timer-Ticks. Die Division durch $f_T$ ergibt die Zeit $t$ in Sekunden. Der gezeigte Überlaufvergleich verwendet ausdrücklich eine andere Frequenz: Ein zweiunddreißig Bit breiter Zähler mit einer Million Schritten pro Sekunde läuft nach $2^{32}/10^6=4294{,}967296$ Sekunden, rund $71{,}58$ Minuten, um. Ein zweiunddreißig Bit breiter Millisekundenzähler würde dagegen $2^{32}$ Millisekunden halten, rund $49{,}71$ Tage.
+
+`mtime` selbst ist auch auf RV32 vierundsechzig Bit breit. Das Problem beim Zugriff ist daher nicht ein zweiunddreißig Bit breiter Timer, sondern das Zusammensetzen seiner Hälften. Frequenz und gezählte Einheit müssen in jeder Rechnung genannt werden.
 :::
 
-## Das 64-Bit-Problem auf RV32
+## Vergleich und Freigaben des Timers
 
-![Zerrissener Snapshot und sichere RV32-Compare-Schreibfolge.](../assets/figures/03_interrupts_timer/hi-lo.png)
+![](../assets/figures/03_interrupts_timer/timer-gates.png){fig-alt="mtime größer oder gleich mtimecmp erzeugt die Timeranforderung; MTIE und globale MIE-Freigabe erlauben im Modell den Trap."}
 
-- RV32: native Wortbreite 32 Bit
-- 32-Bit-Zähler bei 1 MHz: Overflow nach $\approx 71$ Minuten
-- Deshalb: `mtime` im CLINT 64 Bit — auch auf RV32
-- Overflow erst nach astronomisch langen Zeiten (bei üblichen Takten)
+`mtimecmp` muss für den nächsten Termin in der Zukunft liegen.
 
 ::: notes
-Das 64-Bit-Problem auf RV32 setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Bei 1 MHz laufen 2 hoch 32 Ticks etwa 71,58 Minuten, bei 10 MHz etwa 7,16 Minuten. 2 hoch 32 Millisekunden sind etwa 49,71 Tage. 2 hoch 64 Ticks bei 10 MHz sind etwa 58454 Jahre. Ein Überlauf zerstört nicht automatisch den Scheduler, wenn Differenzen korrekt gebildet werden. Auf RV32 sind 64 Bit mehrere Zugriffe. RV32: native Wortbreite 32 Bit. 32-Bit-Zähler bei 1 MHz: Overflow nach $\approx 71$ Minuten. Deshalb: `mtime` im CLINT 64 Bit — auch auf RV32. Overflow erst nach astronomisch langen Zeiten (bei üblichen Takten). Verständnischeck: Ist ein Millisekundenzähler nach 71 Minuten übergelaufen? Nein, erst nach etwa 49,71 Tagen. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+`mtimecmp` heißt Machine Time Compare, Vergleichswert der Maschinenzeit. Er ist wie `mtime`, Machine Time, vierundsechzig Bit breit. Die Hardware betrachtet beide Werte vorzeichenlos und setzt die Timeranforderung, sobald `mtime` größer oder gleich `mtimecmp` ist. Die Abbildung liest sich vom Vergleich über die Freigaben zum Trap.
+
+MTIP bedeutet Machine Timer Interrupt Pending, wartender Maschinen-Timerinterrupt im Register `mip`. MTIE bedeutet Machine Timer Interrupt Enable und ist die Timerfreigabe in `mie`. MIE bedeutet Machine Interrupt Enable, globale Freigabe in `mstatus`. Im Modell mit bereits laufendem Machine Mode müssen Pending, MTIE und MIE zusammen wirksam sein. Die Kästen zeigen getrennte logische Bedingungen, keine Verzögerungen.
+
+Ein Vergleichswert hundert bei aktuellem Zählerstand hundert ist schon fällig. Ein neuer Termin muss daher größer als die aktuelle Zeit sein, wenn die Bedingung wieder falsch werden soll. Ein Interrupt ist hier keine kurze einzelne Flanke des Vergleichers; die Anforderung bleibt grundsätzlich bestehen, bis die Bedingung beseitigt ist. Das erklärt die nötige Aktion im Handler.
 :::
 
-## 64-Bit lesen auf RV32
+## Warum `mret` den Timer nicht quittiert
 
-- CLINT liefert `mtime` als `mtime_lo` / `mtime_hi`
-- Race: Overflow zwischen den beiden Reads möglich
-- Sicheres Muster: `hi` vor und nach `lo` prüfen
+| Vergleich fällig | MTIE | MIE | Timer-Trap im Modell |
+|------------------|------|-----|----------------------|
+| nein | $1$ | $1$ | nein |
+| ja | $0$ | $1$ | nein |
+| ja | $1$ | $0$ | nein |
+| ja | $1$ | $1$ | möglich |
+
+- Vergleichswert in die Zukunft setzen
+- MTIP kann die Änderung mit Verzögerung anzeigen
+
+::: notes
+MTIE ist Machine Timer Interrupt Enable, die Timerkategorienfreigabe. MIE ist Machine Interrupt Enable, die globale Freigabe der betrachteten Maschinen-Interrupts. Die Tabelle fasst die Bedingungen zusammen; „möglich“ bedeutet, dass die Anforderung genommen werden kann, nicht dass eine bestimmte Nanosekundenlatenz garantiert wird. Weitere gleichzeitig anstehende Kategorien können die Auswahl beeinflussen.
+
+`mret`, Machine Return, stellt den Trap-Rückkehrzustand her. Es ändert nicht automatisch `mtimecmp`, den Timervergleichswert. Ist nach Rückkehr `mtime` weiterhin größer oder gleich dem Vergleich und sind die Freigaben wirksam, kann ein neuer Trap folgen. Nur eine Softwarevariable zu erhöhen beseitigt diese Bedingung nicht.
+
+Ein Zukunftswert nimmt die Vergleichsbedingung zurück. MTIP, Machine Timer Interrupt Pending, muss diese Änderung laut Spezifikation aber nicht sofort widerspiegeln. Ein zusätzlicher Timer-Eintritt ohne bereits fälligen neuen Termin ist daher möglich. Der Handler sollte diesen Fall verkraften und nicht jeden Eintritt als vergangene Millisekunde zählen. Ein Busy-Wait, dauerhaftes Prüfen, bis MTIP fällt, ist dafür gewöhnlich nicht nötig. Als Nächstes müssen wir die vierundsechzig Bit langen Werte auf RV32 konsistent zugreifen.
+:::
+
+## Zwei Hälften ergeben nicht immer einen Zeitpunkt
+
+![](../assets/figures/03_interrupts_timer/hi-lo.png){fig-alt="Ein Überlauf zwischen Lesen von HI und LO kann einen nie gelesenen Gesamtzustand erzeugen; ein zweites HI erkennt den Übergang."}
+
+IRQ-Sperren hält den Hardwarezähler nicht an.
+
+::: notes
+RV32 hat zweiunddreißig Bit breite Integerregister. Das vierundsechzig Bit breite `mtime`, Machine Time, kann im angenommenen MMIO-Modell nur in zwei Hälften gelesen werden. HI ist die obere, LO die untere Hälfte. MMIO bedeutet Memory-Mapped Input/Output, Zugriff auf Geräte über Adressen. Der Zähler kann zwischen zwei Lesezugriffen weiterlaufen.
+
+Die Abbildung zeigt den Übergang von `0x00000001_FFFFFFFF` zu `0x00000002_00000000`. Der Unterstrich trennt zur Lesbarkeit die Hälften. Liest Software zuerst HI gleich eins vor dem Übergang und dann LO gleich null danach, würde sie `0x00000001_00000000` bilden. Dieser zusammengesetzte Wert ist deutlich älter als beide beobachteten Zeitpunkte.
+
+Ein weiterer HI-Zugriff liefert zwei und erkennt den Unterschied. Der Leseversuch muss dann wiederholt werden. IRQ bedeutet Interrupt Request, Unterbrechungsanforderung. Das Sperren von Interrupts verhindert gegebenenfalls eine andere Softwarebehandlung, stoppt aber den Zähler nicht. Der Zeitablauf selbst erzeugt dieses Zugriffsproblem. Das folgende Muster nutzt deshalb zwei gleiche HI-Beobachtungen statt einer vermeintlichen atomaren Vierundsechzig-Bit-C-Ladung.
+:::
+
+## `mtime` auf RV32 konsistent lesen
+
+C-Lehrfunktion; `mt[0]` ist LO, `mt[1]` HI:
 
 ```c
-uint32_t hi, lo;
-do {
-    hi = CLINT_MTIME_HI;
-    lo = CLINT_MTIME_LO;
-} while (hi != CLINT_MTIME_HI);
-```
-
-::: notes
-64-Bit lesen auf RV32 setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. HI und LO sind die beiden 32-Bit-Hälften. Vor dem Übergang steht 0x00000001_FFFFFFFF, danach 0x00000002_00000000. Altes HI 1 und neues LO 0 ergeben falsch 0x00000001_00000000. Ein zweites HI gleich 2 verwirft den Versuch. Der Cast zu uint64_t steht vor dem Schieben um 32. IRQ-Sperren stoppen mtime nicht. Das Muster gilt für geordnete MMIO-Snapshots, nicht für jede Softwarevariable. CLINT liefert `mtime` als `mtime_lo` / `mtime_hi`. Race: Overflow zwischen den beiden Reads möglich. Sicheres Muster: `hi` vor und nach `lo` prüfen. Verständnischeck: Warum zweimal HI? Damit ein Überlauf der unteren Hälfte erkannt wird. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Der Auslöser: `mtimecmp`
-
-![Pending ab mtime >= mtimecmp. Ein Trap braucht zusätzlich MTIE und MIE.](../assets/figures/03_interrupts_timer/timer-gates.png)
-
-- `mtimecmp` (Machine Time Compare), ebenfalls 64 Bit
-- Software schreibt einen Zukunftswert (Eieruhr)
-- Beispiel: jetzt $= 100$, Intervall $50$ → `mtimecmp = 150`
-
-::: notes
-Der Auslöser: `mtimecmp` setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. mtimecmp ist der absolute Vergleichswert, Machine Time Compare, kein herunterzählender Timer. 100 plus 50 gleich 150 meint Ticks. MTIP ist das Pending-Bit, MTIE die Freigabe, MIE die globale M-Mode-Freigabe. Pending kann bei maskierter CPU bestehen. mtimecmp ist MMIO, kein CSR. `mtimecmp` (Machine Time Compare), ebenfalls 64 Bit. Software schreibt einen Zukunftswert (Eieruhr). Beispiel: jetzt $= 100$, Intervall $50$ → `mtimecmp = 150`. Verständnischeck: mtime gleich mtimecmp gleich 150 und MTIE gleich 0: pending, aber kein Trap. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Hardware-Logik im CLINT
-
-- 64-Bit-Komparator: in jedem Takt `mtime >= mtimecmp`?
-- Bei wahr: lokaler Timer-Interrupt an die CPU
-- CPU springt (im Vectored Mode) zur Timer-ISR
-
-::: notes
-Hardware-Logik im CLINT setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Der Vergleich ist unsigned 64-Bit mtime größer oder gleich mtimecmp. In jedem Takt ist nur ein vereinfachtes Logikmodell, keine zugesagte Komparatorlatenz. Der Sprung zur ISR braucht Freigabe und Trap. Im Vectored Mode landet die CPU zuerst am Slot. Größer-gleich behält einen überschrittenen Termin. 64-Bit-Komparator: in jedem Takt `mtime >= mtimecmp`?. Bei wahr: lokaler Timer-Interrupt an die CPU. CPU springt (im Vectored Mode) zur Timer-ISR. Verständnischeck: Warum nicht nur Gleichheit? Eine verpasste exakte Gleichheit würde den Alarm verlieren. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## CLINT-Komparator — Schema
-
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[mtime] --> C{"mtime >= mtimecmp?"}
-  B[mtimecmp] --> C
-  C -->|ja| D[Timer-Interrupt]
-  style C fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-CLINT-Komparator — Schema setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Die Zeitachse trennt Vergleich, Pending und Freigabe. Bei jetzt 100 und Compare 150 gibt es kein Pending. Bei 150 und gesperrtem MIE bleibt der Termin fällig, der Trap wird nicht angenommen. Es gibt keinen belegten Zyklusabstand. Verständnischeck: MIE gleich 0 löscht den Termin nicht, sondern maskiert die Annahme. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Quittieren des Timer-Interrupts
-
-- Vergleich ist $\ge$: Interrupt bleibt aktiv, solange `mtime >= mtimecmp`
-- Ohne Update: sofort erneuter Eintritt nach `mret`
-- Pflicht in der ISR: neuen Zukunftswert nach `mtimecmp` schreiben
-
-```c
-/* Lehrcode — nicht kompiliert. Absolutes Raster, kein Wrap im Zeitraum. */
-static uint64_t next_deadline;
-static uint64_t boot_time;
-static volatile uint32_t elapsed_ms_snapshot;
-static uint32_t handled_timer_irqs;
-
-void timer_isr(void) {
-    uint64_t now = read_mtime();
-    handled_timer_irqs++;
-    if (now >= next_deadline) {
-        uint64_t k = (now - next_deadline) / TICKS_PER_MS + 1u;
-        next_deadline += k * TICKS_PER_MS;
-        write_mtimecmp(next_deadline);
-    }
-    elapsed_ms_snapshot = (uint32_t)((now - boot_time) / TICKS_PER_MS);
-}
-```
-
-Die Vier-Schritt-Schleife ist eine andere Strategie: bei 15,3 ms endet sie bei 16,3 ms statt 16,0 ms.
-
-::: notes
-Quittieren des Timer-Interrupts setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Das Hauptmodell prüft now größer oder gleich next_deadline und springt mit k gleich (now minus next) geteilt durch Intervall plus 1 auf den nächsten Zukunftstermin. Bei 10,0 ms und now 15,3 ms ist k gleich 6 und der nächste Termin 16,0 ms. Die Vier-Schritt-Schleife erreicht 14,0 ms und setzt dann 16,3 ms, das ist eine andere Strategie. elapsed_ms_snapshot kommt aus (now minus boot_time) geteilt durch 10000. handled_timer_irqs zählt Eintritte. Ein erneuter Eintritt vor dem Termin verschiebt nichts. TICKS_PER_MS ist 10000 im 10-MHz-Modell. Lehrcode, nicht kompiliert. Vergleich ist $\ge$: Interrupt bleibt aktiv, solange `mtime >= mtimecmp`. Ohne Update: sofort erneuter Eintritt nach `mret`. Pflicht in der ISR: neuen Zukunftswert nach `mtimecmp` schreiben. Verständnischeck: next 10 ms, now 15,3 ms: k gleich 6, next gleich 16 ms. Bei 15,4 ms ohne neuen Termin bleibt 16 ms. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Konzept: Der System-Tick
-
-- Wofür nutzen wir den Timer in der Praxis?
-- Ein periodischer Tick ist ein Softwarekonzept, kein Pflichtbaustein jedes Betriebssystems
-- SysTick ist der Name eines ARM-Timers, hier nicht ein RISC-V-Register
-- Die Zeitbasis kommt aus `mtime`, nicht aus der Zahl der ISR-Aufrufe
-- Ein Tick kann den Scheduler anstoßen, erzwingt aber keinen Taskwechsel
-
-::: notes
-Konzept: Der System-Tick setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Ein System-Tick ist ein Softwarekonzept. SysTick ist zusätzlich der Name eines ARM-Timers, hier kein RISC-V-Register. Kooperative Systeme und ticklose Strategien kommen ohne periodischen Tick aus. Ein Tick muss keinen Taskwechsel erzwingen. Linux ist eine Einordnung, kein Nachweis dieses M-Mode-Modells. Wofür nutzen wir den Timer in der Praxis?. Ein periodischer Tick ist ein Softwarekonzept, kein Pflichtbaustein jedes Betriebssystems. SysTick ist der Name eines ARM-Timers, hier nicht ein RISC-V-Register. Die Zeitbasis kommt aus `mtime`, nicht aus der Zahl der ISR-Aufrufe. Verständnischeck: Muss jeder Tick Task A gegen B tauschen? Nein, das entscheidet die Schedulerpolitik. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Warum oft 1 Millisekunde?
-
-- 1 ms ist ein Lehrkompromiss, kein universeller Sweetspot
-- Aufwand, Auflösung und Frist hängen vom System ab
-- Menschliche Wahrnehmung ersetzt keine Regelungsfrist
-
-::: notes
-Warum oft 1 Millisekunde setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Der Modellanteil ist Tickfrequenz mal ISR-Zyklen geteilt durch CPU-Frequenz. Bei 100 MHz und 1 ms gibt es 100000 CPU-Zyklen. 500 Zyklen sind 5 µs und bei 1 kHz rechnerisch 0,5 Prozent, ohne weitere ISRs. Eine 1-µs-Periode passt nicht zu 5 µs Aufwand. Das sind Annahmen, kein Sweetspot-Gesetz. 1 ms ist ein Lehrkompromiss, kein universeller Sweetspot. Aufwand, Auflösung und Frist hängen vom System ab. Menschliche Wahrnehmung ersetzt keine Regelungsfrist. Verständnischeck: Kann die Tickrate folgenlos steigen? Nein, Aufwand und Zeitbudget ändern sich. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Mathematik: Takte berechnen
-
-![Drift 11,2 ms statt 11,0 ms. Sechs fällige Millisekunden, nächste Deadline 16 ms.](../assets/figures/03_interrupts_timer/tick-drift.png)
-
-- `mtime` zählt Oszillator-Takte, keine Sekunden
-- Umrechnung in Software nötig
-- Beispiel: Quarz $10\,\mathrm{MHz}$ $\Rightarrow$ $10^{7}$ Takte/s
-- Pro ms: $10^{7}/1000 = 10^{4}$ Takte
-- Nächster Alarm im absoluten Modell: `next_deadline`, nicht `now + 10000`
-- `now + 10000` bleibt nur das relative Gegenbeispiel und driftet
-
-```c
-#define TIMER_FREQ   10000000u
-#define TICKS_PER_MS (TIMER_FREQ / 1000u)
-```
-
-::: notes
-Mathematik: Takte berechnen setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. 10 MHz sind 10 hoch 7 Ticks je Sekunde und 10000 Ticks je Millisekunde. 100 MHz CPU sind 100000 Zyklen je Millisekunde. TIMER_FREQ geteilt durch 1000 ist Ganzzahldivision. Service bei 10,2 ms: relativ 11,2 ms, absolut 11,0 ms. Überlast 15,3 ms: sechs fällige Punkte, nächste absolute Zukunft 16,0 ms. Der Fallback 16,3 ms ist der andere Algorithmus. Absolutes Raster entfernt keine Latenz und keinen Oszillatorfehler. `mtime` zählt Oszillator-Takte, keine Sekunden. Umrechnung in Software nötig. Beispiel: Quarz $10\,\mathrm{MHz}$ $\Rightarrow$ $10^{7}$ Takte/s. Pro ms: $10^{7}/1000 = 10^{4}$ Takte. Verständnischeck: Warum sechs Deadlines? 10 bis 15 ms sind fällig, 16 ms liegt in der Zukunft. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Software-Interrupts im CLINT
-
-- `msip` ist ein Pending-Bit pro Hart, Cause 3
-- Die Nutzdaten liegen daneben im Speicher, nicht im Bit selbst
-- MSI ist nicht automatisch der Deferred-Pfad unter dem Timer
-
-::: notes
-Software-Interrupts im CLINT setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. msip ist der MMIO-Softwarezustand, mip.MSIP die Pending-Anzeige. Das Bit enthält keine Nachricht und zählt nicht beliebig viele Anforderungen. MSI steht im klassischen Modell vor MTI. Eine Queue liegt separat. volatile ist kein Protokoll. `msip` ist ein Pending-Bit pro Hart, Cause 3. Die Nutzdaten liegen daneben im Speicher, nicht im Bit selbst. MSI ist nicht automatisch der Deferred-Pfad unter dem Timer. Verständnischeck: Dreimal msip gleich 1 ergibt nicht drei Aufrufe. Die Nutzdaten liegen daneben. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Inter-Processor Interrupts (IPI)
-
-![Hart A setzt msip von Hart B. Cause 3, danach löscht B das Bit.](../assets/figures/03_interrupts_timer/ipi.png)
-
-Vorgriff auf Block 9 (Multicore):
-
-- Zwei Harts, ein `msip`-Bit je Hart
-- Hart A setzt das Bit von Hart B. B erhält Cause 3 und löscht es wieder
-
-::: notes
-Inter-Processor Interrupts (IPI) setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. IPI heißt Inter-Processor Interrupt. Hart A legt Nutzdaten ab, veröffentlicht sie nach einer Ordnungsregel und setzt msip von B. B sieht Cause 3. Das Löschen des Bits allein ist kein verlustfreies Protokoll. Zwei Harts sind ein Vorgriff, kein ausgeführter Multicore-Versuch. Zwei Harts, ein `msip`-Bit je Hart. Hart A setzt das Bit von Hart B. B erhält Cause 3 und löscht es wieder. Verständnischeck: Steht die Nachricht im msip-Bit? Nein, das Bit fordert zum Prüfen einer Datenstruktur auf. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## MMIO beim CLINT
-
-- `mtime` / `mtimecmp` sind keine CSRs (`csrw`), sondern Memory-Mapped Register
-- Zugriff über normale C-Pointer auf physische Adressen
-- Basisadresse abhängig vom SoC (bei SiFive oft ab `0x02000000`)
-
-::: notes
-MMIO beim CLINT setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. CSR-Zugriffe und Loads/Stores an MMIO sind verschieden. Ein C-Pointer macht Hardware nicht zu RAM: Breite, Alignment, Seiteneffekt und Ordnung zählen. 0x02000000 ist eine unvalidierte Lehradresse. time und timeh können CSR-Schatten der Zeit sein. mtime selbst ist in diesem Beispiel MMIO, deshalb ist csrw mtime nicht der gezeigte Zugriff. `mtime` / `mtimecmp` sind keine CSRs (`csrw`), sondern Memory-Mapped Register. Zugriff über normale C-Pointer auf physische Adressen. Basisadresse abhängig vom SoC (bei SiFive oft ab `0x02000000`). Verständnischeck: Warum nicht csrw mtime? mtime ist hier kein CSR-Name dieser Schnittstelle. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## C-Beispiel: System-Tick initialisieren
-
-```c
-/* Lehr-Modell, keine geprüfte SiFive-Map */
-#define CLINT_MTIMECMP 0x02004000u
-#define CLINT_MTIME    0x0200BFF8u
-
-static uint64_t read_mtime(void) {
-    volatile uint32_t *mt = (volatile uint32_t *)CLINT_MTIME;
-    uint32_t hi, lo;
+uint64_t read_mtime32(volatile uint32_t *mt) {
+    uint32_t hi, lo, hi_again;
     do {
         hi = mt[1];
         lo = mt[0];
-    } while (hi != mt[1]); /* nur ein konsistenter Snapshot */
+        hi_again = mt[1];
+    } while (hi != hi_again);
     return ((uint64_t)hi << 32) | lo;
 }
-
-static void write_mtimecmp(uint64_t v) {
-    volatile uint32_t *cmp = (volatile uint32_t *)CLINT_MTIMECMP;
-    cmp[0] = 0xffffffffu;          /* kein zu kleiner Zwischenwert */
-    cmp[1] = (uint32_t)(v >> 32);
-    cmp[0] = (uint32_t)v;
-}
-
-void init_system_tick(void) {
-    /* Stack und mtvec müssen schon stehen */
-    boot_time = read_mtime();
-    next_deadline = boot_time + 10000u; /* 1 ms bei 10 MHz */
-    write_mtimecmp(next_deadline);
-    set_csr(mie, (1u << 7));       /* MTIE */
-    set_csr(mstatus, MSTATUS_MIE);
-}
-```
-
-- Kein 64-Bit-Store auf RV32. Die drei 32-Bit-Schreibungen sind die Compare-Sequenz.
-- Adressen sind das Lehr-Modell, nicht das Labor-Datenblatt.
-
-::: notes
-C-Beispiel: System-Tick initialisieren setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Little Endian und geordnete 32-Bit-MMIO-Zugriffe sind Voraussetzungen. cmp Index 1 ist das Wort bei Offset 4, nicht ein Bit. Die Folge LO gleich 0xffffffff, dann HI, dann neues LO vermeidet den gezeigten zu kleinen Zwischenwert. volatile uint64_t ist auf RV32 nicht atomar. MTIE ist Bit 7 in mie, MIE Bit 3 in mstatus. Stack, mtvec und Variablen müssen vorher gelten. Die globale Freigabe kommt im Startmodell zuletzt. Adressen sind Lehrwerte. ILP32 ist die 32-Bit-Integer-ABI. Kein 64-Bit-Store auf RV32. Die drei 32-Bit-Schreibungen sind die Compare-Sequenz. Adressen sind das Lehr-Modell, nicht das Labor-Datenblatt. Verständnischeck: Ist ein volatile-64-Bit-Store auf RV32 atomar? Nein, die gezeigte Folge ist ein anderer Vertrag. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-## Zusammenfassung CLINT
-
-- Lokale, zeitkritische Ereignisse
-- 64-Bit-Zähler `mtime`, Compare `mtimecmp`
-- Soft-Interrupts melden Arbeit oder einen anderen Hart; spätere Bearbeitung ist Strategie, kein eingebauter Niedrigprioritätsmodus
-- Konfiguration über MMIO
-
-::: notes
-Zusammenfassung CLINT setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Zähler, Compare, Pending, Freigabe und Rearming gehören zusammen. Ohne Update eines abgelaufenen Compare bleibt das Pending, und nach mret kann erneut ein Trap folgen. Die Zeitbasis ist eine Zählerdifferenz. Softwareinterrupt ist eine Benachrichtigung, kein eingebauter Niedrigprioritätsmodus. Lokale, zeitkritische Ereignisse. 64-Bit-Zähler `mtime`, Compare `mtimecmp`. Soft-Interrupts melden Arbeit oder einen anderen Hart; spätere Bearbeitung ist Strategie, kein eingebauter Niedrigprioritätsmodus. Konfiguration über MMIO. Verständnischeck: Was passiert ohne neues mtimecmp? Der Timer bleibt fällig und kann nach der Rückkehr erneut eintreten. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Fragen? — CLINT und System-Tick
-
-- Warum 64-Bit `mtime`?
-- Race Condition beim 64-Bit-Lesen auf RV32?
-- Warum sofort erneuter Timer-Interrupt ohne neues `mtimecmp`?
-
-::: notes
-Fragen? — CLINT und System-Tick setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Das hi-lo-hi-Muster erkennt den Übergang. IRQ-Sperren stoppen den Zähler nicht. Mehrere maskierte Millisekunden liegen nicht als fünf Einträge in einer Queue. mtime erlaubt die Rekonstruktion, ein Pending-Bit nicht die Einzelereignisse. Ein zusätzlicher ISR-Eintritt ohne fälligen Termin ist kein neuer logischer Tick. Warum 64-Bit `mtime`?. Race Condition beim 64-Bit-Lesen auf RV32?. Warum sofort erneuter Timer-Interrupt ohne neues `mtimecmp`?. Verständnischeck: Sind nach 5 ms Maskierung fünf Requests gespeichert? Nein. Die verstrichene Zeit lässt sich aus mtime rekonstruieren. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Auftritt PLIC
-
-- PLIC = Platform-Level Interrupt Controller
-- Dirigent für dutzende externe Geräte
-- Sammelt Signale, priorisiert, meldet ein External Interrupt an den Kern
-
-::: notes
-Auftritt PLIC setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Der PLIC sammelt Quellen, hält Pending, wählt und benachrichtigt über External. Die ID kommt per Claim, nicht als ein CSR-Wort zusammen mit Cause 11. Die Dirigentenanalogie ist Auswahl, kein Preemptionsmanager. Nicht jedes RISC-V-System hat diesen PLIC. PLIC = Platform-Level Interrupt Controller. Dirigent für dutzende externe Geräte. Sammelt Signale, priorisiert, meldet ein External Interrupt an den Kern. Verständnischeck: Meldet der PLIC Cause und UART-ID in einem Wort? Nein, mcause und Claim sind getrennt. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## PLIC-Architektur
-
-- Gateways: Anbindung der Sensoren/Peripherie
-- Arbitration: Schiedsrichter über Prioritäten
-- Targets: typischerweise CPU-Kerne
-- M:N-Router (viele Quellen → wenige Kerne)
-
-::: notes
-PLIC-Architektur setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Gateway nimmt die Quelle an, der Arbiter wählt, das Target ist ein Kontext, hier Hart 0 im M-Mode. Hart und Core sind nicht immer dasselbe. M zu N meint viele Quellen und mehrere Kontexte, keine Latenzformel. Nutzdaten laufen nicht durch den PLIC. Gateways: Anbindung der Sensoren/Peripherie. Arbitration: Schiedsrichter über Prioritäten. Targets: typischerweise CPU-Kerne. M:N-Router (viele Quellen → wenige Kerne). Verständnischeck: Warum eigene Enables je Target? Zustellung ist pro Kontext wählbar. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## PLIC — Schema
-
-```{mermaid}
-%%| fig-width: 4.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  U[UART] -->|ID 1| PLIC
-  I[I2C] -->|ID 2| PLIC
-  S[SPI] -->|ID 3| PLIC
-  PLIC -->|Gewinner| CPU[Core: Ext. Interrupt]
-  style PLIC fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
 ```
 
 ::: notes
-PLIC — Schema setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. IDs 1, 2 und 3 sind Lehrwerte für UART, I2C und SPI. Die IRQ-Leitung überträgt nicht die ID. External ist die Benachrichtigung, Claim liefert die ID, Complete schreibt sie zurück. Bei gleichzeitigem UART und I2C sieht die CPU zuerst External. Verständnischeck: Die CPU sieht zunächst External. Claim 2 ermöglicht den I2C-Handler. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Die C-Lehrfunktion setzt Typdefinitionen aus `stdint.h` voraus. `uint32_t` und `uint64_t` sind vorzeichenlose Ganzzahltypen mit genau zweiunddreißig beziehungsweise vierundsechzig Bit, soweit die Implementierung sie bereitstellt. `mt` ist ein Zeiger auf die untere Hälfte des angenommenen `mtime`-Registers; die nächste Wortposition enthält die obere Hälfte. Das Modell ist Little Endian und erlaubt passend ausgerichtete, in dieser Reihenfolge wirksame zweiunddreißig Bit breite Gerätezugriffe.
+
+`hi`, `lo` und `hi_again` speichern obere, untere und nochmals obere Hälfte. Die Schleife wiederholt bei unterschiedlichen oberen Werten. Sind sie gleich, gehört die gelesene untere Hälfte zum passenden oberen Bereich, vorausgesetzt ein Leseversuch umfasst nicht einen ganzen Umlauf der unteren Hälfte. Die Umwandlung nach `uint64_t` erfolgt vor der Verschiebung um zweiunddreißig Bits; bitweises Oder fügt LO ein.
+
+`volatile` verlangt die entsprechenden beobachtbaren Gerätezugriffe nach den Regeln der verwendeten C-Implementierung. Es ersetzt nicht beliebige plattformspezifische Speicherordnung. Die Funktion ist ein Lehrzugriff, kein bereits ausgeführter RISC-V-Treiber. Das fehlende konkrete Geräteadressargument muss beim Einsatz aus der Plattformbeschreibung stammen. Für das Schreiben eines Vergleichswerts ist eine andere Reihenfolge nötig.
 :::
 
-## Zuweisung von Prioritäten und Enables
+## `mtimecmp` auf RV32 schreiben
 
-- Jedes Gerät hat eine ID
-- Pro Gerät: Priority-Register (MMIO); typisch $0$ = aus, größer = höher
-- Zusätzlich: Enable-Bits pro Target — ohne Enable bleibt die Quelle stumm
-- Prioritäten und Enables zur Laufzeit per Software änderbar
-
-::: notes
-Zuweisung von Prioritäten und Enables setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Die Quellen-ID ist stabil, die Priorität im PLIC konfigurierbar, das Enable gilt pro Kontext. Priorität 0 heißt nie auslösen. Höhere positive Zahl gewinnt, bei Gleichstand die kleinere ID. Ohne Enable bleibt die Quelle für diesen Kontext draußen, das Gerät selbst muss nicht inaktiv sein. Jedes Gerät hat eine ID. Pro Gerät: Priority-Register (MMIO); typisch $0$ = aus, größer = höher. Zusätzlich: Enable-Bits pro Target — ohne Enable bleibt die Quelle stumm. Prioritäten und Enables zur Laufzeit per Software änderbar. Verständnischeck: Hat ID 3 immer Vorrang vor ID 1? Nein, die Priority entscheidet, bei Gleichstand die kleinere ID. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Priority Thresholds
-
-![Threshold 5 lässt ID 1 stumm. ID 2 gewinnt vor ID 3.](../assets/figures/03_interrupts_timer/plic-table.png)
-
-- Pro Target (Kern): Threshold-Register
-- Weiterleitung nur wenn Priorität **strikt größer** als Threshold
-- Beispiel: Threshold $= 5$ → Prio 3 wird blockiert, Prio 7 weckt die CPU
-
-::: notes
-Priority Thresholds setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Threshold 5 lässt Priorität 5 nicht durch, nur strikt größere. ID 2 und 3 mit Priorität 7 benachrichtigen, ID 2 gewinnt den Gleichstand. Ein expliziter Claim kann danach ID 3 und sogar ID 1 mit Priorität 3 liefern, weil der Threshold den Claim nicht filtert. Danach Claim 0, wenn nichts neu pending wird. Der Threshold filtert keinen CLINT-Timer. Pro Target (Kern): Threshold-Register. Weiterleitung nur wenn Priorität **strikt größer** als Threshold. Beispiel: Threshold $= 5$ → Prio 3 wird blockiert, Prio 7 weckt die CPU. Verständnischeck: Kann Claim bei Threshold 5 die ID 1 liefern? Ja, wenn sie enabled und pending ist und nichts Stärkeres wartet. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Das Pending-Array
-
-- Ein angenommenes Pending-Bit speichert wartend oder nicht, nicht jede wiederholte Flanke
-- Threshold filtert die Benachrichtigung, nicht den expliziten Claim
-
-::: notes
-Das Pending-Array setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Ein Pending-Bit ist keine unbegrenzte Warteschlange. Geräte-FIFO, Gateway, PLIC-Pending und Notification sind verschieden. Wiederholte Flanken können zusammenfallen. Ein UART-FIFO kann mehrere Zeichen bis zu seiner Kapazität halten, das Pending-Bit zählt sie nicht. Keine Gatterzahl oder konstante Hardwarezeit wird behauptet. Ein angenommenes Pending-Bit speichert wartend oder nicht, nicht jede wiederholte Flanke. Threshold filtert die Benachrichtigung, nicht den expliziten Claim. Verständnischeck: Warum liefert ein UART trotz eines Bits mehrere Zeichen? Ein FIFO puffert Nutzdaten separat. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Zwei-Stufen-Handshake
-
-- External Interrupt: `mcause` sagt oft nur „PLIC / External“ (Code 11)
-- CPU kennt die Quellen-ID noch nicht
-- Pflicht: Claim (ID lesen) und später Complete (fertig melden)
-
-::: notes
-Zwei-Stufen-Handshake setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Der Ablauf ist Claim lesen, Gerät bedienen, Complete schreiben. Cause 11 heißt im Referenzmodell Machine External, nicht auf jedem Chip garantiert PLIC. ID 0 bedeutet keine Quelle und wird nicht completed. Claim löscht PLIC-Pending, nicht die UART-Ursache. Zweimal lesen ist kein harmloses RAM-Lesen, weil der erste Zugriff übernimmt. External Interrupt: `mcause` sagt oft nur „PLIC / External“ (Code 11). CPU kennt die Quellen-ID noch nicht. Pflicht: Claim (ID lesen) und später Complete (fertig melden). Verständnischeck: Warum ist zweimal Claim kein zweimaliges Variablenlesen? Der erste Zugriff kann den Request schon übernehmen. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Schritt 1: Claim
-
-![Claim löscht PLIC-Pending, nicht die Ursache im UART. ID 0 nicht abschließen.](../assets/figures/03_interrupts_timer/claim.png)
+C-Lehrfunktion für Little Endian und stark geordnete Gerätezugriffe:
 
 ```c
-#define PLIC_MAX_ID 3u
-
-uint32_t plic_claim(void) {
-    return *(volatile uint32_t *)PLIC_CLAIM_REG;
-}
-
-void plic_complete(uint32_t id) {
-    *(volatile uint32_t *)PLIC_CLAIM_REG = id;
+void write_compare32(volatile uint32_t *cmp, uint64_t value) {
+    cmp[0] = UINT32_MAX;
+    cmp[1] = (uint32_t)(value >> 32);
+    cmp[0] = (uint32_t)value;
 }
 ```
 
-- Ein Claim kann 0 liefern: kein Interrupt
-- ID 0 nicht abschließen und keinen Handler aufrufen
+Ein einzelner `uint64_t`-Store garantiert auf RV32 keine atomare Aktualisierung.
 
 ::: notes
-Schritt 1: Claim setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Die Dereferenzierung ist ein 32-Bit-MMIO-Read mit Seiteneffekt. PLIC_CLAIM_REG ist eine Modelladresse, PLIC_MAX_ID 3 die Lehrtabelle. ID 0 ruft keinen Handler und kein Complete. Eine gültige ID wird im Lehrpfad einmal abgeschlossen. Nach Claim 1 ist das PLIC-Pending gelöscht, UART-Daten können bleiben. Ein Claim kann 0 liefern: kein Interrupt. ID 0 nicht abschließen und keinen Handler aufrufen. Verständnischeck: Nach Claim 1 ist das PLIC-Pending weg. Die Geräteursache kann weiter bestehen. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+`mtimecmp` ist Machine Time Compare, der vierundsechzig Bit breite Timervergleich. RV32 hat zweiunddreißig Bit breite Integerregister. Zwei normale Halbschreibungen könnten kurzfristig einen Vergleichswert erzeugen, der kleiner als alter und neuer Gesamtwert ist. Die Funktion verwendet daher die in der Spezifikation beschriebene Dreischrittfolge.
+
+`cmp` zeigt auf die untere Hälfte des Vergleichsregisters, `value` ist der gewünschte vorzeichenlose Vierundsechzig-Bit-Wert. `uint32_t` und `uint64_t` bezeichnen die entsprechend breiten Typen aus `stdint.h`; `UINT32_MAX` ist der maximale Wert `0xFFFFFFFF` des Zweiunddreißig-Bit-Typs. Zuerst setzt die Funktion LO, die untere Hälfte, auf diesen Maximalwert. Danach schreibt sie HI, die obere Hälfte des neuen Werts, und zuletzt dessen LO. Die Zwischenwerte werden dadurch nicht kleiner als der kleinere der beiden Vergleichswerte.
+
+Vorausgesetzt werden Little Endian, hier untere Hälfte an der kleineren Adresse, sowie stark geordnete Gerätezugriffe in dieser Reihenfolge. `volatile` allein begründet diese Hardwareeigenschaft nicht. Ein zweiter schreibender Handler ist im Modell ausgeschlossen. Die Folge vermeidet einen künstlich zu frühen Zwischenvergleich; ein absichtlich bereits fälliger Endwert würde dennoch eine Anforderung erzeugen. Der konkrete Adresszeiger ist eine Plattforminformation, keine universelle RISC-V-Adresse.
 :::
 
-## Atomares Lesen und Löschen
+## Erst vorbereiten, zuletzt freigeben
 
-- Claim-Read löscht atomar das zugehörige Pending-Bit
-- Eine Quelle wird einem Claim zugeordnet; andere Harts können andere wartende Quellen erhalten
-- 0 folgt nur, wenn für dieses Ziel nichts Claimbares bleibt
+1. Gültigen Stack und Trap-Eintritt sicherstellen
+2. Globale Interruptfreigabe zunächst gesperrt halten
+3. Zeit lesen, ersten Zukunftstermin nach `mtimecmp` schreiben
+4. Timerkategorie freigeben: `mie.MTIE`
+5. Globale Freigabe setzen: `mstatus.MIE`
 
 ::: notes
-Atomares Lesen und Löschen setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Atomar heißt hier, ein bestimmter Request wird einem Claim zugeordnet. Zwei Harts können zwei verschiedene Quellen als 2 und 3 erhalten. 0 folgt nur, wenn für das andere Ziel nichts Claimbares bleibt. Der Treiber und geteilte C-Daten werden dadurch nicht automatisch sicher. Claim-Read löscht atomar das zugehörige Pending-Bit. Eine Quelle wird einem Claim zugeordnet; andere Harts können andere wartende Quellen erhalten. 0 folgt nur, wenn für dieses Ziel nichts Claimbares bleibt. Verständnischeck: Hart A claimt 2 und Hart B claimt 3: Das verletzt die Atomarität nicht. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Die Reihenfolge verhindert einen Eintritt in unvorbereitete Software. Der Stack ist der Speicherbereich für Sicherungsrahmen; der Stackzeiger muss bereits gültig sein. `mtvec`, Machine Trap-Vector Base Address, muss auf einen geeigneten Trap-Eintritt zeigen. Die Freigabe MIE, Machine Interrupt Enable in `mstatus`, bleibt bis zum Abschluss dieser Vorbereitungen aus.
+
+Bei zehn Megahertz Zeitquellenfrequenz wird etwa ein erster Termin als aktuell gelesene Zeit plus zehntausend Timer-Ticks für eine Millisekunde gewählt. `mtimecmp`, Machine Time Compare, erhält diesen Wert durch den korrekten Gerätezugriff. Erst danach wird MTIE, Machine Timer Interrupt Enable, das Bit sieben in `mie`, gesetzt. MIE ist dagegen Bit drei in `mstatus`. Die Bits müssen geändert werden, ohne andere Registerfelder versehentlich zu überschreiben.
+
+Die Folie ist eine Initialisierungsreihenfolge, kein vollständiges Bootprogramm. Plattformzustand, Geräteordnung und Abbruchfälle bleiben Aufgaben der konkreten Implementierung. Wenn die Vorbereitung länger als das gewählte Intervall dauert, kann der Termin bei Freigabe bereits fällig sein; entscheidend ist, dass dann ein gültiger Handler existiert. Die spätere periodische Planung benötigt außerdem eine Entscheidung, ob der nächste Termin relativ zur tatsächlichen Bearbeitung oder zu einem Sollraster liegt.
 :::
 
-## Claim und Complete
+## Periodisch planen: Sollraster oder neue Wartezeit?
+
+![](../assets/figures/03_interrupts_timer/tick-drift.png){fig-alt="Ein Termin bei 10 ms wird erst bei 10,2 ms bedient; now plus 1 ms verschiebt auf 11,2 ms, das absolute Raster bleibt bei 11 ms."}
+
+- Relativ: nächster Termin aus der Bearbeitungszeit
+- Absolut: nächster Termin aus dem bisherigen Sollwert
+
+::: notes
+Die Zeitachse zeigt einen Solltermin bei zehn Millisekunden und einen verspäteten Handler-Eintritt bei $10{,}2$ ms. Rot kennzeichnet diese Verzögerung. Mit einem Millisekundenintervall ergibt die relative Planung `now + interval` einen nächsten Termin bei $11{,}2$ ms. Die Eintrittsverspätung wird damit in die Phase des Zeitrasters übernommen.
+
+Eine absolute Planung addiert das Intervall zum bisherigen Solltermin: zehn plus eins ergibt elf Millisekunden. Die Verzögerung der aktuellen Bearbeitung verschiebt dann nicht automatisch alle späteren Solltermine. Die Intervalle sind hier in der Abbildung in Zeit dargestellt; die Software speichert die entsprechenden Timer-Ticks. `now` bedeutet aktuell gelesene Zeit, `interval` das gewünschte Intervall.
+
+Beide Strategien können sinnvoll sein. Eine neue Wartezeit nach Abschluss einer Aktion ist ein anderes Ziel als ein festes periodisches Raster. Ein System-Tick ist ein Softwarekonzept für wiederkehrende Termine und kein universell vorgeschriebener Betriebssystemmechanismus. Das absolute Raster verhindert nicht, dass Software zu spät reagiert. Wenn bereits mehrere Termine vergangen sind, reicht das einmalige Addieren eines Intervalls nicht mehr, um den Vergleich in die Zukunft zu bringen.
+:::
+
+## Mehrere Termine sind bereits fällig
+
+Sollraster mit Periode $\Delta=1$ ms, nächster Termin $d=10$ ms, Zeit $n=15{,}3$ ms.
+
+$$
+k=\left\lfloor\frac{n-d}{\Delta}\right\rfloor+1=6,\qquad
+d'=d+k\Delta=16\ \mathrm{ms}
+$$
+
+Ein Handler-Aufruf bedeutet hier sechs fällige Solltermine.
+
+::: notes
+$d$ ist der bisher nächste Solltermin, $n$ die aktuell gelesene Zeit und $\Delta$ die positive Periode. Alle drei Größen müssen in derselben Einheit stehen; die Folie verwendet Millisekunden zur Anschaulichkeit, die Implementierung Timer-Ticks. Das Modell schließt einen Zählerumlauf und arithmetischen Überlauf im betrachteten Zeitraum aus.
+
+Es sind die Termine zehn, elf, zwölf, dreizehn, vierzehn und fünfzehn Millisekunden fällig. Die Abrundung in der Formel zählt abgeschlossene weitere Perioden seit $d$: $\lfloor(15{,}3-10)/1\rfloor=5$. Mit dem ursprünglichen Termin sind es $k=6$. Der neue Termin liegt bei $d'=10+6\cdot1=16$ ms, also tatsächlich in der Zukunft und weiterhin auf demselben Sollraster.
+
+Nur einmal auf elf Millisekunden zu erhöhen ließe den Vergleich weiterhin fällig. Zurückkehren könnte dann sofort weitere Interrupts erzeugen. Die Anzahl fälliger Termine wird aus der Zeitdifferenz gewonnen, nicht aus einem Pending-Bit, einer einzelnen Wartemarkierung. Ob das Programm sechs logische Aktionen nachholt, Ereignisse zusammenfasst oder Überlast meldet, ist eine gesonderte Anwendungspolitik. Die Zeitquelle und die Zahl der Handler-Eintritte dürfen jedenfalls nicht gleichgesetzt werden.
+:::
+
+## Eine überprüfbare Planungsfunktion
+
+C-Lehrmodell: positive Periode, kein Umlauf oder Überlauf im Zeitraum.
 
 ```c
-void external_interrupt_handler(void) {
-    uint32_t id = plic_claim();
-    if (id == 0u)
-        return;
-    if (id > PLIC_MAX_ID || handlers[id] == 0) {
-        plic_complete(id); /* einmal, keine Schleife */
-        return;
-    }
-    handlers[id]();      /* Ursache im Gerät quittieren */
-    plic_complete(id);   /* nur diese gültige ID */
+uint64_t next_future(uint64_t d, uint64_t now, uint64_t period) {
+    if (now < d)
+        return d;
+    uint64_t k = (now - d) / period + 1u;
+    return d + k * period;
 }
 ```
 
-- Eine Quelle je Eintritt. Weitere Pending-Quellen kommen mit dem nächsten External Interrupt.
-- Unbekannte IDs werden abgeschlossen, damit der PLIC nicht hängen bleibt.
+Die ISR nutzt das Ergebnis für den Vergleich; vergangene Zeit stammt aus `mtime`.
 
 ::: notes
-Claim und Complete setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Pfade: ID 0, ungültiger Index, Nullzeiger, Service, Complete. handlers Index 0 bleibt unbenutzt. Ein Request je Eintritt ist Lehrpolitik. Complete bei unbekannter, weiter aktiver Levelquelle kann einen IRQ-Sturm erzeugen. Eine Quarantäne maskiert die Quelle. Complete für eine inzwischen deaktivierte Quelle kann ignoriert werden. Keine Endlosschleife und kein ungeprüfter Index. Eine Quelle je Eintritt. Weitere Pending-Quellen kommen mit dem nächsten External Interrupt. Unbekannte IDs werden abgeschlossen, damit der PLIC nicht hängen bleibt. Verständnischeck: Beseitigt Complete eine unbekannte Ursache? Nein, ein aktives Level kann erneut melden. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Die C-Funktion isoliert die Terminrechnung vom Gerätezugriff. `uint64_t` aus `stdint.h` bezeichnet einen vorzeichenlosen Vierundsechzig-Bit-Typ. `d` ist der nächste Solltermin, `now` die aktuelle Zeit und `period` das positive Intervall, alle in Timer-Ticks. `k` zählt fällige Termine. Ganzzahlige Division positiver Werte entspricht der Abrundung aus der vorherigen Formel.
+
+Liegt `now` vor `d`, gibt die Funktion den unveränderten zukünftigen Termin zurück. Sonst springt sie um genau so viele Intervalle weiter, dass das Ergebnis strikt größer als `now` ist. Zehntausend Ticks pro Millisekunde ergeben für `d=100000`, `now=153000` und `period=10000` den neuen Wert `160000`. Bei `now=99999` bleibt `100000` bestehen; bei genau `100000` wird auf `110000` erhöht.
+
+Eine ISR, Interrupt Service Routine, kann zuerst `mtime`, Machine Time, konsistent lesen und diesen Hilfswert für `mtimecmp` verwenden. Ein zusätzlicher Eintritt bei noch zukünftigem Termin zählt dadurch nicht automatisch als verstrichene Periode. Die Funktion allein quittiert jedoch kein Gerät und enthält keinen Trap-Prolog. Der echte Vergleichszugriff, die Kontextsicherung und ein eventuell veröffentlichter Zeit-Snapshot sind getrennte Schritte. Die reine Rechnung lässt sich auf dem Host prüfen, ohne eine RISC-V-Firmwareausführung zu behaupten.
 :::
 
-## PLIC in Software steuern (MMIO)
+## Software-Interrupt: ein Bit als Benachrichtigung
 
-- Prioritäten, Enables, Threshold, Claim/Complete — alles MMIO
-- Keine speziellen CSR-Befehle: Pointer in C
-- Trigger am Gateway: Level (Leitung High) oder Edge (Flanke) — oft im Gerät konfigurierbar
+- `msip`: Machine Software Interrupt Pending
+- Software setzt die Anforderung für einen Hart
+- Behandlung löscht sie wieder
+- Nachrichteninhalt braucht eine eigene Datenstruktur
 
 ::: notes
-PLIC in Software steuern (MMIO) setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Level bleibt aktiv, solange die Bedingung gilt. Edge ist eine passende Flanke, nicht jeder Spannungswechsel. Es gibt hier kein erfundenes universelles Umschaltregister. UART-FIFO ist ein Levelbeispiel, eine GPIO-Flanke ein Edgebeispiel. Geräte-Ack und PLIC-Complete sind getrennt. volatile ordnet den Bus nicht. Prioritäten, Enables, Threshold, Claim/Complete — alles MMIO. Keine speziellen CSR-Befehle: Pointer in C. Trigger am Gateway: Level (Leitung High) oder Edge (Flanke) — oft im Gerät konfigurierbar. Verständnischeck: Was folgt auf Complete bei aktivem Level? Der Gateway kann einen neuen Request weitergeben. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+`msip` bedeutet Machine Software Interrupt Pending, Wartemarkierung des Software-Interrupts. Ein Hart ist ein Hardware-Ausführungskontext. In einer klassischen CLINT-Organisation, Core Local Interruptor, besitzt jeder adressierte Hart ein entsprechendes Speicherregister mit dem Anforderungsbit. Im Machine Mode lautet der Ursachencode drei. Die Kategorie benötigt ihre Freigabe sowie die globale Interruptfreigabe.
+
+Ein Inter-Processor Interrupt, IPI, ist die Benachrichtigung eines anderen Prozessorkontexts. Ein Hart kann dessen `msip`-Bit setzen. Der Zielhart behandelt die Anforderung und löscht sie wieder. In einem Einzel-Hart-System kann ein entsprechender Mechanismus lokale Softwarearbeit anfordern, sofern die Plattform ihn bereitstellt.
+
+Das Bit selbst ist kein Nachrichteninhalt und keine Warteschlange. Mehrfaches Setzen auf eins zählt nicht automatisch mehrere Nachrichten. Nutzdaten liegen in einer gesonderten Speicherstruktur, deren Zugriffsordnung und Synchronisation bei mehreren Harts zusätzlich geregelt werden müssen. Diese Mehrkernfragen folgen später. Ein Software-Interrupt ist auch kein automatisch niedriger priorisierter Ausweichpfad für Timerarbeit. Die Priorität seiner Kategorie und die gewählte Softwarepolitik sind getrennte Fragen.
 :::
 
-## Gegenüberstellung: CLINT vs. PLIC
+## Der PLIC verbindet Geräte mit einem Kontext
 
-| | CLINT (lokal) | PLIC (global) |
-|--|---------------|---------------|
-| Zuständigkeit | Timer, Soft/IPI | UART, SPI, GPIO, … |
-| Latenz | minimal (core-nah) | etwas höher (Systembus) |
-| Prioritäten | fest/kritisch | frei konfigurierbar |
-| Handshake | `mtimecmp` neu setzen | Claim und Complete |
+![](../assets/figures/03_interrupts_timer/plic-table.png){fig-alt="Drei externe Geräte speisen den PLIC; Pending, Priorität und Kontextfreigabe bestimmen die Benachrichtigung an einen Hart."}
+
+- Quellen haben Geräte-IDs und Prioritäten
+- Ein Kontext gehört zu Hart und Privilegstufe
+- Globale Ursache im Lehrmodell: Machine External, Code $11$
 
 ::: notes
-Gegenüberstellung: CLINT vs. PLIC setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Die Tabelle vergleicht Zuständigkeit, Cause, Register, Freigabe und Quittung. Keine allgemeine Latenzgarantie und keine feste Kritikalität. Timer: Compare in die Zukunft. Software: msip-Protokoll. PLIC: Geräte-Ack plus Claim und Complete. MEI vor MSI vor MTI ist die Kategorieordnung, PLIC-Priorität gilt unter den externen Quellen. Verständnischeck: Ändert die UART-Priorität die Timer-Cause? Nein, die Stufen bleiben getrennt. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+PLIC heißt Platform-Level Interrupt Controller, Plattform-Interrupt-Controller. Er nimmt Anforderungen externer Geräte über Gateways, Quellanbindungen, an. Das Modell verwendet UART als Quelle eins, einen Sensor als Quelle zwei und einen Taster als Quelle drei. UART heißt Universal Asynchronous Receiver/Transmitter, serielle Sende- und Empfangsschnittstelle; Einzelheiten der Busse sind hier nicht nötig.
+
+Jede Quelle besitzt eine Identifikationsnummer, Geräte-ID, und eine Priorität. Der PLIC verwaltet ihre Pending-Zustände, wartende Anforderungen. Ein Kontext ist ein Ziel mit Zuordnung zu einem Hart, Hardware-Ausführungskontext, und einer Privilegstufe. Es ist daher präziser als die pauschale Bezeichnung „Kern“. Für diesen Kontext existieren Quellenfreigaben und ein Schwellenwert.
+
+Die Abbildung zeigt das Sammeln und Weiterleiten von links nach rechts. Sie ist keine konkrete Memory Map und keine Zeitmessung. Der Machine-Mode-Kontext, die Maschinenprivilegstufe im Zielhart, meldet dem Hart die Kategorie Machine External Interrupt, Ursachencode elf. Die Geräte-ID erhält die Software erst bei Claim, dem Abholen einer Quelle. Zunächst betrachten wir die Regeln, die eine Benachrichtigung zulassen.
 :::
 
-## Fragen? — PLIC
+## Priorität, Enable und Threshold
 
-- Pending vs. Threshold klar?
-- Warum Claim/Complete zwingend?
-- Warum atomarer Claim-Read?
+Für die Benachrichtigung eines Kontexts:
+
+$$
+\mathrm{pending}\land\mathrm{enabled}\land
+(\mathrm{priority}>\mathrm{threshold})
+$$
+
+- Priorität $0$: Quelle unwirksam
+- Bei gleicher aktiver Priorität gewinnt die kleinere Geräte-ID
+- Ein Threshold ist keine Änderung der Gerätepriorität
 
 ::: notes
-Fragen? — PLIC setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Pending merkt den Request, Enable gibt ihn für den Kontext frei, Threshold filtert die Notification, Claim übernimmt, Complete gibt den Gateway frei. Nicht jeder andere Hart liest 0. Claim löscht nicht die UART-Ursache. Pending vs. Threshold klar?. Warum Claim/Complete zwingend?. Warum atomarer Claim-Read?. Verständnischeck: Kann Claim die UART-Ursache löschen? Nein, das tut der Treiber nach der Gerätesemantik. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Priority ist die Priorität einer PLIC-Quelle, ihre Rangordnung. Enable ist die Quellenfreigabe für den betrachteten Kontext. Pending heißt wartend. Threshold ist der kontextbezogene Schwellenwert: Eine Benachrichtigung verlangt eine Priorität strikt größer als dieser Wert. PLIC bedeutet Platform-Level Interrupt Controller.
+
+Bei Threshold fünf darf eine Quelle mit Priorität fünf noch nicht benachrichtigen, mit Priorität sieben dagegen schon, wenn sie wartend und freigegeben ist. Priorität null ist unwirksam. Stimmen aktive Prioritäten überein, entscheidet die kleinere Identifikationsnummer, Geräte-ID. Der Threshold verändert weder diese IDs noch die eingestellten Prioritäten.
+
+Die Formel betrifft die Benachrichtigung vom Controller. Im Hart müssen zusätzlich die externe Kategorienfreigabe und globale Freigabe passen, damit ein Trap genommen wird. Die Formel ist auch nicht unverändert auf einen expliziten Claim zu übertragen: Dieser Abholzugriff ist unabhängig vom Threshold. Eine Quelle auszublenden, eine Rangordnung festzulegen und eine wartende Quelle zu übernehmen sind daher verschiedene Aktionen.
 :::
 
-## Standardverhalten: „taube“ CPU
+## Wer wird zuerst abgeholt?
 
-- Bei Trap setzt die Hardware `MIE` in `mstatus` automatisch auf 0
-- Während der ISR: weitere Interrupts blockiert bis `mret`
-- Schützt vor Chaos — Nachteil bei langen ISRs
+Alle Quellen pending und enabled; Threshold $5$:
+
+| Geräte-ID | Quelle | Priorität |
+|-----------|--------|-----------|
+| $1$ | UART | $3$ |
+| $2$ | Sensor | $7$ |
+| $3$ | Taster | $7$ |
+
+1. Besteht eine Benachrichtigung?
+2. Welche ID liefert der erste Claim?
+3. Was ändert ein Threshold von $7$?
 
 ::: notes
-Standardverhalten: „taube“ CPU setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Beim Trap wird MIE auf 0 gesetzt und der alte Wert nach MPIE kopiert. MIE gleich 0 maskiert im Modell die Interruptannahme, nicht Pending, nicht jede Exception und nicht mtime. mret stellt Status und PC wieder her. Das Hauptmodell bleibt bei kurzen, nicht verschachtelten ISRs. Bei Trap setzt die Hardware `MIE` in `mstatus` automatisch auf 0. Während der ISR: weitere Interrupts blockiert bis `mret`. Schützt vor Chaos — Nachteil bei langen ISRs. Verständnischeck: Kann bei MIE gleich 0 ein fehlerhafter Load eine Exception auslösen? Ja, die Maske ist keine allgemeine Trap-Sperre. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+UART bedeutet Universal Asynchronous Receiver/Transmitter, serielle Sende- und Empfangsschnittstelle. Die Tabelle enthält angenommene Geräte-IDs, Identifikationsnummern, und Prioritäten. Alle drei Anforderungen sind pending, wartend, und im betrachteten PLIC-Kontext enabled, freigegeben. PLIC heißt Platform-Level Interrupt Controller. Claim ist das Abholen der höchsten priorisierten aktiven Quelle.
+
+Bei Threshold, Schwellenwert, fünf bestehen Benachrichtigungen durch die Quellen zwei und drei, weil sieben strikt größer als fünf ist. Quelle eins mit Priorität drei benachrichtigt hier nicht. Der erste Claim liefert ID zwei: Zwischen zwei gleich priorisierten Quellen gewinnt die kleinere ID. Dabei wird ihr PLIC-Pending atomar entfernt. Quelle drei bleibt wartend.
+
+Bei Threshold sieben besteht keine Benachrichtigung dieser Tabelle, denn keine Priorität ist strikt größer als sieben. Ein bewusst ausgeführter Claim kann dennoch ID zwei liefern, solange der Ausgangszustand der Tabelle unverändert ist; der Threshold filtert die Benachrichtigung, nicht den Claim. Ebenso könnte nach Bearbeitung von zwei und drei ein expliziter Claim Quelle eins liefern. Diese Unterscheidung ist wichtig für die Zustandsaufgabe im Übungsblatt.
 :::
 
-## Problem blockierender ISRs
+## Claim ist ein Zugriff mit Seiteneffekt
 
-- Langsame ISR (z. B. I2C, 5 ms) bei SysTick alle 1 ms
-- Mit `MIE = 0` verpassen wir mehrere Ticks
-- Zeitbasis und Scheduler leiden
-- Regel: ISRs so kurz wie möglich halten
+- Liefert die höchstpriorisierte claimbare Geräte-ID
+- Löscht atomar das zugehörige PLIC-Pending
+- ID $0$: keine claimbare Quelle; kein Handler und kein Complete
+- Die Ursache im Gerät ist dadurch noch nicht bearbeitet
 
 ::: notes
-Problem blockierender ISRs setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. 5 ms I2C sind ein Lehrszenario. mtime läuft weiter, der Service verspätet sich. Ein Aufrufzähler ist dann keine Uptime. Die mtime-Differenz erkennt vergangene Zeit, der Scheduler bleibt spät. Deferred Work verkürzt die ISR, garantiert aber keine Frist. Es liegen nicht fünf Timerinterrupts in einer Hardwarequeue. Langsame ISR (z. B. I2C, 5 ms) bei SysTick alle 1 ms. Mit `MIE = 0` verpassen wir mehrere Ticks. Zeitbasis und Scheduler leiden. Regel: ISRs so kurz wie möglich halten. Verständnischeck: Nach 5 ms ISR ist mtime um 5 ms weiter. Fünf einzelne Timerrequests liegen nicht in einer Queue. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Claim ist der Übernahmezugriff beim PLIC, Platform-Level Interrupt Controller. Er wird typischerweise durch Lesen eines kontextbezogenen MMIO-Registers ausgelöst. MMIO bedeutet Memory-Mapped Input/Output, Gerätezugriff über Speicheradressen. Anders als ein normales Lesen einer C-Variablen besitzt dieser Zugriff einen Seiteneffekt: Der Controller liefert die ID der gewählten Quelle und löscht deren Pending, Wartemarkierung, atomar.
+
+Atomar bedeutet hier, dass Übernahme und zugehörige Pending-Änderung nicht als getrennte konkurrierende Schritte beobachtet werden. Wenn mehrere Harts, Hardware-Ausführungskontexte, dieselbe Quelle beanspruchen, kann derselbe wartende Vorgang nicht gleichzeitig zweimal übernommen werden. Andere wartende Quellen bleiben jedoch claimbar. Eine gelesene ID null bedeutet keine Quelle und darf weder für einen Gerätehandler noch ein Complete verwendet werden.
+
+Der Claim liest nicht automatisch die Nutzdaten eines UART, einer seriellen Schnittstelle, und löscht nicht zwangsläufig dessen Statusursache. Ein Debugger oder Diagnoseausdruck, der das Claim-Register noch einmal liest, kann also eine weitere Quelle abholen. Software sollte den gelesenen Wert speichern und denselben Wert später für die passende Abschlussmeldung verwenden.
 :::
 
-## Lösung: Nested Interrupts
+## Claim, Gerät bearbeiten, Complete
 
-- Nesting ist eine gewählte Politik, keine automatische Regel „nur höhere Priorität“
-- Der Timer unterbricht eine externe ISR nicht kraft CLINT-Vorrang
-- Kurze, nicht verschachtelte ISRs bleiben das Hauptmodell
+![](../assets/figures/03_interrupts_timer/claim.png){fig-alt="Gerät meldet eine Ursache, PLIC setzt Pending, Software übernimmt per Claim, bearbeitet die Geräteursache und sendet Complete derselben ID."}
+
+Claim und Complete betreffen den Controller; Gerätequittierung ist ein eigener Schritt.
 
 ::: notes
-Lösung: Nested Interrupts setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. MIE gleich 1 erlaubt verfügbare Kategorien, nicht automatisch nur höhere. Klassisch hat MEI Vorrang. Soll der Timer eine externe ISR unterbrechen, braucht es Masken und gesicherten Kontext. Der PLIC-Threshold filtert keinen CLINT-Timer. Es gibt keinen NVIC-artigen aktiven Prioritätsstack. Nesting ist eine gewählte Politik, keine automatische Regel „nur höhere Priorität“. Der Timer unterbricht eine externe ISR nicht kraft CLINT-Vorrang. Kurze, nicht verschachtelte ISRs bleiben das Hauptmodell. Verständnischeck: Genügt MIE setzen für nur wichtigere ISRs? Nein, Quellen und Kontext müssen festliegen. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Die Abbildung zeigt den normalen Lebenszyklus einer externen Anforderung. Zuerst meldet das Gerät eine Ursache an sein Gateway, die Quellanbindung. Der PLIC, Platform-Level Interrupt Controller, hält sie als Pending, wartend, und benachrichtigt den Hart, Hardware-Ausführungskontext. Die Software übernimmt eine Geräte-ID per Claim, Abholen, wodurch deren PLIC-Pending gelöscht wird.
+
+Danach bearbeitet sie die tatsächliche Ursache im Gerät. Beim UART, Universal Asynchronous Receiver/Transmitter, kann dazu etwa das nach Gerätebeschreibung nötige Lesen empfangener Daten gehören. Diese konkrete Geräteaktion wird hier nicht als universelles Registerrezept erfunden. Anschließend schreibt Software dieselbe geclaimte ID als Complete, Abschlussmeldung, zurück.
+
+Das Gateway darf danach wieder Anforderungen dieser Quelle weiterreichen. Die Pfeile stellen die Reihenfolge der Verantwortlichkeiten dar, nicht garantierte Taktdauern. Ein Complete ersetzt das Bearbeiten einer Geräteursache ebenso wenig wie ein Claim. Auch ein Funktionsrücksprung aus dem Handler informiert den PLIC nicht automatisch über den Abschluss. Die nächste Folie zeigt, wie eine weiterhin aktive Leitung eine neue Anforderung auslösen kann.
 :::
 
-## Clobbering von `mepc`
+## Level-Ursache bleibt aktiv
 
-- Ein Hart hat im M-Mode ein `mepc`, keinen Hardware-Stack mehrerer Rücksprünge
-- Der zweite Trap überschreibt `mepc`; ohne Softwareframe fehlt die äußere Adresse
-- Das muss nicht sofort abstürzen, der Ablauf ist aber falsch
+1. Ein Gerät hält seine Anforderungsleitung aktiv
+2. Claim entfernt das PLIC-Pending
+3. Software meldet Complete, ohne die Geräteursache zu beseitigen
+4. Das Gateway kann erneut Pending melden
+
+Priorität erhöhen behebt die Geräteursache nicht.
 
 ::: notes
-Clobbering von `mepc` setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Ein Hart hat im M-Mode ein mepc. P0 ist die Fortsetzung von Main, P1 die der äußeren ISR. Der innere Trap setzt mepc auf P1. Ohne Frame bleibt P0 nicht erhalten. Auch mstatus kann überschrieben werden. Das Ergebnis ist falscher Ablauf, nicht zwingend ein sofortiger Absturz. Ein Hart hat im M-Mode ein `mepc`, keinen Hardware-Stack mehrerer Rücksprünge. Der zweite Trap überschreibt `mepc`; ohne Softwareframe fehlt die äußere Adresse. Das muss nicht sofort abstürzen, der Ablauf ist aber falsch. Verständnischeck: Beim inneren mret muss P1 bereitstehen. P0 stellt die Software für die äußere Rückkehr wieder her. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+Eine Level-Anforderung bleibt als aktiver Leitungszustand bestehen, solange ihre Ursache vorhanden ist. Eine Edge-Anforderung beruht dagegen auf einer Flanke; Erfassung und Speicherung hängen von Gerät und Gateway ab. PLIC heißt Platform-Level Interrupt Controller. Für das gezeigte Level-Modell nimmt ein Claim, Übernahme, die wartende Controlleranforderung zunächst heraus.
+
+Wird das Gerät nicht passend bedient oder quittiert, bleibt die Leitung aktiv. Complete, Abschluss der übernommenen ID, macht die Quellanbindung wieder aufnahmebereit. Sie kann die aktive Ursache erneut an den PLIC weitergeben. Das führt zu wiederholten Handler-Eintritten, obwohl das vorherige Claim formal korrekt war.
+
+Das ist kein Fehler, den eine höhere Priorität, ein anderer Vektorplatz oder allein `mret`, Trap-Rückkehr, beseitigt. Die zuständige Gerätelogik muss behandelt werden. Ein Pending-Bit ist zugleich kein unbegrenzter Speicher für sämtliche Flanken. Ein Puffer im Gerät und die Controllerwartemarkierung erfüllen verschiedene Aufgaben. Die Folie begründet, warum eine externe Behandlung die Gerätebeschreibung benötigt und auf kurze, aber vollständige Bearbeitung zielen soll.
 :::
 
-## Nesting korrekt: zuerst Stack, dann `MIE`
+## Normaler externer Behandlungspfad
 
-![Konzeptionell: getrennte Frames. Der kurze Prolog ist keine sichere Vorlage.](../assets/figures/03_interrupts_timer/nesting.png)
-
-Konzeptioneller Pseudocode, keine geprüfte sichere ISR:
+Pseudocode für die konfigurierten bekannten Quellen:
 
 ```text
-Frame 16-Byte-ausgerichtet anlegen
-benutzte GPRs und mepc/mstatus sichern
-erst dann eine bewusst gewählte Präemption
-vor dem Epilog wieder maskieren
-CSRs restaurieren, Frame abbauen, mret
-```
-
-- Acht Byte und das Überschreiben von t0/t1 reichen nicht.
-- MIE=1 erlaubt nicht nur höherpriore Quellen.
-- Der Grundkurs bleibt bei kurzen, nicht verschachtelten ISRs.
-
-::: notes
-Nesting korrekt: zuerst Stack, dann `MIE` setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. GPR heißt General-Purpose Register. Der Prolog ist konzeptionell und nicht geprüft. Zuerst Frame und Register, dann eine gewählte Präemption. Im ILP32-Modell ist der Stack 16-Byte-ausgerichtet, nicht pauschal für RV32E. Während der Restaurierung bleibt MIE 0, sonst öffnet ein restauriertes MPIE ein Fenster. mepc auf den Stack und MIE an reicht nicht. Acht Byte und das Überschreiben von t0/t1 reichen nicht. MIE=1 erlaubt nicht nur höherpriore Quellen. Der Grundkurs bleibt bei kurzen, nicht verschachtelten ISRs. Verständnischeck: Warum reicht mepc auf den Stack nicht? Auch Register, Status, Masken und das Restaurierfenster müssen passen. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Gefahren von Nested Interrupts
-
-- Stack Overflow bei tiefer Verschachtelung
-- Deadlocks zwischen ISRs (Locks / geteilte Ressourcen)
-- Praxis: Nesting nur wenn nötig; ISRs kurz halten; Arbeit deferred in `main`
-
-::: notes
-Gefahren von Nested Interrupts setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Verschachtelte Frames verbrauchen Stack. Wartet die ISR auf einen Lock, den Main hält, kann derselbe Hart sich selbst blockieren. Geteilter Zustand erlaubt Reentrancyfehler. Kurze ISRs sind eine Entwurfsregel. Ein Flag fasst Ereignisse zusammen, Zähler oder Puffer brauchen eigene Regeln. Stack Overflow bei tiefer Verschachtelung. Deadlocks zwischen ISRs (Locks / geteilte Ressourcen). Praxis: Nesting nur wenn nötig; ISRs kurz halten; Arbeit deferred in `main`. Verständnischeck: Warum darf die ISR den Main-Lock nicht abwarten? Main läuft erst nach der ISR weiter und kann ihn freigeben. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Fragen? — Nesting
-
-- Warum überschreibt Hardware `mepc` beim Nesting?
-- Wie schützt man sich vor Clobbering?
-- Warum Nesting möglichst vermeiden?
-
-::: notes
-Fragen? — Nesting setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Ein Machine-Trapzustand je Hart. Kontext vor freigegebenem Nesting sichern. MIE gleich 1 lässt nicht nur höhere Quellen zu. Der PLIC kennt keine NVIC-aktive Priorität. Eine normale C-Funktion ohne Trap-Einstieg ist kein Vectorziel, weil Rettung und mret fehlen. Warum überschreibt Hardware `mepc` beim Nesting?. Wie schützt man sich vor Clobbering?. Warum Nesting möglichst vermeiden?. Verständnischeck: Darf eine normale C-Funktion das Vectorziel sein? Nein, Kontext und mret fehlen. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Ausblick Labor: System-Tick
-
-Geplantes Laborziel:
-
-- CLINT so konfigurieren, dass er periodisch (z. B. 1 ms) feuert
-- In der ISR einen Zeit-Snapshot aus `mtime` veröffentlichen, nicht jeden Aufruf als Millisekunde zählen
-- `main` steuert die LED; ein Toggle je Sekunde ergibt zwei Sekunden für An und Aus
-- Renode und Toolchain sind für dieses Labor nicht ausgeführt
-
-::: notes
-Ausblick Labor: System-Tick setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Das Labor ist Planung. Toolchain, Renode und Plattform sind nicht validiert. Die Zeit kommt aus mtime, nicht aus blindem Hochzählen. Ein Toggle je Sekunde ergibt zwei Sekunden für einen vollen An-Aus-Zyklus. Ein Scheduler oder PLIC-Treiber ist nicht gefordert. LED heißt Light-Emitting Diode. CLINT so konfigurieren, dass er periodisch (z. B. 1 ms) feuert. In der ISR einen Zeit-Snapshot aus `mtime` veröffentlichen, nicht jeden Aufruf als Millisekunde zählen. `main` steuert die LED; ein Toggle je Sekunde ergibt zwei Sekunden für An und Aus. Renode und Toolchain sind für dieses Labor nicht ausgeführt. Verständnischeck: Ein späterer Nachweis wäre ein benannter virtueller Trace. Solche Ergebnisse liegen nicht vor. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## Renode und die Zeit
-
-- Renode verwaltet virtuelle Modellzeit, getrennt von der Hostuhr
-- MIPS modellieren Instruktionsleistung, keine zyklengenaue Chiplatenz
-- Ein Lauf liegt hier nicht vor
-
-::: notes
-Renode und die Zeit setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Renode trennt virtuelle Zeit von der Hostzeit. MIPS, Million Instructions Per Second, beschreiben das Instruktionsmodell, nicht 120 MHz und nicht eine Interruptlatenz. Hostlast ändert die Wanduhr, nicht die modellierten Zeitbeziehungen. Es gibt keinen Lauf. Renode verwaltet virtuelle Modellzeit, getrennt von der Hostuhr. MIPS modellieren Instruktionsleistung, keine zyklengenaue Chiplatenz. Ein Lauf liegt hier nicht vor. Verständnischeck: Sind 120 MIPS gleich 120 MHz? Nein, Instruktionsmodell und Mikroarchitektur sind verschieden. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
-:::
-
-## GCC: `__attribute__((interrupt))`
-
-- ISR muss mit `mret` enden, nicht mit normalem `ret`
-- Attribut: `__attribute__((interrupt))` — GCC erzeugt Prolog/Epilog
-- Normale ABI: Callee darf `t`-Register zerstören; eine ISR darf keine Spuren hinterlassen
-- Mit dem Attribut: berührte Register (inkl. temporärer) werden gesichert
-
-```c
-__attribute__((interrupt))
-void timer_isr(void) {
-    /* … */
-}
+id = einmal Claim lesen
+wenn id = 0: zurückkehren
+Geräteursache für id bearbeiten und quittieren
+dieselbe id als Complete schreiben
+gesicherten Kontext wiederherstellen und Trap-Rückkehr
 ```
 
 ::: notes
-GCC: `__attribute__((interrupt))` setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. GCC heißt GNU Compiler Collection, ABI Application Binary Interface. Das Attribut interrupt mit machine erzeugt zielabhängige Ein- und Austrittssequenzen und mret. Es setzt weder mtvec noch Stack, Geräte oder sicheres Nesting. Ein attributierter Handler wird nicht als normale Funktion aus einem Wrapper aufgerufen. Entweder zeigt der Slot direkt auf ihn, oder ein Wrapper ruft einen normalen C-Body und führt selbst mret aus. Kein Disassembly liegt vor. ISR muss mit `mret` enden, nicht mit normalem `ret`. Attribut: `__attribute__((interrupt))` — GCC erzeugt Prolog/Epilog. Normale ABI: Callee darf `t`-Register zerstören; eine ISR darf keine Spuren hinterlassen. Mit dem Attribut: berührte Register (inkl. temporärer) werden gesichert. Verständnischeck: Initialisiert das Attribut mtvec oder den CLINT? Nein, es beschreibt nur die Funktionskonvention. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+`id` ist die Identifikationsnummer einer externen Quelle. Claim, der Übernahmezugriff, wird einmal gelesen und sein Ergebnis gespeichert. Liefert er null, gibt es keine übernommene Quelle; Complete, Abschlussmeldung, entfällt. Bei einer bekannten konfigurierten Quelle wird deren Ursache bearbeitet und anschließend genau ihre ID abgeschlossen. Die normale Trap-Rückkehr verwendet gesicherten Kontext und `mret`, Machine Return.
+
+Der Pseudocode ist kein vollständiger Treiber und setzt eine kontrollierte Quellkonfiguration sowie passenden Ein- und Austritt voraus. Eine reale Tabelle muss Grenzen prüfen und für unerwartete gültige IDs eine definierte Fehlerbehandlung besitzen. Eine unbekannte Quelle einfach immer wieder abzuschließen, während ihr Gerät aktiv bleibt, kann einen Interruptsturm erzeugen.
+
+Bei einer Fehlerpolitik ist außerdem die PLIC-Regel zu beachten: PLIC bedeutet Platform-Level Interrupt Controller; eine Completion für eine im Zielkontext bereits deaktivierte Quelle kann ignoriert werden. Daher darf „zuerst das Enable entfernen, dann irgendwann Complete“ nicht ungeprüft als allgemeines Verfahren gelten. Die Geräteursache und die Abschlussreihenfolge müssen zusammen zur Plattform passen. Für die Papieraufgaben bleiben alle genannten Quellen bekannt und freigegeben, sodass der normale Lebenszyklus eindeutig ist.
 :::
 
-## Background Task und Foreground ISR
+## Quellenpriorität ist nicht automatische Verschachtelung
 
-![uint32-Differenz über den Umbruch ist 48. volatile ersetzt keine Atomarität.](../assets/figures/03_interrupts_timer/foreground.png)
-
-- Foreground: die ISR veröffentlicht vergangene Millisekunden aus `mtime`
-- Background: `main` plant die LED auf einem Sollraster und setzt den Zähler nicht zurück
-
-```c
-/* Lehrcode. Snapshot kann bis zum nächsten Update veralten. */
-volatile uint32_t elapsed_ms_snapshot;
-uint32_t last_toggle = 0;
-while (1) {
-    uint32_t now = elapsed_ms_snapshot;
-    if ((uint32_t)(now - last_toggle) >= 1000u) {
-        toggle_led();
-        last_toggle += 1000u;
-    }
-}
-```
+- PLIC priorisiert externe Quellen untereinander
+- Im klassischen Modell: MEI vor MSI vor MTI
+- Bei MIE $=0$ unterbricht kein betrachteter M-Interrupt die ISR
+- Freigeben bedeutet nicht automatisch „nur höhere Priorität“
 
 ::: notes
-Background Task und Foreground ISR setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Die ISR veröffentlicht einen 32-Bit-Snapshot aus mtime. Bis zum nächsten Update kann er veralten. last gleich 0xFFFFFFF0 und now gleich 0x20 ergeben als uint32_t-Differenz 0x30, also 48. Das ist kleiner als 1000, also noch kein Toggle. last gleich now driftet, last plus 1000 hält ein Raster und braucht bei Rückstand eine Skip-Regel. Eine schnelle Schleife ohne Sleep spart nicht automatisch Energie. RMW heißt Read-Modify-Write. Foreground: die ISR veröffentlicht vergangene Millisekunden aus `mtime`. Background: `main` plant die LED auf einem Sollraster und setzt den Zähler nicht zurück. Verständnischeck: 48 ms genügen nicht für die 1000-ms-Grenze. Ein Toggle je Sekunde hat eine An-Aus-Periode von zwei Sekunden. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+PLIC, Platform-Level Interrupt Controller, legt die Rangfolge seiner externen Geräte fest. Daneben gibt es die Rangfolge der Interrupt-Kategorien im betrachteten klassischen Machine-Mode-Modell. MEI steht für Machine External Interrupt, MSI für Machine Software Interrupt und MTI für Machine Timer Interrupt. Sind diese Kategorien gleichzeitig zur Auswahl berechtigt, gilt hier MEI vor MSI vor MTI.
+
+MIE bedeutet Machine Interrupt Enable, globale Freigabe in `mstatus`. Beim Trap-Eintritt setzt die Hardware es auf null. Eine ISR, Interrupt Service Routine, wird deshalb im Grundmodell nicht allein aufgrund einer höheren PLIC-Gerätepriorität unterbrochen. Auch ein lokaler Timer erhält nicht automatisch Vorrang vor allen externen Quellen.
+
+Software könnte MIE wieder setzen, erlaubt damit aber zunächst alle passend freigegebenen Kategorien, nicht nur gewünschte höher priorisierte Arbeit. Eine echte Verschachtelungspolitik braucht zusätzliche Masken, gesicherten Kontext und begrenzten Stackverbrauch. Wir betrachten diese Risiken später. Das erste Mittel gegen lange Blockierungszeiten bleibt eine kurze, nicht verschachtelte Behandlung und passende Verlagerung weiterer Arbeit ins Hauptprogramm.
 :::
 
-## Geteilte Variablen
+## Kurze ISR und Reaktionsbudget
 
-- Compiler-Caching: `volatile` für von ISR geschriebene, in `main` gelesene Variablen
-- Atomarität: 64-Bit auf RV32 kann „reißen“ — beim Lesen ggf. kurz Interrupts sperren
+Lehrwerte: Prozessor $100$ MHz, Timer $1$ kHz, $500$ Prozessorzyklen je ISR.
+
+$$
+t_\text{ISR}=\frac{500}{100\cdot10^6}=5\,\mu\mathrm{s},\quad
+U=1000\cdot5\,\mu\mathrm{s}=0{,}5\,\%
+$$
+
+- Durchschnittsaufwand ist kein Worst-Case-Reaktionsnachweis
+- Maskierung und vorgelagerte Arbeit zählen ebenfalls
 
 ::: notes
-Geteilte Variablen setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. volatile betrifft die Compiler-Sichtbarkeit. Es ist kein atomares Plus-Plus, kein Lock und keine Barriere. Das Ein-Hart-Modell mit einem Schreiber und ausgerichteten 32-Bit-Zugriffen ist begrenzt. Ein 64-Bit-Softwarewert wird mit gesichertem vorherigem Interruptstatus kurz kopiert, nicht mit blindem MIE gleich 1. Das hi-lo-hi von mtime ist ein anderes Muster. Andere Harts bleiben ungeschützt. Compiler-Caching: `volatile` für von ISR geschriebene, in `main` gelesene Variablen. Atomarität: 64-Bit auf RV32 kann „reißen“ — beim Lesen ggf. kurz Interrupts sperren. Verständnischeck: Was garantiert volatile nicht? Einen Lock, ein atomares Plus-Plus oder die Ordnung anderer Daten. Die nächste Folie nimmt die noch offene Unterscheidung auf. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+ISR bedeutet Interrupt Service Routine, Unterbrechungsbehandlung. MHz bezeichnet eine Million Taktperioden pro Sekunde, kHz tausend Ereignisse pro Sekunde. Die Zahl fünfhundert ist hier ein angenommener gesamter Prozessorzyklusaufwand pro Timerbehandlung einschließlich ihrer Eintritts- und Austrittsarbeit. Bei hundert Megahertz dauert das fünf Mikrosekunden. $U$ ist der mittlere Zeitanteil unter der Annahme genau tausend solcher Behandlungen pro Sekunde: $1000\cdot5\cdot10^{-6}=0{,}005=0{,}5\,\%$.
+
+Eine geringe mittlere Auslastung garantiert dennoch keine Reaktionsfrist. Muss eine neue Anforderung im Modell erst zweihundert Mikrosekunden maskierte Arbeit abwarten, danach fünf Mikrosekunden Eintritt und dreißig Mikrosekunden eigene Nutzarbeit, beträgt ihre relevante Verzögerung $200+5+30=235$ Mikrosekunden. Eine Frist von fünfzig Mikrosekunden würde verfehlt.
+
+Worst Case bedeutet ungünstigster zugelassener Ablauf. Reale Worst-Case-Grenzen benötigen Nachweise für Hardware, Software und Last; die Zahlen hier sind reine Rechenannahmen. Die Unterscheidung verhindert, dass eine kurze Durchschnitts-ISR oder Vektorisierung als vollständiger Echtzeitnachweis verstanden wird.
 :::
 
-## Zusammenfassung Block 3
+## ISR-Eintritt und Compilervertrag
 
-- CLINT: eigener Pfad ohne Latenzgarantie; Zeit aus `mtime`, Freigabe über MTIE und MIE
-- PLIC: Geräte-ID per Claim, Cause 11 ist nur die Kategorie
-- Vectored Mode: Kategorie-Slot, nicht eine Adresse je Gerät
-- Nesting braucht Kontext und Masken, nicht nur `mepc` auf dem Stack
-- Das GCC-Attribut erzeugt Ein- und Austritt, initialisiert aber weder `mtvec` noch Geräte
-
-Vielen Dank — wir sehen uns im Labor.
+- Normale Funktion: Aufrufkonvention gilt zwischen Aufrufer und Funktion
+- Interrupt: unterbrochener Code hat keinen normalen Aufruf vorbereitet
+- GCCs Interrupt-Attribut erzeugt passenden Ein- und Austritt
+- Es installiert weder `mtvec` noch die Gerätefreigaben
 
 ::: notes
-Zusammenfassung Block 3 setzt die bisherige Frage nach Ereignis, Zeit und Ursache fort. Die Kette ist Ereignis, Pending und Freigabe, Trap und Kontext, Service und Rearm, Rückkehr. CLINT hat keine universelle Latenzgarantie. Vectored wählt den Kategorie-Slot. Zeit kommt aus mtime. Nesting braucht Kontext und Masken. Cause 11 und Claim-ID bleiben getrennt. Das GCC-Attribut ist kein Sicherheitsnachweis. PWM, Pulse-Width Modulation, ist nur ein Ausblick. Die praktische Validierung ist nicht vorbereitet. CLINT: eigener Pfad ohne Latenzgarantie; Zeit aus `mtime`, Freigabe über MTIE und MIE. PLIC: Geräte-ID per Claim, Cause 11 ist nur die Kategorie. Vectored Mode: Kategorie-Slot, nicht eine Adresse je Gerät. Nesting braucht Kontext und Masken, nicht nur `mepc` auf dem Stack. Verständnischeck: Abschluss: Claim liefert die ID, mtime zählt die Zeitbasis, volatile ersetzt weder Synchronisation noch Nesting. Als Ausblick folgen geteilte Zustände und Atomik. Eine Toolchain- oder Renode-Prüfung ist dafür noch nicht erfolgt. Zahlen und Adressen dieses Blocks sind das synthetische RV32-M-Mode-Modell, keine Messung und kein Datenblatt. Steht Code auf der Folie, ist er Lehrcode und wurde nicht kompiliert, assembliert oder ausgeführt.
+GCC bedeutet GNU Compiler Collection. Sein RISC-V-Interrupt-Attribut kennzeichnet eine Funktion als Unterbrechungsbehandlung und erzeugt passende Eintritts- und Austrittssequenzen. Für Machine Mode kann es als `__attribute__((interrupt("machine")))` geschrieben werden; die konkrete Unterstützung ist anhand der verwendeten Compiler-Version zu prüfen.
+
+Eine ABI, Application Binary Interface, ist die Vereinbarung über Register, Stack und Aufrufe zwischen übersetzten Komponenten. Bei einem normalen C-Aufruf weiß der Aufrufer, welche Register die aufgerufene Funktion verändern darf. Ein asynchron unterbrochenes Programm hat diese Vorbereitung nicht ausgeführt. Ein Handler muss daher die durch seinen Pfad benötigten allgemeinen Register passend sichern und am Ende mit Trap-Semantik zurückkehren.
+
+`ret` ist der normale Rücksprung über die Aufrufkonvention; `mret`, Machine Return, kehrt anhand von `mepc` und dem Trap-Status zurück. Das Attribut allein stellt keine Plattforminitialisierung bereit und ist kein vollständiger Nesting-Vertrag für relevante Steuerregister. Hier wurde kein RISC-V-Compilerlauf ausgeführt. Die GCC-Dokumentation belegt das Attribut, nicht die Eignung eines erfundenen vollständigen Prologs.
+:::
+
+## Kurze Behandlung, spätere Nutzarbeit
+
+![](../assets/figures/03_interrupts_timer/foreground.png){fig-alt="Eine kurze ISR übernimmt den dringenden Geräteschritt und veröffentlicht Zustand; das Hauptprogramm verarbeitet ihn später, wodurch zusätzliche Reaktionszeit entsteht."}
+
+- ISR: erforderliche zeitkritische Schritte
+- Hauptprogramm: längere Verarbeitung
+- Eine Markierung allein ist nicht schon die fertige Reaktion
+
+::: notes
+ISR heißt Interrupt Service Routine, Unterbrechungsbehandlung. Die Abbildung zeigt auf einer Zeitachse zuerst die Unterbrechung des Hauptprogramms, dann eine kurze Behandlung und anschließend spätere Hauptprogrammarbeit. Foreground bezeichnet hier die vorrangige ISR, Background das zwischen Interrupts laufende Hauptprogramm. Beide laufen auf demselben Hart, Hardware-Ausführungskontext, nacheinander und nicht parallel auf zwei Kernen.
+
+Die ISR erledigt die für das Gerät oder den Timer nötige unmittelbare Aktion und veröffentlicht beispielsweise einen Zeit-Snapshot oder eine Arbeitsmarkierung. Rechenintensive Auswertung kann das Hauptprogramm übernehmen. Deferred Handling bedeutet aufgeschobene Behandlung. Das kann die Zeit verkürzen, in der weitere Interrupts blockiert sind.
+
+Für die vollständige Reaktion muss allerdings auch die Wartezeit bis zur Hauptprogrammbearbeitung berücksichtigt werden. Die Pfeile trennen Benachrichtigung und Nutzarbeit. Eine gesetzte Variable beweist nicht, dass die gewünschte Ausgabe schon erfolgt ist. Ebenso dürfen Daten nicht schneller anfallen, als ein Puffer oder Bearbeitungspfad sie bewältigt. Die Aufteilung erzeugt gemeinsam genutzten Zustand, dessen Zugriffe wir nun prüfen.
+:::
+
+## Gemeinsam genutzter Zustand
+
+- ISR und Hauptprogramm greifen zeitlich verschränkt zu
+- Snapshot: veröffentlichter Beobachtungsstand
+- Ein Bit kann Ereignisse zusammenfassen
+- Mehrschrittige Änderungen benötigen ein Konsistenzverfahren
+
+::: notes
+ISR bedeutet Interrupt Service Routine. Selbst auf einem Hart kann das Hauptprogramm zwischen zwei eigenen Schritten unterbrochen werden. Das ist zeitliche Verschränkung, keine gleichzeitige Mehrkern-Ausführung. Ein Snapshot ist ein veröffentlichter Beobachtungsstand, etwa vergangene Millisekunden aus der Hardware-Zeitquelle. Er kann bis zur nächsten Veröffentlichung veralten.
+
+Ein einzelnes natürlich ausgerichtetes Zweiunddreißig-Bit-Wort kann im festgelegten Plattformmodell durch einen unteilbaren Zugriff gelesen und geschrieben werden. Dies ist eine Hardware- und Compilerannahme, keine allgemeine Wirkung des C-Schlüsselworts `volatile`. Ein Vierundsechzig-Bit-Wert auf RV32, der Variante mit Zweiunddreißig-Bit-Integerregistern, kann dagegen mehrere Zugriffe benötigen und auseinandergerissene Hälften liefern.
+
+Ein konsistenter Zugriff kann beispielsweise in einer kurzen kritischen Sektion stattfinden. Diese sperrt die nötigen Interrupts für den Zugriff und stellt anschließend den zuvor geltenden Freigabestand wieder her. Sie darf nicht blind alle Interrupts freigeben, wenn sie vorher schon gesperrt waren. Andere Verfahren verwenden bewusst entworfene atomare oder versionierte Datenstrukturen. Ein bloßes „wird schon passen“ ersetzt keine dieser Voraussetzungen.
+:::
+
+## `volatile` verhindert keinen verlorenen Hinweis
+
+| Schritt | Hauptprogramm | ISR |
+|---------|---------------|-----|
+| $1$ | liest Flag $1$ | |
+| $2$ | | setzt erneut Flag $1$ |
+| $3$ | schreibt Flag $0$ | |
+
+Die zweite Markierung ist danach nicht mehr sichtbar.
+
+::: notes
+Ein Flag ist eine einzelne Zustandsmarkierung. ISR steht für Interrupt Service Routine. Im Beispiel hat eine frühere Behandlung das Flag auf eins gesetzt. Das Hauptprogramm liest eins und plant, die vorgemerkte Arbeit zu übernehmen. Vor seinem Löschen setzt eine weitere ISR dasselbe Flag erneut auf eins. Danach schreibt das Hauptprogramm null. Die zweite Markierung bleibt nicht unterscheidbar erhalten.
+
+`volatile` weist die verwendete C-Implementierung an, die entsprechenden beobachtbaren Zugriffe zu berücksichtigen. Es macht die getrennte Folge „lesen, entscheiden, löschen“ nicht zu einer atomaren Gesamtaktion und stellt keine Warteschlange bereit. Die Tabelle stellt die Reihenfolge dar, nicht drei gleichzeitig ablaufende Prozessoren.
+
+Ein Bit kann bewusst „mindestens eine neue Arbeit vorhanden“ bedeuten und mehrere Ereignisse zusammenfassen. Wenn jedes einzelne Ereignis erhalten werden muss, ist diese Bedeutung unzureichend. Ein geeignetes Konsistenzverfahren und gegebenenfalls ein Zähler oder Puffer sind nötig. Bei einem Flag kann etwa die kurze Übernahme-und-Lösch-Aktion gegen die betreffende ISR geschützt werden; die längere Nutzarbeit folgt außerhalb. Welche Lösung passt, hängt davon ab, was die Ereignisse repräsentieren.
+:::
+
+## Zeitdifferenz trotz $32$-Bit-Umlauf
+
+Lehrbeispiel eines vorzeichenlosen Millisekundenzählers:
+
+$$
+\text{last}=\texttt{0xFFFFFFF0},\quad
+\text{now}=\texttt{0x00000020}
+$$
+
+$$
+(\text{now}-\text{last})\bmod2^{32}=48\ \mathrm{ms}
+$$
+
+Kein vollständiger Umlauf darf zwischen den verglichenen Beobachtungen verborgen bleiben.
+
+::: notes
+`last` ist der vorherige Beobachtungswert, `now` der aktuelle eines vorzeichenlosen Zweiunddreißig-Bit-Millisekundenzählers. Der Wert läuft nach $2^{32}$ Schritten wieder bei null weiter. Hier liegt last sechzehn Schritte vor dem Umlauf und now zweiunddreißig Schritte danach. Die tatsächliche kleine Differenz ist daher $16+32=48$ Millisekunden.
+
+C-Arithmetik in einem passenden vorzeichenlosen Typ bildet den Rest modulo $2^{32}$. Ein Ausdruck wie `(uint32_t)(now - last)` kann diese Differenz erhalten. `uint32_t` aus `stdint.h` bezeichnet einen vorzeichenlosen Typ mit genau zweiunddreißig Bit. Ein einfacher Größenvergleich `now >= last` würde am gezeigten Umlauf dagegen nicht die vergangene Zeit ausdrücken.
+
+Die Methode setzt voraus, dass zwischen den relevanten Beobachtungen nicht ein vollständiger Umlauf unbemerkt vergangen ist. Ein Snapshot aus einer ISR, Interrupt Service Routine, muss zusätzlich konsistent übernommen werden. Der Zweiunddreißig-Bit-Millisekundenumlauf beträgt rund neunundvierzig Komma einundsiebzig Tage, nicht die etwa einundsiebzig Minuten eines Zweiunddreißig-Bit-Tickzählers bei einem Megahertz. Die Einheit gehört zur Bedeutung jedes Werts.
+:::
+
+## Verschachtelung überschreibt den Trap-Zustand
+
+![](../assets/figures/03_interrupts_timer/nesting.png){fig-alt="Beim äußeren Trap steht die Main-Adresse in mepc; ein innerer Trap ersetzt sie durch die ISR-Adresse. Separate Softwareframes erhalten beide Rückkehrzustände."}
+
+Ein Hart hat hier ein `mepc`-Register, keinen automatischen Stapel aller Rücksprünge.
+
+::: notes
+Nesting bedeutet Verschachtelung von Interruptbehandlungen. Im Grundmodell bleibt MIE, Machine Interrupt Enable, während der ISR, Interrupt Service Routine, null. Wenn Software es vorzeitig wieder setzt, kann eine weitere freigegebene Anforderung eintreten. `mepc`, Machine Exception Program Counter, erhält dabei die neue Fortsetzungsadresse.
+
+Im Beispiel der Abbildung unterbricht der äußere Trap das Hauptprogramm bei `0x80001000`. Diese Adresse steht zuerst in `mepc`. Ein innerer Trap bei `0x80002040` innerhalb der äußeren ISR überschreibt das Register mit jener Adresse. Ohne separate Software-Sicherung fehlt danach die ursprüngliche Hauptprogrammadresse. Der innere Rücksprung kann korrekt sein, während der spätere äußere falsch wird.
+
+Die rechte Bildhälfte zeigt getrennte Softwareframes, Sicherungsrahmen im Stack, für äußeren und inneren Zustand. Gesichert werden müssen auch benötigte allgemeine Register, Status und geänderte Masken, nicht allein zwei Adresswerte. Pfeile zeigen die umgekehrte Rückkehrreihenfolge. Die Darstellung ist ein Kontextmodell und keine geprüfte sichere Assemblerimplementierung. Vor jeglicher Wiederfreigabe muss die erforderliche Sicherung bereits existieren.
+:::
+
+## Nesting braucht eine begrenzte Politik
+
+- Vor Wiederfreigabe Kontext und Rückkehrzustand sichern
+- Gewünschte Quellen gezielt maskieren
+- Vor Wiederherstellung erneut passend sperren
+- Stackverbrauch und gegenseitige Abhängigkeiten begrenzen
+
+Lehrbudget: $256$ Byte nur für ISR-Frames, $64$ Byte je Frame $\Rightarrow$ höchstens $4$ Frames.
+
+::: notes
+ISR heißt Interrupt Service Routine. Ein Frame ist der Software-Sicherungsrahmen einer Behandlung. Bei einem ausschließlich für solche Frames verfügbaren Budget von zweihundertsechsundfünfzig Byte und angenommenen vierundsechzig Byte pro Frame passen rechnerisch vier Rahmen. Hauptprogrammstack, zusätzliche Funktionsaufrufe und andere Daten sind bei dieser Angabe bereits ausgeschlossen. Die Rechnung ist eine Lehrgrenze, kein Nachweis eines realen Stackbedarfs.
+
+Ein geeigneter Nesting-Pfad sichert allgemeine Register, `mepc`, Machine Exception Program Counter, nötigen `mstatus`-Zustand und veränderte Masken, bevor MIE, Machine Interrupt Enable, erneut gesetzt wird. Vor dem Restaurieren muss ein weiterer Eingriff passend verhindert werden. Die normale RISC-V-Aufrufkonvention verlangt bei Standard-C-Aufrufen eine sechzehn Byte ausgerichtete Stackadresse; ein erfundener Acht-Byte-Rahmen ist keine allgemeine Vorlage.
+
+Freigeben erlaubt nicht automatisch nur höher priorisierte Quellen. Eine noch aktive eigene Ursache kann rekursive Eintritte ermöglichen. Locks, Sperren auf gemeinsam benötigte Ressourcen, können zudem eine innere ISR blockieren, während deren Besitzer unterbrochen ist. Deshalb bleibt das Hauptmodell kurz und nicht verschachtelt. Nesting benötigt eine ausdrücklich begründete, begrenzte Politik.
+:::
+
+## Optional: Modell und Firmware getrennt prüfen
+
+- Papiermodell: Zustände, Zeiten und Adressen nachrechnen
+- Host-Prüfung: reine Terminrechnung ohne Gerätezugriff
+- Renode: konkrete Plattform und Firmware erforderlich
+- Simulatorzeit ist kein Nachweis realer Chiplatenz
+
+::: notes
+Renode ist ein Systemsimulator, der eine konkrete Plattformbeschreibung und passende Firmware benötigt. Er kann Geräte, Timer und virtuelle Zeit modellieren. Diese virtuelle Modellzeit ist von der Uhr des Hostrechners zu unterscheiden. Eine konfigurierte Instruktionsleistung ist kein allgemeiner Nachweis zyklengenauer realer Hardwarelatenz.
+
+Die reine Funktion `next_future` lässt sich dagegen als gewöhnliche C-Rechnung mit einem Hostcompiler prüfen. Das validiert ihre Ergebnisse unter den genannten Grenzen, aber weder eine Geräteadresse noch einen RISC-V-Trap-Prolog. Eine Plattformausführung müsste zusätzlich `mtvec`, die Trap-Basis, Kontextsicherung, Gerätefreigaben und die Interruptursache tatsächlich zusammenbringen.
+
+Für die Pflichtübung sind deshalb keine neu installierte Toolchain und keine erfundene Laborplatine nötig. Alle Zustands- und Zeitaufgaben sind auf Papier lösbar. Eine spätere Renode-Untersuchung sollte die konkrete Version, Plattform, Timerfrequenz und beobachtete Ursache dokumentieren. Es liegt in dieser Überarbeitung keine ausgeführte Renode-Firmware und kein gemessener RISC-V-Handler vor. Aussagen über Simulator oder Hardware müssen auf den jeweiligen Nachweis beschränkt bleiben.
+:::
+
+## Abschlussquiz: Entscheidungen begründen
+
+- Zehn Fragen zu Vorlesung 3
+- Zehn Minuten beantworten, fünf Minuten auswerten
+- Bei Unsicherheit: Ursache, Registerzustand oder Zwischenrechnung nennen
+- Antwortlänge liefert keinen verlässlichen Lösungsweg
+
+::: notes
+Das Quiz nutzt die zehn Fragen der zugehörigen QuizAcademy-Datei. Die Zeitplanung sieht zehn Minuten individuelles Beantworten und fünf Minuten gezielte Auswertung häufiger Fehlentscheidungen vor. Die vorhandene Fragenzahl bleibt nach der Quizregel erhalten. Jede Frage besitzt genau eine richtige Antwort, und Erläuterungen erklären die Entscheidung anhand der Vorlesung.
+
+Wichtige Unterscheidungen sind der Cause-Code, Ursachencode einer Interrupt-Kategorie, gegenüber der Geräte-ID, sowie Pending, wartend, gegenüber Enable, freigegeben. Hinzu kommen der vektorisierte Einsprung, ein konsistenter Zeitwert und der gesicherte Trap-Rückkehrzustand. Diese Wörter haben jeweils eine konkrete Funktion im behandelten Modell.
+
+Bitten Sie bei unterschiedlichen Antworten um den passenden Registerwert oder Rechenschritt statt bloß um eine Vermutung. Eine längere Formulierung ist nicht grundsätzlich richtiger; die Optionen wurden so gestaltet, dass ihre Länge keine systematische Kennzeichnung liefert. Die Auswertung kann diejenigen Aufgaben aufgreifen, bei denen Modellannahmen vergessen wurden. Danach bündelt die letzte Folie die Ergebnisse als Grundlage der zeitbezogenen Aktorik in der nächsten Vorlesung.
+:::
+
+## Was Sie jetzt nachvollziehen können
+
+- Ereignis, wartende Anforderung und tatsächliche Behandlung trennen
+- Kategorieeinsprung und externe Geräteauswahl unterscheiden
+- Zeit aus `mtime` statt aus Handler-Aufrufen ableiten
+- Geräteursache, Claim und Complete vollständig behandeln
+- Kontext und gemeinsam genutzten Zustand erhalten
+
+::: notes
+Ein Interruptpfad verbindet mehrere getrennte Verantwortlichkeiten. Geräte oder Timer erzeugen eine Bedingung. Hardware hält und signalisiert eine wartende Anforderung. Freigaben erlauben den Trap-Eintritt. Der Einsprung bestimmt zuerst eine Kategorie; beim PLIC, Platform-Level Interrupt Controller, liefert Claim die konkrete externe Geräte-ID. Die Behandlung muss die Geräteursache bearbeiten und die Übernahme mit Complete abschließen.
+
+`mtime`, Machine Time, liefert die Zeitquelle. Ein fester Sollrastertermin wird nicht allein durch die Zahl von ISR-Aufrufen, Interrupt Service Routine, repräsentiert. Die Software erhält zudem allgemeinen Kontext und den nötigen Trap-Zustand. `volatile` ersetzt keine mehrschrittige Konsistenzregel.
+
+Die Grundbegriffe orientieren sich an Harris/Harris, Digital Design and Computer Architecture — RISC-V Edition. Die Register- und Timerregeln wurden mit der [RISC-V Machine-Level-Spezifikation](https://github.com/riscv/riscv-isa-manual/blob/main/src/priv/machine.adoc), Claim und Threshold mit der [PLIC-Spezifikation](https://github.com/riscv/riscv-plic-spec/blob/master/riscv-plic.adoc) abgeglichen. GCCs [RISC-V-Attributdokumentation im Quellbaum](https://github.com/gcc-mirror/gcc/blob/master/gcc/doc/extend.texi) beschreibt den Compilervertrag. Damit sind Zustandsmodelle belegbar, während konkrete Firmwaremessungen weiterhin eine passende Plattform benötigen. Vorlesung 4 nutzt diese Zeit- und Ereignisgrundlage für Aktorik.
 :::
