@@ -1,242 +1,198 @@
 #!/usr/bin/env python3
-"""Didaktische Vektorfiguren für VL02. Zahlen aus dem Referenzmodell, keine Messdaten."""
+"""Abbildungen für VL02: SVG; mit --png zusätzlich PNG via Playwright/Chromium.
+
+Alle Zahlen sind Lehrmodelle. PNGs werden direkt aus den SVGs gerendert,
+damit Folien und PDF-Handout denselben Inhalt zeigen.
+"""
 from pathlib import Path
+from html import escape
+import argparse
 
 OUT = Path(__file__).resolve().parent
-TAG, IDX, OFF = "#6A1B9A", "#E65100", "#1565C0"
-INK, MUTED, HAIR = "#1D1D1F", "#5F6368", "#E5E5EA"
-HIT, MISS = "#1B5E20", "#B71C1C"
+INK, MUTED, HAIR, BG, RED = "#1D1D1F", "#86868B", "#E5E5EA", "#F5F5F7", "#E2001A"
+FIGURES = []
 
-def svg(w, h):
-    return [
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">',
-        f'<rect width="{w}" height="{h}" fill="#fff"/>',
-        '<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>',
-    ]
+def text(x, y, value, size=24, anchor="start", color=INK):
+    return f'<text x="{x}" y="{y}" font-size="{size}" text-anchor="{anchor}" fill="{color}">{escape(str(value))}</text>'
 
-def T(x, y, s, size=18, fill=INK, anchor="start", w="600"):
-    return f'<text x="{x}" y="{y}" font-size="{size}" font-weight="{w}" fill="{fill}" text-anchor="{anchor}">{s}</text>'
-
-def save(name, parts):
-    (OUT / name).write_text("\n".join(parts) + "\n</svg>\n", encoding="utf-8")
-    print(name)
-
-def box(x, y, w, h, fill="#fff", stroke=INK):
-    return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="6" fill="{fill}" stroke="{stroke}"/>'
-
-def fig_locality():
-    p = svg(1100, 280)
-    p += [T(16, 24, "Modell: kalter Cache, 64-B-Lines, keine Verdrängung in dieser Folge", 16, MUTED, w="400")]
-    p += [T(16, 58, "Zeitlich: 0x1000, 0x1000, 0x1000", 18)]
-    for i, lab in enumerate(["Miss", "Hit", "Hit"]):
-        c = MISS if lab == "Miss" else HIT
-        p += [box(16 + i * 140, 72, 120, 36, "#fff", c), T(28 + i * 140, 96, lab, 16, c)]
-    p += [T(16, 150, "Räumlich (Daten): 0x1000, 0x1004, 0x1008 — dieselbe Line 0x1000–0x103F", 18)]
-    for i, lab in enumerate(["Miss", "Hit", "Hit"]):
-        c = MISS if lab == "Miss" else HIT
-        p += [box(16 + i * 140, 164, 120, 36, "#fff", c), T(28 + i * 140, 188, lab, 16, c)]
-    p += [T(16, 230, "Befehlsfolge PC, PC+4 liegt im L1-I. Daten-Loads liegen im L1-D.", 16)]
-    p += [T(16, 258, "Assemblerfolge ist gemischt. Die Kaesten sind zwei getrennte Vergleichsspuren.", 15, MUTED, w="400")]
-    save("locality.svg", p)
-
-def fig_layout():
-    p = svg(1100, 260)
-    p += [T(16, 24, "Array: aufeinanderfolgende uint32_t in einer 64-Byte-Line", 18)]
-    for i in range(8):
-        p += [box(16 + i * 70, 40, 66, 40, "#E3F2FD", OFF), T(28 + i * 70, 66, f"+{4*i}", 14, OFF)]
-    p += [T(16, 110, "Line 0x1000–0x103F nutzt hier 32 von 64 Byte (8 Wörter gezeichnet).", 15, MUTED, w="400")]
-    p += [T(16, 150, "Liste: ein mögliches verstreutes Layout, nicht jedes Listenlayout", 18)]
-    xs = [16, 220, 480, 760]
-    addrs = ["0x2000", "0x8040", "0x4010", "0x9000"]
-    for x, a in zip(xs, addrs):
-        p += [box(x, 168, 140, 40, "#FFF3E0", IDX), T(x + 12, 194, a, 16, IDX)]
-    p += [T(16, 240, "Jede Adresse kann eine eigene Line füllen. Nachbarn der Liste liegen dann nicht in der Line.", 16)]
-    save("array-list.svg", p)
-
-def fig_amat():
-    p = svg(1100, 300)
-    p += [T(16, 24, "100 Zugriffe, Hit Time 1, zusätzliche Miss Penalty 100 (berechnetes Modell)", 16)]
-    p += [box(16, 40, 760, 28, "#E8F5E9", HIT), T(24, 60, "100 × 1 Takt Hit Time", 16, HIT)]
-    p += [box(16, 78, 38, 28, "#FFEBEE", MISS), T(64, 98, "5 × 100 Takte extra", 16, MISS)]
-    p += [T(16, 140, "95×1 + 5×(1+100) = 600 Takte;  600/100 = 6 Takte/Zugriff", 20)]
-    p += [T(16, 176, "AMAT = 1 + MissRate×100", 18, TAG)]
-    pts = [(0, 1), (0.05, 6), (0.1, 11), (0.2, 21), (0.5, 51)]
-    p += [T(16, 210, "Kurve (Modell): Miss Rate 0 → 1;  5 % → 6;  10 % → 11;  50 % → 51", 16)]
-    p += [T(16, 246, "6 Takte sind mittlere Zugriffszeit. 100/6 ist kein gemessener Programm-Speedup.", 16, MUTED, w="400")]
-    p += [T(16, 278, "Ohne Cache im selben Modell: jeder Zugriff 100 Takte, nicht 1+100.", 16, MUTED, w="400")]
-    save("amat.svg", p)
-
-def fig_line():
-    p = svg(1100, 240)
-    p += [T(16, 22, "64-Byte-Grenzen. Dezimaladresse 1000 liegt in Line 960–1023, Offset 40.", 17)]
-    p += [box(40, 40, 900, 36, "#E3F2FD", OFF)]
-    p += [T(48, 64, "960", 16, OFF), T(860, 64, "1023", 16, OFF, "end")]
-    p += [f'<line x1="640" y1="40" x2="640" y2="76" stroke="{MISS}" stroke-width="3"/>']
-    p += [T(620, 100, "1000", 16, MISS, "middle")]
-    p += [T(16, 140, "Ausgerichtetes uint32_t-Array, Basis mod 64 = 0: eine Line = 16 Elemente.", 17)]
-    p += [T(16, 176, "Weitere Elemente derselben gültigen Line sind Hits, solange sie nicht verdrängt oder invalidiert wird.", 16)]
-    p += [T(16, 214, "Ein Miss lädt 960–1023, nicht 1000–1063.", 18, MISS)]
-    save("line-bounds.svg", p)
-
-def band(p, y, title, segs):
-    p.append(T(16, y, title, 16))
-    x = 16
-    for w, label, col in segs:
-        p.append(box(x, y + 8, w, 36, "#fff", col))
-        p.append(T(x + 8, y + 32, label, 14, col))
-        x += w
-
-def fig_bits():
-    p = svg(1100, 220)
-    p += [T(16, 22, "0x12345678, 32-Bit-Byteadresse, Zweierpotenzen. Metadaten zählen nicht zur Datenkapazität.", 15, MUTED, w="400")]
-    band(p, 40, "Direct Mapped 32 KiB, 512 Sets, 64 B: Tag 0x2468, Index 345, Offset 56", [(420, "Tag 17 Bit", TAG), (220, "Index 9", IDX), (160, "Off 6", OFF)])
-    band(p, 120, "4-Way, gleiche Datenkapazität, 128 Sets: Tag 0x91A2, Set 89, Offset 56", [(480, "Tag 19 Bit", TAG), (180, "Index 7", IDX), (160, "Off 6", OFF)])
-    save("bitfields.svg", p)
+def box(x, y, w, h, fill=BG, stroke=HAIR):
+    return f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="10" fill="{fill}" stroke="{stroke}" stroke-width="2"/>'
 
 def arrow(x1, y1, x2, y2):
-    return f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{INK}" stroke-width="2" marker-end="url(#arr)"/>'
+    return f'<path d="M{x1},{y1} H{x2} V{y2}" fill="none" stroke="{MUTED}" stroke-width="2" marker-end="url(#arrow)"/>'
 
-def fig_datapath():
-    p = svg(1100, 340)
-    p += ['<defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#1D1D1F"/></marker></defs>']
-    p += [T(16, 24, "Direct-Mapped-Leseweg. Ein Miss geht zur naechsten Ebene, nicht immer zum DRAM.", 16)]
-    steps = [
-        (16, "Adresse"),
-        (190, "Index"),
-        (360, "Tag + Valid"),
-        (560, "Vergleich"),
-        (760, "Offset-MUX"),
-        (940, "CPU"),
+def save(name, height, parts, description):
+    head = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="{height}" viewBox="0 0 1000 {height}" role="img">',
+        f'<title>{escape(description)}</title>',
+        '<style>text{font-family:Inter,Arial,sans-serif;font-weight:400}</style>',
+        f'<rect width="1000" height="{height}" fill="#FFFFFF"/>',
+        f'<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="{MUTED}"/></marker></defs>',
     ]
-    for x, lab in steps:
-        p += [box(x, 48, 140, 44, "#fff", INK), T(x + 10, 76, lab, 15)]
-    for x in (156, 330, 500, 700, 900):
-        p += [arrow(x, 70, x + 30, 70)]
-    p += [box(190, 130, 310, 70, "#F3E5F5", TAG), T(204, 158, "gespeichertes Tag", 16, TAG), T(204, 184, "Valid = 1 und Tag gleich", 15, TAG)]
-    p += [box(560, 130, 300, 70, "#E3F2FD", OFF), T(574, 158, "Datenarray, ein Way", 16, OFF), T(574, 184, "Offset waehlt das Wort", 15, OFF)]
-    p += [arrow(345, 130, 345, 96)]
-    p += [arrow(700, 130, 830, 96)]
-    p += [box(16, 230, 500, 80, "#FFEBEE", MISS), T(28, 260, "Miss: Fill von der naechsten Ebene", 16, MISS), T(28, 288, "alte Dirty-Line zuerst sichern", 15, MISS)]
-    p += [box(540, 230, 530, 80, "#E8F5E9", HIT), T(552, 260, "4-Way: vier Kandidaten, ein Hit-Way", 16, HIT), T(552, 288, "Decoder, SRAM, Vergleich brauchen Zeit", 15, HIT)]
-    save("datapath.svg", p)
+    (OUT / f"{name}.svg").write_text("\n".join(head + parts + ["</svg>"]) + "\n", encoding="utf-8")
+    FIGURES.append((name, height))
 
-def fig_thrash():
-    p = svg(1100, 420)
-    p += [T(16, 24, "Acht Loads: 0x1000 / 0x9000 im Wechsel. Kalt, keine Prefetches.", 16)]
-    p += [T(16, 52, "DM  Index 64   Tags 0 und 1", 16, MISS)]
-    p += [T(560, 52, "4-Way  Set 64   Tags 0 und 4", 16, HIT)]
-    seq = ["1000", "9000", "1000", "9000", "1000", "9000", "1000", "9000"]
-    dm = ["M", "M", "M", "M", "M", "M", "M", "M"]
-    way = ["M", "M", "H", "H", "H", "H", "H", "H"]
-    p += [T(24, 80, "Zugriff", 14), T(258, 80, "DM", 14, MISS), T(328, 80, "4W", 14, HIT)]
-    for i, (a, d, w) in enumerate(zip(seq, dm, way)):
-        y = 96 + i * 36
-        p += [box(16, y, 220, 30), T(24, y + 21, f"{i+1}  0x{a}", 15)]
-        p += [box(250, y, 50, 30, "#FFEBEE", MISS), T(264, y + 21, d, 15, MISS)]
-        c = "#FFEBEE" if w == "M" else "#E8F5E9"
-        col = MISS if w == "M" else HIT
-        p += [box(320, y, 50, 30, c, col), T(334, y + 21, w, 15, col)]
-    p += [box(420, 96, 640, 250), T(436, 128, "DM: beide Bloecke brauchen denselben Platz.", 16, MISS)]
-    p += [T(436, 164, "Erste zwei Misses: compulsory.", 16)]
-    p += [T(436, 200, "Sechs weitere: conflict, Cache sonst leer.", 16)]
-    p += [T(436, 248, "4-Way: zwei Ways, danach Hits.", 16, HIT)]
-    p += [T(436, 292, "Capacity-Miss ist das nicht.", 16)]
-    save("thrashing.svg", p)
+def hierarchy():
+    p = []
+    for x,y,w,h,label in [(20,95,130,70,"CPU"),(210,25,180,65,"L1-I"),(210,165,180,65,"L1-D"),(470,95,190,70,"L2"),(740,95,235,70,"DRAM")]:
+        p += [box(x,y,w,h),text(x+w/2,y+h/2+8,label,28,"middle")]
+    p += [arrow(150,115,180,58),arrow(180,58,210,58),arrow(150,145,180,198),arrow(180,198,210,198)]
+    p += [arrow(390,58,430,115),arrow(430,115,470,115),arrow(390,198,430,145),arrow(430,145,470,145),arrow(660,130,740,130)]
+    p += [text(300,120,"Befehle",22,"middle"),text(300,260,"Daten",22,"middle"),text(565,205,"gemeinsam",22,"middle")]
+    save("hierarchy",285,p,"Anfragewege: CPU zu L1-I/L1-D, danach L2 und DRAM.")
 
-def fig_repl():
-    p = svg(1100, 360)
-    p += [T(16, 24, "Ein kaltes 4-Way-Set. Alt links, neu rechts. Nur Loads.", 16)]
-    p += [T(16, 56, "FIFO nach A B C D A", 16, MISS), T(560, 56, "LRU nach A B C D A", 16, HIT)]
-    fifo = ["A alt", "B", "C", "D neu"]
-    lru = ["B alt", "C", "D", "A neu"]
-    for i, lab in enumerate(fifo):
-        p += [box(16 + i * 120, 72, 110, 44, "#FFEBEE", MISS), T(28 + i * 120, 100, lab, 16, MISS)]
-    for i, lab in enumerate(lru):
-        p += [box(560 + i * 120, 72, 110, 44, "#E8F5E9", HIT), T(572 + i * 120, 100, lab, 16, HIT)]
-    p += [box(16, 150, 500, 80, "#FFEBEE", MISS), T(28, 182, "E verdrängt FIFO-A", 18, MISS), T(28, 210, "Hit auf A aendert FIFO nicht", 15, MISS)]
-    p += [box(560, 150, 500, 80, "#E8F5E9", HIT), T(572, 182, "E verdrängt LRU-B", 18, HIT), T(572, 210, "A wurde zuletzt benutzt", 15, HIT)]
-    p += [T(16, 270, "Danach: FIFO B C D E,  LRU C D A E.", 16)]
-    p += [T(16, 310, "LRU kennt die Zukunft nicht. Pseudo-LRU naehert die Reihenfolge an.", 16, MUTED, w="400")]
-    save("fifo-lru.svg", p)
+def locality():
+    p=[]
+    for y,title,addresses in [(35,"Zeitlich",["0x1000","0x1000","0x1000"]),(175,"Räumlich",["0x1000","0x1004","0x1008"])]:
+        p += [text(20,y,title,26)]
+        for j,(a,result) in enumerate(zip(addresses,["Miss","Hit","Hit"])):
+            x=210+j*250
+            p += [box(x,y-25,220,90,stroke=RED if j==0 else HAIR),text(x+110,y+4,a,26,"middle"),text(x+110,y+40,result,24,"middle",RED if j==0 else INK)]
+            if j<2:p.append(arrow(x+220,y+20,x+250,y+20))
+    p += [text(20,290,"Jeweils kalt; 64-Byte-Lines; keine Verdrängung.",24)]
+    save("locality",315,p,"Zwei getrennte Zugriffsspuren mit Miss, Hit, Hit.")
 
-def fig_writes():
-    p = svg(1100, 300)
-    p += [T(16, 20, "Ein Wort, Start Cache=0, nächste Ebene=0. Stores 5, dann 7. Ein-Level-Modell.", 15, MUTED, w="400")]
-    rows = [
-        ("Write-Through ohne Puffer", "Cache 5 dann 7, Ebene sofort 5 dann 7"),
-        ("Write-Through mit Puffer", "Cache schon 5/7; Puffer hält Updates; voller Puffer → Stall"),
-        ("Write-Back", "Cache 5/7, Dirty=1; nächste Ebene bleibt 0 bis Writeback"),
+def line():
+    p=[text(20,30,"Dezimaladressen · Blockgröße 64 Byte",26)]
+    # Byte cells: marker at byte 40, not an arbitrary location.
+    p += [box(50,70,896,65),text(50,170,"960",24),text(946,170,"1023",24,"end")]
+    x=50+40*14
+    p += [f'<path d="M{x},60 V145" stroke="{RED}" stroke-width="3"/>',text(x,205,"1000",26,"middle",RED)]
+    p += [text(500,255,"40 Byte ab Blockbeginn",26,"middle")]
+    save("line-bounds",280,p,"Adresse 1000 innerhalb des Blocks 960 bis 1023 mit Offset 40.")
+
+def layout():
+    p=[text(20,30,"Array: benachbarte 4-Byte-Elemente",26)]
+    for j in range(8):
+        p += [box(20+j*112,55,110,65),text(75+j*112,97,f"+{4*j}",26,"middle")]
+    p += [text(20,165,"Liste: ein mögliches Streulayout",26)]
+    for j,a in enumerate(["0x2000","0x8040","0x4010","0x9000"]):
+        x=20+j*250
+        p += [box(x,190,200,65),text(x+100,232,a,26,"middle")]
+        if j<3:p.append(arrow(x+200,222,x+250,222))
+    save("array-list",280,p,"Zusammenhängende Arrayelemente und verteilte per Zeiger verbundene Listenknoten.")
+
+def amat():
+    p=[text(20,30,"100 Zugriffe: Prüfung + zusätzliche Miss-Kosten",26)]
+    # Both bars use 1.6 pixels per accumulated cycle.
+    p += [text(20,80,"100 × 1 = 100 Takte",24),box(20,95,160,40)]
+    p += [text(20,180,"5 × 100 = 500 Takte zusätzlich",24),box(20,195,800,40,stroke=RED)]
+    p += [text(20,280,"Gesamt: 600 Takte / 100 Zugriffe = 6 Takte pro Zugriff",26)]
+    save("amat",305,p,"Gleich skalierte Balken: hundert Takte Prüfung und fünfhundert Takte zusätzliche Miss-Kosten.")
+
+def bits():
+    p=[text(20,30,"32 Bit · 32 KiB Daten · 64-Byte-Lines",26)]
+    for y,label,widths,labels in [(75,"Direct Mapped",[17,9,6],["Tag 17","Index 9","Offset 6"]),(195,"4-Way",[19,7,6],["Tag 19","Index 7","Offset 6"])]:
+        p += [text(20,y,label,24)]
+        x=20
+        for w,t in zip(widths,labels):
+            width=w*30
+            p += [box(x,y+15,width,60,fill="#FFFFFF"),text(x+width/2,y+55,t,26,"middle")]
+            x+=width
+    save("bitfields",290,p,"Proportionale Bitfelder: 17/9/6 für Direct Mapped und 19/7/6 für vier Ways.")
+
+def datapath():
+    p=[]
+    # Independent address components; stored and requested tags converge at compare.
+    for x,y,w,h,label in [(20,20,170,60,"Index"),(20,140,170,60,"Anfrage-Tag"),(20,260,170,60,"Offset"),(270,20,330,85,"Cache-Eintrag"),(680,135,270,65,"Tag-Vergleich"),(350,260,250,60,"Offset-MUX")]:
+        p += [box(x,y,w,h),text(x+w/2,y+38,label,25,"middle")]
+    p += [text(435,87,"Tag · Valid · Daten",22,"middle")]
+    p += [arrow(190,50,270,50),arrow(190,170,680,170)]
+    # Stored tag and Valid leave at top, so their route never crosses the data box.
+    p += [arrow(600,50,815,135),arrow(600,90,640,240),arrow(640,240,475,260)]
+    p += [arrow(190,290,350,290),arrow(600,290,900,290),text(910,298,"Daten",22)]
+    p += [text(815,230,"Valid = 1 und Tag gleich → Hit",22,"middle",RED)]
+    save("datapath",345,p,"Index liest den Eintrag; gespeichertes und angefragtes Tag werden geprüft; Offset wählt Daten.")
+
+def thrash():
+    p=[text(20,30,"32 KiB · 64-Byte-Lines · beide Caches kalt",24)]
+    p += [text(25,80,"Load",25),text(455,80,"Direct Mapped",25),text(785,80,"4-Way",25)]
+    for j in range(8):
+        y=100+j*36
+        p += [text(25,y+25,f"{j+1}.  0x{'1000' if j%2==0 else '9000'}",24)]
+        for x,value in [(455,"Miss"),(785,"Miss" if j<2 else "Hit")]:
+            p += [text(x,y+25,value,24,color=RED if value=="Miss" else INK)]
+    p += [text(20,430,"Ein Set: 1 Platz gegenüber 4 Plätzen",25)]
+    save("thrashing",455,p,"Acht wechselnde Loads: acht Misses gegenüber zwei Misses und sechs Hits.")
+
+def replacement():
+    p=[text(20,30,"Nach A, B, C, D, A · alt links, neu rechts",26)]
+    for y,title,order,victim in [(90,"FIFO",["A","B","C","D"],"A"),(210,"LRU",["B","C","D","A"],"B")]:
+        p += [text(20,y+35,title,27)]
+        for j,name in enumerate(order):
+            x=150+j*125
+            p += [box(x,y,105,60,stroke=RED if j==0 else HAIR),text(x+52,y+39,name,28,"middle")]
+        p += [text(700,y+38,f"E verdrängt {victim}",26)]
+    save("fifo-lru",300,p,"FIFO behält die Ladereihenfolge; LRU verjüngt A und verdrängt B.")
+
+def writes():
+    p=[text(20,30,"Store-Hits: 0 → 5 → 7",26)]
+    rows=[
+        ("Write-Through", "Cache 7", "nächste Ebene 7"),
+        ("mit Schreibpuffer", "Cache 7", "Updates ggf. ausstehend"),
+        ("Write-Back", "Cache 7, Dirty 1", "nächste Ebene noch 0"),
     ]
-    for i, (a, b) in enumerate(rows):
-        y = 40 + i * 70
-        p += [box(16, y, 1060, 60), T(28, y + 26, a, 16, TAG), T(28, y + 50, b, 16)]
-    p += [T(16, 270, "Dirty=0: Line verwerfen. Dirty=1: im einfachen Modell erst Writeback, dann Refill.", 16)]
-    p += [T(16, 294, "Die Penalty verdoppelt sich nicht universell; Puffer und Überlappung ändern das.", 15, MUTED, w="400")]
-    save("write-states.svg", p)
+    for j,(title,left,right) in enumerate(rows):
+        y=60+j*85
+        p += [text(20,y+38,title,23),box(290,y,280,65),box(650,y,330,65),text(430,y+40,left,24,"middle"),text(815,y+40,right,22,"middle")]
+        if j!=2:p.append(arrow(570,y+32,650,y+32))
+    save("write-states",325,p,"Gleiche Stores, getrennte Weitergabestrategien und Zustände.")
 
-def fig_alloc():
-    p = svg(1100, 240)
-    p += [T(16, 22, "Zwei getrennte Entscheidungen, nicht fest gekoppelt.", 16)]
-    p += [box(16, 48, 500, 80, "#fff", TAG), T(28, 78, "Weitergabe: Write-Through oder Write-Back", 16, TAG)]
-    p += [box(540, 48, 530, 80, "#fff", IDX), T(552, 78, "Store-Miss: Allocate oder No-Allocate", 16, IDX)]
-    p += [T(16, 160, "Allocate: Block laden, Store ausführen, Zustand setzen.", 17)]
-    p += [T(16, 192, "No-Allocate: Store an die nächste Ebene, keinen neuen Eintrag anlegen.", 17)]
-    p += [T(16, 224, "Matrix-Nullsetzen unten nur eindeutig, wenn die Store-Miss-Policy genannt ist.", 16, MUTED, w="400")]
-    save("write-allocate.svg", p)
+def allocate():
+    p=[text(20,30,"Zwei Fragen an eine Schreibstrategie",26)]
+    p += [box(20,65,460,150),box(520,65,460,150)]
+    p += [text(250,105,"Änderung weitergeben?",27,"middle"),text(250,155,"Write-Through",25,"middle"),text(250,190,"oder Write-Back",25,"middle")]
+    p += [text(750,105,"Bei Store-Miss laden?",27,"middle"),text(750,155,"Write-Allocate",25,"middle"),text(750,190,"oder No-Write-Allocate",25,"middle")]
+    save("write-allocate",240,p,"Weitergabe und Anlegen einer Line bei Store-Miss sind getrennte Entscheidungen.")
 
-def fig_matrix():
-    p = svg(1100, 420)
-    p += [T(16, 22, "Miniatur: 16 Zeilen, je eine 64-Byte-Line. 8 DM-Plaetze. Nicht 1000x1000.", 16)]
-    for r in range(16):
-        y = 40 + r * 18
-        col = "#E8F5E9" if r < 8 else "#FFEBEE"
-        p += [box(16, y, 28, 16, col, INK), T(48, y + 13, f"Zeile {r:02d}  Set {r % 8}", 13)]
-    p += [box(280, 40, 360, 140, "#E8F5E9", HIT)]
-    p += [T(296, 70, "Zeilenweise", 18, HIT)]
-    p += [T(296, 100, "1 Miss, dann 15 Hits", 16, HIT)]
-    p += [T(296, 130, "gesamt 16 M / 240 H", 16, HIT)]
-    p += [T(296, 160, "Line bleibt bis Zeilenende", 15, HIT)]
-    p += [box(280, 200, 360, 160, "#FFEBEE", MISS)]
-    p += [T(296, 230, "Spaltenweise", 18, MISS)]
-    p += [T(296, 260, "Schritt = eine Zeile = 64 B", 16, MISS)]
-    p += [T(296, 290, "Zeile r und r+8: Set r%8", 16, MISS)]
-    p += [T(296, 320, "gesamt 256 M / 0 H", 16, MISS)]
-    p += [box(680, 40, 390, 320)]
-    p += [T(696, 70, "Grosses C-Beispiel getrennt", 16, TAG)]
-    p += [T(696, 110, "1000 Spalten x 4 Byte", 16)]
-    p += [T(696, 146, "Zeilenabstand 4000 Byte", 16)]
-    p += [T(696, 182, "4000 mod 64 = 32", 16)]
-    p += [T(696, 230, "Keine exakte Miss-Quote", 16, MISS)]
-    p += [T(696, 266, "ohne festgelegte Spur.", 16, MISS)]
-    p += [T(16, 360, "Nur die 256 Daten-Loads. Basis 0x1000 ist eine Annahme.", 15, MUTED, w="400")]
-    p += [T(16, 390, "Store-Zaehlung nur mit genannter Write-Allocate-Policy.", 15, MUTED, w="400")]
-    save("matrix.svg", p)
+def matrix():
+    p=[text(20,28,"16 × 16 Wörter · 64 Byte je Zeile · 8 Cache-Sets",25)]
+    # Two array halves pair rows with the same set; all sixteen columns remain visible.
+    p += [text(250,70,"Zeilen 0–7",24,"middle"),text(750,70,"Zeilen 8–15",24,"middle")]
+    for r in range(8):
+        y=90+r*25
+        p += [text(50,y+19,r,22,"middle"),text(550,y+19,r+8,22,"middle"),text(485,y+19,f"Set {r}",20,"middle")]
+        for c in range(16):
+            for x,fill in [(90+c*20,BG),(590+c*20,"#FFFFFF")]:
+                p += [f'<rect x="{x}" y="{y}" width="20" height="25" fill="{fill}" stroke="{HAIR}"/>']
+    # Outside-grid arrows mark visit direction; pairing is represented by set labels.
+    p += [text(140,335,"Zeilenweise:  →  +4 Byte",26),text(570,335,"Spaltenweise:  ↓  +64 Byte",26)]
+    p += [text(140,375,"1 Miss, dann 15 Hits je Zeile",25),text(570,375,"Zeile r + 8 ersetzt Zeile r",25)]
+    save("matrix",405,p,"Arrayraster: sechzehn Zeilen mit acht Set-Indizes und zwei Traversalrichtungen.")
 
-def fig_visible():
-    p = svg(1100, 240)
-    p += [box(16, 16, 320, 90, "#F3E5F5", TAG), T(28, 48, "Kern, Dirty-Kopie 5", 16, TAG), T(28, 76, "regulärer Write-Back", 15, TAG)]
-    p += [box(360, 16, 320, 90, "#E3F2FD", OFF), T(372, 48, "Untere Ebene noch 0", 16, OFF), T(372, 76, "kein Kohärenzfehler", 15, OFF)]
-    p += [box(16, 130, 500, 80), T(28, 162, "Kohärenter zweiter Kern: aktueller Wert über das Protokoll,", 15), T(28, 188, "DRAM muss nicht jederzeit 5 enthalten. Details: Block 9.", 15)]
-    p += [box(540, 130, 530, 80, "#FFF3E0", IDX), T(552, 162, "Nicht kohärentes DMA: Maintenance am", 15, IDX), T(552, 188, "gemeinsamen Punkt. Kein Zicbom für jedes RV32I.", 15, IDX)]
-    save("visibility.svg", p)
+def blocksize():
+    p = [text(20, 30, "Dezimaladressen: 0, 4, 64, 68 · beide Caches kalt", 25)]
+    p += [text(20, 75, "16-Byte-Lines: Miss, Hit, Miss, Hit", 26)]
+    for j in range(8):
+        x = 50 + j * 112
+        p += [box(x, 100, 112, 60, stroke=RED if j in (0, 4) else HAIR)]
+        p += [text(x + 56, 139, f"{16*j}–{16*j+15}", 21, "middle")]
+    p += [text(20, 245, "128-Byte-Line: Miss, Hit, Hit, Hit", 26)]
+    p += [box(50, 270, 896, 60, stroke=RED), text(498, 308, "0–127", 26, "middle")]
+    # Identical spatial scale for both block sizes; paired labels avoid overlap.
+    for y in (160, 330):
+        for address in (0, 4, 64, 68):
+            x = 50 + address * 7
+            p += [f'<path d="M{x},{y} V{y+15}" stroke="{RED}" stroke-width="2"/>']
+        p += [text(80, y + 40, "0 und 4", 22, "middle"), text(530, y + 40, "64 und 68", 22, "middle")]
+    save("blocksize", 390, p, "Gleiche Adressen innerhalb kleiner und großer Cache-Blöcke; zwei gegenüber einem Fill.")
 
-def fig_hierarchy():
-    p = svg(1000, 220)
-    p += [box(16, 40, 120, 50), T(48, 70, "CPU", 16)]
-    p += [box(180, 16, 140, 44, "#FFF3E0", IDX), T(200, 44, "L1-I", 16, IDX)]
-    p += [box(180, 76, 140, 44, "#E3F2FD", OFF), T(200, 104, "L1-D", 16, OFF)]
-    p += [box(380, 40, 160, 50), T(420, 70, "L2", 16)]
-    p += [box(600, 40, 200, 50, "#F3E5F5", TAG), T(640, 70, "nächste Ebene", 16, TAG)]
-    p += [f'<line x1="136" y1="50" x2="180" y2="38" stroke="{IDX}" stroke-width="2"/>']
-    p += [f'<line x1="136" y1="70" x2="180" y2="98" stroke="{OFF}" stroke-width="2"/>']
-    p += [f'<line x1="320" y1="38" x2="380" y2="60" stroke="{INK}"/>']
-    p += [f'<line x1="320" y1="98" x2="380" y2="70" stroke="{INK}"/>']
-    p += [f'<line x1="540" y1="65" x2="600" y2="65" stroke="{TAG}" stroke-width="2"/>']
-    p += [T(16, 160, "L1-Miss geht zur nächsten Ebene, nicht zwingend bis DRAM.", 17)]
-    p += [T(16, 196, "Größen und Takte der Folie sind Größenordnungen, keine Messreihe.", 16, MUTED, w="400")]
-    save("hierarchy.svg", p)
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--png",action="store_true")
+    parser.add_argument("--chromium",default="/usr/bin/chromium")
+    args=parser.parse_args()
+    for build in (hierarchy,locality,line,layout,amat,bits,datapath,thrash,replacement,writes,allocate,matrix,blocksize):build()
+    if args.png:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser=p.chromium.launch(executable_path=args.chromium,headless=True,args=["--no-sandbox"])
+            page=browser.new_page(device_scale_factor=2)
+            for name,height in FIGURES:
+                page.set_viewport_size({"width":1000,"height":height})
+                page.set_content('<body style="margin:0">' + (OUT/f"{name}.svg").read_text(encoding="utf-8") + '</body>')
+                page.locator("svg").screenshot(path=str(OUT/f"{name}.png"))
+            browser.close()
+    print(f"{len(FIGURES)} SVGs" + (" und PNGs" if args.png else ""))
 
-if __name__ == "__main__":
-    fig_locality(); fig_layout(); fig_amat(); fig_line(); fig_bits()
-    fig_datapath(); fig_thrash(); fig_repl(); fig_writes(); fig_alloc()
-    fig_matrix(); fig_visible(); fig_hierarchy()
+if __name__=="__main__":main()

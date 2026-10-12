@@ -1,189 +1,389 @@
 ---
 title: "Übungsblatt 2: Speicherhierarchie und Caches"
-subtitle: "Mikrocomputertechnik 3 (MCT3)"
+subtitle: "Mikrocomputertechnik 3 · Papieraufgaben und optionaler Simulatorvergleich"
+header-includes: |
+  \usepackage{needspace}
 ---
 
 ::: {.content-visible when-profile="solution"}
 > **Musterlösung**
 :::
 
-## Zielsetzung
+## Ziel und Arbeitsweise
 
-Sie vertiefen Vorlesung 2: Lokalitätsprinzip, AMAT, Cache-Mapping (Direct Mapped / Set-Associative), Schreibstrategien und cache-freundlichen C-Code (Row-Major vs. Column-Major).
+Sie erklären Lokalität, rechnen die mittlere Speicherzugriffszeit aus und verfolgen
+Cache-Zustände. Alle Pflichtaufgaben sind ohne Rechner und ohne Simulator lösbar.
 
-**Bearbeitungszeit:** ca. 45–60 Min. | **Orientierungspunkte:** Aufgabe 1: 14 P, Aufgabe 2: 8 P (Gesamt: 22 P)
+**Bearbeitungszeit:** etwa 60–75 Minuten. **Orientierungspunkte:** 32 Punkte.
+Für die vier Schulstunden sind insgesamt 55 Minuten angeleitete Arbeitsphasen
+vorgesehen: Aufgabe 1 (10 Minuten), Aufgaben 2–3 (15 Minuten), Aufgaben 4–5
+(15 Minuten) und Aufgabe 6 (15 Minuten). Gemeinsame Besprechungen erfolgen in
+den Vorlesungsphasen; die längere Zeitangabe gilt für selbstständiges Bearbeiten.
+Begründen Sie Ihre Antworten; zu Rechnungen gehören Formel, Rechenweg und Einheit.
+Hexadezimale Adressen tragen das Präfix `0x`. Eine Adresse bezeichnet ein Byte.
 
-## Teil 1: Theorie — Speicherhierarchie und Caches
+Wir verwenden ausdrücklich vereinfachte Lehrmodelle: ein Prozessor, normaler
+cachefähiger Speicher, abgeschlossene Anfragen, kein Vorabladen und keine
+zusätzlichen Zugriffe. „Kalt“ bedeutet, dass alle Valid-Bits zunächst null sind.
+Valid ist das Gültigkeitsbit, Dirty das Änderungsbit einer Write-Back-Line.
+Zähler und Zeiten der Modelle sind keine Messungen eines übersetzten C-Programms.
 
-### Aufgabe 1.1: Das Lokalitätsprinzip
+## Aufgabe 1: Lokalität begründen (4 Punkte)
 
-Caches funktionieren nur, weil Software kein völlig zufälliges Zugriffsverhalten zeigt.
+Die beiden Folgen beginnen jeweils unabhängig mit einem kalten Cache und
+$64$-Byte-Lines. Es findet keine Verdrängung statt.
 
-1. Erklären Sie den Unterschied zwischen zeitlicher Lokalität (Temporal Locality) und räumlicher Lokalität (Spatial Locality).
-2. Warum sind Arrays aus Sicht des Caches typischerweise effizienter zu verarbeiten als verkettete Listen (Linked Lists)?
+- A: `0x1000, 0x1000, 0x1000`
+- B: `0x1000, 0x1004, 0x1008`
+
+1. Ordnen Sie zeitliche und räumliche Lokalität zu. Begründen Sie die Zuordnung. (2 P)
+2. Bestimmen Sie für jede Folge Hits und Misses. Erklären Sie, warum eine
+   verstreute verkettete Liste mit demselben Elementumfang schlechtere räumliche
+   Lokalität haben kann, aber nicht muss. (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+**Ihr Rechenweg und Ihre Begründung:**
 
-*(Notieren Sie Ihre Lösung hier.)*
+
+\vspace{2cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 1.1**
+**Musterlösung 1**
 
-1. **Zeitliche Lokalität:** Eine kürzlich genutzte Adresse wird mit hoher Wahrscheinlichkeit bald erneut benötigt (z. B. Schleifenzähler, Instruktionen in einer Schleife) — der Cache behält solche Daten.  
-   **Räumliche Lokalität:** Nach Zugriff auf eine Adresse folgen oft Zugriffe auf benachbarte Adressen — deshalb lädt die Hardware bei einem Miss eine ganze Cache-Line (z. B. 64 Byte).
+A zeigt zeitliche Lokalität: Dieselbe Adresse wird erneut gelesen. B zeigt räumliche
+Lokalität: Benachbarte Wörter werden gelesen. Alle Adressen gehören zur Line
+`0x1000` bis `0x103F`. In beiden unabhängigen Folgen entsteht daher zuerst ein
+Miss, danach zwei Hits. Das gilt unter der Annahme, dass die gültige Line erhalten
+bleibt.
 
-2. Arrays liegen als zusammenhängender Block im Speicher. Ein Miss beim ersten Element zieht Nachbarn mit in den schnellen SRAM. Bei verketteten Listen liegen Knoten oft weit verstreut (`malloc`); mitgeladene Nachbardaten sind dann meist nutzlos → viele Misses.
+Ein Array speichert seine Elemente zusammenhängend. Bei einer verstreuten Liste
+kann der Zeiger auf einen Knoten in einer anderen Line führen; die mitgeladenen
+Nachbarn helfen dann wenig. Zusammenhängend abgelegte Listenknoten können dagegen
+ebenfalls gute räumliche Lokalität haben. Der Datentyp allein legt die Quote nicht
+fest. Bewertung: je 1 P für die zwei Zuordnungen, 1 P für die Bilanzen,
+1 P für die begründete Layout-Aussage.
 :::
 
-### Aufgabe 1.2: AMAT-Berechnung
+## Aufgabe 2: AMAT auf zwei Wegen (5 Punkte)
 
-Die Average Memory Access Time (AMAT) ist eine zentrale Kenngröße der Speicherarchitektur.
+Hit Time $t_H=1$ Takt, **zusätzliche** Miss Penalty $p=100$ Takte.
+AMAT bedeutet Average Memory Access Time, mittlere Speicherzugriffszeit.
 
-Ein Prozessor habe:
-
-- Hit Time des L1-Caches: $1$ Takt
-- Miss Penalty (Zugriff Hauptspeicher/DRAM): $100$ Takte
-- Hit Rate des L1 bei einem Programm: $95\,\%$
-
-1. Berechnen Sie die AMAT. Geben Sie Formel und Rechenweg an.
-2. Welche Auswirkungen hat es auf die AMAT, wenn Pointer-Ketten die Hit Rate auf $50\,\%$ senken?
+1. Eine Folge mit $100$ Anfragen hat $95$ Hits und $5$ Misses. Berechnen Sie
+   die Miss Rate und AMAT. Kontrollieren Sie das Ergebnis durch Aufsummieren
+   aller Einzelzeiten. (3 P)
+2. Berechnen Sie AMAT bei $80\,\%$ Hit Rate. (1 P)
+3. Ist das Verhältnis der beiden AMAT-Werte bereits der Beschleunigungsfaktor
+   eines ganzen Programms? Begründen Sie. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+**Ihr Rechenweg:**
 
-*(Notieren Sie Ihre Lösung hier.)*
+
+\vspace{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 1.2**
+**Musterlösung 2**
 
-Formel (ein Cache-Level, Miss geht zum Hauptspeicher):
-
-$$
-\mathrm{AMAT} = \text{Hit Time} + (\text{Miss Rate} \times \text{Miss Penalty})
-$$
-
-1. Miss Rate $= 1 - 0{,}95 = 0{,}05$
+Die Miss Rate $m$ ist der Anteil der Misses:
 
 $$
-\mathrm{AMAT} = 1 + (0{,}05 \times 100) = 1 + 5 = 6\ \mathrm{Takte}
+m=\frac{5}{100}=0{,}05,\qquad
+\mathrm{AMAT}=t_H+mp=1+0{,}05\cdot100=6\ \text{Takte}.
 $$
 
-2. Bei Hit Rate $50\,\%$: Miss Rate $= 0{,}5$
+Jeder Miss kostet insgesamt $1+100=101$ Takte. Kontrolle:
 
 $$
-\mathrm{AMAT} = 1 + (0{,}5 \times 100) = 1 + 50 = 51\ \mathrm{Takte}
+\frac{95\cdot1+5\cdot101}{100}
+=\frac{600}{100}=6\ \text{Takte}.
 $$
 
-Die mittlere Zugriffszeit steigt stark — schlechte Lokalität verlangsamt das Programm deutlich.
+Bei $80\,\%$ Hit Rate ist $m=1-0{,}80=0{,}20$ und
+$\mathrm{AMAT}=1+0{,}20\cdot100=21$ Takte. Die Prüfung kostet auch beim Miss
+einen Takt; daher sind $5$ beziehungsweise $20$ Takte keine korrekten Ergebnisse.
+
+Das Verhältnis $21/6=3{,}5$ vergleicht die mittleren Zugriffszeiten des Modells.
+Für eine Programmlaufzeit fehlen unter anderem Anfrageanzahl, übrige
+Rechenarbeit und Überlappung. Bewertung: Miss Rate 1 P, Formel und Ergebnis 1 P,
+Kontrollrechnung 1 P, zweite AMAT 1 P, begründete Abgrenzung 1 P.
 :::
 
-### Aufgabe 1.3: Cache-Mapping und Adresszerlegung
+## Aufgabe 3: Adressfelder und Blockgrenzen (6 Punkte)
 
-Eine 32-Bit-Adresse wird in Tag, Index und Offset zerlegt.
+Referenzmodell aus der Vorlesung: $32$-Bit-Byteadressen, $C=32$ KiB
+Datenkapazität, $B=64$ Byte je Line. Ein KiB hat $1024$ Byte.
+Tags und Zustandsbits zählen nicht zu $C$.
 
-1. Welche Aufgabe haben Tag, Index und Offset beim Lookup im Cache?
-2. Erklären Sie Thrashing bei einem Direct-Mapped-Cache anhand zweier Arrays A und B.
-3. Wie mildert ein N-Way Set-Associative Cache Thrashing? Warum sinkt dabei typischerweise die Zahl der Index-Bits?
+1. Bestimmen Sie Anzahl der Sets sowie Bitbreiten von Tag, Index und Offset
+   für Direct Mapped und für $4$-Way. Erklären Sie, warum der Offset gleich bleibt. (3 P)
+2. Zerlegen Sie `0x12345678` für Direct Mapped. Geben Sie Index und Offset
+   dezimal, das Tag hexadezimal an. Kontrollieren Sie durch Rückrechnung. (2 P)
+3. Eine andere Anfrage hat die **Dezimaladresse** $1000$. Geben Sie bei
+   $64$-Byte-Lines Blockbeginn, Blockende und Offset an. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+**Ihre Rechnung:**
 
-*(Notieren Sie Ihre Lösung hier.)*
+
+\vspace{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 1.3**
+**Musterlösung 3**
 
-1. **Offset:** unterste Bits — Byte-Position innerhalb der Cache-Line.  
-   **Index:** mittlere Bits — wählt die Zeile bzw. das Set.  
-   **Tag:** oberste Bits — Vergleich mit dem gespeicherten Tag, ob die Line die gesuchte Adresse trägt.
+Mit $W$ Ways, also Plätzen je Set, gilt
 
-2. **Thrashing:** A und B kollidieren auf demselben Index. Im Direct-Mapped-Cache gibt es nur einen Platz pro Index — abwechselnde Zugriffe werfen sich gegenseitig heraus. Die Miss Rate kann nahe $100\,\%$ liegen, obwohl andere Lines frei sind.
+$$
+S=\frac{C}{BW},\quad b=\log_2 B,\quad s=\log_2 S,\quad \tau=32-b-s.
+$$
 
-3. **Set-Associative:** Mehrere Ways pro Set. A und B können denselben Set-Index teilen, aber in unterschiedlichen Ways liegen. Bei fester Cache-Größe und fester Line-Größe bedeutet mehr Associativity weniger Sets → weniger Index-Bits; die Bits wandern typisch ins Tag.
+| Organisation | Sets $S$ | Tagbits $\tau$ | Indexbits $s$ | Offsetbits $b$ |
+|--------------|----------|----------------|---------------|----------------|
+| Direct Mapped | $512$ | $17$ | $9$ | $6$ |
+| $4$-Way | $128$ | $19$ | $7$ | $6$ |
+
+Die Blockgröße bleibt $64$ Byte; der Offset adressiert weiterhin dieselben
+Bytepositionen. Vier Ways verteilen dieselben $512$ Plätze auf weniger Sets.
+
+Für `0x12345678` ist $o=56$, $q=\lfloor a/64\rfloor=\texttt{0x48D159}$,
+$i=q\bmod512=345$ und $t=\lfloor q/512\rfloor=\texttt{0x2468}=9320$.
+Die Rückrechnung lautet
+
+$$
+a=t\cdot32768+i\cdot64+o
+=9320\cdot32768+345\cdot64+56=305419896=\texttt{0x12345678}.
+$$
+
+Für Dezimaladresse $1000$ ist die Blocknummer $15$.
+Blockbeginn $15\cdot64=960$, Blockende $960+63=1023$, Offset $1000-960=40$.
+Bewertung: je 1 P pro Tabellenzeile, 1 P für unveränderten Offset,
+1 P für Adressfelder, 1 P für Rückrechnung, 1 P für Blockgrenzen und Offset.
 :::
 
-### Aufgabe 1.4: Schreibstrategien
+## Aufgabe 4: Zugriffstabelle und Ersetzung (6 Punkte)
 
-Beim Schreiben droht Inkonsistenz zwischen L1-Cache und RAM.
+### 4a: Ein Platz oder vier Plätze? (4 Punkte)
 
-1. Vergleichen Sie Write-Through und Write-Back hinsichtlich Bus-Belastung und Performance.
-2. Welche Rolle hat das Dirty-Bit bei Write-Back, und wann werden Daten in den RAM geschrieben (Eviction)?
+Verwenden Sie das Referenzmodell aus Aufgabe 3. Beide Caches beginnen kalt.
+Alle Anfragen sind Daten-Loads; vier Ways verwenden zunächst freie Plätze.
+
+\Needspace{12\baselineskip}
+
+| Schritt | Adresse | DM: Index | DM: Tag | DM: Hit/Miss | 4-Way: Hit/Miss |
+|---------|---------|-----------|---------|--------------|-----------------|
+| 1 | `0x1000` | | | | |
+| 2 | `0x1004` | | | | |
+| 3 | `0x9000` | | | | |
+| 4 | `0x1000` | | | | |
+| 5 | `0x9000` | | | | |
+| 6 | `0x1004` | | | | |
+
+DM steht für Direct Mapped. Füllen Sie die Tabelle aus. Nennen Sie für jeden Cache
+Hits, Misses und Hit Rate. Begründen Sie, warum die zusätzlichen DM-Misses
+Konflikt-Misses und keine Kapazitäts-Misses sind.
+
+### 4b: FIFO oder LRU? (2 Punkte)
+
+Ein getrenntes, zunächst leeres $4$-Way-Set erhält die Blockfolge
+`A, B, C, D, A, E`. Alle Blöcke haben denselben Set-Index.
+
+Geben Sie für FIFO (First In, First Out) und LRU (Least Recently Used) die
+Reihenfolge „alt nach neu“ nach dem zweiten A sowie den durch E verdrängten
+Block an. Erklären Sie die Wirkung eines Hits auf beide Regeln.
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+**Ihre Zählung und Begründung:**
 
-*(Notieren Sie Ihre Lösung hier.)*
+
+\vspace{2cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 1.4**
+**Musterlösung 4**
 
-1. **Write-Through:** Jeder Write geht (nahezu) synchron in Cache und Hauptspeicher → hohe Bus-Last, oft langsamere Stores.  
-   **Write-Back:** Write zunächst nur im Cache → hohe Performance, geringe Bus-Last; RAM kann vorübergehend veraltet sein.
+\Needspace{12\baselineskip}
 
-2. Das **Dirty-Bit** markiert eine veränderte Line. Zurückschreiben in den DRAM erfolgt typisch bei **Eviction** (Verdrängung), wenn der Platz für eine neue Line benötigt wird — nicht bei jedem Write.
+| Schritt | Adresse | DM: Index | DM: Tag | DM | 4-Way |
+|---------|---------|-----------|---------|----|--------|
+| 1 | `0x1000` | $64$ | $0$ | Miss | Miss |
+| 2 | `0x1004` | $64$ | $0$ | Hit | Hit |
+| 3 | `0x9000` | $64$ | $1$ | Miss | Miss |
+| 4 | `0x1000` | $64$ | $0$ | Miss | Hit |
+| 5 | `0x9000` | $64$ | $1$ | Miss | Hit |
+| 6 | `0x1004` | $64$ | $0$ | Miss | Hit |
+
+`0x1004` gehört zur selben Line wie `0x1000`. Direct Mapped hat
+$1$ Hit, $5$ Misses und Hit Rate $1/6\approx16{,}67\,\%$. Zwei Misses sind
+erste Blockanforderungen, drei weitere entstehen durch gegenseitige Verdrängung.
+
+Der $4$-Way-Cache hat $4$ Hits, $2$ Misses und Hit Rate $4/6\approx66{,}67\,\%$.
+Beide Blöcke treffen dort ebenfalls Set $64$, mit Tags $0$ und $4$.
+Sie belegen verschiedene Ways. Schon zwei Plätze würden für diese Folge genügen.
+Die zusätzlichen DM-Misses entstehen trotz ausreichend großer Gesamtkapazität:
+Ein vollassoziativer Cache gleicher Kapazität könnte beide Blöcke halten.
+Bewertung 4a: Index/Tag 1 P, Trefferfolgen 1 P, Bilanzen und Quoten 1 P,
+Konfliktbegründung 1 P.
+
+FIFO behält nach dem Hit auf A die Ladereihenfolge A, B, C, D und verdrängt A.
+LRU aktualisiert die letzte Nutzung zu B, C, D, A und verdrängt B.
+Ein Hit verjüngt einen Block nur in der LRU-Nutzungsordnung.
+Bewertung 4b: je 1 P für vollständige Reihenfolge, Opfer und Begründung pro Regel.
 :::
 
-## Teil 2: Praxis — Cache-freundlicher C-Code
+## Aufgabe 5: Schreiben und alte Blockadresse (5 Punkte)
 
-### Aufgabe 2.1: Row-Major vs. Column-Major
+Direct Mapped wie Aufgabe 3, Write-Back und Write-Allocate, keine Puffer.
+Zunächst ist die Line `0x1000` gültig und sauber (Dirty $=0$).
+Das betrachtete Wort hat im Cache und in der nächsten Ebene den Wert $0$.
+`0x9000` ist nicht im Cache; dort enthält die nächste Ebene den Wert $9$.
 
-Gegeben sind zwei Snippets, die ein $1000\times 1000$-Integer-Array auf $0$ setzen. C speichert 2D-Arrays **zeilenweise** (Row-Major).
+Verfolgen Sie: `Store 5 nach 0x1000; Load 0x1000; Store 7 nach 0x1000;
+Load 0x9000`. Nur diese vier Anfragen werden gezählt.
 
-**Variante A:**
+1. Füllen Sie Zustand und eventuelles Writeback nach jedem Schritt aus. (3 P)
+
+\Needspace{12\baselineskip}
+
+| Schritt | Cache-Blockbasis | Wortwert | Dirty | Wert unten bei `0x1000` | Writeback-Adresse |
+|---------|-----------------|----------|-------|-------------------------|-------------------|
+| Store 5 | | | | | |
+| Load | | | | | |
+| Store 7 | | | | | |
+| Load `0x9000` | | | | | |
+
+2. Warum muss der letzte Schritt gegebenenfalls an die alte Blockadresse
+   zurückschreiben? (1 P)
+3. Was wäre bei einem Store-Miss mit No-Write-Allocate anders?
+   Ist diese Regel durch Write-Back schon festgelegt? (1 P)
+
+::: {.content-hidden when-profile="solution"}
+**Ihre Erläuterung:**
+
+
+\vspace{1.5cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+**Musterlösung 5**
+
+\Needspace{12\baselineskip}
+
+| Schritt | Blockbasis | Wortwert | Dirty | Wert unten bei `0x1000` | Writeback |
+|---------|------------|----------|-------|-------------------------|-----------|
+| Store 5 | `0x1000` | $5$ | $1$ | $0$ | keiner |
+| Load | `0x1000` | $5$ | $1$ | $0$ | keiner |
+| Store 7 | `0x1000` | $7$ | $1$ | $0$ | keiner |
+| Load `0x9000` | `0x9000` | $9$ | $0$ | $7$ | nach `0x1000` |
+
+Die ersten drei Anfragen sind Hits. Lesen ändert Dirty nicht. Der vierte
+Zugriff ist ein Miss auf denselben Index $64$ und verdrängt die veränderte Line.
+Die alte Blockbasis ist aus altem Tag und Index zu bilden:
+
+$$
+a_\text{alt}=(t_\text{alt}\cdot S+i)B=(0\cdot512+64)\cdot64=\texttt{0x1000}.
+$$
+
+Das Zurückschreiben erhält den aktuellen Wert $7$ am richtigen Ort.
+Ein Writeback nach `0x9000` würde den fremden Block überschreiben.
+Danach wird der angefragte Block geladen und ist sauber.
+Die gültige Line bleibt bei allen dargestellten Zuständen Valid $=1$.
+
+No-Write-Allocate würde bei einem Store-Miss den Store weitergeben, ohne eine
+neue Cache-Line anzulegen. Weitergabe und Zuteilen sind getrennte Entscheidungen;
+Write-Back legt die Store-Miss-Regel nicht allein fest. Bewertung:
+Stores 1 P, Load-Hit 1 P, letzter Zustand 1 P, alte Adresse 1 P, Policy-Abgrenzung 1 P.
+:::
+
+## Aufgabe 6: C-Layout als Papieraufgabe (6 Punkte)
+
+Es gilt `uint32_t a[16][16]`: $16$ Zeilen, $16$ Spalten, $4$ Byte pro
+Element, Basis `0x1000`. Die Elemente sind initialisiert.
+Betrachten Sie zwei **definierte Modellspuren**, je genau ein Daten-Load pro
+Element. Andere Zugriffe und Compileroptimierungen gehören nicht zur Zählung.
 
 ```c
-for (int row = 0; row < 1000; row++) {
-    for (int col = 0; col < 1000; col++) {
-        bild[row][col] = 0;
-    }
-}
+/* A: zeilenweise; sum ist ein uint64_t-Akkumulator mit Startwert 0. */
+for (unsigned r = 0; r < 16; ++r)
+    for (unsigned c = 0; c < 16; ++c)
+        sum += a[r][c];
+
+/* B: unabhängig davon spaltenweise, sum zuvor wieder 0. */
+for (unsigned c = 0; c < 16; ++c)
+    for (unsigned r = 0; r < 16; ++r)
+        sum += a[r][c];
 ```
 
-**Variante B:**
+`uint32_t` und `uint64_t` sind vorzeichenlose Ganzzahltypen mit $32$
+beziehungsweise $64$ Bit; `r` und `c` sind Zeilen- und Spaltenindex.
 
-```c
-for (int col = 0; col < 1000; col++) {
-    for (int row = 0; row < 1000; row++) {
-        bild[row][col] = 0;
-    }
-}
-```
-
-1. Welche Variante ist cache-freundlich, welche problematisch? Begründen Sie physikalisch (Lokalität, Cache-Lines).
-2. Was passiert in Variante B bei jedem Schritt der inneren Schleife bezüglich der geladenen Cache-Line?
+1. Leiten Sie die Elementadresse her und geben Sie die ersten vier Adressen
+   beider Spuren an. (2 P)
+2. Kleines Modell: $512$ Byte Datenkapazität, Direct Mapped, $64$-Byte-Lines,
+   vor jeder Variante kalt. Leiten Sie den Set-Index der Zeile $r$ her und zählen
+   Sie Hits und Misses für beide vollständigen Spuren. (3 P)
+3. Ändern Sie nur die Datenkapazität auf $1024$ Byte. Was ändert sich an der
+   spaltenweisen Bilanz? Begründen Sie. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+**Ihr Rechenweg:**
 
-*(Notieren Sie Ihre Lösung hier.)*
+
+\vspace{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 2.1**
+**Musterlösung 6**
 
-1. **Variante A** (innere Schleife über Spalten einer Zeile) ist cache-freundlich: aufeinanderfolgende Elemente liegen im RAM nebeneinander → räumliche Lokalität.  
-   **Variante B** (innere Schleife über Zeilen einer Spalte) springt um jeweils eine Zeilenbreite (hier $1000 \times \mathrm{sizeof(int)}$ Byte) → schlechte räumliche Lokalität, viele Misses.
+C speichert zeilenweise. Vor Zeile $r$ liegen $16r$ Elemente, davor in der Zeile
+weitere $c$. Somit
 
-2. Bei B lädt ein Miss zu `bild[r][c]` typisch eine Line mit horizontalen Nachbarn in derselben Zeile. Der nächste Zugriff `bild[r+1][c]` liegt weit entfernt — die mitgeladenen Nachbarn werden oft nicht genutzt, bevor die Line verdrängt wird. Folge: nahezu Miss pro Innenschritt (je nach Line-Größe und Array-Layout).
+$$
+a_{r,c}=\texttt{0x1000}+4(16r+c).
+$$
+
+Spur A beginnt `0x1000, 0x1004, 0x1008, 0x100C`.
+Spur B beginnt `0x1000, 0x1040, 0x1080, 0x10C0`.
+
+Im kleinen Modell gibt es $512/64=8$ Sets. Eine Arrayzeile ist
+$16\cdot4=64$ Byte groß und beginnt auf einer Blockgrenze. Ihre Blocknummer
+ist $64+r$, also ihr Set-Index $(64+r)\bmod8=r\bmod8$.
+
+Zeilenweise folgen auf den ersten Load einer Zeile fünfzehn Hits:
+$16$ Misses und $240$ Hits, Hit Rate $93{,}75\,\%$.
+Spaltenweise ersetzen Zeilen $8$ bis $15$ die Zeilen $0$ bis $7$ in denselben Sets.
+In der nächsten Spalte fehlen die ersten acht Zeilen wieder; sie ersetzen
+die zweiten acht, die anschließend ebenfalls fehlen. Daher $256$ Misses und
+$0$ Hits. Die $16$ ersten Blockanforderungen sind Kaltstart-Misses.
+Die späteren Misses sind gegenüber einem vollassoziativen Acht-Plätze-Cache
+mit LRU ebenfalls nicht vermeidbar; die aktive Menge ist zu groß.
+
+Mit $1024$ Byte gibt es $16$ Sets. Jede Zeile hat einen eigenen Platz und bleibt
+bis zur Wiederverwendung erhalten. Spaltenweise lädt die erste Spalte alle
+$16$ Lines; die folgenden $15$ Spalten ergeben $240$ Hits. Beide Varianten haben
+nun $16$ Misses und $240$ Hits. Ein großer Adresssprung allein beweist somit
+keine bestimmte Miss Rate oder Programmlaufzeit.
+
+Bewertung: Adressformel 1 P, Anfangsspuren 1 P, Set-Index 1 P,
+je eine begründete Bilanz 1 P, größerer Cache 1 P.
 :::
 
-### Aufgabe 2.2: Messung (optional / Labor)
+## Optional: Simulatorvergleich (ohne Punkte)
 
-Übertragen Sie Variante A (und zum Vergleich Variante B) in einen Simulator mit Daten-Cache (z. B. Ripes). Aktivieren Sie den D-Cache und vergleichen Sie die Hit-Rates.
+Wenn Ripes, ein visueller RISC-V-Simulator, verfügbar ist, vergleichen Sie eine
+explizite Load-Spur mit der Papierlösung. Dokumentieren Sie Version, Cache-Größe,
+Blockgröße, Ways, Anfangszustand und welche Datenanfragen tatsächlich gezählt
+werden. Setzen Sie den Cache vor jedem Vergleich zurück.
 
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-*(Notieren Sie Ihre Beobachtungen hier.)*
-:::
+Behandeln Sie Trefferzahlen als Analyse der Spur. Das Cache-Modell von Ripes ist
+kein vollständiges Cache-Latenzmodell und belegt keinen allgemeinen
+Geschwindigkeitsfaktor. Zusätzliche Datenzugriffe eines Simulatorprogramms müssen
+gesondert berücksichtigt werden.
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 2.2**
-
-Erwartung: Variante A ist deutlich schneller und zeigt eine höhere Hit-Rate als Variante B — wegen der räumlichen Lokalität im Row-Major-Layout. Die absolute Rate hängt von Line-Größe, Cache-Kapazität und Associativity ab; entscheidend ist der relative Unterschied.
+**Hinweis zur Auswertung:** Eine Abweichung zuerst auf zusätzliche Zugriffe,
+falsche Einstellungen oder einen nicht zurückgesetzten Cache prüfen.
+Keine bestimmte Simulatorzeit ist als Musterergebnis vorgegeben.
 :::
