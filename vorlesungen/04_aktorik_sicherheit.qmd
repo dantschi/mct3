@@ -1,1017 +1,960 @@
 ---
 title: "04 · Aktorik & Sicherheit"
-subtitle: "Mikrocomputertechnik 3 · Von Hardware-Countern, PWM-Signalen und dem rettenden Watchdog"
+subtitle: "Mikrocomputertechnik 3 · Hardware-PWM und überwachte Abläufe"
 author: "Prof. Dr.-Ing. Daniel Klünder"
-lang: de
-# Vortrag:  quarto preview vorlesungen/04_aktorik_sicherheit.qmd
-#           (Notizen nur mit Taste S)
-# Handout:  quarto render vorlesungen/04_aktorik_sicherheit.qmd --profile handout --to pdf
-#           → _handout/vorlesungen/04_aktorik_sicherheit.pdf
 format: revealjs
+title-slide-attributes:
+  data-visibility: hidden
+lang: de
+# Vortrag: quarto render vorlesungen/04_aktorik_sicherheit.qmd --to revealjs
+# Skript: quarto render vorlesungen/04_aktorik_sicherheit.qmd --profile handout --to pdf
 ---
 
-## Willkommen zu Block 4!
+## Von Ereignissen zu Ausgaben
 
-- Willkommen zur vierten Vorlesung in Mikrocomputertechnik 3
-- Rückblick: In Block 3 hat der CLINT dem SoC einen Herzschlag (System-Tick) gegeben
-- Bisher: CPU reagiert auf Ereignisse (Interrupts) und verarbeitet Daten
-- Heute: das System wird aktiv — physikalische Welt steuern (Aktorik)
-- Sicherheitsnetz: Wer passt auf die CPU auf, wenn Software hängt?
-
-::: notes
-Willkommen zu Block 4 knüpft an die bisherige Frage nach Signal und Überwachung an. CPU heißt Central Processing Unit, SoC System on Chip. CLINT ist der Core Local Interruptor, PLIC der Platform-Level Interrupt Controller. Eine LED ist eine Leuchtdiode. Der Prozessor kann Helligkeit rechnen, der Pin braucht daraus ein brauchbares Signal. PWM-Hardware und Watchdog haben verschiedene Aufgaben: eines formt das Ausgangssignal, das andere überwacht ausbleibenden Fortschritt. Ein System-Tick ist eine mögliche Architektur, kein Pflichtherzschlag. Solange Timer und Takt laufen, kann das letzte PWM-Signal weiterlaufen, auch wenn die Hauptschleife hängt. Willkommen zur vierten Vorlesung in Mikrocomputertechnik 3. Rückblick: In Block 3 hat der CLINT dem SoC einen Herzschlag (System-Tick) gegeben. Bisher: CPU reagiert auf Ereignisse (Interrupts) und verarbeitet Daten. Verständnischeck: Was passiert mit Hardware-PWM bei einem Hänger der Hauptschleife? Sie kann unverändert weiterlaufen. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Einordnung im Semester
-
-```{mermaid}
-%%| fig-width: 4.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[Block 3: Interrupts] -->|CPU reagiert| B[Block 4: Aktorik]
-  B -->|CPU steuert| C[LEDs und Motoren]
-  D[Watchdog] -.->|Hardware schützt| B
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+- Vorlesung 3: Zeitquelle, Termine und Interruptbehandlung
+- Heute: Licht, Bewegung und andere physikalische Wirkungen
+- Ein Timer erzeugt ein Signal; eine Treiberstufe liefert Leistung
+- Ein Watchdog überwacht einen vereinbarten Fortschrittsnachweis
 
 ::: notes
-Einordnung im Semester knüpft an die bisherige Frage nach Signal und Überwachung an. Aktorik ist die Wirkung auf die Umwelt, nicht nur eine ausgegebene Zahl. Verfügbarkeit durch Neustart ist etwas anderes als ein definierter Zustand bei Gefahr. Funktionale Sicherheit wird hier nicht abgeschlossen. Block 3 liefert die monotone Zeit, mit der Fading-Schritte zu Sollzeitpunkten geplant werden. Verständnischeck: Warum ist Block 3 Voraussetzung? Ohne Zeitbasis gibt es kein festes 10-ms-Raster. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Vorlesung 3 hat erklärt, wie Hardwarezeit, Interruptfreigaben und Softwaretermine zusammenhängen. Aktorik erweitert diese Verarbeitung um eine physikalische Ausgabe: Licht, Wärme oder Bewegung. Ein Aktor setzt ein elektrisches Kommando in eine solche Wirkung um. Das Kommando ist nicht automatisch die dafür benötigte Energie.
+
+Eine Pulsweitenmodulation kann aus einem digitalen Ausgang ein zeitlich veränderliches Steuersignal machen. Eine angeschlossene Last reagiert darauf entsprechend ihren elektrischen und mechanischen Eigenschaften. Der Watchdog ist dagegen eine Überwachung: Bleibt ein vereinbartes Lebenszeichen aus, löst er im betrachteten Modell einen Reset aus. Das ersetzt weder die eigentliche Steuerung noch den Entwurf eines passenden Ausgangszustands.
+
+Wir behandeln beide Aufgaben gemeinsam, weil Hardwareausgänge auch dann weiterlaufen können, wenn die Anwendung nicht mehr fortschreitet. Der rote Faden führt daher von der Zeitbasis über Ausgangssignale zu ihrer Aktualisierung und anschließend zur Erkennung ausbleibender Arbeit.
+
+Ein Beispiel ist eine langsam heller werdende Lampe: Die Anwendung entscheidet über den nächsten Sollwert, ein PWM-Timer erzeugt die Pulse. PWM steht für Pulse Width Modulation, Pulsweitenmodulation. Stoppt nur die Sollwertberechnung, kann die Lampe mit der zuletzt eingestellten Ausgabe weiter leuchten.
 :::
 
-## Anknüpfung: CLINT, Tick und volatile
+## Voraussetzungen und unser Timer-Modell
 
-Kurz-Recap aus Block 3 (Vertiefung im Übungsblatt):
+- Geräteadressen, C-Zeiger und Timer-Ticks aus Vorlesung 3
+- GPT: General Purpose Timer, Peripheriezähler
+- Up-Counting: `CNT` läuft von $0$ bis einschließlich `ARR`
+- Vorteiler `PSC+1`; Active-High, solange `CNT < CCR`
+- Diese Registerkonvention ist ein Lehrmodell, kein RISC-V-Standard
 
-- CLINT liefert eine monotone Zeit für Termine, keinen PWM-Pin
-- Ein Folgetermin knüpft an den bisherigen Solltermin an
-- `volatile` verhindert bestimmte Wegoptimierungen, nicht Atomarität
-- Die PWM-Flanken erzeugt später ein eigener Peripherietimer
+::: notes
+GPT heißt General Purpose Timer, allgemein verwendbarer Peripherietimer. CNT steht für Counter, Zählwert. ARR bedeutet Auto-Reload Register, Periodengrenze. PSC ist der Prescaler, Vorteiler. CCR heißt Capture/Compare Register; wir nutzen seine Vergleichsfunktion. Im Modell zählt CNT aufwärts von null bis einschließlich ARR und setzt sich erst mit dem nächsten Tick zurück. Die Periode hat daher $N=ARR+1$ Zählintervalle.
+
+Der Vorteiler teilt die anliegende Timerfrequenz durch PSC plus eins. Der Ausgang ist im Active-High-Modell aktiv und HIGH, solange CNT kleiner als CCR ist. Für die folgenden Rechnungen legen wir einen Timer-Eingangstakt von hundert Megahertz, PSC neunundneunzig und ARR neunhundertneunundneunzig fest, sofern nicht ausdrücklich anders angegeben.
+
+RISC-V beschreibt den Befehlssatz des Prozessors; GPT, Registeradressen, Pinzuordnung und Watchdog sind Plattformmerkmale. Die Konvention erinnert an verbreitete Peripherietimer, ersetzt aber kein Datenblatt. Alle Zahlen sind Lehrannahmen. Für vollständige Hardware-Ausführung fehlen bewusst eine konkrete Plattform und ein geprüfter Treiber.
+
+Active-High benennt die aktive Polarität, nicht eine höhere elektrische Leistung. HIGH und LOW sind die hohen und niedrigen Pegel. Up-Counting beschreibt nur die Zählrichtung; die Wirkung am Pin entsteht erst durch Vergleich, Modus und angeschlossene Last.
+:::
+
+## Vier Schulstunden: Ablauf
+
+| Stunde | Vorlesungsphase | Arbeitsphase |
+|--------|-----------------|--------------|
+| 1 | Timer und PWM-Grundlagen: 35 min | Aufgabe 1: 10 min |
+| 2 | Signale und Aktualisierung: 30 min | Aufgaben 2–3: 15 min |
+| 3 | Anwendungen und Überwachung: 30 min | Aufgabe 4: 15 min |
+| 4 | Watchdog und Ausgangszustand: 15 min | Aufgaben 5–6: 15 min; Quiz: 15 min |
+
+::: notes
+Vier Schulstunden entsprechen hundertachtzig Minuten Unterricht, Pausen zusätzlich. Der Plan enthält hundertzehn Minuten Erklärung mit Denkfragen und gemeinsamer Lösungsbesprechung, fünfundfünfzig Minuten angeleitete Papierübungen und fünfzehn Minuten Quiz.
+
+PWM heißt Pulse Width Modulation, Pulsweitenmodulation. In der ersten Phase werden ihre Zeitgrößen aus dem Zähler abgeleitet. In der zweiten unterscheiden wir Spannungsgrößen, Softwareflanken und gepufferte Änderungen. Anwendungen wie LED-Dimmen und Servos führen in der dritten Phase zu der Frage, was bei fehlender neuer Softwarearbeit geschieht. LED bedeutet Light Emitting Diode, Leuchtdiode. Der Watchdog, eine zeitbezogene Überwachung, und sein Zusammenspiel mit dem Ausgangszustand schließen den Ablauf ab.
+
+Die sechs Aufgaben des Übungsblatts folgen dieser Reihenfolge. Für vollständiges selbstständiges Bearbeiten nennt das Blatt einen längeren Richtwert; im Unterricht werden Schritte angeleitet und Lösungen in den Vorlesungsphasen besprochen. Die fünfzig Folien dienen als unterschiedlich lange Gesprächsgrundlagen. Insbesondere die Signaldiagramme und Zustandsbeispiele benötigen mehr Zeit als eine kurze Orientierung.
+:::
+
+## Systemzeit ist nicht PWM-Träger
+
+- `mtime`: Zeitquelle für Softwaretermine
+- `mtimecmp`: Zeitpunkt einer Timeranforderung
+- Peripherietimer: wiederkehrende Flanken am Ausgang
+- PWM-Träger und Änderungsrate eines Sollwerts unterscheiden
+
+::: notes
+`mtime` heißt Machine Time, Hardware-Zeitquelle des klassischen RISC-V-Modells. `mtimecmp` ist Machine Time Compare, Vergleichswert für eine zeitbezogene Interruptanforderung. Die CLINT-Organisation, Core Local Interruptor, aus Vorlesung 3 bietet solche lokalen Funktionen. Sie besitzt in diesem Modell keinen PWM-Ausgangspin.
+
+PWM bedeutet Pulse Width Modulation, Pulsweitenmodulation. Ein eigener Peripherietimer kann seine Flanken erzeugen, während Software ihre Termine anhand der Systemzeit plant. Beispielsweise kann das Ausgangssignal tausendmal pro Sekunde wiederholen, während das Hauptprogramm den Helligkeitssollwert nur alle zehn Millisekunden ändert. Das sind verschiedene Raten und möglicherweise verschiedene Taktquellen.
+
+Die Aufteilung erlaubt, dass das genaue Ausgangsmuster nicht bei jeder Flanke eine Interrupt Service Routine, ISR, benötigt. Eine ISR kann stattdessen kurz Zeit oder Arbeit veröffentlichen; die eigentliche Sollwertänderung erfolgt anderswo. Das macht Hardware-PWM nicht unfehlbar: Ihre Taktrate, Konfiguration und Freigaben müssen weiterhin passen. Für die physikalische Wirkung kommt außerdem eine angeschlossene Leistungs- oder Laststufe hinzu.
+
+Im genannten Beispiel liegen zehn Trägerperioden zwischen zwei Sollwertänderungen. Eine Frequenz von einem Kilohertz bedeutet tausend Wiederholungen pro Sekunde; zehn Millisekunden Abstand bedeuten dagegen hundert Änderungen pro Sekunde. Beide Zahlen müssen bei der Beschreibung eines zeitlich veränderlichen Signals getrennt angegeben werden.
+:::
+
+## Steuerpfad und Leistungsweg
+
+![](../assets/figures/04_aktorik_sicherheit/paths.png){fig-alt="Software und Timer liefern ein Steuersignal an einen Treiber; eine separate Versorgung speist über den Treiber den Aktor."}
+
+- Ein Kommando transportiert nicht die gesamte Aktorleistung
+- Ohne Rückmeldung ist ein Tastverhältnis zunächst offene Steuerung
+
+::: notes
+Die Abbildung liest sich im Steuerpfad von links nach rechts: Software legt einen Sollwert fest, der Timer erzeugt das Steuersignal, der Treiber schaltet die Last. Ein separater Pfeil führt von der Versorgung zur Treiberstufe. Dieser Leistungsweg liefert die Energie des Aktors. Die Grafik ist ein Funktionsbild, keine vollständig verdrahtete Schaltung.
+
+PWM bedeutet Pulse Width Modulation, Pulsweitenmodulation. Ein GPIO, General Purpose Input/Output, allgemein verwendbarer Ein- und Ausgangspin, liefert hier einen Steuerpegel. Ein Motor mit eigener Versorgung zieht seinen Laststrom über einen passenden Treiber, nicht durch den Prozessorpin. Spannungsbereiche, Stromgrenzen und gemeinsame Bezugspotenziale oder galvanische Trennung sind Eigenschaften der konkreten Verbindung.
+
+Ein vorgegebenes Tastverhältnis ist eine offene Steuerung: Es legt ein Kommando fest, ohne die tatsächliche Bewegung oder Helligkeit zurückzumessen. Regelung würde zusätzlich einen Messwert mit dem Sollwert vergleichen und das Kommando anpassen. Eine Zahl fünfzig Prozent garantiert deshalb nicht fünfzig Prozent Drehzahl oder Leistung. Wir betrachten zunächst nur, welche Ausgangszeitanteile der Timer tatsächlich erzeugt.
+
+Bei beispielhaften drei Komma drei Volt Steuerpegel und zwölf Volt Lastversorgung sind deshalb zwei Spannungsbereiche beteiligt. Die Verbindung dazwischen muss zur Treiberbeschaltung passen. Das Funktionsbild zeigt ihre Aufgabe, behauptet aber keine konkrete elektrische Kompatibilität beliebiger Pins und Treiber.
+:::
+
+## Zwei Pegel, viele Zeitanteile
+
+- Ideales digitales Signal: LOW $0$ V, HIGH $3{,}3$ V
+- PWM verändert die Dauer der Pegel, nicht ihre Höhe
+- Die ungefilterte Leitung bleibt ein Schaltsignal
+- Last und Wahrnehmung entscheiden über die Wirkung
+
+::: notes
+PWM bedeutet Pulse Width Modulation, Pulsweitenmodulation. Für unsere Signalrechnungen nehmen wir ideale Pegel von null und drei Komma drei Volt an. LOW bezeichnet den niedrigen, HIGH den hohen Pegel. Die Hardware schaltet zwischen diesen Pegeln. Wird die HIGH-Phase verkürzt, entstehen nicht automatisch niedrigere HIGH-Spitzen.
+
+Die zeitliche Folge kann eine träge Last oder einen Filter anders beeinflussen als eine dauerhafte Spannung. Eine LED, Light Emitting Diode, Leuchtdiode, kann während aktiver Phasen Licht abgeben. Ein Motor enthält dagegen unter anderem Induktivität und mechanische Trägheit. Die einfache Zeitanteilsrechnung beschreibt daher zunächst das Kommando, nicht jede Lastreaktion.
+
+Auch die menschliche Wahrnehmung ist keine lineare Spannungsmessung. Wir führen deshalb später zeitlichen Mittelwert, Effektivwert und wahrgenommene Helligkeit getrennt ein. Bevor wir solche Größen berechnen können, benötigen wir eine festgelegte Periode und ein nachvollziehbares Zählmodell.
+
+Bei konstanten drei Komma drei Volt gibt es dagegen keine LOW-Phase. Eine mittlere Zahl unterhalb dieses Pegels kann sowohl ein wechselndes Rechteck als auch eine kleinere konstante Spannung beschreiben. Deshalb reicht eine einzelne Spannungszahl ohne Angabe der Signalform nicht aus.
+:::
+
+## Vom Takt zum Ausgang
+
+![](../assets/figures/04_aktorik_sicherheit/prescaler.png){fig-alt="Timer-Eingangstakt durchläuft einen Vorteiler; der Zähler wird durch ARR begrenzt, sein Vergleich mit CCR steuert den Ausgang."}
+
+GPT: Zählwerk, Periodengrenze und Vergleich arbeiten ohne Software pro Tick.
+
+::: notes
+GPT heißt General Purpose Timer, allgemein verwendbarer Peripherietimer. Die Abbildung zeigt seine funktionale Kette. Links liegt der Timer-Eingangstakt an. PSC, Prescaler, ist der programmierbare Vorteiler. CNT, Counter, ist der Zähler hinter diesem Teiler. ARR, Auto-Reload Register, bestimmt im Modell die obere Zählgrenze. CCR, Capture/Compare Register, liefert den Vergleichswert für die Ausgangssteuerung.
+
+Die Pfeile zeigen Daten- und Steuerbeziehungen, keine gemessenen Laufzeiten. Für jeden weitergegebenen Zähltick verändert das Zählwerk seinen Zustand. Periodengrenze und Vergleich wirken in Hardware. Der Prozessor muss somit nicht für jedes einzelne Intervall einen Registerwert lesen und den Pin umschalten.
+
+Der eigentliche Pin benötigt dennoch einen verbundenen Ausgangspfad, etwa über Pin-Mux, eine Funktionsauswahl am Pin, sowie passende Kanal- und Timerfreigaben. Diese zusätzlichen Bedingungen werden später separat konfiguriert. Zuerst bestimmen wir, wie schnell der Zähler läuft.
+
+Im Hauptbeispiel erreicht alle hundert Eingangstakte ein Tick das Zählwerk. Tausend solcher Ticks bilden später eine Periode. Der Vorteiler verändert also die Zeitskala, ARR die Zahl der Intervalle und CCR ihre aktive Teilmenge. Erst zusammen beschreiben diese Einstellungen das Ausgangsmuster.
+:::
+
+## Der Vorteiler zählt mit
+
+$$
+f_\text{cnt}=\frac{f_\text{tim}}{PSC+1}
+$$
+
+| Timer-Eingang $f_\text{tim}$ | PSC | Zählfrequenz $f_\text{cnt}$ |
+|----------------------------|-----|----------------------------|
+| $100$ MHz | $0$ | $100$ MHz |
+| $100$ MHz | $99$ | $1$ MHz |
+
+Bei $1$ MHz dauert ein Zählintervall $1\,\mu$s.
+
+::: notes
+$f_\text{tim}$ ist die Frequenz am Timereingang, $f_\text{cnt}$ die Frequenz der Zählintervalle. PSC steht für Prescaler, Vorteilerregister. MHz bedeutet Megahertz, eine Million Taktperioden pro Sekunde. Die Registerkonvention PSC plus eins ist eine ausdrückliche Modellannahme; andere Hardware kann andere Teilerkodierungen verwenden.
+
+PSC null teilt durch eins, verändert die Frequenz also nicht. PSC neunundneunzig teilt durch hundert: $100\,\mathrm{MHz}/100=1\,\mathrm{MHz}$. Ein Zählintervall dauert dann $1/f_\text{cnt}=10^{-6}$ Sekunden, eine Mikrosekunde. Ein größerer PSC-Wert verlängert die Intervalle, ohne die Zahl der Registerzustände zu ändern.
+
+Die Timer-Eingangsfrequenz muss aus dem konkreten Taktbaum bestimmt werden. Sie ist nicht allein aus einer beworbenen Prozessortaktfrequenz ableitbar. In dieser Vorlesung ist sie mit hundert Megahertz vorgegeben, damit Perioden- und Pulsrechnungen zusammenpassen. Als Nächstes klären wir, wie viele Intervalle bis zum Neustart verstreichen.
+
+Als Gegenprobe liefert PSC drei in derselben Konvention einen Teiler vier, nicht drei. Bei hundert Megahertz wären das fünfundzwanzig Megahertz Zählfrequenz. Der Registerwert und der tatsächliche Teilfaktor müssen daher beim Lesen eines Programms getrennt notiert werden.
+:::
+
+## ARR gilt einen vollen Tick
+
+Kleines Up-Counting-Modell mit `ARR = 3`:
+
+| Zeitpunkt in Zählticks | $0$ | $1$ | $2$ | $3$ | $4$ |
+|------------------------|-----|-----|-----|-----|-----|
+| CNT | $0$ | $1$ | $2$ | $3$ | $0$ |
+
+$$
+N=ARR+1=4,\qquad T=\frac{N}{f_\text{cnt}}
+$$
+
+::: notes
+ARR bedeutet Auto-Reload Register, Periodengrenze. CNT ist Counter, der aktuelle Zählwert. Up-Counting heißt Aufwärtszählen. Das kleine Beispiel macht die Zählkonvention sichtbar: CNT hält null während des ersten Intervalls, eins während des zweiten, zwei während des dritten und drei während des vierten. Erst der nächste Tick startet wieder bei null.
+
+$N$ ist die Zahl der Intervalle einer Periode, $T$ deren Zeitdauer und $f_\text{cnt}$ die Zählfrequenz. Bei ARR drei hat die Periode vier Intervalle, daher $N=ARR+1$, nicht ARR. Im Hauptbeispiel ARR neunhundertneunundneunzig gibt es entsprechend tausend Intervalle. Ein voller Zustand an der oberen Grenze ist nicht ein zusätzlicher Fehler, sondern Bestandteil des Modells.
+
+Die Aussage muss bei konkreter Hardware für den gewählten Modus geprüft werden. Ein Datenblatt kann andere Grenz- oder Reloadregeln beschreiben. Für alle folgenden Up-Counting-Aufgaben bleibt jedoch dieselbe Konvention erhalten, damit Frequenz und Tastverhältnis nicht durch wechselnde Definitionen widersprüchlich werden.
+
+Die letzte Null der Tabelle ist der Anfang der folgenden Periode. Würde man sowohl diese Null als auch die erste zum selben Zyklus zählen, käme man fälschlich auf fünf Intervalle. Für Zeitdiagramme sind die Perioden daher als direkt aneinandergrenzende, halboffene Abschnitte zu lesen.
+:::
+
+## Registerbreite begrenzt den Zählbereich
+
+Ein $16$-Bit-Zähler hat $2^{16}=65536$ Zustände.
+
+$$
+T_\text{max}=\frac{65536}{f_\text{cnt}}
+$$
+
+- Bei $100$ MHz: $0{,}65536$ ms
+- Bei $1$ MHz: $65{,}536$ ms
+- Registerbreite und nutzbare PWM-Auflösung sind verschiedene Größen
+
+::: notes
+Ein Bit ist eine Binärstelle. Sechzehn Bit erlauben die Werte null bis fünfundsechzigtausendfünfhundertfünfunddreißig, insgesamt fünfundsechzigtausendfünfhundertsechsunddreißig Zustände. Im festgelegten Aufwärtszählmodell mit maximalem ARR, Auto-Reload Register, dauert eine Periode daher so viele Zählintervalle.
+
+$T_\text{max}$ ist diese größte Periodendauer, $f_\text{cnt}$ die Zählfrequenz. Bei hundert Megahertz ergeben sich $65536/10^8=0{,}00065536$ Sekunden, also $0{,}65536$ Millisekunden. Bei einer Million Schritten pro Sekunde sind es $0{,}065536$ Sekunden, $65{,}536$ Millisekunden. Ein Vorteiler kann größere Zeitspannen ermöglichen, macht den einzelnen Tick dabei aber gröber.
+
+PWM heißt Pulse Width Modulation, Pulsweitenmodulation. Ihr verfügbares Tastverhältnis hängt von den tatsächlich gewählten Periodenintervallen ab, nicht nur von der maximalen Registerbreite. Eine kurze Periode kann weit weniger als fünfundsechzigtausend Stufen enthalten. Außerdem haben manche Compare-Register andere Breiten oder Sonderregeln für konstante Ausgänge; diese prüfen wir bei den Endwerten.
+
+Ein sechzehn Bit breites Register enthält nicht den Wert $65536$, sondern höchstens $65535$. Trotzdem sind es mit null zusammen $65536$ Zustände. Diese Unterscheidung zwischen höchstem Zahlenwert und Anzahl der Werte erklärt sowohl die Periodenformel als auch spätere Probleme beim Hundert-Prozent-Compare.
+:::
+
+## Zählmodi und Perioden
+
+![](../assets/figures/04_aktorik_sicherheit/count-modes.png){fig-alt="Bei ARR 4 hat der Aufwärtszähler fünf Intervalle; der modellierte Auf-und-ab-Zyklus 0,1,2,3,4,3,2,1 hat acht Intervalle."}
+
+- Up und Down: hier jeweils $ARR+1$ Intervalle
+- Center-Aligned: hier $2ARR$, ohne doppelte Endpunktintervalle
+
+::: notes
+Up-Counting bedeutet Aufwärtszählen, Down-Counting Abwärtszählen und Center-Aligned eine zentrierte Auf-und-ab-Folge. ARR, Auto-Reload Register, ist die obere Grenze. CNT bedeutet Counter, aktueller Zählwert. Die Abbildung zeigt diskrete Zählerstände über Zählticks, keine analogen Spannungen. Im kleinen Modell ARR vier ist die Up-Folge null, eins, zwei, drei, vier, dann erneut null. Sie hat fünf Intervalle.
+
+Für die zentrierte Folge legen wir null, eins, zwei, drei, vier, drei, zwei, eins und erneut null fest. Das sind acht Intervalle. Die Endpunkte werden beim Richtungswechsel nicht als zwei volle aufeinanderfolgende Intervalle doppelt gezählt. N ist die Zahl der Periodenintervalle. Für positives ARR gilt in genau diesem Modell $N=2ARR$.
+
+Bei einer Million Zählticks pro Sekunde ergeben ARR vier und Up-Modus zweihundert Kilohertz, der Center-Modus dagegen hundertfünfundzwanzig Kilohertz. Die Frequenzen unterscheiden sich nicht exakt um den Faktor zwei, weil auch die Zählkonvention verschieden ist. Center-Aligned-PWM und Endpunktverhalten sind hardwareabhängig; wir verwenden hierfür keine ungeprüfte Up-Formel. Das Hauptmodell bleibt Up-Counting.
+
+Die senkrechte Richtung der Treppen bedeutet wachsender beziehungsweise fallender CNT-Wert; die gleich breiten waagerechten Abschnitte entsprechen jeweils einem Tick. Sie zeigen, dass beim Richtungswechsel keine zusätzliche Wartephase eingezeichnet ist. Das ist die hier ausdrücklich festgelegte Endpunktregel.
+:::
+
+## PWM: gleiche Periode, andere Pulsbreite
+
+![](../assets/figures/04_aktorik_sicherheit/pwm-power.png){fig-alt="Drei Rechtecksignale mit gleicher Periode und 25, 50 und 75 Prozent HIGH-Anteil; die Pegelhöhe bleibt gleich."}
+
+PWM: Pulse Width Modulation, Pulsweitenmodulation.
+
+::: notes
+PWM heißt Pulse Width Modulation, Pulsweitenmodulation. T bezeichnet im Diagramm die volle Periodendauer. Eine Pulsbreite ist die Zeitdauer der aktiven Phase innerhalb einer wiederholten Periode. Im Active-High-Beispiel entspricht aktiv dem hohen Spannungspegel. Die Abbildung zeigt drei alternative Rechteckfolgen mit gleicher Periode von einer Millisekunde, aber unterschiedlicher HIGH-Dauer.
+
+Die horizontale Achse ist Zeit. Jede Bahn wechselt zwischen null und drei Komma drei Volt; die Pegel werden nicht verkleinert. Bei fünfundzwanzig Prozent bleibt der Ausgang eine Viertelmillisekunde HIGH und drei Viertelmillisekunden LOW. Bei fünfzig Prozent sind beide Phasen gleich lang, bei fünfundsiebzig Prozent ist die HIGH-Phase länger.
+
+Die Darstellung ist idealisiert. Flankensteilheit, Treiberverluste und Taktabweichungen sind nicht modelliert. Sie zeigt daher die steuerbare Zeitaufteilung und keine allgemeine Motorleistung oder genaue Helligkeitswahrnehmung. Für belastbare Rechnungen benennen wir nun Periode, Frequenz und Tastverhältnis einzeln.
+
+D steht im Diagramm für den dimensionslosen HIGH-Anteil dieses Active-High-Beispiels. Die drei Signalbahnen sind Alternativen, keine gleichzeitig gemessenen Kanäle. Vergleichen Sie jeweils die erste fallende Flanke: Sie liegt nach zweihundertfünfzig, fünfhundert beziehungsweise siebenhundertfünfzig Mikrosekunden.
+:::
+
+## Periode, Frequenz und Tastverhältnis
+
+$$
+f_\text{PWM}=\frac1T,\qquad D=\frac{t_\text{aktiv}}T
+$$
+
+Bei Active-High: $T=1$ ms, $t_\text{HIGH}=250\,\mu$s.
+
+$$
+f_\text{PWM}=1\ \mathrm{kHz},\qquad D=0{,}25=25\,\%
+$$
+
+::: notes
+PWM ist Pulse Width Modulation, Pulsweitenmodulation. $T$ bezeichnet die Dauer einer vollständigen Periode, $f_\text{PWM}$ die Anzahl solcher Perioden pro Sekunde. $t_\text{aktiv}$ ist die aktive Zeit, $D$ das dimensionslose Tastverhältnis, auf Englisch Duty Cycle. Active-High bedeutet, dass die aktive Phase dem HIGH-Pegel entspricht; dann ist $t_\text{aktiv}=t_\text{HIGH}$.
+
+Eine Millisekunde ist ein Tausendstel einer Sekunde. Die Frequenz ist daher tausend Hertz, ein Kilohertz. Zweihundertfünfzig Mikrosekunden sind eine Viertelmillisekunde. Die Division $250/1000=0{,}25$ ergibt fünfundzwanzig Prozent. Die restlichen siebenhundertfünfzig Mikrosekunden sind im Beispiel inaktiv.
+
+Ein Tastverhältnis ist ein Zeitanteil und enthält keine eigene Spannungs- oder Leistungsdimension. Die Zahl fünfundzwanzig muss als Prozentwert erst durch hundert geteilt werden, bevor sie als Faktor in Formeln eingesetzt wird. Eine Frequenzänderung verändert die Periodendauer; eine Duty-Änderung kann bei gleicher Frequenz nur die Aufteilung verschieben. Die Timerregister sollen diese beiden Ziele nachvollziehbar einstellen.
+
+Eine Kontrollrechnung ist $t_\text{aktiv}=DT$. Beim gleichen Anteil von einem Viertel und einer verdoppelten Periode wäre auch der Puls doppelt so lang. Prozentangabe und Pulsbreite sind somit nur bei festgelegter Periode eindeutig miteinander verknüpft.
+:::
+
+## Das durchgängige Timerbeispiel
+
+$$
+f_\text{tim}=100\,\mathrm{MHz},\quad PSC=99,\quad ARR=999
+$$
+
+$$
+f_\text{cnt}=1\,\mathrm{MHz},\quad N=1000,\quad
+f_\text{PWM}=\frac{f_\text{cnt}}N=1\,\mathrm{kHz}
+$$
+
+Welcher Registerwert bestimmt die aktive Dauer von $250\,\mu$s?
+
+::: notes
+$f_\text{tim}$ ist der Timer-Eingangstakt, PSC der Prescaler oder Vorteiler. Der Divisor ist hundert, somit $f_\text{cnt}=100\,\mathrm{MHz}/100=1\,\mathrm{MHz}$. ARR, Auto-Reload Register, ist neunhundertneunundneunzig. Mit der vereinbarten Zählweise ergibt das $N=ARR+1=1000$ Intervalle. Jedes dauert eine Mikrosekunde.
+
+Die Periode beträgt tausend Mikrosekunden, eine Millisekunde. Daher ist die PWM-Frequenz, Wiederholrate der Pulsweitenmodulation, ein Kilohertz. Für eine aktive Dauer von zweihundertfünfzig Mikrosekunden benötigen wir zweihundertfünfzig aktive Zählintervalle. Der Compare-Wert CCR, Capture/Compare Register, wird im folgenden Active-High-Modell auf zweihundertfünfzig gesetzt.
+
+Die Antwort entsteht aus zwei getrennten Rechnungen: Zähltick und Zahl der Intervalle. Sie kann nicht durch die Prozessorfrequenz allein oder durch eine vermeintliche Prozentzahl im Compare-Register ersetzt werden. Aufgabe 1 des Übungsblatts verwendet dieselben Annahmen und prüft ihre Grenzen.
+
+Würde versehentlich ARR tausend eingestellt, gäbe es tausendein Intervalle. Bei unverändertem Zähltakt wären Frequenz und aktiver Anteil geringfügig kleiner: ungefähr $999{,}001$ Hertz und $24{,}975$ Prozent. Diese Abweichung zeigt, warum die obere Grenze einschließlich ihres vollen Intervalls mitgerechnet werden muss.
+:::
+
+## Compare erzeugt den HIGH-Anteil
+
+![](../assets/figures/04_aktorik_sicherheit/edge-pwm.png){fig-alt="CNT zählt 0 bis 999; bei CCR 250 ist der Ausgang für Zählwerte 0 bis 249 HIGH und ab 250 LOW."}
+
+$$
+\mathrm{HIGH}\iff CNT<CCR,\qquad D=\frac{CCR}{ARR+1}
+$$
+
+::: notes
+CNT bedeutet Counter, Zählwert. CCR ist das Capture/Compare Register, hier die Vergleichsschwelle. ARR ist das Auto-Reload Register, Periodengrenze. Im gewählten Active-High-Up-Counting-Modell wird der Ausgang durch den Vergleich CNT kleiner als CCR aktiviert. Ein Compare-Match ist Gleichheit der beiden Werte.
+
+Die Abbildung zeigt den Zähler auf einer Zeitachse von null bis tausend Mikrosekunden und darunter den Ausgang. Bei CCR zweihundertfünfzig sind die Zählwerte null bis zweihundertneunundvierzig aktiv, also genau zweihundertfünfzig volle Intervalle. Bei CNT zweihundertfünfzig wird der Vergleich falsch. Bis einschließlich neunhundertneunundneunzig bleibt der Pin LOW; erst danach startet die neue Periode bei null.
+
+Der Duty Cycle, Tastverhältnis $D$, ist somit $250/1000=25\,\%$. Ein Zählwert ist keine Dauer allein; seine Dauer stammt aus der Zählfrequenz. Der Ausgang braucht für diesen Vergleich keinen Compare-Interrupt und keine ISR, Interrupt Service Routine, pro Flanke. Die Hardwareverknüpfung mit dem Pin muss allerdings zuvor eingerichtet sein.
+
+Die rote Signalbahn bezeichnet den digitalen Ausgang, die dunkle Treppe den Zähler. Die gestrichelte Schwelle dient zum Ablesen des Vergleichs. Sie ist keine zusätzliche elektrische Spannung; Zählerwert und Pinpegel sind unterschiedliche Größen mit unterschiedlichen Einheiten.
+:::
+
+## Null und hundert Prozent
+
+Für $N=1000$ Intervalle:
+
+| CCR | Aktive Intervalle | Tastverhältnis |
+|-----|------------------|----------------|
+| $0$ | $0$ | $0\,\%$ |
+| $250$ | $250$ | $25\,\%$ |
+| $1000$ | $1000$ | $100\,\%$ |
+
+Endwerte und darstellbare Compare-Werte in der konkreten Hardware prüfen.
+
+::: notes
+CCR bedeutet Capture/Compare Register; es stellt hier die Vergleichsschwelle bereit. Im Modell gilt aktiv genau dann, wenn der Zählwert kleiner als CCR ist. Bei CCR null erfüllt kein Zählwert diese Bedingung. Bei CCR tausend sind alle Zählwerte null bis neunhundertneunundneunzig kleiner; der Ausgang bleibt konstant aktiv. Hundert Prozent ist hier also eine Konstante, kein periodisch schmaler LOW-Impuls.
+
+Die Tabelle setzt voraus, dass CCR tausend als Wert darstellbar und für diesen Modus wirksam ist. Das funktioniert etwa bei einem ausreichend breiten Vergleichsregister im Hauptbeispiel. Am maximalen ARR, Auto-Reload Register, eines Sechzehn-Bit-Timers wäre $N=65536$ dagegen nicht in einem gleich breiten Compare-Register darstellbar. Dann kann ein spezieller erzwungener Ausgangsmodus oder eine andere dokumentierte Lösung nötig sein.
+
+Die mathematische Grenze darf deshalb nicht blind in jeden Registertyp geschrieben werden. Active-High bedeutet bei null Prozent LOW und bei hundert Prozent HIGH; eine umgekehrte Polarität ändert die Pegel. Die folgenden Funktionsbeispiele liefern zunächst mathematische Compare-Werte, deren Hardwaredarstellung separat zu prüfen ist.
+
+Bei null und hundert Prozent hat der konstante Pinpegel keine sichtbaren wiederkehrenden Flanken. Die intern eingestellte Timerperiode kann trotzdem bestehen. Eine Frequenzmessung allein am konstanten Ausgang könnte diese Einstellung daher nicht aus dem Signal rekonstruieren.
+:::
+
+## Frequenz ändern, Duty beibehalten
+
+Gleiche Werte `ARR = 999` und `CCR = 250`:
+
+| PSC | Zählfrequenz | PWM-Frequenz | Duty |
+|-----|--------------|-------------|------|
+| $99$ | $1$ MHz | $1$ kHz | $25\,\%$ |
+| $199$ | $0{,}5$ MHz | $0{,}5$ kHz | $25\,\%$ |
+
+HIGH dauert dann $250$ beziehungsweise $500\,\mu$s.
+
+::: notes
+PSC steht für Prescaler, Vorteiler. ARR, Auto-Reload Register, bleibt neunhundertneunundneunzig und bestimmt tausend Periodenintervalle. CCR, Capture/Compare Register, bleibt zweihundertfünfzig und bestimmt zweihundertfünfzig aktive Intervalle. Die Timer-Eingangsfrequenz bleibt hundert Megahertz.
+
+PSC neunundneunzig teilt durch hundert, PSC hundertneunundneunzig durch zweihundert. Die Zählfrequenz halbiert sich daher von einer auf eine halbe Million Intervalle pro Sekunde. Die einzelne Intervalldauer verdoppelt sich von einer auf zwei Mikrosekunden. Die Pulsweitenmodulation, PWM, wiederholt damit nur noch fünfhundert statt tausend Perioden pro Sekunde.
+
+Der Anteil aktiver Intervalle ist unverändert $250/1000=0{,}25$. Die absolute HIGH-Dauer wächst dagegen von zweihundertfünfzig auf fünfhundert Mikrosekunden. Die Tabelle trennt Anteil und Dauer. Für eine Anwendung wie einen Servo kann diese Dauer wesentlich sein, selbst wenn das Tastverhältnis gleich bleibt. Frequenz und aktive Zeit dürfen daher nicht allein über einen Prozentwert beurteilt werden.
+
+Die mathematische PWM-Frequenz ist $f_\text{cnt}/N$ mit $N=ARR+1$. Das Tastverhältnis ist CCR geteilt durch dieselbe Intervallzahl. Der erste Ausdruck enthält die Zählfrequenz, der zweite nicht. Diese Formeln begründen direkt, weshalb eine reine Vorteileränderung den Anteil erhält.
+:::
+
+## Active-Low ist eine andere Polarität
+
+![](../assets/figures/04_aktorik_sicherheit/polarity.png){fig-alt="Bei gleicher aktiver Vergleichsphase ist Active-High 25 Prozent HIGH; Active-Low ist 25 Prozent LOW und 75 Prozent HIGH."}
+
+$$
+D_\text{HIGH}=
+\begin{cases}
+D_\text{aktiv} & \text{Active-High}\\
+1-D_\text{aktiv} & \text{Active-Low}
+\end{cases}
+$$
+
+::: notes
+Polarität bezeichnet, welcher elektrische Pegel die aktive Phase repräsentiert. Active-High ist im Modell während CNT kleiner als CCR HIGH, Active-Low in dieser selben Phase LOW. CNT heißt Counter, Zählwert; CCR ist das Capture/Compare Register, die Compare-Schwelle. Beide Varianten können deshalb denselben aktiven Zeitanteil haben, obwohl ihre HIGH-Anteile verschieden sind.
+
+Die Abbildung zeigt eine ganze Periode mit fünfundzwanzig Prozent aktiver Zeit. Oben ist diese erste Viertelperiode HIGH. Unten ist sie LOW; die übrigen drei Viertel sind HIGH. $D_\text{aktiv}$ bezeichnet den Anteil der aktiven Phase und $D_\text{HIGH}$ den Anteil des hohen Pegels. Bei Active-Low gilt $D_\text{HIGH}=1-0{,}25=0{,}75$.
+
+Eine an einen Stromsenker angeschlossene Leuchtdiode kann gerade bei LOW eingeschaltet sein. Dann ist die Helligkeitssteuerung mit dem aktiven, nicht dem HIGH-Anteil zu verbinden. Eine bloße Aussage „größeres CCR heißt mehr HIGH“ wäre für diese Polarität falsch. Die Lastbeschaltung muss zum ausgewählten Ausgangsmodus passen.
+
+Der Pegel darf nicht aus der roten Farbe abgeleitet werden: Entscheidend ist die obere beziehungsweise untere Lage der Signalbahn. Die Zeitachse ist in Mikrosekunden beschriftet. Beide aktiven Abschnitte dauern zweihundertfünfzig Mikrosekunden, unabhängig davon, welcher Pegel die Last aktiviert.
+:::
+
+## Zeitlicher Mittelwert ist keine neue Pulshöhe
+
+Ideales Rechteck: $0$ und $V_H=3{,}3$ V, HIGH-Anteil $D_H=0{,}25$.
+
+$$
+\overline V=D_HV_H=0{,}825\ \mathrm{V}
+$$
+
+- Ungefiltert bleiben die Pegel $0$ und $3{,}3$ V
+- Die Mittelwertzahl beschreibt das Zeitmittel
+- Bei Active-Low den tatsächlichen HIGH-Anteil einsetzen
+
+::: notes
+$V_H$ bezeichnet den hohen Spannungspegel, $D_H$ den HIGH-Anteil und $\overline V$ den zeitlichen Mittelwert über eine ganze Periode. Im idealen Rechteck ist die Spannung während einer Viertelperiode drei Komma drei Volt und sonst null. Das gewichtete Zeitmittel ergibt $0{,}25\cdot3{,}3=0{,}825$ Volt.
+
+Diese Zahl ersetzt die beiden tatsächlichen Leitungspegel nicht. Ohne Filter liegt am Pin keine konstante Spannung von null Komma achtzweifünf Volt an. Ein Messgerät kann je nach Messart und Bandbreite unterschiedliche Signalgrößen anzeigen. Für eine physikalische Interpretation muss die gemessene Größe benannt werden.
+
+Die zuvor verwendete aktive Zeit ist bei Active-High gleich dem HIGH-Anteil. Bei Active-Low mit derselben aktiven Viertelperiode ist HIGH dagegen drei Viertel der Zeit. Dann wäre der Spannungsmittelwert $0{,}75\cdot3{,}3=2{,}475$ Volt, obwohl die aktive Lastzeit weiterhin fünfundzwanzig Prozent beträgt. Als Nächstes zeigt eine ohmsche Last, warum auch der Mittelwert nicht mit dem Effektivwert verwechselt werden darf.
+
+Bei null Volt während LOW lässt sich das Zeitmittel auch als Summe zweier gewichteter Pegel schreiben: $\overline V=D_HV_H+(1-D_H)\cdot0$. Diese Darstellung erklärt, weshalb die tatsächliche HIGH-Dauer und nicht ein unabhängig davon benannter Helligkeitswunsch in die Spannungsrechnung eingeht.
+:::
+
+## Effektivwert und ohmsche Leistung
+
+Für dasselbe ungefilterte Rechteck:
+
+$$
+V_\text{RMS}=V_H\sqrt{D_H}=1{,}65\ \mathrm{V}
+$$
+
+Ideale Spannungsquelle, Widerstand $R=1$ k$\Omega$:
+
+$$
+P=\frac{V_\text{RMS}^2}{R}
+ =D_H\frac{V_H^2}{R}=2{,}7225\ \mathrm{mW}
+$$
+
+::: notes
+RMS steht für Root Mean Square, Quadratwurzel des mittleren Quadrats, und bezeichnet den Effektivwert. Er vergleicht die Wirkung einer zeitlich veränderlichen Spannung an einem idealen ohmschen Widerstand mit der einer konstanten Spannung. $R$ ist der Widerstand, $P$ die mittlere Leistung. Ein Kiloohm entspricht tausend Ohm.
+
+$D_H$ ist der HIGH-Anteil, $V_H$ der hohe Spannungspegel. Da die Spannung hier für den Anteil $D_H$ gleich $V_H$ und sonst null ist, beträgt ihr mittleres Quadrat $D_HV_H^2$. Die Quadratwurzel ergibt $V_\text{RMS}=3{,}3\sqrt{0{,}25}=1{,}65$ Volt. An tausend Ohm folgt $P=1{,}65^2/1000=0{,}0027225$ Watt, also $2{,}7225$ Milliwatt.
+
+Eine tatsächlich konstante Spannung von $0{,}825$ Volt, dem vorigen Mittelwert, erzeugte dagegen nur $0{,}825^2/1000=0{,}680625$ Milliwatt. Der Mittelwert darf für das ungefilterte Rechteck daher nicht einfach quadriert werden. Die Rechnung setzt eine ideale Spannungsquelle und einen ohmschen Widerstand voraus, nicht ein beliebiges Stromvermögen eines Ausgangspins und nicht einen Motor mit Induktivität und Gegen-EMK. EMK bedeutet elektromotorische Kraft, hier die durch Bewegung erzeugte Gegenspannung.
+
+Die Quadratwurzel wird erst nach der zeitlichen Mittelung gezogen. Bei den beiden Pegeln ist das mittlere Quadrat $0{,}25\cdot(3{,}3\,\mathrm V)^2$. Mit demselben Widerstand ist damit die volle Pulsleistung viermal so groß wie die Leistung der konstanten Mittelwertspannung.
+:::
+
+## RC-Filter: Mittelwert und Restwelligkeit
+
+![](../assets/figures/04_aktorik_sicherheit/rc-filter.png){fig-alt="Ein unbelastetes RC-Modell glättet PWM; der vergrößert dargestellte Ausgang schwankt trotz Mittelwert 0,825 V um etwa 61,9 mV."}
+
+$$
+\tau=RC=10\ \mathrm{ms},\qquad f_c=\frac1{2\pi RC}\approx15{,}9\ \mathrm{Hz}
+$$
+
+::: notes
+RC bezeichnet ein Widerstands-Kondensator-Glied. $R$ ist der Widerstand, $C$ die Kapazität, $\tau$ die Zeitkonstante und $f_c$ die Grenzfrequenz eines einfachen Tiefpasses. Ein Tiefpass dämpft schnelle Signalanteile stärker als langsame. PWM heißt Pulse Width Modulation, Pulsweitenmodulation. Das Diagramm zeigt den Eingang und darunter einen ausdrücklich vergrößerten Ausschnitt des gefilterten Ausgangs.
+
+D ist hier der HIGH-Anteil, T die Periodendauer und V_H der hohe Pegel. Mit tausend Ohm und zehn Mikrofarad ist $\tau=0{,}01$ Sekunden, zehn Millisekunden. Die Grenzfrequenz ist ungefähr fünfzehn Komma neun Hertz. Bei einer Kilohertz-PWM ist die Periode eine Millisekunde, deutlich kürzer als die Zeitkonstante. Trotzdem wird der Ausgang nicht vollständig konstant.
+
+Im idealen unbelasteten stationären Modell gilt mit $a=e^{-DT/\tau}$ und $b=e^{-(1-D)T/\tau}$ für die Spitzen $V_\text{max}=V_H(1-a)/(1-ab)$ und $V_\text{min}=bV_\text{max}$. $D=0{,}25$, $T=1$ ms und $V_H=3{,}3$ V ergeben ungefähr $0{,}8562$ und $0{,}7943$ Volt, rund $61{,}9$ Millivolt Restwelligkeit. Der Mittelwert bleibt $0{,}825$ Volt. Nach einem Sollwertsprung benötigt ein solcher Tiefpass für ungefähr fünfundneunzig Prozent der Änderung etwa drei Zeitkonstanten, dreißig Millisekunden. Belastung und reale Bauteile verändern diese Ergebnisse; das Filter ist kein Leistungstreiber.
+
+Die obere rote Bahn zeigt den Eingang zwischen null und drei Komma drei Volt. Die untere ist ein Spannungszoom zwischen den beschrifteten Spitzen. Gleiche gezeichnete Höhen sind deshalb keine gleichen Voltwerte. Der Ausgang steigt während HIGH und sinkt während LOW exponentiell.
+:::
+
+## Frequenz und Auflösung konkurrieren
+
+![](../assets/figures/04_aktorik_sicherheit/resolution.png){fig-alt="Bei einem MHz Zähltakt enthält eine 1-kHz-Periode 1000 Schritte, eine 20-kHz-Periode nur 50; die Duty-Schrittweite wird gröber."}
+
+$$
+N=\frac{f_\text{cnt}}{f_\text{PWM}},\qquad \Delta D=\frac1N
+$$
+
+::: notes
+$f_\text{cnt}$ ist die Zählfrequenz, $f_\text{PWM}$ die Wiederholfrequenz der Pulsweitenmodulation. $N$ zählt Intervalle einer Periode. CCR bedeutet Capture/Compare Register und ist die Vergleichsschwelle. Die kleinste Änderung des mathematischen aktiven Anteils ist $\Delta D=1/N$, wenn der Vergleich um einen Tick verändert wird.
+
+Bei einem Megahertz Zähltakt und einem Kilohertz Ausgangsfrequenz gibt es tausend Intervalle, ARR, Auto-Reload Register oder Periodengrenze, also neunhundertneunundneunzig. Die Schrittweite beträgt $0{,}001$, null Komma eins Prozentpunkte. Bei zwanzig Kilohertz bleiben nur fünfzig Intervalle, ARR neunundvierzig. Ein Schritt beträgt zwei Prozentpunkte. Die Abbildung zeigt diese Periodenraster und ihre unterschiedlichen Stufenanzahlen, keine gemessene Helligkeit.
+
+Ein Sechzehn-Bit-Timer bietet bei einer kurzen gewählten Periode daher nicht automatisch sechzehn Bit nutzbare PWM-Auflösung. Eine Wunschfrequenz muss zudem mit einem ganzzahligen $N$ und den möglichen Teilern erreichbar sein; andernfalls entsteht eine quantisierte Näherung. Hardwaretakt und Zielauflösung sind gemeinsam auszulegen, bevor die Anwendung aus Prozentwerten Compare-Werte bildet.
+
+Die beiden horizontalen Raster sind mit gleicher Breite je Zähltick gezeichnet. Die längere Periode bietet mehr mögliche Compare-Grenzen; sie ist keine längere Bearbeitungszeit des Prozessors. Ein Duty-Schritt beschreibt eine Änderung in Prozentpunkten, keine relative Prozentänderung des bisher eingestellten Werts.
+:::
+
+## Eine PWM-Frequenz begründet auswählen
+
+- Last: gewünschter Stromverlauf oder Pulsprotokoll
+- Wahrnehmung: Flimmern und Bewegung berücksichtigen
+- Timer: erreichbare Frequenz und Compare-Schrittweite
+- Treiber: Schaltaufwand und zulässige Betriebsbedingungen
+
+::: notes
+PWM steht für Pulse Width Modulation, Pulsweitenmodulation. Die gewünschte Frequenz ist kein universeller Parameter, der für jede LED oder jeden Motor gleich passt. LED heißt Light Emitting Diode, Leuchtdiode. Wahrnehmbares Flimmern hängt auch von Bewegung, Helligkeit und Beobachtung ab; ein einzelner Richtwert ist keine allgemeine Flimmerfreiheitsgarantie.
+
+Ein Motorstrom hängt unter anderem von Induktivität, Treiber und Versorgung ab. Höhere Schaltfrequenz kann einen anderen Stromverlauf oder akustischen Eindruck erzeugen, erhöht aber gegebenenfalls Schaltverluste. Ein Servo kann dagegen eine dokumentierte Wiederholrate und Pulsbreitenspanne erwarten; dessen Signal ist ein Kommandoformat und kein einfaches Leistungs-Tastverhältnis.
+
+Im Timer begrenzen Eingangstakt, Vorteiler und Zahl der Intervalle die erreichbare Auflösung. Compare bedeutet Vergleich zwischen Zählwert und Schwelle. Eine Frequenzwahl muss deshalb Lastanforderung, Treibereigenschaften und Zählmodell verbinden. Für unsere Rechnungen bleibt das Ein-Kilohertz-Hauptbeispiel erhalten; spätere Anwendungsbeispiele ändern es ausdrücklich, statt daraus allgemeine Hardwareempfehlungen abzuleiten.
+
+Für ein vorgegebenes Protokoll ist zunächst dessen Signalformat einzuhalten. Für eine einfache Dimmaufgabe können dagegen mehrere Frequenzen sinnvoll sein. Die verbleibende Anzahl Compare-Stufen zeigt anschließend, wie fein die Software das aktive Zeitverhältnis einstellen kann.
+:::
+
+## Softwareflanken können verspätet sein
+
+![](../assets/figures/04_aktorik_sicherheit/sw-vs-hw.png){fig-alt="Geplant sind 50 µs HIGH und 50 µs LOW; eine um 20 µs verspätete fallende Flanke ergibt im Beispiel 70 µs HIGH und 50 µs LOW."}
+
+$$
+T'=120\,\mu\mathrm{s},\qquad D'=\frac{70}{120}\approx58{,}33\,\%
+$$
+
+::: notes
+T mit Strich bezeichnet die veränderte Periode, D mit Strich ihren HIGH-Anteil. Bit-Banging bedeutet, dass Software die einzelnen Ausgangspegel selbst setzt. Busy Waiting ist beschäftigtes Warten zwischen diesen Änderungen. Ein Ablauf mit fünfzig Mikrosekunden HIGH und fünfzig Mikrosekunden LOW hätte ideal eine Hundert-Mikrosekunden-Periode, also zehn Kilohertz. Reale Funktions- und Schleifenkosten können schon ohne weitere Ereignisse hinzukommen.
+
+Die Abbildung konstruiert eine zusätzliche Verzögerung der fallenden Flanke um zwanzig Mikrosekunden, während die anschließende LOW-Wartezeit unverändert fünfzig Mikrosekunden beträgt. HIGH dauert nun siebzig Mikrosekunden, die gesamte Periode hundertzwanzig und der HIGH-Anteil ungefähr achtundfünfzig Komma dreiunddreißig Prozent. Die Wiederholrate dieses konstruierten Ablaufs wäre etwa $8{,}33$ Kilohertz.
+
+Eine ISR, Interrupt Service Routine, kann bei freigegebenen Interrupts trotz einer wartenden Hauptschleife laufen und solche Verschiebungen erzeugen. Jitter bezeichnet die Schwankung des Flankenzeitpunkts, nicht jede konstante Latenz. Werden beide Flanken eines einzelnen Pulses gleich um fünf Mikrosekunden verschoben, bleibt seine Breite unverändert; seine Lage verschiebt sich. Hardware-PWM entkoppelt diese Flanken von der Softwarebehandlung, sofern Timer und Ausgangspfad weiterlaufen.
+
+Die roten Bahnen stehen für geplanten und verzögerten Verlauf. Die Zeitachse gibt Mikrosekunden an; sie zeigt unterschiedliche nächste Periodenanfänge. Der Vergleich ist ein konstruiertes Beispiel zur Ursachenanalyse, keine gemessene Aussage über einen bestimmten Prozessor oder Interrupt.
+:::
+
+## Hardwarevergleich und echter Pin
+
+- Timerzählwerk und Compare erzeugen den internen Zustand
+- Pin-Mux verbindet ihn mit einem Ausgang
+- Kanal, Polarität und Timer benötigen passende Freigaben
+- Ein laufendes Hardware-Signal ist nicht durch eine ISR pro Flanke erzeugt
+
+::: notes
+Compare ist der Hardwarevergleich zwischen CNT, Counter oder Zählwert, und CCR, Capture/Compare-Schwelle. Der daraus gebildete interne Ausgangszustand muss den Pin tatsächlich erreichen. Pin-Mux ist die Funktionsauswahl eines Pins; ein als allgemeiner Softwareausgang konfigurierter Pin muss nicht automatisch das Timersignal zeigen.
+
+Ein PWM-Kanal, Kanal der Pulsweitenmodulation, benötigt passenden Modus, Polarität und Freigabe. Timer-Eingangstakt und Zählwerk müssen ebenfalls laufen. Ein Registerausschnitt, der nur PSC, Prescaler, ARR, Auto-Reload Register, und CCR beschreibt, ist daher kein vollständiger Treiber.
+
+Die zeitliche Erzeugung benötigt in diesem Modell keine Interrupt Service Routine, ISR, bei jeder Flanke. Änderungen und Rückmeldungen können trotzdem Interrupts nutzen. Hardware-PWM ist gegenüber ISR-Latenzen entkoppelt, nicht gegenüber ausgefallenen Takten, falschen Einstellungen oder jeder realen Taktabweichung. Als Nächstes betrachten wir, wann ein neu geschriebener Compare-Wert aktiv werden soll.
+
+Ein hilfreiches Gegenbeispiel ist ein korrekt laufender Zähler bei falscher Pinzuordnung. Seine interne Vergleichsentscheidung kann stimmen, während am betrachteten Anschluss kein PWM-Signal erscheint. Fehlerdiagnose muss daher sowohl Zeitmodell als auch Signalweg prüfen; richtige Frequenzrechnung ersetzt diese Verbindung nicht.
+:::
+
+## Compare-Änderung mitten in der Periode
+
+![](../assets/figures/04_aktorik_sicherheit/preload.png){fig-alt="Ein ungepufferter Wechsel von CCR 250 auf 750 bei CNT 500 kann im gewählten Vergleichsmodell einen zweiten HIGH-Abschnitt erzeugen; Preload verschiebt die Übernahme an den Periodenbeginn."}
+
+Preload: neuen Wert puffern und am vereinbarten Update-Ereignis übernehmen.
+
+::: notes
+CCR ist das Capture/Compare Register, hier die Vergleichsschwelle. CNT bezeichnet den Zählwert. Im zunächst betrachteten kontinuierlichen Vergleichsmodell war CCR zweihundertfünfzig. Die erste Viertelperiode ist HIGH, danach LOW. Wird bei CNT fünfhundert der aktive Wert sofort auf siebenhundertfünfzig geändert, gilt wieder CNT kleiner als CCR. Der Ausgang kann bis siebenhundertfünfzig erneut HIGH werden.
+
+Die obere Bildbahn enthält dadurch zwei aktive Abschnitte von je zweihundertfünfzig Intervallen. Der Übergangszyklus hat insgesamt fünfzig Prozent HIGH, weder das alte gewünschte Tastverhältnis von fünfundzwanzig noch das neue von fünfundsiebzig Prozent. Dies ist eine explizite Eigenschaft unseres einfachen Vergleichsmodells; konkrete Timer können andere Latch- und Ereignisregeln besitzen. Latch bezeichnet hier das Speichern eines Zustands bis zu einem bestimmten Ereignis.
+
+Preload bedeutet Vorladen in einen Puffer. In der unteren Bahn bleibt der aktive alte Wert bis zum Update-Ereignis erhalten; am folgenden Periodenbeginn übernimmt die Hardware den neuen Wert. Die Änderungsabsicht und der Übernahmezeitpunkt werden damit getrennt. Auch ARR, Auto-Reload Register oder Periodengrenze, und PSC, Prescaler oder Vorteiler, können gepufferte Regeln haben. Welche Register zusammen und wann wirksam werden, muss aus der Peripheriebeschreibung stammen.
+
+Im Diagramm markiert die rote gestrichelte Linie den Schreibzeitpunkt, die graue den nächsten Periodenanfang. Die Achse ist in Mikrosekunden angegeben. Die zweite Periode besitzt in beiden Varianten den neuen aktiven Anteil; der Unterschied liegt im Übergangszyklus.
+:::
+
+## Vor der Ausgangsfreigabe konfigurieren
+
+1. Treiber beziehungsweise Ausgang in den vorgesehenen Anfangszustand bringen
+2. Timer-Takt, Zählmodus und Pinzuordnung einstellen
+3. PSC, ARR, CCR und Polarität festlegen
+4. Gepufferte Werte nach dokumentierter Regel übernehmen
+5. Erst danach Kanal und Ausgang freigeben
+
+::: notes
+PSC bedeutet Prescaler, Vorteiler. ARR, Auto-Reload Register, legt im Modell die Periodengrenze fest. CCR, Capture/Compare Register, bestimmt die aktive Phase. Pinzuordnung verbindet die Timerfunktion mit dem gewünschten Anschluss. Die Initialisierung umfasst daher mehr als drei Registerwerte.
+
+Ein angeschlossener Treiber kann eine eigene Enable-Leitung besitzen, eine Freigabe. Diese sollte während der Vorbereitung den für die Anwendung vorgesehenen Zustand halten. Ein Timerregister oder Pin kann nach Reset eine andere Funktion besitzen als im Normalbetrieb. Die Reihenfolge ist deshalb eine konzeptionelle Vorbereitung, kein universelles Hardware-Rezept.
+
+Puffer- und Update-Regeln können erfordern, dass Werte ausdrücklich übernommen und alte Statusflags passend behandelt werden. Polarität, Kanalmodus und Ausgangsfreigabe dürfen nicht gegensätzlich wirken. Wir nehmen hier keinen bereits getesteten Geräteadressraum an. Die Folie legt die Verantwortlichkeiten offen, ohne eine erfundene Adresse als vollständigen Treiber auszugeben. Eine reine Prozentrechnung lässt sich dagegen unabhängig davon vollständig prüfen.
+
+Für einen Motor kann eine passende Vorbereitung bedeuten, die Treiberfreigabe bis zur vollständigen Konfiguration zu sperren. Ob ein niedriger oder hoher Pegel diese Sperre bewirkt, bestimmt der Treiber. Eine pauschale Zuordnung von LOW zu sicher wäre ohne diese Information falsch.
+:::
+
+## Prozentwerte in Compare-Werte umsetzen
+
+C-Lehrfunktion für eine $16$-Bit-Periodengrenze:
 
 ```c
-/* Lehrcode, verkürzt. Kein vollständiger Trap-Pfad.
-   Relatives now+Intervall verschiebt das Raster. */
-void timer_isr(void) {
-    if (now >= next_deadline) {
-        next_deadline += TICKS_PER_MS;
-        write_mtimecmp(next_deadline);
-    }
+uint32_t percent_to_ccr(uint32_t percent, uint16_t arr) {
+    if (percent > 100u)
+        percent = 100u;
+    uint32_t n = (uint32_t)arr + 1u;
+    return (percent * n + 50u) / 100u;
 }
 ```
 
-::: notes
-Anknüpfung: CLINT, Tick und volatile knüpft an die bisherige Frage nach Signal und Überwachung an. mtime und mtimecmp sind Zähler und Vergleich der Maschinenzeit. Ein Folgetermin read_mtime plus Intervall verschiebt das Raster um die ISR-Latenz. Bei 1 ms Soll und 20 µs konstanter Verspätung wird das Raster etwa 1,020 ms. An den alten Solltermin anzuknüpfen hält die Phase. uptime_ms plus plus zählt Aufrufe, nicht ausgelassene Perioden. volatile unterdrückt Wegoptimierungen und garantiert keine Atomarität und keinen konsistenten 64-Bit-Lesezugriff auf RV32. Das Attribut installiert keinen vollständigen Trap-Pfad. Die PWM-Trägerfrequenz kommt vom GPT, nicht vom CLINT. CLINT liefert eine monotone Zeit für Termine, keinen PWM-Pin. Ein Folgetermin knüpft an den bisherigen Solltermin an. `volatile` verhindert bestimmte Wegoptimierungen, nicht Atomarität. Verständnischeck: Was macht relatives Rearming bei 20 µs Verspätung? Das Raster wächst auf etwa 1,020 ms. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Von der Zeitmessung zur Weltsteuerung
-
-- EVA-Prinzip: Eingabe, Verarbeitung, Ausgabe
-- Bisheriger Fokus: RAM (Verarbeitung) und Interrupts (Eingabe)
-- Fehlender Teil: Eingriff in die physikalische Welt
-- Aktorik setzt ein Kommando in Licht, Wärme oder Bewegung um
-- Ein Tastverhältnis ist offene Steuerung, keine Drehzahlregelung
+`ARR = 999`: $0,25,50,100\,\%$ ergeben $CCR=0,250,500,1000$.
 
 ::: notes
-Von der Zeitmessung zur Weltsteuerung knüpft an die bisherige Frage nach Signal und Überwachung an. EVA heißt Eingabe, Verarbeitung, Ausgabe. RAM ist der Arbeitsspeicher, nicht die Verarbeitung selbst. Ein Aktor setzt ein elektrisches Kommando in Licht, Wärme oder Bewegung um. 50 Prozent PWM ist offene Steuerung. Regelung bräuchte Messung und Vergleich. Die Lastenergie kommt meist aus einer eigenen Versorgung. EVA-Prinzip: Eingabe, Verarbeitung, Ausgabe. Bisheriger Fokus: RAM (Verarbeitung) und Interrupts (Eingabe). Fehlender Teil: Eingriff in die physikalische Welt. Verständnischeck: Ist 50 Prozent PWM schon Drehzahlregelung? Nein, Messung und Sollvergleich fehlen. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Die C-Funktion berechnet nur den mathematischen Compare-Wert, schreibt kein Gerät. `uint32_t` und `uint16_t` aus `stdint.h` sind vorzeichenlose Zweiunddreißig- und Sechzehn-Bit-Typen. `percent` ist eine gewünschte Prozentzahl und wird auf maximal hundert begrenzt. `arr` ist die modellierte Periodengrenze ARR, Auto-Reload Register. `n` enthält die Zahl der Intervalle $ARR+1$.
+
+Die Addition von fünfzig vor der ganzzahligen Division durch hundert rundet zum nächstgelegenen Intervall, bei einem halben Intervall nach oben. Mit ARR neunhundertneunundneunzig ist `n` tausend. Fünfundzwanzig Prozent ergeben $(25\cdot1000+50)/100=250$ bei Ganzzahldivision. Bei ARR neunundvierzig und einem Prozent ergibt sich ein Compare-Wert von eins, also wegen der groben Auflösung tatsächlich zwei Prozent.
+
+Für gültige Sechzehn-Bit-Grenzen und begrenzte Prozentwerte passen Zwischenwerte in `uint32_t`. Der Rückgabewert kann am oberen Ende fünfundsechzigtausendfünfhundertsechsunddreißig sein. Ob das echte CCR, Capture/Compare Register, diesen Hundert-Prozent-Wert unterstützt, muss gesondert geprüft werden. Die Funktion ist somit vollständig prüfbare Arithmetik mit ausdrücklich begrenztem Hardwareanspruch.
+
+Für null Prozent liefert die Funktion trotz Rundung null; für hundert den Wert $N$. Die maximale Multiplikation ist $100\cdot65536=6553600$, danach kommen fünfzig hinzu. Das bleibt deutlich unter der Grenze eines vorzeichenlosen Zweiunddreißig-Bit-Werts und begründet die gewählte Zwischenwertbreite.
 :::
 
-## EVA — Schema
+## Drei Kanäle, eine Periode
 
-![Steuerpfad, Leistungsweg und Watchdog sind getrennte Ebenen.](../assets/figures/04_aktorik_sicherheit/paths.png)
+![](../assets/figures/04_aktorik_sicherheit/rgb-gamma.png){fig-alt="Ein Counter und ARR liefern das gemeinsame Raster an drei Compare-Kanäle für Rot, Grün und Blau; jeder Kanal hat einen eigenen Duty-Wert."}
 
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  E[Eingabe: Sensor] --> V[Verarbeitung: SoC]
-  V --> A[Ausgabe: Aktorik]
-  A --> M[Motor / LED]
-  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+- RGB: Red, Green, Blue, drei Leuchtdiodenzweige
+- Separate Strombegrenzung je Zweig
+- Gemeinsame Frequenz, unterschiedliche aktive Zeitanteile
 
 ::: notes
-EVA — Schema knüpft an die bisherige Frage nach Signal und Überwachung an. GPIO ist ein digitaler Ein- und Ausgang. Der WDT ist der Watchdog Timer. Die Grafik trennt Signalpfeile von Leistungspfaden. Der 12-V-Motorstrom darf nicht durch den GPIO fließen. Ein gezeichneter Reset ist keine automatische Motorabschaltung. Verständnischeck: Warum nicht 12 V durch den GPIO? Der Pin liefert ein Steuerpegel und ist dafür nicht ausgelegt. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+RGB bedeutet Red, Green, Blue, Rot, Grün, Blau. Eine RGB-LED, Light Emitting Diode, besteht aus Leuchtdioden verschiedener Spektren. Ein Timer kann mehrere Kanäle besitzen: CNT, Counter, und ARR, Auto-Reload Register, geben ein gemeinsames Periodenraster vor; CCR1, CCR2 und CCR3, Capture/Compare Register, legen unterschiedliche aktive Dauern fest.
+
+Die Abbildung zeigt genau diese Verzweigung vom gemeinsamen Zähler zu drei Vergleichspfaden und Ausgängen. Die Namen der Farben sind Beschriftungen; die Zeichnung ist keine vollständige Anschluss- oder Widerstandsschaltung. Die Lasten benötigen jeweils passende Strombegrenzung und Treiberfähigkeiten.
+
+Common Cathode, gemeinsame Kathode, und Common Anode, gemeinsame Anode, bezeichnen unterschiedliche Anschlussarten. Sie können eine andere aktive Polarität verlangen. Hundert Prozent Rot und fünfzig Prozent Grün können bei passender Beschaltung und Kalibrierung orange wirken; Spektrum, Ströme und Wahrnehmung verhindern aber eine allgemeine Farbgarantie. Für gleichmäßig empfundene Helligkeitsänderungen kommt zusätzlich eine Kennlinie in Betracht.
+
+$N$ bezeichnet in der Grafik die Intervalle einer Periode, $f$ ihre Wiederholfrequenz. Bei Active-High entsprechen die gezeigten CCR-Werte fünfundzwanzig, fünfzig und null Prozent. Die neutrale Zeichenfarbe stellt keine Farbmischung dar; die drei Zweige werden nur über ihre Namen unterschieden.
 :::
 
-## Das Problem der digitalen Welt
+## Eine Kennlinie ist eine Modellentscheidung
 
-- Die CPU lebt in einer binären Welt
-- GPIO-Pin: typisch nur HIGH (z. B. $3{,}3\,\mathrm{V}$) oder LOW ($0\,\mathrm{V}$)
-- Dilemma: der Pin kennt nur zwei Pegel. Helligkeit und Kraft folgen nicht linear aus einem Zwischenwert.
-- Viele MCU-Pins haben keinen stufenlosen Analogausgang (DAC)
-- Lösungsidee: Trägheit der realen Welt ausnutzen
-
-::: notes
-Das Problem der digitalen Welt knüpft an die bisherige Frage nach Signal und Überwachung an. HIGH und LOW sind logische Zustände. 3,3 V und 0 V sind ideale Beispielpegel, keine RISC-V-Norm. Ein DAC wäre ein Digital-Analog-Wandler. PWM ändert Zeitanteile, nicht die Pulshöhe. Bei 50 Prozent liegen am ungefilterten Pin weiterhin 0 V und 3,3 V im Wechsel. 1,65 V ist der Mittelwert. Die CPU lebt in einer binären Welt. GPIO-Pin: typisch nur HIGH (z. B. $3{,}3\,\mathrm{V}$) oder LOW ($0\,\mathrm{V}$). Dilemma: der Pin kennt nur zwei Pegel. Helligkeit und Kraft folgen nicht linear aus einem Zwischenwert. Verständnischeck: Liegen dauerhaft 1,65 V an? Nein, das ist der zeitliche Mittelwert des Rechtecks. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Das Problem der Software-Fehler
-
-- Zuverlässigkeit: Was, wenn der Code in `while (1);` hängt?
-- Folgen: System reagiert nicht; Aktoren können unkontrolliert weiterlaufen
-- In sicherheitskritischen Domänen (Medizin, Avionik, Industrie) inakzeptabel
-- Bedarf: Hardware, die die CPU überwacht und im Notfall resetten kann
-
-```{mermaid}
-%%| fig-width: 3.6
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  A[Normaler Betrieb] --> B{Software-Bug?}
-  B -->|ja| C[Freeze / Endlosschleife]
-  C --> D[Hardware muss eingreifen]
-  style D fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Das Problem der Software-Fehler knüpft an die bisherige Frage nach Signal und Überwachung an. Eine Endlosschleife kann Instruktionen ausführen, ohne relevanten Fortschritt zu machen. Ein unabhängiger Abschaltpfad kann trotzdem arbeiten. Der Watchdog erkennt fehlenden Feed, nicht jeden falschen Helligkeitswert. Sicher ist anwendungsabhängig: Lampe aus ist nicht dasselbe wie Motor ausrollen oder halten. Zuverlässigkeit: Was, wenn der Code in `while (1);` hängt?. Folgen: System reagiert nicht; Aktoren können unkontrolliert weiterlaufen. In sicherheitskritischen Domänen (Medizin, Avionik, Industrie) inakzeptabel. Verständnischeck: Erkennt der Watchdog jeden falschen Helligkeitswert? Nein, wenn weiter gültig gefüttert wird. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Agenda für den heutigen Tag
-
-1. Hardware-Counter und Timer-Architektur (warum der CLINT hier nicht reicht)
-2. Pulsweitenmodulation (PWM) — Illusion analoger Signale
-3. PWM-Erzeugung in Hardware (Compare-Register)
-4. System-Sicherheit und Watchdog Timer (WDT)
-5. Brückenschlag zum Labor (z. B. Renode und RGB-LEDs)
-
-::: notes
-Agenda für den heutigen Tag knüpft an die bisherige Frage nach Signal und Überwachung an. GPT heißt General Purpose Timer. PWM ist Pulsweitenmodulation. RGB steht für Rot, Grün und Blau. Renode ist ein optionaler, nicht ausgeführter Laborausblick. Der CLINT plant Softwaretermine, der GPT erzeugt im Modell den Pinimpuls. Zuerst muss klar sein, warum der Aktor ohne Hauptschleife weiterlaufen kann. Verständnischeck: Warum nicht sofort Watchdog-Code? Weil das Weiterlaufen der PWM sonst unverständlich bleibt. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Lernziele Block 4
-
-- Aufbau eines General Purpose Timers (GPT) inkl. Prescaler erklären
-- Mathematik der PWM verstehen (Frequenz, Duty Cycle)
-- Begründen, warum Software-PWM (Bit-Banging) die CPU belastet und Timing gefährdet
-- Watchdog Timer (WDT) korrekt konfigurieren und „füttern“
-- Typische Anfängerfehler beim WDT vermeiden
-
-::: notes
-Lernziele Block 4 knüpft an die bisherige Frage nach Signal und Überwachung an. Prüfbar sind Frequenz aus Takt, PSC und ARR, CCR für ein Tastverhältnis, eine verspätete Softwareflanke, Feed an Fortschritt und die Grenzen eines Resets. PSC, CNT, ARR und CCR sind Register eines Timermodells, keine RISC-V-Register. Eine reale Konfiguration braucht Taktquelle, Registersemantik, Pinbelegung und Beschaltung. Aufbau eines General Purpose Timers (GPT) inkl. Prescaler erklären. Mathematik der PWM verstehen (Frequenz, Duty Cycle). Begründen, warum Software-PWM (Bit-Banging) die CPU belastet und Timing gefährdet. Verständnischeck: Welche Zusatzinformation fehlt? Datenblatt, Pin-Mux und Ausgangsbeschaltung. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Die Leitfrage des Tages
-
-- SoC-Pin: oft maximal $3{,}3\,\mathrm{V}$ (100 %) oder $0\,\mathrm{V}$ (0 %)
-- Ziel im Beispiel: 50 Prozent Tastverhaeltnis. Das ist nicht allgemein halbe Motorleistung.
-- Ohne externe Bauteile wie digitale Potentiometer
-- Wie dimmt man auf 50 %, wenn der Pin nur „Vollgas“ oder „Aus“ kennt?
-
-::: notes
-Die Leitfrage des Tages knüpft an die bisherige Frage nach Signal und Überwachung an. Die Leitfrage ist 50 Prozent aktive Zeit, nicht 50 Prozent Motorleistung oder Helligkeit. Ohne zusätzlichen Analogwandler bleibt das Steuersignal digital. Der Pin erzeugt ein Kommando, der Motor braucht eine Leistungsstufe. SoC-Pin: oft maximal $3{,}3\,\mathrm{V}$ (100 %) oder $0\,\mathrm{V}$ (0 %). Ziel im Beispiel: 50 Prozent Tastverhaeltnis. Das ist nicht allgemein halbe Motorleistung. Ohne externe Bauteile wie digitale Potentiometer. Verständnischeck: Was ist bei idealen 50 Prozent Active-High sicher? HIGH und LOW dauern gleich lang. Die Wirkung ist damit nicht bestimmt. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Leitfrage — Schema
-
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  H[3.3 V HIGH] -->|Trick?| M[Motor bei 50 %]
-  L[0 V LOW] -->|Trick?| M
-  style M fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Leitfrage — Schema knüpft an die bisherige Frage nach Signal und Überwachung an. Zwei Pulse gleicher Höhe und verschiedener Breite haben verschiedene Mittelwerte. Die gestrichelte Linie ist ein rechnerischer Mittelwert, keine ungefilterte Pinspannung. Der Treiber und die Versorgung gehören zum Motorpfad. Verständnischeck: Warum sind gleiche Höhe und verschiedene Breite nicht dasselbe Signal? Der aktive Zeitanteil unterscheidet sich. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## CLINT vs. Peripherie-Timer
-
-- Warum nicht einfach `mtime` aus Block 3 für Aktorik?
-- CLINT: 64-Bit-System-Timer — läuft durch, darf nicht „wild“ zurückgesetzt werden (OS-Zeitbasis)
-- Aktorik braucht Timer, die periodisch bei 0 neu starten und mit Ausgangspins verbunden sind
-- Lösung: General Purpose Timers (GPT) in der Peripherie — oft viele pro SoC
-
-::: notes
-CLINT vs. Peripherie-Timer knüpft an die bisherige Frage nach Signal und Überwachung an. Die Systemzeit plant alle 10 ms einen Stellwert. Der PWM-Zähler läuft mit 1 kHz, also zehn Perioden je Fading-Schritt. 10 MHz Systemzeit und 1 MHz Counter sind verschiedene Zähler. Hardware-PWM ist keine CLINT- und keine RISC-V-ISA-Funktion. Warum nicht einfach `mtime` aus Block 3 für Aktorik?. CLINT: 64-Bit-System-Timer — läuft durch, darf nicht „wild“ zurückgesetzt werden (OS-Zeitbasis). Aktorik braucht Timer, die periodisch bei 0 neu starten und mit Ausgangspins verbunden sind. Verständnischeck: Bleibt ein Helligkeitswert 10 ms, während zehn PWM-Perioden laufen? Ja, bei 1 kHz und 10-ms-Schritten. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Der General Purpose Timer (GPT)
-
-- Flexibles Zählwerk in Hardware, unabhängig vom RISC-V-Kern
-- Aufgaben: externe Ereignisse zählen, Zeit stoppen, Pulsmuster auf Pins ausgeben
-- Heute: programmierbarer Signalgenerator — nicht „System-Uhr“
-- Konfiguration über Memory-Mapped Register (MMIO)
-
-::: notes
-Der General Purpose Timer (GPT) knüpft an die bisherige Frage nach Signal und Überwachung an. Der Timer liegt außerhalb des Rechenwerks. MMIO heißt Memory-Mapped Input/Output. TIM, PSC und ARR sind ein STM32-nahes Lehrmodell, keine RISC-V-Namen. Ein Schreiben konfiguriert Hardware, es legt nicht nur eine RAM-Variable ab. Flexibles Zählwerk in Hardware, unabhängig vom RISC-V-Kern. Aufgaben: externe Ereignisse zählen, Zeit stoppen, Pulsmuster auf Pins ausgeben. Heute: programmierbarer Signalgenerator — nicht „System-Uhr“. Verständnischeck: Was bedeutet ein MMIO-Schreiben? Es verändert einen Hardwarezustand nach Registervertrag. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Anatomie eines Hardware-Counters
-
-Drei Kernbausteine:
-
-- Clock Source: oft Systemtakt (z. B. $100\,\mathrm{MHz}$)
-- Prescaler (PSC): Vorteiler, drosselt den Takt
-- Counter-Register (CNT): Zählwert (typisch 16- oder 32-Bit)
-
-Jeder Tick hinter dem Prescaler erhöht `CNT` um 1.
-
-::: notes
-Anatomie eines Hardware-Counters knüpft an die bisherige Frage nach Signal und Überwachung an. 100 MHz sind 100 Millionen Eingangsperioden je Sekunde, hier eine Modellannahme am Timer-Eingang. Ein Tick erhöht CNT nur im Up-Counting. 16 Bit bieten 65536 Zustände von 0 bis 65535. Ein freier Durchlauf bei 100 MHz dauert 655,36 µs. Clock Source: oft Systemtakt (z. B. $100\,\mathrm{MHz}$). Prescaler (PSC): Vorteiler, drosselt den Takt. Counter-Register (CNT): Zählwert (typisch 16- oder 32-Bit). Verständnischeck: Wie lange dauern 65536 Intervalle bei 100 MHz? 655,36 µs. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Counter-Kette — Schema
-
-![100 MHz durch PSC+1. PSC 99 ergibt 1 MHz. 16 Bit hat 65536 Zustaende.](../assets/figures/04_aktorik_sicherheit/prescaler.png)
-
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[System Clock\n100 MHz] -->|Takt| B[Prescaler PSC]
-  B -->|verlangsamt| C[Counter CNT]
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Counter-Kette — Schema knüpft an die bisherige Frage nach Signal und Überwachung an. PSC gleich 99 teilt durch 100. 100 MHz geteilt durch 100 ist 1 MHz, also 1 µs je Tick. Die 65536 Zustände sind die Registerbreite. ARR gleich 999 benutzt später nur 1000 Intervalle. Die Pfeile sind Takte, kein Instruktionsfluss. Verständnischeck: Wie lange dauert ein voller 16-Bit-Durchlauf nach der Teilung? 65536 µs, also 65,536 ms, ohne kleinere ARR-Grenze. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Der Prescaler (Vorteiler)
-
-- Problem: $100\,\mathrm{MHz}$ = $10^{8}$ Ticks/s; 16-Bit-Max $\approx 65\,535$ → Überlauf in unter 1 ms
-- Lösung: Prescaler lässt nur jeden $n$-ten Takt durch
-- Typisch: Registerwert $PSC$, Teilung durch $PSC + 1$ (weil 0 mitzählt)
-- Beispiel: $PSC = 99$ → Teiler 100 → langsameres Zählen, längere Messfenster
-
-::: notes
-Der Prescaler (Vorteiler) knüpft an die bisherige Frage nach Signal und Überwachung an. Im Modell bedeutet Registerwert 0 den Teiler 1, Wert 99 den Teiler 100. Null stoppt den Timer nicht. Für den Überlauf zählen 65536 Intervalle, nicht nur der Zahlenwert 65535. Die Semantik ist datenblattabhängig und hier festgesetzt. Problem: $100\,\mathrm{MHz}$ = $10^{8}$ Ticks/s; 16-Bit-Max $\approx 65\,535$ → Überlauf in unter 1 ms. Lösung: Prescaler lässt nur jeden $n$-ten Takt durch. Typisch: Registerwert $PSC$, Teilung durch $PSC + 1$ (weil 0 mitzählt). Verständnischeck: Welcher PSC ergibt 1 MHz? PSC plus 1 gleich 100, also PSC gleich 99. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Mathematik: Zählfrequenz
+Gewünschter normierter Helligkeitswert $b$, Lehrkennlinie:
 
 $$
-f_{\mathrm{cnt}} = \frac{f_{\mathrm{clock}}}{PSC + 1}
+D=b^{2{,}2}
 $$
 
-Beispiel: $f_{\mathrm{clock}} = 100\,\mathrm{MHz}$, $PSC = 9999$
-
-$$
-f_{\mathrm{cnt}} = \frac{10^{8}}{10^{4}} = 10\,\mathrm{kHz}
-$$
-
-→ Counter erhöht sich $10\,000$-mal pro Sekunde (alle $0{,}1\,\mathrm{ms}$).
+| $b$ | $0$ | $0{,}25$ | $0{,}5$ | $0{,}75$ | $1$ |
+|-----|-----|----------|---------|----------|-----|
+| CCR bei $N=1000$ | $0$ | $47$ | $218$ | $531$ | $1000$ |
 
 ::: notes
-Mathematik: Zählfrequenz knüpft an die bisherige Frage nach Signal und Überwachung an. f_cnt gleich f_clock geteilt durch PSC plus 1. PSC gleich 9999 ergibt 10 kHz und 100 µs je Tick. Das ist eine Rechenvariante, nicht der spätere PSC 99. PWM-Frequenz braucht zusätzlich N Intervalle. 10 kHz Zähltakt und N gleich 1000 ergäben nur 10 Hz PWM. Verständnischeck: Sind 10 kHz Zähltakt automatisch 10 kHz PWM? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+$b$ ist ein normierter Eingabewert zwischen null und eins, der hier eine gewünschte Helligkeit repräsentiert. $D$ ist das aktive Tastverhältnis. Die Potenzkennlinie $D=b^{2{,}2}$ ist eine didaktische Gamma-Annahme, keine universelle Beschreibung jedes Auges oder jeder Leuchtdiode.
+
+Für tausend Periodenintervalle ergibt sich der Compare-Wert näherungsweise als gerundetes $1000D$. Ein Viertel als Eingabewert ergibt $0{,}25^{2{,}2}\approx0{,}04737$, also CCR siebenundvierzig. Eine Hälfte ergibt ungefähr $0{,}21764$, also zweihundertachtzehn. Drei Viertel ergeben ungefähr $0{,}53105$, also fünfhunderteinunddreißig. Null und eins bleiben die Endwerte.
+
+CCR bedeutet Capture/Compare Register, $N$ die Zahl der Periodenintervalle. Die Kennlinie verändert die Zuordnung zwischen Eingabe und elektrischer aktiver Zeit, nicht die PWM-Frequenz. PWM heißt Pulse Width Modulation, Pulsweitenmodulation. Reale Farbwiedergabe und Helligkeit benötigen gegebenenfalls Messung und Abgleich. Schon dieses einfache Beispiel zeigt, warum „fünfzig Prozent Eingabe“ und „fünfzig Prozent Duty“ nicht automatisch dasselbe sind.
+
+Bei $b=0{,}5$ liefert das lineare Modell einen halben aktiven Anteil, die gewählte Potenzkennlinie dagegen nur etwa $0{,}218$. Das ist ein gezielter Unterschied in der Zuordnung, kein Rechenfehler. Welche Kennlinie die gewünschte Wahrnehmung trifft, kann nur für die konkrete Anwendung beurteilt werden.
 :::
 
-## Das Auto-Reload Register (ARR)
+## Servo: Pulsbreite als Kommando
 
-- Wo endet das Zählen? → Auto-Reload / Period Register (ARR)
-- Programmierte Periodengrenze in diesem Up-Counting-Modell
-- `CNT = ARR` gilt einen vollen Tick; der nächste Tick setzt auf 0
-- Die Periode hat N = ARR+1 Intervalle
-- Im Kernmodell: PSC+1, Vergleich `CNT < CCR`, Active-High
+![](../assets/figures/04_aktorik_sicherheit/applications.png){fig-alt="Das Servo-Lehrbeispiel zeigt drei alternative Pulse von 1,0, 1,5 und 2,0 ms auf einer gemeinsamen 20-ms-Zeitachse."}
+
+Bei $1$ MHz Zähltakt: `ARR = 19999` und `CCR = 1000, 1500, 2000`.
 
 ::: notes
-Das Auto-Reload Register (ARR) knüpft an die bisherige Frage nach Signal und Überwachung an. ARR ist die programmierte Grenze, nicht die Registerbreite. CNT gleich 999 dauert einen vollen Tick, danach folgt 0. N gleich ARR plus 1. Bei 1 MHz und ARR 999 ist T gleich 1000 µs. CNT von 0 bis 9 einschließlich sind zehn Intervalle, ARR gleich 9. Wo endet das Zählen? → Auto-Reload / Period Register (ARR). Programmierte Periodengrenze in diesem Up-Counting-Modell. `CNT = ARR` gilt einen vollen Tick; der nächste Tick setzt auf 0. Verständnischeck: Wie viele Intervalle hat CNT gleich 0 bis 9? Zehn, also N gleich 10. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Ein Servo interpretiert ein Eingangssignal als Stellkommando. Im ausdrücklich gewählten Beispiel beträgt die Wiederholperiode zwanzig Millisekunden, also fünfzig Hertz. Die aktiven Pulsbreiten sind eine, eine Komma fünf und zwei Millisekunden. Die Grafik zeigt diese drei getrennten alternativen Pulse auf derselben Zeitachse. Die lange restliche LOW-Phase ist nicht einfach eine prozentuale Aussage über die Motorleistung.
+
+Bei einer Million Zählticks pro Sekunde dauert jedes Intervall eine Mikrosekunde. Zwanzigtausend Intervalle benötigen im Up-Counting-Modell ARR neunzehntausendneunhundertneunundneunzig. CCR, Capture/Compare Register, tausend, tausendfünfhundert und zweitausend ergeben die genannten Pulsbreiten. Die HIGH-Anteile sind fünf, sieben Komma fünf und zehn Prozent.
+
+Welche Winkel und Wiederholraten ein realer Servo akzeptiert, ist servospezifisch. Die oft genannten Pulse stehen hier nur für beispielhafte Stellbereiche, nicht für eine garantierte Null-, Neunzig- oder Hundertachtzig-Grad-Zuordnung. Leistung erhält der Servo über eine geeignete separate Versorgung; der Steuerpin liefert das Kommando.
+
+ARR steht für Auto-Reload Register, die Periodengrenze. Die Zeitachse zeigt Millisekunden; die kurzen roten HIGH-Abschnitte sind maßstäblich viel kürzer als die volle Periode. Sie sind drei alternative Kommandos und kein einzelner Puls, der seine Breite während des Zeichnens ändert.
 :::
 
-## Zähl-Modus: Up-Counting
+## Motorstrom braucht eine Treiberstufe
 
-- Standard für viele GPT-Anwendungen
-- Ablauf: 0 → hoch bis ARR → Reset auf 0
-- Signalform: Sägezahn
-- Einsatz: Zeitmessung, periodische Interrupts, einfache PWM
-
-| Phase | CNT |
-|-------|-----|
-| Start | 0 |
-| Mitte | steigt |
-| Grenze | ARR |
-| Danach | 0 (neu) |
+- GPIO liefert den Steuerpegel
+- Eine H-Brücke schaltet die externe Motorversorgung
+- Induktiver Strom kann auch in einer inaktiven Phase weiterfließen
+- Totzeit und Abschaltverhalten gehören zum Treiberentwurf
 
 ::: notes
-Zähl-Modus: Up-Counting knüpft an die bisherige Frage nach Signal und Überwachung an. Up-Counting ist eine Treppe, kein glatter Sägezahn. Nach dem vollständigen ARR-Intervall setzt der nächste Tick auf null. Ein Update kann Register übernehmen, muss aber keinen CPU-Interrupt erzeugen. Bei ARR gleich 3 gehören 0, 1, 2 und 3 zu einer Periode. Standard für viele GPT-Anwendungen. Ablauf: 0 → hoch bis ARR → Reset auf 0. Signalform: Sägezahn. Verständnischeck: Welche Werte hat eine Periode bei ARR gleich 3? 0, 1, 2 und 3. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+GPIO heißt General Purpose Input/Output, allgemein verwendbarer Ein- und Ausgang. Sein zulässiges Strom- und Spannungsvermögen stammt vom Datenblatt. Ein Motorstrom darf nicht einfach durch einen solchen Steuerpin geleitet werden. Eine H-Brücke ist eine Treiberstruktur, die eine separate Versorgung geeignet an den Motor schaltet und auch die Stromrichtung beeinflussen kann.
+
+DC bedeutet Direct Current, Gleichstrom. Bei einem Gleichstrommotor bestimmen Versorgung, Induktivität, Gegen-EMK, die als Gegenspannung wirksame elektromotorische Kraft, mechanische Last und Treiber gemeinsam den Strom und die Bewegung. Eine inaktive PWM-Phase, Phase der Pulsweitenmodulation, bedeutet daher nicht zwingend sofort null Motorstrom. Umlauf- beziehungsweise Freilaufpfade sind Teil der Leistungsschaltung.
+
+In einer Halbbrücke dürfen die beiden gegensätzlichen Leistungsschalter nicht unzulässig gleichzeitig durchschalten. Totzeit bezeichnet eine Zeit ohne gleichzeitige Leitfähigkeit beim Umschalten. Das konkrete Verfahren gehört zum Treiber, nicht zu einer abstrakten Prozentfunktion. Aus, Bremsen und Halten sind verschiedene Aktoraktionen. Diese Unterscheidung wird beim Reset wichtig; ein Neustart allein wählt keine davon universell aus.
+
+Ein PWM-Timer legt das Timing fest, aber nicht die zulässige Motorlast. Auch ein korrekt berechnetes Tastverhältnis kann an einer ungeeigneten Treiberstufe problematisch sein. Die Trennung von Signalrechnung und Leistungspfad verhindert, dass Registerwerte als vollständiger Motorentwurf verstanden werden.
 :::
 
-## Zähl-Modus: Down-Counting
+## Gleicher Duty, anderes Anwendungssignal
 
-- Umgekehrt: Start bei ARR, herunter bis 0
-- Bei 0 oft Event/Interrupt; Neu laden mit ARR
-- Signalform: fallender Sägezahn
-- Einsatz: Timeouts; verwandt mit manchen SysTick-Konzepten (z. B. Cortex-M)
+| Anwendung | Relevante Größe |
+|-----------|-----------------|
+| LED-Lehrmodell | aktive Lichtzeit und Strom |
+| Servo-Lehrmodell | Pulsbreite und Wiederholperiode |
+| Motor mit Treiber | Stromverlauf, Versorgung und Last |
+
+Was bedeuten $7{,}5\,\%$ HIGH bei $20$ ms gegenüber $1$ ms Periode?
 
 ::: notes
-Zähl-Modus: Down-Counting knüpft an die bisherige Frage nach Signal und Überwachung an. Down-Counting braucht eine eigene Regel, wann null ein Intervall ist und wann neu geladen wird. Die Formel CNT kleiner CCR gilt nicht ungeprüft. SysTick ist ein ARM-Cortex-M-Zeitgeber, kein RISC-V-Modul. Umgekehrt: Start bei ARR, herunter bis 0. Bei 0 oft Event/Interrupt; Neu laden mit ARR. Signalform: fallender Sägezahn. Verständnischeck: Was fehlt bei Startwert 3? Welche Zustände wie lange gelten und wann das Ablaufereignis kommt. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Duty Cycle ist das Tastverhältnis. LED heißt Light Emitting Diode, Leuchtdiode. Bei einer LED-Last kann die aktive Zeit zusammen mit dem Zweigstrom die mittlere Lichtabgabe beeinflussen; Wahrnehmung und Kennlinie kommen hinzu. Ein Servo erwartet dagegen eine Pulsbreite innerhalb eines bestimmten Wiederholmusters. Ein Motorstrom braucht ein Modell der Treiber- und Lastwirkung.
+
+Die Verständnisfrage hält den HIGH-Anteil bei sieben Komma fünf Prozent fest. Bei zwanzig Millisekunden Periode ergibt $t_H=0{,}075\cdot20=1{,}5$ Millisekunden. Bei einer Millisekunde Periode sind es $0{,}075$ Millisekunden, fünfundsiebzig Mikrosekunden. Der gleiche Anteil erzeugt somit sehr unterschiedliche Kommandopulse.
+
+Die erste Variante passt zur mittleren Pulsbreite unseres Servo-Beispiels; die zweite darf ohne Servobeschreibung nicht als dasselbe Kommando interpretiert werden. Die Frage verbindet die früher getrennten Größen Periode, Anteil und Dauer. Sie bereitet Aufgabe 4 des Übungsblatts vor, bevor wir Sollwerte zeitlich verändern und die fortlaufende Anwendung überwachen.
+
+$t_H$ bezeichnet die HIGH-Dauer, $D_H$ ihren Anteil und $T$ die volle Periode. Es gilt $t_H=D_HT$. Die Formel benötigt daher neben der Prozentangabe stets eine Zeitbasis; aus sieben Komma fünf Prozent allein folgt noch keine absolute Pulsdauer.
 :::
 
-## Zähl-Modus: Center-Aligned
+## Sollwertänderung ist langsamer als der Träger
 
-- Fortgeschrittener Modus: 0 → ARR → wieder zurück nach 0 (Richtungsumkehr)
-- Signalform: Dreieck
-- Einsatz: moderne Motorsteuerung (z. B. FOC), Wechselrichter
+Lehrmodell:
 
-| Phase | Verhalten |
-|-------|-----------|
-| Aufwärts | 0 → ARR |
-| Abwärts | ARR → 0 |
-| Form | Dreieck |
+| Zeitfunktion | Frequenz oder Intervall |
+|--------------|------------------------|
+| Hardware-PWM | $1$ kHz |
+| `mtime`-Zeitquelle | $10$ MHz |
+| Helligkeitsaktualisierung | alle $10$ ms |
+
+Zehn Millisekunden entsprechen $100000$ `mtime`-Ticks.
 
 ::: notes
-Zähl-Modus: Center-Aligned knüpft an die bisherige Frage nach Signal und Überwachung an. Center-Aligned kehrt die Richtung um. BLDC ist ein bürstenloser Gleichstrommotor, FOC feldorientierte Regelung, beides nur Ausblick. Im kleinen Modell ARR gleich 4 lautet die Folge 0, 1, 2, 3, 4, 3, 2, 1 und dann wieder 0, also acht Ticks. Die Edge-Formel ARR plus 1 gilt hier nicht automatisch. Fortgeschrittener Modus: 0 → ARR → wieder zurück nach 0 (Richtungsumkehr). Signalform: Dreieck. Einsatz: moderne Motorsteuerung (z. B. FOC), Wechselrichter. Verständnischeck: Darf man dieselbe PWM-Frequenz wie im Up-Counting annehmen? Nein, der Auf-und-ab-Zyklus hat eine andere Intervallzahl. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+PWM bedeutet Pulse Width Modulation, Pulsweitenmodulation. Ihr Träger ist hier das jede Millisekunde wiederholte Hardwaremuster. `mtime`, Machine Time, liefert dagegen die Zeitquelle aus Vorlesung 3; deren Frequenz ist im Beispiel zehn Megahertz. Ein Helligkeitssollwert wird nur alle zehn Millisekunden geändert, also hundertmal pro Sekunde.
+
+Zwischen zwei Sollwertänderungen liegen zehn volle PWM-Perioden. Der Timer erzeugt ihre Flanken selbst. Die Systemzeit hilft dem Hauptprogramm lediglich, den nächsten Änderungszustand zu berechnen. Bei zehn Millionen Timer-Ticks pro Sekunde entsprechen zehn Millisekunden hunderttausend Ticks. Diese dürfen nicht mit den eine Million Schritte pro Sekunde des PWM-Zählers hinter dem Vorteiler verwechselt werden.
+
+Ein festes Raster sollte aus der gespeicherten Startzeit beziehungsweise den bisherigen Sollzeiten folgen. Bei einer Verspätung kann die Anwendung gezielt einen aktuellen Zustand berechnen und ausgelassene Zwischenwerte überspringen, statt das ganze Raster zu verschieben. Das ist eine gewählte Fading-Politik, keine Eigenschaft des Watchdogs. Die folgende reine Funktion macht diese Zustandsfolge überprüfbar.
+
+Der Systemtakt im Beispiel ist eine Lehrannahme für die Zeitquelle, kein Automatismus aus dem PWM-Eingangstakt. Ein geeigneter Zeitwert muss auf RV32, der RISC-V-Variante mit Zweiunddreißig-Bit-Integerregistern, wie zuvor erläutert konsistent gelesen werden. Sonst kann bereits die Berechnung des aktuellen Schritts falsch sein.
 :::
 
-## Fragen? — Counter und GPT
+## Eine nicht blockierende Fading-Folge
 
-- Rolle von Prescaler (PSC) und Auto-Reload (ARR) klar?
-- Zählfrequenz $f_{\mathrm{cnt}}$ berechnen können?
-- Up-Counting vs. Center-Aligned unterschieden?
-- Warum Datenblatt zu $ARR$ vs. $ARR+1$ prüfen?
-
-::: notes
-Fragen? — Counter und GPT knüpft an die bisherige Frage nach Signal und Überwachung an. PSC setzt den Countertakt, ARR die Periodengrenze im gewählten Modus. Mit 100 MHz, PSC 99 und ARR 999 bleibt das Kernmodell bei 1 kHz. Steigt nur PSC auf 199, halbieren sich f_cnt und f_PWM auf 500 kHz und 500 Hz. D bei gleichem CCR bleibt gleich. Rolle von Prescaler (PSC) und Auto-Reload (ARR) klar?. Zählfrequenz $f_{\mathrm{cnt}}$ berechnen können?. Up-Counting vs. Center-Aligned unterschieden?. Verständnischeck: Was ändert PSC gleich 199? Frequenz halbiert, Duty bei gleichem CCR nicht. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Die analoge Illusion
-
-- Zurück zur Leitfrage: 50 Prozent aktive Zeit an einem binären Pin?
-- Trick: Pin sehr schnell ein- und ausschalten
-- Beispiel: 1 kHz, je Hälfte der Periode HIGH/LOW
-- Motor und Auge sind zu träge, um dem Stottern zu folgen
-- Effekt: schnelles Schalten. Wahrnehmung und mechanische Wirkung sind davon zu trennen.
-
-::: notes
-Die analoge Illusion knüpft an die bisherige Frage nach Signal und Überwachung an. Bei T gleich 1 ms und je 0,5 ms HIGH und LOW bleibt die Periode gleich, wenn nur das Tastverhältnis auf 25 Prozent fällt. Die Pulsdauer wird kürzer. 1 kHz ist kein Garant gegen Flimmern, Kamerabänder oder Geräusche. Trägheit gehört zur Last, nicht zum Pin. Zurück zur Leitfrage: 50 Prozent aktive Zeit an einem binären Pin?. Trick: Pin sehr schnell ein- und ausschalten. Beispiel: 1 kHz, je Hälfte der Periode HIGH/LOW. Verständnischeck: Was bleibt bei festem f_PWM gleich? Periode und Pegelhöhe. Die aktive Dauer ändert sich. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Was ist PWM?
-
-- Pulsweitenmodulation (PWM, Pulse Width Modulation)
-- Wichtige Schnittstelle: digitale Steuerung und Leistungselektronik
-- Grundfrequenz bleibt konstant; die Pulsweite (HIGH-Anteil) wird moduliert
-- Breiter Puls → viel Energie; schmaler Puls → wenig Energie
-
-::: notes
-Was ist PWM knüpft an die bisherige Frage nach Signal und Überwachung an. PWM verändert die aktive Dauer bei fester Periode. Breiter Puls bedeutet mehr Energie nur bei gleicher Spannung und Last. Ein Servo nutzt die Pulsbreite später als Information. 1 ms bei T gleich 2 ms ist 50 Prozent, bei T gleich 20 ms nur 5 Prozent. Pulsweitenmodulation (PWM, Pulse Width Modulation). Wichtige Schnittstelle: digitale Steuerung und Leistungselektronik. Grundfrequenz bleibt konstant; die Pulsweite (HIGH-Anteil) wird moduliert. Verständnischeck: Sind 1-ms-Pulse bei 2 ms und 20 ms dasselbe Tastverhältnis? Nein, 50 beziehungsweise 5 Prozent. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Periode und Frequenz
-
-- Periode $T$: Dauer eines Zyklus (HIGH + LOW)
-- Frequenz $f = 1/T$
-- Zu niedrige $f$ (z. B. 10 Hz): sichtbares Flackern, ruckelige Motoren
-- Richtwerte (Faustregeln): LEDs oft $\gtrsim 200\,\mathrm{Hz}$; Motoren oft 10–20 kHz (weniger hörbares Fiepen)
-
-| Abschnitt | Bedeutung |
-|-----------|-----------|
-| HIGH | Energie ein |
-| LOW | Energie aus |
-| $T$ | ein voller Zyklus |
-
-::: notes
-Periode und Frequenz knüpft an die bisherige Frage nach Signal und Überwachung an. f gleich 1 geteilt durch T. 1 ms ist 0,001 s, also 1000 Hz. HIGH und LOW sind Kommandopegel im Active-High-Modell. In LOW kann Freilaufstrom fließen. 20 kHz haben eine Periode von 50 µs. Frequenzwahl hängt von Treiber, Last und Auflösung ab. Periode $T$: Dauer eines Zyklus (HIGH + LOW). Frequenz $f = 1/T$. Zu niedrige $f$ (z. B. 10 Hz): sichtbares Flackern, ruckelige Motoren. Verständnischeck: Wie lang ist eine Periode bei 20 kHz? 50 µs. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Der Duty Cycle (Tastverhältnis)
-
-- Wichtigste PWM-Größe: Anteil der HIGH-Zeit an der Periode
-
-$$
-\mathrm{Duty\ Cycle} = \frac{t_{\mathrm{HIGH}}}{T}
-$$
-
-- Anteil der aktiven Zeit im gewählten PWM-Modell
-- Periode/Frequenz konstant; wir ändern den Duty Cycle
-
-::: notes
-Der Duty Cycle (Tastverhältnis) knüpft an die bisherige Frage nach Signal und Überwachung an. D_aktiv ist t_aktiv geteilt durch T, zwischen 0 und 1. Im Active-High-Modell ist das der HIGH-Anteil. Bei Active-Low ist der HIGH-Anteil 1 minus D_aktiv. 250 µs aktiv bei 1000 µs sind 25 Prozent, unabhängig vom aktiven Pegel. Wichtigste PWM-Größe: Anteil der HIGH-Zeit an der Periode. Anteil der aktiven Zeit im gewählten PWM-Modell. Periode/Frequenz konstant; wir ändern den Duty Cycle. Verständnischeck: Wie groß ist D bei 250 µs aktiv und T gleich 1000 µs? 0,25. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Duty Cycle in Prozent
-
-Bei konstanter Frequenz:
-
-| Duty Cycle | Wirkung (qualitativ) |
-|------------|----------------------|
-| 10 % | kurze Pulse; schwach |
-| 50 % | halbe aktive Zeit |
-| 90 % | fast dauerhaft HIGH |
-
-Die Periode bleibt gleich — nur die fallende Flanke wandert.
-
-::: notes
-Duty Cycle in Prozent knüpft an die bisherige Frage nach Signal und Überwachung an. Bei T gleich 1 ms dauern 10, 50 und 90 Prozent 100, 500 und 900 µs. Die fallende Flanke wandert nur in der gezeigten Edge-Aligned-Active-High-Darstellung. Die Wirkung ist eine Tendenz, keine garantierte Licht- oder Motorleistung. Verständnischeck: Welche Pulsdauer hat 90 Prozent bei 1 kHz? 900 µs. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Mittlere Spannung berechnen
-
-![25 Prozent: Mittelwert 0,825 V, RMS 1,65 V. Ohmsche Rechteckleistung ist nicht Vmittel zum Quadrat durch R.](../assets/figures/04_aktorik_sicherheit/pwm-power.png)
-
-Zeitlicher Mittelwert über die Periode (nicht der Effektivwert/RMS):
-
-$$
-\bar{V} = V_{\mathrm{Pin}} \times \mathrm{Duty\ Cycle}
-$$
-
-Beispiel: $V_{\mathrm{Pin}} = 3{,}3\,\mathrm{V}$, Duty Cycle $= 25\,\%$ $= 0{,}25$
-
-$$
-\bar{V} = 3{,}3\,\mathrm{V} \times 0{,}25 = 0{,}825\,\mathrm{V}
-$$
-
-Zum Vergleich RMS eines Rechtecksignals: $V_{\mathrm{RMS}} = V_{\mathrm{Pin}} \cdot \sqrt{D}$ — bei 25 % also $\approx 1{,}65\,\mathrm{V}$. Bei idealer ohmscher Last gilt $P=D\cdot V^2/R$, nicht $V_{\mathrm{avg}}^2/R$ fuer das ungefilterte Rechteck.
-
-::: notes
-Mittlere Spannung berechnen knüpft an die bisherige Frage nach Signal und Überwachung an. V_mittel gleich D mal 3,3 V. V_RMS, der Effektivwert, ist 3,3 V mal Wurzel aus D. Bei D gleich 0,25 sind das 0,825 V und 1,65 V. Für R gleich 100 Ohm ist die mittlere Rechteckleistung D mal V quadrat geteilt durch R, also 27,225 mW. Das Quadrat des Mittelwerts ergibt nur 6,806 mW und unterschätzt die Heizwirkung. LOW gleich 0, ideale Flanken und ohmsche Last sind Annahmen. Die Mittelwertlinie ist kein gefilterter Ausgang. Verständnischeck: Warum ist der Effektivwert größer? Die hohen Pulse gehen quadratisch ein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Auflösung (Resolution)
-
-![Bei 1 MHz: 1 kHz hat 0,1 Prozent Schritt, 20 kHz hat 2 Prozent.](../assets/figures/04_aktorik_sicherheit/resolution.png)
-
-- Nutzbare Schrittweite im Kernmodell: 1/N mit N = ARR+1
-- 16 Bit sind die Registergrenze, nicht automatisch 16 Bit PWM-Auflösung
-- Bei 1 MHz: 1 kHz hat 0,1 Prozentpunkte, 20 kHz hat 2 Prozentpunkte
-
-::: notes
-Auflösung (Resolution) knüpft an die bisherige Frage nach Signal und Überwachung an. Die Schrittweite ist 1/N. Bei 1 MHz sind N gleich 1000, 250 und 50 für 1, 4 und 20 kHz, ARR gleich 999, 249 und 49, Schritte 0,1, 0,4 und 2 Prozentpunkte. log2 von N ist etwa 9,97, 7,97 und 5,64 Bit des Zeitrasters. N Intervalle und N plus 1 Schwellen sind verschieden. Ein 16-Bit-CCR kann N gleich 65536 nicht halten. Nutzbare Schrittweite im Kernmodell: 1/N mit N = ARR+1. 16 Bit sind die Registergrenze, nicht automatisch 16 Bit PWM-Auflösung. Bei 1 MHz: 1 kHz hat 0,1 Prozentpunkte, 20 kHz hat 2 Prozentpunkte. Verständnischeck: Warum sinkt die Auflösung bei höherer PWM-Frequenz? Pro Periode bleiben weniger Ticks. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Warum nicht Software? (Bit-Banging)
-
-![20 us verspaetete Flanke: Periode 120 us, etwa 58,3 Prozent. Hardware-PWM folgt dem Timer.](../assets/figures/04_aktorik_sicherheit/sw-vs-hw.png)
+Ein Schritt entspricht $10$ ms; Berechnung eines linearen Duty-Sollwerts:
 
 ```c
-/* Software-PWM — blockiert die CPU */
-while (1) {
-    set_pin_high();
-    delay_us(50);   /* 50 % HIGH */
-    set_pin_low();
-    delay_us(50);
+uint8_t fade_percent(uint64_t step) {
+    uint32_t phase = (uint32_t)(step % 200u);
+    return (uint8_t)(phase <= 100u ? phase : 200u - phase);
 }
 ```
 
-- CPU zu 100 % im Busy Waiting — keine andere Arbeit
-- Jeder Interrupt zerstört das Timing
+Schritte $0,100,200$ ergeben $0,100,0\,\%$; ein Zyklus dauert $2$ s.
 
 ::: notes
-Warum nicht Software? (Bit-Banging) knüpft an die bisherige Frage nach Signal und Überwachung an. Bit-Banging schaltet den Pin in Software. Die gezeigte Warteschleife bindet den Vordergrund, nicht jede Software-PWM muss die CPU voll belegen. Ein angenommener 20-µs-Interrupt vor der fallenden Flanke macht HIGH 70 µs, LOW 50 µs, T 120 µs und D etwa 58,33 Prozent. Das ist eine Rechnung, keine Ausführung. Trifft die Verzögerung LOW, sinkt D auf etwa 41,67 Prozent. CPU zu 100 % im Busy Waiting — keine andere Arbeit. Jeder Interrupt zerstört das Timing. Verständnischeck: Was passiert, wenn die 20 µs in LOW fallen? D sinkt auf etwa 41,67 Prozent. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Die C-Lehrfunktion liefert eine Zustandsfolge, keinen kompletten Gerätezugriff. `uint8_t`, `uint32_t` und `uint64_t` aus `stdint.h` sind vorzeichenlose Typen mit acht, zweiunddreißig und vierundsechzig Bit. `step` ist die Zahl verstrichener Zehn-Millisekunden-Intervalle seit einem Start. Sie kann im betrachteten Zeitraum ohne Umlauf aus einem konsistenten Zeitwert und einem Startwert berechnet werden.
+
+`phase` ist der Rest bei Division durch zweihundert und liegt zwischen null und hundertneunundneunzig. Bis hundert steigt das Ergebnis, danach ergibt `200 - phase` die fallende Hälfte. Schritte null, fünfundzwanzig, hundert, hundertfünfundzwanzig, hundertneunundneunzig und zweihundert liefern null, fünfundzwanzig, hundert, fünfundsiebzig, eins und wieder null Prozent. Zweihundert Schritte zu zehn Millisekunden ergeben zwei Sekunden pro vollständigem Zyklus.
+
+Das Hauptprogramm kann den aktuellen Schritt berechnen, den Compare-Wert bilden und ihn über einen echten Treiber übernehmen lassen. Die Funktion wartet nicht und holt nicht künstlich jeden verpassten Zustand nach. Eine wahrnehmungsbezogene Kennlinie wäre ein eigener weiterer Schritt. Sie füttert auch keinen Watchdog; ein neuer Duty-Wert allein ist nicht der gesamte benötigte Fortschrittsnachweis.
+
+Der Ausdruck mit Fragezeichen und Doppelpunkt ist der bedingte C-Operator: Er wählt abhängig vom Vergleich einen der beiden Ergebniszweige. Der Restoperator macht die Phase periodisch. Weil beide Zweige höchstens hundert liefern, passt das Ergebnis in den Acht-Bit-Rückgabetyp.
 :::
 
-## Timing-Problem: Jitter
+## Was passiert, wenn das Hauptprogramm hängt?
 
-- Auch mit Timer-ISRs statt `delay()`: andere Interrupts (z. B. UART) verzögern Toggles
-- Jitter: unbestimmte Verschiebung der Flanken
-- Folge: Duty Cycle schwankt → Motor zuckt, LED blitzt
+- Bei weiterlaufendem Timer und Takt kann die letzte PWM weiterlaufen
+- Neue Sollwerte und andere Arbeit bleiben aus
+- Eine laufende ISR beweist nicht Fortschritt der Anwendung
+- Überwachung muss den relevanten Fehler tatsächlich beobachten
 
 ::: notes
-Timing-Problem: Jitter knüpft an die bisherige Frage nach Signal und Überwachung an. Latenz ist Verzögerung, Jitter ihre Schwankung. Eine gleiche Verschiebung beider Flanken um 5 µs ändert die Pulsdauer nicht, wohl die Phase. UART ist eine serielle Schnittstelle. Zucken oder Blitzen sind mögliche Folgen, kein allgemeiner Lagerschaden. Auch mit Timer-ISRs statt `delay()`: andere Interrupts (z. B. UART) verzögern Toggles. Jitter: unbestimmte Verschiebung der Flanken. Folge: Duty Cycle schwankt → Motor zuckt, LED blitzt. Verständnischeck: Ändern 5 µs auf beiden Flanken die Pulsdauer? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+PWM ist Pulse Width Modulation, Pulsweitenmodulation. Die Hardware kann das zuletzt konfigurierte Muster selbstständig wiederholen. Wenn das Hauptprogramm in einer fehlerhaften Dauerschleife stecken bleibt, müssen Timer, Ausgangspfad und Versorgung deshalb nicht ebenfalls anhalten. Neue Fading-Werte bleiben aus, aber das alte Signal kann weiter am Pin stehen.
+
+ISR bedeutet Interrupt Service Routine, Unterbrechungsbehandlung. Bei wirksamen Freigaben kann eine kurze Timer-ISR weiterhin laufen, obwohl das Hauptprogramm seine Aufgaben nicht mehr erledigt. Dies entspricht der Trennung von Pending, Freigabe und tatsächlicher Softwarearbeit aus Vorlesung 3.
+
+Nicht jede `while(1)`-Schleife ist ein Fehler: Eine normale Hauptschleife ist häufig absichtlich endlos. Der Unterschied ist, ob sie die vereinbarten Verarbeitungsschritte weiter ausführt. Ein künstlicher Hänger ohne Rückkehr ist außerdem nicht automatisch ein Deadlock, der eine gegenseitige Warteabhängigkeit bezeichnet. Der Watchdog muss daher ein passendes Lebenszeichen überwachen, statt bloß irgendeine weiterlaufende Aktivität zu zählen.
+
+Ein Beispiel ist eine Ausgabe, die vor dem Hänger auf fünfundsiebzig Prozent stand. Ein autonomer Timer kann dieses Muster weiter erzeugen, obwohl ein neuer Sensorwert nie mehr berechnet wird. Sichtbare Ausgangsaktivität beweist daher nicht automatisch die Aktualität ihrer zugrunde liegenden Entscheidung.
 :::
 
-## Hardware-PWM rettet den Tag
+## Der Watchdog überwacht eine Frist
 
-- Philosophie: konfigurieren und vergessen
-- GPT ist oft direkt mit dem Pin verdrahtet (Alternate Function / Pin-Mux)
-- CPU setzt Frequenz und Duty Cycle einmal — dann weiterrechnen oder schlafen
-- Hardware erzeugt das Rechteck autark und jitterarm
+- WDT: Watchdog Timer
+- Ein gültiger Feed erneuert die Frist
+- Im Basismodell führt Ablauf zu einem Reset
+- Verhalten, Takt, Start und Abschaltbarkeit sind plattformabhängig
 
 ::: notes
-Hardware-PWM rettet den Tag knüpft an die bisherige Frage nach Signal und Überwachung an. Der Pfad ist Zähler, Vergleich, Ausgangsfunktion, Pin. Pin-Mux wählt die interne Funktion. Hardware-PWM nimmt die CPU aus der einzelnen Flanke, nicht aus Takt und Fehlerbehandlung. Im Sleep läuft der Timer nur weiter, wenn Takt und Ausgangsdomäne aktiv bleiben. Philosophie: konfigurieren und vergessen. GPT ist oft direkt mit dem Pin verdrahtet (Alternate Function / Pin-Mux). CPU setzt Frequenz und Duty Cycle einmal — dann weiterrechnen oder schlafen. Verständnischeck: Warum kann die CPU rechnen, während PWM läuft? Der Timer vergleicht in eigener Hardware. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+WDT bedeutet Watchdog Timer, zeitbezogener Überwachungsbaustein. Ein Feed oder Refresh ist die von der Software veranlasste Erneuerung seiner Frist. Bleibt sie aus, läuft der Watchdog ab. Unser Basismodell löst dann einen Reset aus, ohne auf eine noch funktionierende ISR, Interrupt Service Routine, angewiesen zu sein.
+
+Ein häufiges Hardwaremodell ist ein Abwärtszähler, der beim Start beziehungsweise Feed einen Wert lädt und anschließend bis zum Ablauf zählt. Ein anderes Modul kann zusätzlich eine Vorwarnung, andere Resetziele oder besondere Betriebszustände haben. Der Ausdruck Watchdog allein garantiert weder eine unabhängige Taktquelle noch, dass das ganze System stromlos wird.
+
+Software muss den gültigen Feed durch die dokumentierte Sequenz auslösen. Eine dokumentierte Schlüssel- oder Schreibfolge ist Teil des konkreten Gerätemodells. Vor der Nutzung sind Timeout, Takt, Startverhalten, Debug- oder Schlafverhalten und mögliche Abschaltbarkeit zu verstehen. Zunächst legt eine Zeitachse offen, ab welchem Moment die Frist tatsächlich läuft.
+
+Reset bedeutet hier einen Neustart der betroffenen Verarbeitungseinheit und ihrer dokumentierten Resetdomänen. Der Name beschreibt keine allgemeine Trennung einer externen Lastversorgung. Für eine zeitliche Rechnung muss zuerst bekannt sein, wann der letzte Feed erfolgreich war.
 :::
 
-## Praxis: RGB-LEDs
+## Die Frist beginnt beim letzten Feed
 
-- RGB-LED: drei Dioden (Rot, Grün, Blau)
-- Je Farbe ein PWM-Kanal
-- Beispiel: R 100 %, G 50 %, B 0 % → wahrgenommenes Orange
-- Laborziel (geplant): Farbverläufe über Duty Cycles
+![](../assets/figures/04_aktorik_sicherheit/watchdog.png){fig-alt="Gültige Feeds bei 0, 0,5 und 1,0 s setzen das ideale Zwei-Sekunden-Timeout jeweils neu; ohne weiteren Feed folgt Reset bei 3,0 s."}
+
+Hänger ab $1{,}2$ s; nominaler Reset $1{,}0+2{,}0=3{,}0$ s.
 
 ::: notes
-Praxis: RGB-LEDs knüpft an die bisherige Frage nach Signal und Überwachung an. Drei LED-Chips brauchen drei Kanäle und Strombegrenzung. Common Cathode und Common Anode bestimmen den aktiven Pegel. Gleiche Duty-Werte sind nicht gleich viel wahrgenommenes Rot, Grün und Blau. Beliebige RGB-Farben werden nicht behauptet. RGB-LED: drei Dioden (Rot, Grün, Blau). Je Farbe ein PWM-Kanal. Beispiel: R 100 %, G 50 %, B 0 % → wahrgenommenes Orange. Verständnischeck: Warum nicht gleiche Helligkeit bei gleichem Duty? Kanäle und spektrale Empfindlichkeit unterscheiden sich. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Feed bedeutet das gültige Auffrischen des Watchdog-Timers, WDT. Die horizontale Achse zeigt Zeit in Sekunden. Wir nehmen ein ideales Timeout von zwei Sekunden und gültige Feeds bei null, einer halben und einer Sekunde an. Jede erfolgreiche Erneuerung verschiebt die Frist erneut.
+
+Der letzte Feed liegt bei einer Sekunde, daher endet das Timeout bei drei Sekunden. Ein Hänger ab einer Komma zwei Sekunden ist kein eigenes Startsignal des Watchdogs. Bis zur nominellen Auslösung verstreichen ab dem Hänger folglich $3-1{,}2=1{,}8$ Sekunden. Reset bei zwei Sekunden seit Systemstart oder bei drei Komma zwei Sekunden wäre für diesen Ablauf falsch.
+
+Die Linien markieren getrennt Feed-Zeitpunkte, Fehlerbeginn und Fristende. Taktabweichungen und Ausgangsabschaltzeiten sind hier noch nicht eingerechnet. Ein Watchdog erkennt nicht den Hänger unmittelbar, sondern das Ausbleiben der nächsten vereinbarten Erneuerung. Die Software muss deshalb festlegen, was eine solche Erneuerung tatsächlich bestätigt.
+
+Die Feedmarkierungen sind diskrete Auffrischungen, kein kontinuierliches Lebenszeichen. Der Pfeil spannt die zwei Sekunden ab dem letzten Feed auf. Eine noch geplante spätere Erneuerung zählt nicht: Erst die tatsächlich ausgeführte gültige Aktion ändert den Beginn der nächsten Frist.
 :::
 
-## Nichtlinearität des Auges
+## Feed-Ort allein ist kein Gesundheitsnachweis
 
-- Helligkeitsempfindung folgt nicht linear dem Tastverhältnis
-- Lehrkennlinie: $D = b^{2{,}2}$, keine universelle Gamma-Norm
-- Für $N = 1000$ sind die gerundeten CCR-Werte 0, 47, 218, 531, 1000
-
-![RGB-Beschaltung und Potenzkennlinie sind Lehrannahmen, keine Farbkalibrierung.](../assets/figures/04_aktorik_sicherheit/rgb-gamma.png)
+- Bedingungsloser Feed aus einer Tick-ISR kann einen Hänger verdecken
+- Ein Feed in `main` ist ebenfalls nicht automatisch richtig
+- Erst frische relevante Arbeit und Plausibilität prüfen
+- Das Lebenszeichen muss seit dem letzten Feed neu entstanden sein
 
 ::: notes
-Nichtlinearität des Auges knüpft an die bisherige Frage nach Signal und Überwachung an. b ist die gewünschte Helligkeitsstufe, D das elektrische Tastverhältnis. Das Modell ist D gleich b hoch 2,2. Für N gleich 1000 ergeben gerundete CCR-Werte 0, 47, 218, 531 und 1000. Eine LUT speichert solche Werte. 50 Prozent gewünschte Helligkeit und 50 Prozent Duty sind verschiedene Eingaben. Die Prozentfunktion setzt zunächst elektrischen Duty. Helligkeitsempfindung folgt nicht linear dem Tastverhältnis. Lehrkennlinie: $D = b^{2{,}2}$, keine universelle Gamma-Norm. Für $N = 1000$ sind die gerundeten CCR-Werte 0, 47, 218, 531, 1000. Verständnischeck: Welcher CCR gehört zu b gleich 0,5? 218, etwa 21,8 Prozent elektrischer Duty. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+main bezeichnet hier die C-Funktion mit dem Anwendungsablauf; die Hauptschleife erledigt dessen fortlaufende Arbeit. ISR heißt Interrupt Service Routine, Unterbrechungsbehandlung. Ein periodischer Timer kann eine ISR auch dann ausführen, wenn die Hauptschleife hängt. Füttert diese ISR den WDT, Watchdog Timer, bedingungslos weiter, wird der relevante Ausfall nicht erkannt. Ein einzelner Programmort entscheidet aber noch nicht über die Qualität der Überwachung.
+
+Auch eine Endlosschleife im Hauptprogramm kann wiederholt eine Feed-Funktion aufrufen, ohne neue Sensordaten auszuwerten oder Ausgaben korrekt zu aktualisieren. Umgekehrt kann ein bewusst entworfener Supervisor, eine Überwachungsinstanz, Feeds veranlassen, wenn er die erforderlichen frischen Fortschrittsmeldungen wirklich prüft. Die pauschale Regel „nur am Ende von main“ genügt daher nicht.
+
+Frisch bedeutet hier: Die geforderten Arbeitsschritte wurden seit der letzten bestätigten Überwachungsrunde erneut abgeschlossen. Plausibilität ergänzt die reine Erreichbarkeit eines Codepunkts, erkennt aber ebenfalls nicht jeden Fehler. Die nächste Folie beschreibt eine solche Runde als konkretes Zustandsmodell statt als unbegründeten Feed-Aufruf.
+
+Beispielsweise kann die Eingangserfassung Fortschritt melden, während die Berechnung seit der vorigen Runde nichts Neues geliefert hat. Ein Feed allein aufgrund des neuen Eingangs würde dann genau den kritischen Stillstand verdecken. Die Meldungen müssen die gewählten gemeinsamen Anforderungen erfüllen.
 :::
 
-## Fragen? — PWM-Grundlagen
+## Fortschritt als Überwachungsrunde
 
-- Periode $T$ und Duty Cycle klar?
-- Warum ist Bit-Banging riskant für Stabilität und Timing?
-- $V_{\mathrm{eff}}$ nachvollziehbar?
+Eine Runde verlangt frische Ergebnisse aus:
+
+1. Eingang erfassen und plausibilisieren
+2. Steuerentscheidung berechnen
+3. Neue Ausgabe erfolgreich übernehmen
+
+Erst bei allen Meldungen und fälligem Service Feed erlauben; danach eine neue Runde beginnen.
 
 ::: notes
-Fragen? — PWM-Grundlagen knüpft an die bisherige Frage nach Signal und Überwachung an. Bei T gleich 1 ms und 250 µs aktiv sind Frequenz 1 kHz und Duty 25 Prozent. Mittelwert 0,825 V, Effektivwert 1,65 V. Am ungefilterten Pin liegt keine konstante Zwischenpegelspannung. Aus 0,825 V folgt keine Motorleistung. Periode $T$ und Duty Cycle klar?. Warum ist Bit-Banging riskant für Stabilität und Timing?. $V_{\mathrm{eff}}$ nachvollziehbar?. Verständnischeck: Kann man aus 0,825 V die Motorleistung rechnen? Nein, Last und Stromverlauf fehlen. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Eine Überwachungsrunde ist hier eine definierte Anwendungsepoche seit dem letzten Feed. Der WDT, Watchdog Timer, sieht nicht unmittelbar alle Rechenergebnisse. Eine Softwareüberwachung muss deshalb passende Meilensteine zusammenführen. Das Modell verlangt einen frischen Eingang, eine abgeschlossene Steuerentscheidung und eine erfolgreich übernommene Ausgabe.
+
+Ein gespeichertes Wahrheitsbit aus einer alten Runde darf nicht dauerhaft weiter als neuer Fortschritt gelten. Nach einem gültigen Feed werden die Meldungen daher für die nächste Runde neu bewertet, beispielsweise durch neue Epochennummern oder gezielte Rücksetzung im korrekt synchronisierten Modell. Die genauen gemeinsamen Zugriffe müssen wie in Vorlesung 3 konsistent sein.
+
+Service fällig bedeutet außerdem, dass der erlaubte Feed-Zeitpunkt erreicht ist. Ein Fenster-Watchdog kann zu frühes Auffrischen ablehnen. Erneuerung darf also nicht allein aus der schnellen Ausgabefunktion folgen. Dieses Zustandsmodell ist eine didaktische Überwachungsstrategie, kein vollständiger Nachweis funktionaler Sicherheit. Es macht jedoch sichtbar, weshalb eine alte Flag-Kombination oder ein weiterlaufender Tick allein den gewünschten Fortschritt nicht belegt.
+
+Eine neue Eingangsmeldung zusammen mit einem alten Ausgabe-Flag genügt nicht für die nächste Runde. Das Beispiel verlangt drei neue Meldungen derselben Epoche. Ob die berechnete Entscheidung fachlich richtig ist, bleibt zusätzlich von der Plausibilitätsprüfung und dem Anwendungsmodell abhängig.
 :::
 
-## Counter trifft Compare-Register
+## Eigener Takt und Feed-Fenster sind verschieden
 
-- Bekannt: `CNT` zählt, `ARR` begrenzt die Periode
-- Neu: Capture/Compare Register (`CCR`) — Schwelle für den Duty Cycle
-- Merksatz:
-  - `ARR` → Frequenz / Periode
-  - `CCR` → Duty Cycle
+| Eigenschaft | Beobachtetes Problem |
+|-------------|----------------------|
+| unabhängige Zeitquelle | Ausfall des überwachten Haupttakts |
+| Feed-Fenster | zu frühe oder zu späte Erneuerung |
+
+Eine Eigenschaft folgt nicht automatisch aus der anderen.
 
 ::: notes
-Counter trifft Compare-Register knüpft an die bisherige Frage nach Signal und Überwachung an. Capture erfasst Zeitpunkte, Compare vergleicht mit einer Schwelle. Hier gilt Compare. f_PWM gleich f_cnt geteilt durch ARR plus 1, D_aktiv gleich CCR geteilt durch ARR plus 1, bei festem Takt und PSC. CCR von 250 auf 500 verdoppelt D von 25 auf 50 Prozent, die Frequenz bleibt. Preload kann die Wirkung verzögern. Bekannt: `CNT` zählt, `ARR` begrenzt die Periode. Neu: Capture/Compare Register (`CCR`) — Schwelle für den Duty Cycle. Merksatz:. Verständnischeck: Was ändert CCR von 250 auf 500? Nur das Tastverhältnis, nicht die Frequenz. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Ein Watchdog benötigt eine fortschreitende Zeitbasis, um einen fehlenden Feed, ein fehlendes Auffrischen, zu erkennen. Bleiben Prozessor und Überwachung beim Ausfall derselben Taktquelle gemeinsam stehen, kann diese Anordnung genau diesen Fehler nicht mehr zeitlich erkennen. Eine geeignete unabhängige Zeitquelle erweitert daher die beobachtbaren Ausfälle.
+
+Ein Fenster-Watchdog prüft dagegen das Alter seit dem letzten gültigen Feed. Er kann Erneuerung vor einem unteren Zeitlimit oder nach der Frist zurückweisen. Das sagt allein nichts darüber, woher sein Takt stammt. Ein unabhängiger Watchdog kann Fensterfunktionen haben, ein Fenster-Watchdog kann auch aus einem Systemtakt gespeist sein.
+
+Ein Herstellerbeispiel ist der IWDG, Independent Watchdog, der STM32F4-Dokumentation mit LSI, Low-Speed Internal, internem langsamen Takt. Dessen WWDG, Window Watchdog, verwendet hingegen einen abgeleiteten Bustakt. Diese Bezeichnungen und Eigenschaften sind keine universellen RISC-V-Regeln. Weitere Betriebszustände wie Debug-Halt oder Schlaf können das Verhalten ebenfalls verändern und müssen zur konkreten Plattform dokumentiert werden.
+
+RISC-V ist die Prozessor-Befehlssatzarchitektur, nicht die Festlegung dieser Peripheriemodule. Beim Herstellerbeispiel bezeichnet der Bustakt den Takt der betreffenden Peripherieanbindung. Damit sind eine unabhängige Uhr und ein zusätzliches Feed-Fenster zwei getrennt zu prüfende Merkmale.
 :::
 
-## Der Komparator im Timer
+## Taktabweichung verändert das Timeout
 
-- Hardware vergleicht fortlaufend `CNT` und `CCR`
-- Typische Logik (vereinfacht): solange `CNT < CCR` → Pin HIGH, sonst LOW
-- Läuft automatisch — ohne Software-Latenz pro Takt
+Lehrmodell: nominal $T_0=2$ s, tatsächlicher Watchdog-Takt $\pm20\,\%$.
+
+$$
+T_\text{min}=\frac{2}{1{,}2}\approx1{,}667\ \mathrm{s},\qquad
+T_\text{max}=\frac{2}{0{,}8}=2{,}5\ \mathrm{s}
+$$
+
+Gesunder maximaler Feed-Abstand muss unter dem kürzesten tatsächlichen Timeout liegen.
 
 ::: notes
-Der Komparator im Timer knüpft an die bisherige Frage nach Signal und Überwachung an. Bei CCR gleich 250 sind CNT 249 aktiv, 250 und 251 inaktiv, weil die Regel CNT kleiner CCR ist. Sofort heißt hier ohne Softwaretakt je Flanke, nicht null physikalische Verzögerung. Dunkler folgt nur bei passender Beschaltung. Hardware vergleicht fortlaufend `CNT` und `CCR`. Typische Logik (vereinfacht): solange `CNT < CCR` → Pin HIGH, sonst LOW. Läuft automatisch — ohne Software-Latenz pro Takt. Verständnischeck: Ist der Ausgang bei CNT gleich CCR noch aktiv? Im Modell nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+$T_0$ ist der nominelle Timeout-Wert. Wir nehmen eine feste Zahl Watchdog-Zählschritte an. Die tatsächliche Dauer ist deshalb umgekehrt proportional zur Frequenz. Ein zwanzig Prozent schnellerer Takt liefert den frühesten Ablauf $T_\text{min}=2/1{,}2\approx1{,}667$ Sekunden. Ein zwanzig Prozent langsamerer liefert den spätesten $T_\text{max}=2/0{,}8=2{,}5$ Sekunden. Die Toleranz ist eine Lehrannahme, keine Angabe für ein bestimmtes Produkt.
+
+Ein gesunder Programmablauf mit maximal einer Komma vier Sekunden bis zum Feed und zusätzlich null Komma zwei Sekunden begrenzter Verzögerung hätte insgesamt eine Komma sechs Sekunden Abstand. Das liegt in diesem Modell noch unter dem kürzesten Timeout. Eine bloße Aussage „unter zwei Sekunden“ wäre dagegen unzureichend.
+
+Für die späteste Reaktion auf einen Fehler ist die andere Grenze relevant. Zum langsamen Timeout können Zeit bis zur Ausgangsabschaltung, Neustart oder andere Maßnahmen hinzukommen. Die Auslegung braucht somit sowohl eine Grenze gegen unbeabsichtigte Resets als auch eine Grenze für die Fehlerreaktion. Ein nomineller Wert allein erfüllt keine dieser beiden Aufgaben vollständig.
+
+Ein Timeout ist die Dauer bis zur Reaktion nach ausbleibender Erneuerung. Die Prozentabweichung betrifft hier den Takt, nicht direkt die Dauer. Würde man einfach zwei Sekunden um zwanzig Prozent verkürzen oder verlängern, entstünden daher falsche Zeitgrenzen.
 :::
 
-## Edge-Aligned PWM
+## Ein Fenster erlaubt nicht jeden Feed
 
-![CNT 0 bis 999, CCR 250: 250 aktive und 750 inaktive Tickintervalle.](../assets/figures/04_aktorik_sicherheit/edge-pwm.png)
+![](../assets/figures/04_aktorik_sicherheit/window.png){fig-alt="Im gewählten Modell sind Feed-Alter über 0,5 s und unter 2 s zulässig; 0,2 s ist zu früh, 1 s gültig, 2,1 s bereits abgelaufen."}
 
-- Up-Counting (Sägezahn) + Vergleich mit CCR → Edge-Aligned PWM
-- Beispiel: `ARR = 999`, `CCR = 250` → exakt 25 % Duty Cycle (Periode $0\ldots999$ = 1000 Takte)
-- Pin HIGH von 0 bis unter CCR, danach LOW bis ARR, dann Reset
+Modellbedingung: $0{,}5\ \mathrm{s}<t_\text{Alter}<2\ \mathrm{s}$.
+
+Grenzwerte und genaue Aktionen sind im echten Gerät dokumentiert.
 
 ::: notes
-Edge-Aligned PWM knüpft an die bisherige Frage nach Signal und Überwachung an. Bei 1 MHz gilt CNT 0 von 0 bis 1 µs, CNT 249 von 249 bis 250 µs, CNT 999 von 999 bis 1000 µs. Aktiv sind 0 bis 250 µs, inaktiv 250 bis 1000 µs. CCR 0 ist immer inaktiv. CCR 1000 ist immer aktiv, wenn der Wert darstellbar ist. 250 geteilt durch 999 wäre falsch, weil null mitzählt. Up-Counting (Sägezahn) + Vergleich mit CCR → Edge-Aligned PWM. Beispiel: `ARR = 999`, `CCR = 250` → exakt 25 % Duty Cycle (Periode $0\ldots999$ = 1000 Takte). Pin HIGH von 0 bis unter CCR, danach LOW bis ARR, dann Reset. Verständnischeck: Warum 25 Prozent und nicht 250 geteilt durch 999? Weil N gleich 1000 ist. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+$t_\text{Alter}$ ist die Zeit seit dem letzten gültigen Feed, dem Auffrischen des Watchdogs. Für diese Folie definieren wir ein offenes Fenster: älter als eine halbe und jünger als zwei Sekunden. Die Abbildung färbt die erlaubte Zone mit einer hellen Fläche und kennzeichnet konkrete Zeitpunkte. Die Farben ersetzen die Beschriftungen nicht.
+
+Ein Feed nach null Komma zwei Sekunden ist zu früh. Einer nach einer Sekunde passt. Nach zwei Komma eins Sekunden ist die Frist bereits verstrichen; der Ablauf kann nicht nachträglich durch einen neuen Feed ungeschehen gemacht werden. Im gewählten Basismodell führen Fehlzeitpunkte zur Resetreaktion. Die exakten Randregeln und Aktionen eines Produkts können anders lauten.
+
+Die Fensterprüfung erkennt bestimmte zu schnelle Abläufe, aber nicht jede Endlosschleife: Wenn fehlerhafte Software trotzdem im gültigen Zeitfenster füttert, bleibt ihr Verhalten zeitlich zulässig. Neue Fading-Ausgaben alle zehn Millisekunden sind außerdem keine Aufforderung, genauso oft zu füttern. Fortschrittsrunde und erlaubter Servicezeitpunkt müssen gemeinsam erfüllt werden.
+
+Die markierte Ein-Sekunden-Stelle prüft nur den zeitlichen Teil. Fehlt gleichzeitig eine neue kritische Verarbeitung, muss die Anwendung den Feed dennoch zurückhalten. Das erlaubt, gültiges Fenster und tatsächlichen Fortschrittsnachweis als zwei getrennte Bedingungen zu formulieren.
 :::
 
-## Schritt 1: Start — Pin HIGH
+## Eine prüfbare Feed-Entscheidung
 
-- Start: `CNT = 0`
-- Vergleich: $0 < 250$ (`CNT < CCR`) → ja → Pin HIGH ($3{,}3\,\mathrm{V}$)
-- Timer zählt weiter; die CPU kann andere Aufgaben erledigen
-- LED leuchtet in der HIGH-Phase
-
-| CNT | CCR | Pin |
-|-----|-----|-----|
-| 0 … 249 | 250 | HIGH |
-| $\ge$ 250 | 250 | LOW (nächster Schritt) |
-
-::: notes
-Schritt 1: Start — Pin HIGH knüpft an die bisherige Frage nach Signal und Überwachung an. Der Start CNT gleich 0 ist aktiv, weil 0 kleiner 250. Die Intervalle 0 bis 249 sind aktiv. 3,3 V ist der ideale Pegel. Bei CCR gleich 0 ist 0 kleiner 0 falsch, der Start ist inaktiv. Start immer HIGH gilt daher nicht. Start: `CNT = 0`. Vergleich: $0 < 250$ (`CNT < CCR`) → ja → Pin HIGH ($3{,}3\,\mathrm{V}$). Timer zählt weiter; die CPU kann andere Aufgaben erledigen. Verständnischeck: Was liefert CCR gleich 0 am Start? Keine aktive Phase. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Schritt 2: Counter erreicht CCR (Match)
-
-- Counter erreicht exakt `CCR = 250`
-- Vergleich: $250 < 250$? → nein → Compare Match
-- Ab `CNT = CCR` ist der Steuerpin im Active-High-Modell inaktiv
-- Induktive Lasten können in LOW weiter Strom führen
-- Ein ungepufferter CCR-Wechsel mitten in der Periode kann erneut aktivieren
-
-| Phase | Bedingung | Pin |
-|-------|-----------|-----|
-| aktiv | `CNT < CCR` | HIGH |
-| Match | `CNT = CCR` | LOW, Beginn der inaktiven Phase |
-| danach | `CNT > CCR` bis ARR | LOW |
-
-![Ungepuffert kann CCR = 750 bei CNT = 500 erneut aktivieren. Mit Preload gilt der neue Wert erst ab dem Update.](../assets/figures/04_aktorik_sicherheit/preload.png)
-
-::: notes
-Schritt 2: Counter erreicht CCR (Match) knüpft an die bisherige Frage nach Signal und Überwachung an. Match ist die Gleichheit CNT gleich CCR. CNT größer oder gleich CCR beschreibt die anschließende inaktive Phase. Ab 250 µs bleibt der Pin bis 1000 µs inaktiv. Der Steuerpin ist inaktiv, die Last kann weiter Strom führen. Ohne Preload wird bei CNT gleich 500 und neuem CCR 750 der Vergleich 500 kleiner 750 wieder wahr. Mit Preload bleibt die erste Periode 25 Prozent, die nächste wird 75 Prozent. Registernamen sind herstellerspezifisch. Counter erreicht exakt `CCR = 250`. Vergleich: $250 < 250$? → nein → Compare Match. Ab `CNT = CCR` ist der Steuerpin im Active-High-Modell inaktiv. Verständnischeck: Warum wird ungepuffert bei CNT 500 wieder aktiv? Weil 500 kleiner 750 nun gilt. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Nach dem ARR-Intervall: Neustart
-
-- `CNT = 999` dauert von 999 bis 1000 µs
-- Erst der nächste Tick setzt `CNT = 0` und startet die neue Periode
-- Vergleich erneut: $0 < 250$ → Pin wieder HIGH
-- Im Kernmodell ist das 1 kHz, nicht ungeprüft 10 kHz
-
-::: notes
-Nach dem ARR-Intervall: Neustart knüpft an die bisherige Frage nach Signal und Überwachung an. CNT gleich 998 liegt in 998 bis 999 µs, CNT gleich 999 in 999 bis 1000 µs, CNT gleich 0 erst in 1000 bis 1001 µs. Der Ausgang wird bei 1000 µs wieder aktiv. Das Beispiel bleibt 1 kHz. Ein Sleep muss den Timer-Takt behalten. Flackerfrei ist keine Wahrnehmungsgarantie. `CNT = 999` dauert von 999 bis 1000 µs. Erst der nächste Tick setzt `CNT = 0` und startet die neue Periode. Vergleich erneut: $0 < 250$ → Pin wieder HIGH. Verständnischeck: Wann beginnt die zweite Periode? Bei t gleich 1000 µs. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Die Polarität (Polarity)
-
-- Bisher Active-High: `CNT < CCR` → Pin HIGH, $D_{\mathrm{HIGH}} = D_{\mathrm{aktiv}}$
-- Active-Low: dieselbe aktive Zeit, aber LOW. Bei CCR = 250 ist HIGH dann 75 Prozent
-- Größeres CCR verlängert die aktive Phase, nicht automatisch die HIGH-Zeit
-
-::: notes
-Die Polarität (Polarity) knüpft an die bisherige Frage nach Signal und Überwachung an. Bei CCR 250 und N 1000 ist D_aktiv in beiden Polaritäten 25 Prozent. Active-High hat 25 Prozent HIGH, Active-Low 25 Prozent LOW und damit 75 Prozent HIGH. Größeres CCR verlängert die aktive Phase auch bei Active-Low. Bei CNT gleich 100 und Active-Low ist der Pegel LOW. Bisher Active-High: `CNT < CCR` → Pin HIGH, $D_{\mathrm{HIGH}} = D_{\mathrm{aktiv}}$. Active-Low: dieselbe aktive Zeit, aber LOW. Bei CCR = 250 ist HIGH dann 75 Prozent. Größeres CCR verlängert die aktive Phase, nicht automatisch die HIGH-Zeit. Verständnischeck: Welcher Pegel ist bei CNT 100 im Active-Low-Fall? LOW, der aktive Anteil bleibt CCR geteilt durch N. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Mehrere Kanäle an einem Timer
-
-- Ein Timer: ein Counter und ein ARR → gemeinsame Frequenz
-- Oft 4 Compare-Register (CCR1–CCR4) → bis zu 4 Pins
-- Unterschiedliche Duty Cycles möglich, gleiche Grundfrequenz
-- Ideal für RGB: ein Rhythmus, drei Helligkeiten
-
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  CNT[Counter und ARR] --> C1[CCR1]
-  CNT --> C2[CCR2]
-  CNT --> C3[CCR3]
-  C1 --> R[LED Rot]
-  C2 --> G[LED Grün]
-  C3 --> B[LED Blau]
-  style CNT fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Mehrere Kanäle an einem Timer knüpft an die bisherige Frage nach Signal und Überwachung an. Ein gemeinsamer Zähler kann mehrere CCR und Pins haben. Vier Kanäle sind keine allgemeine Garantie. CCR 100, 500 und 900 sind 10, 50 und 90 Prozent bei N 1000. Dieselbe ARR-Einstellung kann nicht zugleich 1 kHz und 50 Hz erzeugen. Drei Schreibzugriffe, die ein Update überstreichen, können trotz Preload einen gemischten Kanalsatz erzeugen. Ein Timer: ein Counter und ein ARR → gemeinsame Frequenz. Oft 4 Compare-Register (CCR1–CCR4) → bis zu 4 Pins. Unterschiedliche Duty Cycles möglich, gleiche Grundfrequenz. Verständnischeck: Geht 1-kHz-LED und 50-Hz-Servo am selben ARR? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Center-Aligned PWM
-
-- Dreieckszähler: Komparator schaltet beim Hoch- und Herunterzählen
-- PWM-Pulse symmetrisch zur Periodenmitte
-- Nutzen: Wechselrichter / Motorantrieb — oft weniger störende Harmonische
-- Für LEDs reicht meist Edge-Aligned
-
-::: notes
-Center-Aligned PWM knüpft an die bisherige Frage nach Signal und Überwachung an. Symmetrische Pulse brauchen die Vergleichsregel in beiden Richtungen. Das Dreieck mit acht Intervallen ist das Modell von Folie 21. EMI heißt elektromagnetische Störung, falls genannt. Geringere Verluste sind keine Garantie. Ein Dreieckbild allein liefert keine exakten Prozente. Dreieckszähler: Komparator schaltet beim Hoch- und Herunterzählen. PWM-Pulse symmetrisch zur Periodenmitte. Nutzen: Wechselrichter / Motorantrieb — oft weniger störende Harmonische. Verständnischeck: Warum reicht das Dreieck nicht für Prozente? Endpunkte, Vergleich und Polarität fehlen. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Glättung von PWM-Signalen
-
-- Manche Lasten brauchen echte Gleichspannung (z. B. Audio)
-- RC-Glied (Widerstand + Kondensator) als Tiefpass am PWM-Pin
-- Hohe Frequenzanteile (Kanten) werden gedämpft → Mittelwert bleibt
-- Ergebnis: steuerbare Analogspannung — PWM als einfacher DAC
-
-::: notes
-Glättung von PWM-Signalen knüpft an die bisherige Frage nach Signal und Überwachung an. RC ist hier Widerstand und Kondensator, ein Tiefpass. Audio ist ein veränderliches Nutzsignal, keine Gleichspannung. R gleich 10 Kiloohm und C gleich 1 Mikrofarad ergeben Tau gleich 10 ms und eine Grenzfrequenz von etwa 15,9 Hz im unbelasteten Modell. Bei 1 kHz und 50 Prozent nähert sich der Mittelwert 1,65 V. Größeres Tau glättet stärker und reagiert langsamer. Das ist kein geprüftes Schaltungsdesign. Manche Lasten brauchen echte Gleichspannung (z. B. Audio). RC-Glied (Widerstand + Kondensator) als Tiefpass am PWM-Pin. Hohe Frequenzanteile (Kanten) werden gedämpft → Mittelwert bleibt. Verständnischeck: Warum folgt der neue Mittelwert nicht sofort? Der Kondensator lädt mit endlicher Zeitkonstante. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Anwendung: Servomotoren
-
-![RC-Glied, Servo mit 20 ms und H-Bruecke sind drei verschiedene Anwendungen.](../assets/figures/04_aktorik_sicherheit/applications.png)
-
-- Hier ist PWM oft Datenprotokoll, nicht reine Leistungsübertragung
-- Typisch: 50 Hz (Periode 20 ms)
-- Pulsbreite steuert den Winkel:
-  - $1{,}0\,\mathrm{ms}$ → eine Endlage
-  - $1{,}5\,\mathrm{ms}$ → Mitte
-  - $2{,}0\,\mathrm{ms}$ → andere Endlage
-- Motorleistung kommt über separate Versorgung
-
-::: notes
-Anwendung: Servomotoren knüpft an die bisherige Frage nach Signal und Überwachung an. RC-Servo heißt Radio-Control-Servo, nicht Widerstand-Kondensator. 20 ms Rahmen und 1, 1,5 und 2 ms Pulse sind häufige Beispiele, keine Winkelgarantie. 1,5 geteilt durch 20 ist 7,5 Prozent des Steuersignals, nicht der Motorleistung. Die Versorgung speist die interne Stufe separat. Hier ist PWM oft Datenprotokoll, nicht reine Leistungsübertragung. Typisch: 50 Hz (Periode 20 ms). Pulsbreite steuert den Winkel:. Verständnischeck: Wie groß ist D bei 1,5 ms in 20 ms? 7,5 Prozent, im Beispiel der mittlere Positionsbefehl. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Anwendung: DC-Motoren und H-Brücke
-
-- Motor nie direkt an GPIO (Strombegrenzung, Chip-Schutz)
-- Motortreiber / H-Brücke dazwischen
-- SoC: schwaches PWM-Kommando (z. B. $3{,}3\,\mathrm{V}$)
-- H-Brücke: schaltet externe Versorgung (z. B. 12 V) im PWM-Takt
-
-::: notes
-Anwendung: DC-Motoren und H-Brücke knüpft an die bisherige Frage nach Signal und Überwachung an. DC heißt Gleichstrom. 3,3 V ist das Logiksignal, 12 V eine beispielhafte Motorversorgung. Eine H-Brücke kann die Polarität ändern. PWM, Richtung und Enable sind nur dann Pins, wenn das Modell sie definiert. Gleichzeitiges Durchschalten einer Brücke ist unzulässig. In LOW kann Induktivität weiter Strom treiben. Motor nie direkt an GPIO (Strombegrenzung, Chip-Schutz). Motortreiber / H-Brücke dazwischen. SoC: schwaches PWM-Kommando (z. B. $3{,}3\,\mathrm{V}$). Verständnischeck: Warum fließt in LOW noch Strom? Die Wicklung speichert Energie, der Treiber stellt einen Pfad bereit. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Zusammenfassung: Hardware-PWM
-
-- GPT erzeugt Signale autark (kein Bit-Banging)
-- Frequenz: Prescaler (PSC) und Auto-Reload (ARR)
-- Duty Cycle: Compare-Register (CCR)
-- Active-High (typisch): `CNT < CCR` → Pin HIGH
-- LEDs direkt (strombegrenzt); Motoren über Treiber/H-Brücke — jitterarm
-
-::: notes
-Zusammenfassung: Hardware-PWM knüpft an die bisherige Frage nach Signal und Überwachung an. Das Kernmodell: 100 MHz, PSC 99, ARR 999, CCR 250 ergeben 1 kHz und 25 Prozent aktive Zeit. Der Pin muss gemultiplext sein. LEDs brauchen Strombegrenzung, Motoren einen Treiber. Nach einem Hänger kann das letzte PWM-Signal bleiben. GPT erzeugt Signale autark (kein Bit-Banging). Frequenz: Prescaler (PSC) und Auto-Reload (ARR). Duty Cycle: Compare-Register (CCR). Verständnischeck: Was bleibt bei einem Hänger aktiv? Das letzte PWM-Signal, solange Takt und Timer laufen. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Fragen? — Hardware-PWM
-
-- Zusammenspiel von Counter, ARR und CCR?
-- Warum gleiche Frequenz, aber unterschiedliche Duty Cycles auf einem Timer?
-- PWM zum Dimmen vs. PWM als Servo-Protokoll?
-
-::: notes
-Fragen? — Hardware-PWM knüpft an die bisherige Frage nach Signal und Überwachung an. Der Counter liefert das Raster, ARR beendet es nach N Intervallen, CCR setzt die Schwelle. Mehrere Kanäle teilen die Grundfrequenz. Ein direktes CCR-Schreiben mitten in der Periode kann Pulse zerschneiden oder verdoppeln. Preload verschiebt die Wirkung an das Update. Zusammenspiel von Counter, ARR und CCR?. Warum gleiche Frequenz, aber unterschiedliche Duty Cycles auf einem Timer?. PWM zum Dimmen vs. PWM als Servo-Protokoll?. Verständnischeck: Warum ist direktes Schreiben heikel? Der neue Vergleich kann in derselben Periode zusätzlich schalten. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Szenario: System ohne Reset-Zugang
-
-- Beispiel: Gerät ohne physischen Zugang (Satellit, Implantat, Feldgerät)
-- Software hängt in einer Endlosschleife (Freeze)
-- Kommunikation und Steuerung fallen aus
-- Niemand kann den Reset-Knopf drücken
-- Folge: Mission / Funktion dauerhaft verloren — ohne Selbstheilung
-
-::: notes
-Szenario: System ohne Reset-Zugang knüpft an die bisherige Frage nach Signal und Überwachung an. Das Beispiel ist ein entferntes LED-Feldgerät, kein Implantat. Ein Hänger blockiert die Anwendung, autonome Peripherie kann weiterlaufen. Ein Reset beseitigt einen temporären Zustand, nicht zwingend eine bleibende Ursache. Ein kurzgeschlossener Sensor kann nach dem Boot erneut hängen lassen. Beispiel: Gerät ohne physischen Zugang (Satellit, Implantat, Feldgerät). Software hängt in einer Endlosschleife (Freeze). Kommunikation und Steuerung fallen aus. Verständnischeck: Warum hilft Reset bei einem dauerhaften Sensorfehler nicht immer? Die Ursache bleibt. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Warum stürzt Software ab?
-
-- Endlosschleifen (z. B. Timeout vergessen: `while (sensor_busy);`)
-- Deadlocks (Multicore, später Block 9)
-- Stack Overflow (z. B. zu tiefes Nesting)
-- Soft-Errors: Bit-Flips (z. B. Strahlung) → Program Counter / Zustand zerstört
-
-::: notes
-Warum stürzt Software ab knüpft an die bisherige Frage nach Signal und Überwachung an. Eine Endlosschleife, unbegrenztes Warten, wechselseitige Locks, erschöpfter Stack und ein Bitfehler sind verschiedene Fälle. Deadlock ist nicht jede while-1-Schleife. Tiefe Aufrufe verbrauchen Stack, verschachtelte ifs nicht automatisch. Der Watchdog sieht ausbleibenden Feed, nicht den falschen Sensorwert. Endlosschleifen (z. B. Timeout vergessen: `while (sensor_busy);`). Deadlocks (Multicore, später Block 9). Stack Overflow (z. B. zu tiefes Nesting). Verständnischeck: Erkennt der Watchdog einen falschen Wert bei weiterem Feed? Nicht allein durch den Timeout. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Leitfrage 2: Wer resettet die tote CPU?
-
-- OS/C-Code abgestürzt — CPU reagiert nicht mehr
-- Wie resettet man, wenn das „Gehirn“ den Reset nicht mehr auslösen kann?
-- Antwort: Software nicht vertrauen — unabhängige, einfache Hardware
-
-```{mermaid}
-%%| fig-width: 3.6
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  CPU[CPU abgestürzt] -->|keine Reaktion| S[System eingefroren]
-  W{Wer drückt Reset?} -.-> S
-  style W fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Leitfrage 2: Wer resettet die tote CPU knüpft an die bisherige Frage nach Signal und Überwachung an. Tot ist ein Bild: die CPU kann weiterlaufen, während die relevante Arbeit fehlt. Der Watchdog kann im SoC sitzen. Der Pfad ist Ablauf des Zählers zur Resetlogik ohne die hängende Schleife. Eine eigene Taktquelle ist ein zusätzlicher Entwurf, keine Folge der räumlichen Trennung. OS/C-Code abgestürzt — CPU reagiert nicht mehr. Wie resettet man, wenn das „Gehirn“ den Reset nicht mehr auslösen kann?. Antwort: Software nicht vertrauen — unabhängige, einfache Hardware. Verständnischeck: Warum genügt ein Reset-Aufruf am Schleifenende nicht? Der Hänger erreicht ihn nicht. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Der Watchdog Timer (WDT)
-
-- WDT: einfaches Hardware-Modul, getrennt von der ALU
-- Ultimatum im Basismodell: Reset 2 s nach dem letzten gültigen Feed
-- Gesunde Software erneuert die Frist nach geprüftem Fortschritt
-- Bei Ausfall: Timeout → Hardware zieht die Reset-Leitung
-
-::: notes
-Der Watchdog Timer (WDT) knüpft an die bisherige Frage nach Signal und Überwachung an. ALU ist das Rechenwerk. Getrennt von der ALU heißt noch keine eigene Takt- oder Stromversorgung. Das Basismodell nutzt 2 s, nicht 5 s. Ein Feed erneuert die Frist und prüft keine Ergebnisse. Der Hund ist nur die Analogie nach dieser Beschreibung. WDT: einfaches Hardware-Modul, getrennt von der ALU. Ultimatum im Basismodell: Reset 2 s nach dem letzten gültigen Feed. Gesunde Software erneuert die Frist nach geprüftem Fortschritt. Verständnischeck: Was schließt ein gültiger Feed? Nur, dass der Feed-Vorgang stattfand. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Architektur des WDT
-
-![Feeds bei 0, 0,5 und 1 s, idealer Reset bei 3 s. 0xAA55 ist fiktiv.](../assets/figures/04_aktorik_sicherheit/watchdog.png)
-
-- Oft Down-Counter
-- Beim Start: Timeout nominal 2 s laden
-- Feeds bei 0, 0,5 und 1,0 s starten die Frist neu; idealer Reset bei 3,0 s
-- Abschaltbarkeit ist plattformabhängig, keine allgemeine Garantie
-
-::: notes
-Architektur des WDT knüpft an die bisherige Frage nach Signal und Überwachung an. Feeds bei 0, 0,5 und 1 s starten je 2 s neu. Nach dem Feed bei 1 s endet die Frist bei 3 s. Ein Hänger bei 1,2 s wartet im Idealmodell 1,8 s. 0xAA55 ist ein Lehrschlüssel. Ein Down-Counter ist eine mögliche Umsetzung, keine notwendige Innenschaltung. Nicht jeder WDT lässt sich nach dem Scharfmachen abschalten. Oft Down-Counter. Beim Start: Timeout nominal 2 s laden. Feeds bei 0, 0,5 und 1,0 s starten die Frist neu; idealer Reset bei 3,0 s. Verständnischeck: Warum nicht schon bei 2 s seit Start? Der Feed bei 1 s hat die Frist neu gestartet. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Der Biss des Hundes
-
-- Counter erreicht 0
-- Kein „freundlicher“ Interrupt (CPU könnte taub sein)
-- Direkter Eingriff in Reset-/Power-Management
-- Chip wie nach Hardware-Reset: CPU, Zustand, Peripherie neu
-- Boot ab Reset-Vektor / Flash-Startadresse
-
-::: notes
-Der Biss des Hundes knüpft an die bisherige Frage nach Signal und Überwachung an. Manche Watchdogs warnen vor oder wählen die Ablaufaktion. Dieses Modell erzwingt einen Reset ohne die hängende ISR. Ein Watchdog-Reset ist nicht zwingend ein Power-On-Reset. RAM, Peripherie und Flags können verschiedene Domänen haben. Der Bootpfad ist plattformspezifisch. Dieselbe Ursache kann erneut hängen lassen. Counter erreicht 0. Kein „freundlicher“ Interrupt (CPU könnte taub sein). Direkter Eingriff in Reset-/Power-Management. Verständnischeck: Kann die Firmware denselben Fehler erneut treffen? Ja. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Den Hund streicheln (Feed)
-
-- Gesunde Software muss den WDT periodisch zurücksetzen
-- „Petting / kicking the dog“: magischen Wert ins Feed-Register schreiben
-- Counter springt auf den Startwert zurück
+C-Lehrmodell mit exakt bekanntem Alter in Millisekunden:
 
 ```c
-void wdt_feed(void) {
-    *(volatile uint32_t *)WDT_FEED_REG = 0xAA55;
+bool may_feed(uint32_t age_ms, bool fresh_progress) {
+    return fresh_progress
+        && age_ms > 500u
+        && age_ms < 2000u;
 }
 ```
 
+Alter allein reicht nicht; Fortschritt allein reicht ebenfalls nicht.
+
 ::: notes
-Den Hund streicheln (Feed) knüpft an die bisherige Frage nach Signal und Überwachung an. Der Zeigerzugriff schreibt 32 Bit an eine fiktive Adresse. volatile macht den Zugriff im C-Modell sichtbar, ersetzt aber Breite, Sequenz und Ordnung nicht. Manche Bausteine brauchen mehrere Schlüssel. Der Aufruf erneuert nur die Frist. Gesunde Software muss den WDT periodisch zurücksetzen. „Petting / kicking the dog“: magischen Wert ins Feed-Register schreiben. Counter springt auf den Startwert zurück. Verständnischeck: Warum nicht 0xAA55 auf ein anderes Board? Adresse und Sequenz stehen im Datenblatt. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Die C-Funktion entscheidet nur über das didaktische Fenster, sie bedient kein Hardware-Register. `bool` aus `stdbool.h` ist ein Wahrheitswert. `uint32_t` aus `stdint.h` ist ein vorzeichenloser Zweiunddreißig-Bit-Typ. `age_ms` ist das exakt bekannte Alter seit dem letzten gültigen Feed in Millisekunden, `fresh_progress` die korrekt zusammengesetzte neue Fortschrittsmeldung.
+
+Der Operator `&&` ist logisches Und. Die Rückgabe ist nur wahr, wenn die Meldung frisch ist und das Alter strikt größer als fünfhundert sowie kleiner als zweitausend Millisekunden ist. Bei tausend Millisekunden und frischem Fortschritt ist sie wahr; bei zweihundert oder zweitausendeinhundert falsch. Bei tausend ohne frischen Fortschritt ebenfalls falsch.
+
+Eine tatsächliche Implementierung braucht dazu eine geeignete Zeitmessung, konsistente Meldungen, Sicherheitsabstand zu den realen Grenzen und die dokumentierte Feed-Sequenz. Eine veraltete Zeitprobe oder ein seit der vorigen Runde nicht erneuertes Wahrheitsbit wäre kein gültiger Ersatz. Nach einem wirklich erfolgreichen Feed muss die neue Runde beginnen. Der reine Prädikatstest weist diese Hardwarevoraussetzungen nicht nach.
+
+Bei genau fünfhundert oder zweitausend Millisekunden ist das Ergebnis in diesem offenen Modell ebenfalls falsch. Die Funktion benutzt Integervergleich, keine ungenaue Gleitkommanäherung. Sie kann aber nicht feststellen, ob ihr Eingabewert noch aktuell ist; das muss der Aufrufer sicherstellen.
 :::
 
-## Wo streichelt man den Hund?
+## Reset und Aktorzustand
 
-- Falsch: Füttern nur in der SysTick-ISR
-  - `main` kann tot sein, Interrupts laufen weiter → kein Reset
-- Falsch: bedingungsloses Füttern in einer weiterlaufenden Tick-ISR
-- Ein Aufruf am Ende von `main` reicht nicht, wenn die Arbeit selbst nicht geprüft wurde
+![](../assets/figures/04_aktorik_sicherheit/safe-state.png){fig-alt="Zwischen Hängerbeginn 1,2 s und nominalem Watchdog-Reset 3 s kann die Hardware-PWM weiterlaufen; der Zustand während und nach Reset ist eine weitere Entwurfsfrage."}
 
-```c
-/* Lehrcode. Timeout 2 s. Feed nur nach frischem Fortschritt. */
-while (1) {
-    bool fresh = work_finished_and_plausible();
-    if (service_due && fresh)
-        wdt_feed();
-}
-```
+- Erkennung, Abschaltung und Neustart sind getrennte Zeiten
+- Eine externe Aktorversorgung wird durch CPU-Reset nicht automatisch getrennt
 
 ::: notes
-Wo streichelt man den Hund knüpft an die bisherige Frage nach Signal und Überwachung an. Ein Tick-Feed verdeckt einen Hänger der Hauptschleife. Rückkehr von lese_sensoren und berechne_werte beweist keine frischen, plausiblen Daten. Feed nur, wenn die vereinbarte Arbeit neu und rechtzeitig fertig ist. Alte Flags gelten nicht für den nächsten Abschnitt. 0,5 s Service ist nicht die 10-ms-Fading-Periode. Falsch: Füttern nur in der SysTick-ISR. `main` kann tot sein, Interrupts laufen weiter → kein Reset. Falsch: bedingungsloses Füttern in einer weiterlaufenden Tick-ISR. Verständnischeck: Warum reicht die Rückkehr der beiden Funktionen nicht? Sie können veraltete oder falsche Ergebnisse liefern. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+PWM heißt Pulse Width Modulation, Pulsweitenmodulation. CPU bedeutet Central Processing Unit, Verarbeitungseinheit. Die Abbildung zeigt erneut den letzten Feed bei einer Sekunde, den Hänger bei einer Komma zwei und den idealen Reset bei drei Sekunden. Dazwischen kann bei laufendem Timer und Takt das letzte PWM-Muster weiter bestehen. Die gezeigte Dauer beträgt eine Komma acht Sekunden.
+
+Ein Reset betrifft bestimmte Domänen eines Systems: Prozessor, Speicher oder Peripherie können unterschiedlich reagieren. Das ist nicht notwendigerweise ein Power-On-Reset, ein Neustart durch Einschalten der Versorgung. Eine externe Motorspannung kann weiterhin anliegen. Auch ein hochohmiger oder anders umkonfigurierter Steuerpin ist nicht automatisch die gewünschte Treiberfreigabe.
+
+Ein definierter Ausgangszustand benötigt deshalb passende Pin- und Treibereigenschaften während Vorbereitung, Fehler und Reset. Bei einer Lampe kann Aus erwünscht sein, bei einem Motor sind Ausrollen, Bremsen oder Halten verschiedene Wirkungen. Der Watchdog wählt diese Anwendungspolitik nicht selbst aus. Die Grafik zeigt Zeit- und Verantwortungsgrenzen und keine zertifizierte Schutzschaltung.
+
+Die waagerechten Flächen kennzeichnen Zeitabschnitte von Fortschritt beziehungsweise möglicher Signalerzeugung, nicht einzelne PWM-Pulse. Die rechte Fläche bleibt bewusst ohne festen Pegelwert. An dieser Grenze ist die konkrete Gerätebeschreibung nötig, um den Aktorzustand zu bestimmen.
 :::
 
-## Unabhängige Taktquelle (LSI)
+## Nach dem Reset die Ursache auswerten
 
-- Was, wenn der Hauptquarz ausfällt?
-- Gemeinsamer Takt: CPU und WDT würden gemeinsam einfrieren
-- Für den Ausfall des Haupttakts braucht die Überwachung eine eigene Zeitquelle
-- LSI und etwa 32 kHz sind ein Herstellerbeispiel, keine Norm jedes Watchdogs
+Konzeptioneller Bootablauf:
+
+1. Resetursache gemäß Gerätebeschreibung erfassen
+2. Ausgang und Treiber in den vorgesehenen Anfangszustand bringen
+3. Diagnose beziehungsweise Wiederanlaufpolitik anwenden
+4. Erst nach Vorbereitung normale Ausgabe freigeben
 
 ::: notes
-Unabhängige Taktquelle (LSI) knüpft an die bisherige Frage nach Signal und Überwachung an. LSI, Low-Speed Internal, ist ein Herstellername, keine Norm. Für einen Ausfall des Haupttakts braucht der WDT eine passende eigene Zeitquelle. 20 Prozent höhere Taktfrequenz verkürzt 2 s auf 2 geteilt durch 1,2, etwa 1,667 s. 20 Prozent weniger dehnt auf 2,5 s. Das sind keine symmetrischen plus minus 20 Prozent der Zeit. Ein gemeinsamer Spannungsausfall bleibt unbeobachtet. Verständnischeck: Warum wird der Timeout kürzer? Derselbe Zählwert wird schneller erreicht. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Ein Reset-Reason-Register oder Statusflag kann angeben, welche Resetursachen die Plattform gespeichert hat. Ein Watchdog-Flag ist ein Beispiel, aber weder Bitnummer noch Adresse noch Löschmethode sind universell. Einige Register erfordern besondere Quittierung; blindes Schreiben eines vermuteten Nullwerts ist kein allgemeines Verfahren.
+
+Die Ursache sollte in der vorgesehenen Reihenfolge erfasst werden, bevor ihre Information verloren geht. Eine Diagnose kann einen ausgebliebenen Feed bestätigen, beweist jedoch nicht von allein die genaue Softwareursache. Auch Zeitmessung, fehlerhafte Feed-Sequenz oder eine falsche Konfiguration können relevant sein.
+
+Wird nach jedem Watchdog-Reset derselbe fehlerhafte Ablauf unverändert wieder gestartet, kann eine Reset-Schleife entstehen. Ein Wiederanlaufkonzept kann deshalb begrenzte Versuche, einen Diagnosemodus oder einen anderen vorgesehenen Aktorzustand vorsehen. Welcher Zustand richtig ist, folgt aus der Anwendung. Ein Reset setzt außerdem nicht generell jedes RAM-Byte, Random Access Memory, Arbeitsspeicher, auf einen fest bekannten Wert. Die konkrete Resetdomäne muss geprüft werden.
+
+Ein sinnvoller Diagnoseeintrag unterscheidet etwa Einschalten, externen Reset und Watchdogauslösung, soweit die Plattform diese Ursachen bereitstellt. Die Information erklärt einen Neustart, aber ohne zusätzliche Beobachtungen noch nicht die vorausgegangene fehlerhafte Instruktion oder die Ursache einer ausgebliebenen Fortschrittsmeldung.
 :::
 
-## Window Watchdog (WWDG)
+## Was ein Watchdog nicht nachweist
 
-![Weiterfuettern aus dem Tick verdeckt einen Haenger. Fenster und Normal-Feed sind verschieden.](../assets/figures/04_aktorik_sicherheit/window.png)
-
-- Normaler WDT: erkennt zu langsames Füttern (Timeout)
-- Problem: fehlerhafter Code füttert zu oft / zu früh
-- Window Watchdog: Füttern nur in einem Zeitfenster erlaubt
-- Zu früh oder zu spät → Reset
-
-| Zeitpunkt | Bewertung |
-|-----------|-----------|
-| vor Fenster | Reset (zu früh) |
-| im Fenster | OK |
-| nach Timeout | Reset (zu spät) |
+- Ein Feed prüft keine beliebige Rechenkorrektheit
+- Ein gültiges Fenster erkennt nicht jeden falschen Programmablauf
+- Ein Neustart beseitigt nicht automatisch die Ursache
+- Funktionale Sicherheit benötigt mehr als diesen Überwachungsbaustein
 
 ::: notes
-Window Watchdog (WWDG) knüpft an die bisherige Frage nach Signal und Überwachung an. WWDG ist ein herstellerspezifischer Name für einen Window-Watchdog. Im Modell gilt 0,5 s kleiner Delta t kleiner 2 s seit dem letzten gültigen Feed. Ein Feed alle 10 ms ist hier zu früh. Das Fenster prüft ein Zeitmuster, keine Ergebnisrichtigkeit. Eigene Taktquelle und Fenster sind unabhängige Merkmale. Normaler WDT: erkennt zu langsames Füttern (Timeout). Problem: fehlerhafter Code füttert zu oft / zu früh. Window Watchdog: Füttern nur in einem Zeitfenster erlaubt. Verständnischeck: Warum passt der 10-ms-Fade-Feed nicht ins Fenster? Er kommt vor den erlaubten 0,5 s. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Der Watchdog beobachtet die Einhaltung seiner Feed-Regeln, also das vereinbarte Auffrischen und gegebenenfalls dessen Timing. Ein falscher Helligkeitswert kann weiterhin rechtzeitig gefüttert werden. Selbst eine fehlerhafte Schleife kann die Zeitfenster einhalten. Eine Fortschrittsüberwachung verbessert die Aussage des Lebenszeichens, ist aber ebenfalls an die Qualität der gewählten Prüfungen gebunden.
+
+Verfügbarkeit durch einen Neustart und ein definierter Zustand bei einem Fehler sind verschiedene Ziele. Das erneute Ausführen derselben Firmware, der Gerätesoftware, kann dieselbe Ursache wieder treffen. Funktionale Sicherheit meint die begründete Beherrschung relevanter Fehlwirkungen eines Systems; sie lässt sich nicht allein aus einem Watchdog-Timeout oder einem kurzen Programmbeispiel ableiten.
+
+Die Folie begrenzt die vorherigen Aussagen, ohne den Nutzen der Überwachung aufzuheben. Ein einfacher Timeout kann einen tatsächlich ausbleibenden Ablauf erkennen, eine geeignete Uhr kann bestimmte Taktfehler sichtbar machen und ein Fenster bestimmte zu frühe Feeds. Entscheidend bleibt, welche Fehler im Modell beobachtbar sind und welche zusätzliche Ausgangsstrategie die Anwendung besitzt.
+
+Ein plausibler Sensorfehler kann zum Beispiel immer neue, aber falsche Werte liefern. Die Anwendung könnte daraufhin alle drei Fortschrittsschritte abschließen und zeitlich richtig füttern. Eine reine Aktualitätsprüfung würde dieses Fehlerbild nicht erkennen.
 :::
 
-## Zusammenfassung Watchdog
+## Optional: Modelle und Geräteausführung trennen
 
-- WDT: Netz bei Freeze, Deadlocks, entgleistem Ablauf
-- Autarker Down-Counter → harter System-Reset bei 0
-- Software setzt periodisch zurück (Feed)
-- Feed in der Main-Loop, nicht in der Timer-ISR
-- Window Watchdog: auch zu schnelles Abarbeiten erkennen
+- Host-C: Prozentrechnung, Fading und Feed-Prädikat
+- Papier: Timerzustände, Spannungen und Zeitfenster
+- Renode: konkrete unterstützte Plattform und Firmware nötig
+- Registeradressen und Pinverhalten nicht aus dem Lehrmodell erfinden
 
 ::: notes
-Zusammenfassung Watchdog knüpft an die bisherige Frage nach Signal und Überwachung an. Das Basismodell ist Zeitüberwachung mit Reset, optional eigener Takt und optionalem Fenster. Feed hängt an frischem Fortschritt. Ein zeitlich korrektes Fenster beweist keine inhaltliche Richtigkeit. Der Aktor kann nach dem CPU-Reset noch aktiv sein, bis ein eigener Abschaltpfad wirkt. WDT: Netz bei Freeze, Deadlocks, entgleistem Ablauf. Autarker Down-Counter → harter System-Reset bei 0. Software setzt periodisch zurück (Feed). Verständnischeck: Können Reset und weiter laufender Aktor zugleich gelten? Ja, bis zur separaten Abschaltwirkung. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Die drei reinen C-Funktionen berechnen einen Compare-Wert, einen Fading-Sollwert und ein Feed-Prädikat. Ihre Ergebnisse lassen sich mit einem Hostcompiler prüfen. Diese Prüfung enthält keinen Gerätezugriff, kein echtes PWM-Signal und keinen real ausgelösten Reset.
+
+Renode ist ein Systemsimulator. Eine passende Untersuchung benötigt eine konkret benannte unterstützte Plattform mit Timer-, Ausgangs- und Watchdog-Modell sowie zugehöriger Firmware. Aus einer sichtbaren Datei oder einem erfundenen Registeroffset folgt noch keine vorhandene Simulation. Virtuelle Zeit und reale Chiplatenz sind ebenfalls unterschiedliche Nachweise.
+
+Für die Pflichtaufgaben ist keine solche neue Toolchain erforderlich. Die Modelle sind vollständig auf Papier bearbeitbar und die reine Arithmetik kann separat geprüft werden. In dieser Überarbeitung liegt keine ausgeführte Renode-Firmware oder RISC-V-Peripheriemessung vor. Das ist die Grenze der Aussagen zu tatsächlichen Pinpegeln, Ausgangsströmen und Resetdomänen. Bei späterem Einsatz müssen diese Eigenschaften mit einer konkreten Plattform nachgewiesen werden.
+
+Ein Host ist hier der Rechner, auf dem ein gewöhnlicher C-Compiler die Rechenfunktionen ausführt. Ein Prädikat ist eine Funktion mit Wahrheitswert als Ergebnis. PWM bedeutet Pulsweitenmodulation; ihre echten Flanken entstehen in diesen Hostfunktionen gerade nicht.
 :::
 
-## Fragen? — Watchdog
+## Abschlussquiz: Zeitanteile und Überwachung
 
-- Warum eigener Takt (nicht CPU-Takt)?
-- Warum ist Feed in der Timer-ISR ein Designfehler?
-- Welches Problem löst der Window Watchdog zusätzlich?
+- Zehn QuizAcademy-Fragen zu Vorlesung 4
+- Zehn Minuten beantworten, fünf Minuten auswerten
+- Mit Formel, Zählfolge oder Zustand begründen
+- Antwortlänge liefert keinen zuverlässigen Hinweis
 
 ::: notes
-Fragen? — Watchdog knüpft an die bisherige Frage nach Signal und Überwachung an. Eine eigene Zeitquelle hilft beim angenommenen Haupttaktausfall. Feed aus dem Tick kann die Hauptschleife verdecken. Das Fenster erkennt zu frühes Füttern, nicht falsche Ergebnisse. Renode braucht passende Timer-, GPIO- und Watchdog-Modelle. Ein Lauf liegt nicht vor. Warum eigener Takt (nicht CPU-Takt)?. Warum ist Feed in der Timer-ISR ein Designfehler?. Welches Problem löst der Window Watchdog zusätzlich?. Verständnischeck: Ist Feed aus einer ISR immer falsch? Nein, falsch ist bedingungsloses Füttern ohne Fortschrittsvertrag. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Das Quiz behält die zehn vorhandenen Fragen. Geprüft werden Entscheidungen aus dem Foliensatz: Periodenintervalle, aktiver gegenüber hohem Zeitanteil, Spannungsmittelwert gegenüber Effektivwert, Softwareflanken und Bedingungen der Überwachung. Eine reine Wortwiederholung einer Definition ersetzt keine begründete Auswahl.
+
+Die vorgesehenen fünfzehn Minuten teilen sich in zehn Minuten individuelle Bearbeitung und fünf Minuten gemeinsame Auswertung häufiger Fehler. Bei einer strittigen Antwort sollte der betreffende Zwischenwert oder Zustand genannt werden. Beispielsweise klärt $ARR+1$ die Periodenlänge und der letzte gültige Feed den Anfang der Watchdog-Frist.
+
+Jede Frage besitzt genau eine richtige Option. Die Formulierungen und Längen sind so gestaltet, dass nicht immer die längste oder kürzeste Aussage stimmt. Erläuterungen beziehen sich auf das gewählte Lehrmodell und erfinden keine Hardwaremesswerte. Die Auswertung kann anschließend zu den entsprechenden Papieraufgaben zurückführen. Damit endet der Block mit begründeten Zusammenhängen statt bloß mit einzelnen Merksätzen.
 :::
 
-## Ausblick Labor: smarte Lampe
+## Was Sie jetzt unterscheiden können
 
-Geplantes Szenario:
-
-- Timer als PWM-Generator; virtuelle RGB-LEDs in Renode
-- Fading in der Main-Schleife
-- Watchdog aktivieren
-- Virtueller Taster → künstliche `while (1);` (Freeze provozieren)
-
-::: notes
-Ausblick Labor: smarte Lampe knüpft an die bisherige Frage nach Signal und Überwachung an. Das Labor ist ein späterer Ausblick. Virtuelle LEDs belegen weder Flanken noch Jitter. Ohne Firmware lassen sich Registerarithmetik, 10-ms-Plan, Feed-Zeitlinie und Resetgrenzen nachrechnen. Während des Hängers kann PWM weiterlaufen, der nominale Reset folgt der 2-s-Frist. Timer als PWM-Generator; virtuelle RGB-LEDs in Renode. Fading in der Main-Schleife. Watchdog aktivieren. Verständnischeck: Was ist ohne Ausführung prüfbar? Die Modellrechnung von PWM, Fading und Watchdog-Zeit. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## MMIO-Register für den Timer
-
-Beispielhafte Adressen (fiktiv — immer Datenblatt prüfen):
-
-```c
-#define TIMER_BASE 0x40000000
-#define TIMER_PSC  (*(volatile uint32_t *)(TIMER_BASE + 0x00))
-#define TIMER_ARR  (*(volatile uint32_t *)(TIMER_BASE + 0x04))
-#define TIMER_CCR1 (*(volatile uint32_t *)(TIMER_BASE + 0x0C))
-
-/* Registerausschnitt, fiktiv. Kein vollstaendiger Treiber. */
-void init_pwm_registers(void) {
-    TIMER_PSC = 99;     /* Teiler 100 */
-    TIMER_ARR = 999;    /* N = 1000 */
-    TIMER_CCR1 = 0;
-}
-/* Danach noch noetig: Takt, Pin-Mux, Modus, Polaritaet,
-   Preload, Kanal- und Timerfreigabe laut Datenblatt. */
-```
-
-- PSC: Takt drosseln
-- ARR: Periode / Frequenz
-- CCR1: Duty Cycle Kanal 1
+- Timer-Tick, PWM-Periode und Sollwertaktualisierung
+- Aktive Zeit, HIGH-Anteil, Mittelwert und Effektivwert
+- Gepufferte Änderungen und sofortige Compare-Wirkung
+- Frische Fortschrittsrunde und bloßer Feed-Aufruf
+- Watchdog-Reaktion und tatsächlicher Aktorzustand
 
 ::: notes
-MMIO-Register für den Timer knüpft an die bisherige Frage nach Signal und Überwachung an. TIMER_BASE 0x40000000 ist fiktiv. Die Makros benennen Zugriffe. PSC 99 und ARR 999 folgen aus 100 MHz und 1 kHz. CCR 0 legt eine inaktive Schwelle fest. uint32_t beschreibt den Lehrzugriff, nicht jede echte Busbreite. Danach fehlen Takt, Pin-Mux, Modus, Polarität, Preload, Update und Freigabe. Drei Register allein erzeugen keinen Pin. PSC: Takt drosseln. ARR: Periode / Frequenz. CCR1: Duty Cycle Kanal 1. Verständnischeck: Warum CCR 0 vor dem Start? Als inaktive Anfangsschwelle. Der sichere Ausgang braucht zusätzlich die Beschaltung. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
+PWM bedeutet Pulse Width Modulation, Pulsweitenmodulation. Ihre Zeitgrößen folgen im gewählten Up-Counting-Modell aus Vorteiler, Periodenintervallen und Vergleich. Die physikalische Wirkung braucht zusätzlich Last-, Filter- oder Protokollannahmen. Ein Watchdog überwacht dagegen Feed-Bedingungen und kann auf deren Verletzung reagieren; er garantiert weder jede Rechenkorrektheit noch einen universellen Zustand des Aktors.
 
-## Hilfsfunktion: Prozent → CCR
+Die Grundlagen orientieren sich an Harris/Harris, Digital Design and Computer Architecture — RISC-V Edition. Für verbreitete Peripherieeigenschaften wurden die offiziellen STMicroelectronics-Quellen zu [Timern und PWM](https://github.com/STMicroelectronics/stm32f4xx-hal-driver/blob/master/Src/stm32f4xx_hal_tim.c), [unabhängigem Watchdog](https://github.com/STMicroelectronics/stm32f4xx-hal-driver/blob/master/Src/stm32f4xx_hal_iwdg.c) und [Fenster-Watchdog](https://github.com/STMicroelectronics/stm32f4xx-hal-driver/blob/master/Src/stm32f4xx_hal_wwdg.c) herangezogen. Sie sind Herstellerbeispiele aus einer anderen Prozessorplattform, keine RISC-V-Registerfestlegung.
 
-```c
-void set_led_duty_percent(uint8_t percent) {
-    if (percent > 100) percent = 100;
-    const uint32_t N = 1000u; /* ARR + 1 im Kernmodell */
-    uint32_t ccr = ((uint32_t)percent * N) / 100u;
-    TIMER_CCR1 = ccr;
-}
-```
-
-- 0, 25, 50 und 100 Prozent ergeben CCR 0, 250, 500 und 1000.
-- Kleine Abstraktion erleichtert die Main-Logik
-
-::: notes
-Hilfsfunktion: Prozent → CCR knüpft an die bisherige Frage nach Signal und Überwachung an. percent wird auf 0 bis 100 begrenzt. Der Cast vor der Multiplikation vermeidet einen zu kleinen Typ. Geteilt durch 100 ist Ganzzahldivision. 0, 25, 50 und 100 ergeben 0, 250, 500 und 1000. Die Funktion setzt elektrischen Duty, nicht b gleich 0,5. Dafür wäre CCR 218. 100 Prozent braucht CCR gleich N. Bei N 1000 passt das in ein 16-Bit-Feld. Preload verzögert die Wirkung bis zum Update. 0, 25, 50 und 100 Prozent ergeben CCR 0, 250, 500 und 1000. Kleine Abstraktion erleichtert die Main-Logik. Verständnischeck: Setzt 50 Prozent die Helligkeitsstufe 0,5? Nein, das wäre im Gammamodell CCR 218. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Fading alle 10 ms
-
-```c
-/* Lehrcode — nicht kompiliert.
-   10 MHz Systemzeit, nicht der 1-MHz-PWM-Zähler. */
-#define FADE_TICKS UINT64_C(100000)
-static uint64_t next_fade;
-static int brightness;
-static int direction;
-
-void fade_init(uint64_t now) {
-    brightness = 0;
-    direction = 1;
-    next_fade = now + FADE_TICKS;
-}
-
-bool fade_poll(uint64_t now) {
-    if (now < next_fade)
-        return false;
-    uint64_t k = UINT64_C(1)
-        + (now - next_fade) / FADE_TICKS;
-    next_fade += k * FADE_TICKS;
-    brightness += direction;
-    if (brightness == 100 || brightness == 0)
-        direction = -direction;
-    set_led_duty_percent((uint8_t)brightness);
-    return true;
-}
-```
-
-Der Watchdog-Feed steht nicht in dieser Funktion.
-
-::: notes
-Fading alle 10 ms knüpft an die bisherige Frage nach Signal und Überwachung an. FADE_TICKS 100000 bei 10 MHz sind 10 ms. fade_init setzt den ersten Termin auf now plus ein Intervall. Bei now kleiner next_fade passiert nichts. k gleich 1 plus der ganzzahlige Abstand überspringt verpasste Plätze, ein Aufruf macht genau einen Schritt. Start bei 0: erster Schritt bei 100000 auf 1 Prozent, nächster Termin 200000. Bei next 100000 und now 350000 ist k gleich 3, next wird 400000, ein Schritt. Derselbe now noch einmal ändert nichts. 100 Schritte erreichen 100 Prozent, danach geht es abwärts, nach 200 Schritten wieder 0. Ideal sind 1 s hin und 2 s für hin und zurück. Der Feed bleibt außerhalb. Ein altes Erfolgskennzeichen darf nicht weiter füttern. Lehrcode, nicht kompiliert. Die Zeitbasis überläuft im betrachteten Betrieb nicht. Verständnischeck: Was macht now gleich 350000? k gleich 3, nächster Termin 400000, genau ein Helligkeitsschritt. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Den Crash provozieren
-
-![Von 1,2 bis 3,0 s laeuft PWM ohne Main. Reset und sicherer Aktorzustand fallen auseinander.](../assets/figures/04_aktorik_sicherheit/safe-state.png)
-
-- Watchdog-Timeout z. B. 2 s
-- Button löst einen künstlichen Hänger aus, keinen Deadlock
-- Letzter Feed bei 1,0 s, Hänger ab 1,2 s, nominaler Reset bei 3,0 s
-
-```c
-if (button_pressed()) {
-    printf("Freeze — warte auf WDT...\n");
-    while (1) {
-        /* kein wdt_feed() */
-    }
-}
-```
-
-::: notes
-Den Crash provozieren knüpft an die bisherige Frage nach Signal und Überwachung an. Der while-1-Zustand ist ein Hänger, kein Deadlock, weil keine zwei Seiten aufeinander warten. printf kann selbst blockieren. Feeds bei 0, 0,5 und 1 s, Hänger bei 1,2 s, Reset bei 3 s. Vom Hänger bis zum Reset sind 1,8 s, weil die 2 s seit 1 s laufen. PWM kann bis zum Reset den letzten CCR halten. Der Pinzustand nach Reset ist plattformabhängig. Watchdog-Timeout z. B. 2 s. Button löst einen künstlichen Hänger aus, keinen Deadlock. Letzter Feed bei 1,0 s, Hänger ab 1,2 s, nominaler Reset bei 3,0 s. Verständnischeck: Warum 1,8 s? 3 minus 1,2, weil der Timeout seit dem Feed bei 1 s läuft. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Reset-Ursache lesen
-
-- Nach Reboot: warum neu gestartet?
-- Reset-Reason-Register (Power-/Reset-Block)
-- Beim Boot zuerst auswerten
-
-```c
-void check_reset_reason(void) {
-    uint32_t reason = *(volatile uint32_t *)RESET_REASON_REG;
-    if (reason & WDT_RESET_FLAG) {
-        printf("WDT-Reset nach Freeze\n");
-        /* optional: loggen / sicherer Modus */
-    }
-}
-```
-
-::: notes
-Reset-Ursache lesen knüpft an die bisherige Frage nach Signal und Überwachung an. RESET_REASON_REG und das Flag sind fiktiv. Das Flag nennt eine Resetquelle, nicht die volle Ursachenkette. Mehrere Flags können gesetzt sein. W1C, write one to clear, löscht durch Schreiben einer Eins, falls das Datenblatt das so definiert. Diagnose darf den sicheren Start nicht blockieren. Nach Reboot: warum neu gestartet?. Reset-Reason-Register (Power-/Reset-Block). Beim Boot zuerst auswerten. Verständnischeck: Beweist das Flag einen konkreten Softwarefehler? Nein, nur die gemeldete Resetquelle. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Best Practices: WDT-Intervall
-
-- Der maximale gesunde Feed-Abstand muss kleiner sein als der kürzeste tatsächliche Timeout
-- Im fiktiven ±20-Prozent-Taktmodell liegt ein 2-s-Nennwert zwischen etwa 1,667 s und 2,5 s
-- Abschalt- und Lastzeit kommen gegebenenfalls hinzu
-
-::: notes
-Best Practices: WDT-Intervall knüpft an die bisherige Frage nach Signal und Überwachung an. Der gesunde Feed-Abstand muss unter dem kürzesten Timeout liegen. Die verlangte Reaktion muss den längsten Timeout plus Abschalt- und Lastzeit fassen. 2,5 s plus 0,02 s plus 0,08 s sind 2,60 s Modellzeit und verfehlen eine 1-s-Anforderung. Bootzeit zählt nur, wenn der sichere Zustand erst dann entsteht. Ein 0,5-s-Feed kann gesund sein und die 1-s-Reaktion trotzdem verfehlen. Der maximale gesunde Feed-Abstand muss kleiner sein als der kürzeste tatsächliche Timeout. Im fiktiven ±20-Prozent-Taktmodell liegt ein 2-s-Nennwert zwischen etwa 1,667 s und 2,5 s. Abschalt- und Lastzeit kommen gegebenenfalls hinzu. Verständnischeck: Passt 2,5 s Maximum zu einer 1-s-Reaktion? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Zusammenfassung Block 4
-
-- PWM-Duty ist nicht allgemein Leistung oder Wahrnehmung
-- Feed nach frischem Fortschritt, nicht allein weil eine ISR weiterläuft
-- Reset garantiert keinen sicheren Aktorzustand
-- Das Labor ist geplant und hier nicht ausgeführt
-
-Vielen Dank — wir sehen uns im Labor.
-
-::: notes
-Zusammenfassung Block 4 knüpft an die bisherige Frage nach Signal und Überwachung an. Der Block erklärt Ausgabe, Zeitüberwachung und Wiederanlauf, keinen Safety-Nachweis. f_PWM folgt aus Takt, PSC und ARR, D aus CCR geteilt durch N. Feed nach frischem Fortschritt ist nicht schon richtig, nur weil er in main steht. Rechnung, Lehrcode und Labor bleiben drei Evidenzen. Renode ist nicht ausgeführt. PWM-Duty ist nicht allgemein Leistung oder Wahrnehmung. Feed nach frischem Fortschritt, nicht allein weil eine ISR weiterläuft. Reset garantiert keinen sicheren Aktorzustand. Verständnischeck: Welche drei Grenzen bleiben? Duty ist nicht Leistung, Feed ist kein Richtigkeitsbeweis, Reset ist kein sicherer Aktor. Als Ausblick bleiben echte Hardwaredaten und ein optionales späteres Labor. Adressen, Takte und Toleranzen sind Lehrannahmen. Code auf der Folie ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Die Rechnungen bleiben daher klar benannte Modelle mit überprüfbaren Grenzen. Vorlesung 5 erweitert die Geräteanbindung um serielle Bussysteme; dort bleibt die Trennung von Daten, Steuersignal und zeitlicher Bearbeitung ebenfalls wichtig.
 :::
