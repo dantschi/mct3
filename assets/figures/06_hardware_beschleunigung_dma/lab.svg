@@ -1,28 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400">
-<rect width="1200" height="400" fill="#fff"/>
-<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>
-<text x="16" y="24" font-size="17" font-weight="600" fill="#1D1D1F" text-anchor="start">Rechenmodell, keine Renode-Messung. 4096 Byte, 115200 Baud, 8N1.</text>
-<text x="16" y="50" font-size="16" font-weight="600" fill="#E65100" text-anchor="start">Ideale Leitungszeit: 4096 x 10 / 115200 = 355,56 ms.</text>
-<rect x="16" y="76" width="180" height="52" rx="2" fill="#fff" stroke="#1B5E20" stroke-width="1.6"/>
-<text x="24" y="96" font-size="14" font-weight="600" fill="#1B5E20" text-anchor="start">TX-Puffer</text>
-<text x="24" y="114" font-size="12" font-weight="400" fill="#5F6368" text-anchor="start">lebt weiter</text>
-<rect x="220" y="76" width="180" height="52" rx="2" fill="#fff" stroke="#E65100" stroke-width="1.6"/>
-<text x="228" y="96" font-size="14" font-weight="600" fill="#E65100" text-anchor="start">DMAC</text>
-<text x="228" y="114" font-size="12" font-weight="400" fill="#5F6368" text-anchor="start">Request</text>
-<rect x="420" y="76" width="180" height="52" rx="2" fill="#fff" stroke="#E65100" stroke-width="1.6"/>
-<text x="428" y="96" font-size="14" font-weight="600" fill="#E65100" text-anchor="start">UART</text>
-<text x="428" y="114" font-size="12" font-weight="400" fill="#5F6368" text-anchor="start">FIFO/Shift</text>
-<rect x="640" y="76" width="180" height="52" rx="2" fill="#fff" stroke="#1B5E20" stroke-width="1.6"/>
-<text x="648" y="96" font-size="14" font-weight="600" fill="#1B5E20" text-anchor="start">Pruefer</text>
-<text x="648" y="114" font-size="12" font-weight="400" fill="#5F6368" text-anchor="start">Bytestrom</text>
-<rect x="860" y="76" width="180" height="52" rx="2" fill="#fff" stroke="#1565C0" stroke-width="1.6"/>
-<text x="868" y="96" font-size="14" font-weight="600" fill="#1565C0" text-anchor="start">main</text>
-<text x="868" y="114" font-size="12" font-weight="400" fill="#5F6368" text-anchor="start">Heartbeat</text>
-<text x="16" y="170" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">Heartbeat schaltet die LED in main(), etwa alle 10 ms nach Zeitvergleich.</text>
-<text x="16" y="198" font-size="14" font-weight="600" fill="#B71C1C" text-anchor="start">Ein Timer darf die Zeitbasis sein. Der Wechsel darf nicht autonom in Hardware oder Timer-ISR liegen.</text>
-<text x="16" y="236" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Vergleich nur bei identischen Daten und UART-Einstellungen.</text>
-<text x="16" y="264" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">Getrennt protokollieren: korrekter Bytestrom, Main-Fortschritt, Heartbeat-Luecken, DMA-TC, Leitung fertig.</text>
-<text x="16" y="300" font-size="15" font-weight="600" fill="#6A1B9A" text-anchor="start">PerformanceInMips ist keine MCU-Taktfrequenz. Hostlaufzeit ist keine Transferzeit.</text>
-<text x="16" y="334" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">Ohne Baud- und Handshake-Modell bleibt der Lauf ein Funktionstest, keine Entlastungsmessung.</text>
-<text x="16" y="370" font-size="14" font-weight="400" fill="#5F6368" text-anchor="start">Im Repository kein DMA-Modell und keine .repl. Diese Adressen bleiben fiktiv.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="365" viewBox="0 0 1000 365" role="img" aria-labelledby="title">
+<title id="title">Abbruch mit bestätigtem Stillstand oder weiterhin gesperrtem Puffer</title>
+<style>text{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:400}</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6" fill="#1D1D1F"/></marker></defs>
+<rect width="1000" height="365" fill="#FFFFFF"/>
+<text x="20" y="30" font-size="24" fill="#1D1D1F" text-anchor="start">Timeout oder Fehler ist kein Beweis für ruhende Speicherzugriffe</text>
+<rect x="20" y="100" width="220" height="85" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="130.0" y="150.5" font-size="24" fill="#1D1D1F" text-anchor="middle">Stopp anfordern</text>
+<rect x="360" y="100" width="260" height="85" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="490.0" y="135.5" font-size="24" fill="#1D1D1F" text-anchor="middle">Begrenzt warten</text>
+<text x="490.0" y="165.5" font-size="24" fill="#1D1D1F" text-anchor="middle">Status prüfen</text>
+<rect x="760" y="100" width="220" height="85" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="870.0" y="135.5" font-size="24" fill="#1D1D1F" text-anchor="middle">Ruhe bestätigt</text>
+<text x="870.0" y="165.5" font-size="24" fill="#1D1D1F" text-anchor="middle">Puffer zurück</text>
+<line x1="240" y1="142" x2="355" y2="142" stroke="#1D1D1F" stroke-width="2" marker-end="url(#arrow)"/>
+<line x1="620" y1="142" x2="755" y2="142" stroke="#E2001A" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="695" y="116" font-size="22" fill="#1D1D1F" text-anchor="middle">ja</text>
+<line x1="490" y1="185" x2="490" y2="245" stroke="#1D1D1F" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="330" y="255" width="320" height="75" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="490.0" y="285.5" font-size="24" fill="#1D1D1F" text-anchor="middle">Nicht bestätigt:</text>
+<text x="490.0" y="315.5" font-size="24" fill="#1D1D1F" text-anchor="middle">Puffer bleibt gesperrt</text>
+<text x="670" y="231" font-size="23" fill="#1D1D1F" text-anchor="middle">Frist abgelaufen</text>
 </svg>

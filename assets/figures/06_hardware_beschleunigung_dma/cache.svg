@@ -1,32 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 460" width="1200" height="460">
-<rect width="1200" height="460" fill="#fff"/>
-<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>
-<text x="16" y="24" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Nicht kohaerenter Write-Back-D-Cache. Werte beispielhaft. Linie hier 64 Byte, nur illustrativ.</text>
-<text x="16" y="70" font-size="16" font-weight="600" fill="#E65100" text-anchor="start">TX</text>
-<rect x="70" y="48" width="270" height="40" rx="2" fill="#fff" stroke="#B71C1C" stroke-width="1.6"/>
-<text x="78" y="68" font-size="14" font-weight="600" fill="#B71C1C" text-anchor="start">Cache 0x22, RAM 0x11</text>
-<rect x="370" y="48" width="270" height="40" rx="2" fill="#fff" stroke="#1565C0" stroke-width="1.6"/>
-<text x="378" y="68" font-size="14" font-weight="600" fill="#1565C0" text-anchor="start">Clean: RAM wird 0x22</text>
-<rect x="670" y="48" width="270" height="40" rx="2" fill="#fff" stroke="#1B5E20" stroke-width="1.6"/>
-<text x="678" y="68" font-size="14" font-weight="600" fill="#1B5E20" text-anchor="start">DMA liest 0x22</text>
-<text x="16" y="150" font-size="16" font-weight="600" fill="#1565C0" text-anchor="start">RX</text>
-<rect x="70" y="128" width="270" height="44" rx="2" fill="#fff" stroke="#B71C1C" stroke-width="1.6"/>
-<text x="78" y="148" font-size="14" font-weight="600" fill="#B71C1C" text-anchor="start">Cache alt, RAM neu</text>
-<rect x="370" y="128" width="270" height="44" rx="2" fill="#fff" stroke="#B71C1C" stroke-width="1.6"/>
-<text x="378" y="148" font-size="14" font-weight="600" fill="#B71C1C" text-anchor="start">schmutzige Line kann zurueckschreiben</text>
-<rect x="670" y="128" width="270" height="44" rx="2" fill="#fff" stroke="#1B5E20" stroke-width="1.6"/>
-<text x="678" y="148" font-size="14" font-weight="600" fill="#1B5E20" text-anchor="start">danach CPU liest neu</text>
-<rect x="16" y="200" width="560" height="90" rx="2" fill="#fff" stroke="#1B5E20" stroke-width="1.6"/>
-<text x="28" y="224" font-size="15" font-weight="600" fill="#1B5E20" text-anchor="start">Puffer auf ganzen Linien isoliert</text>
-<text x="28" y="250" font-size="16" font-weight="600" fill="#1D1D1F" text-anchor="start">[ DMA-Daten | DMA-Daten ]</text>
-<text x="28" y="274" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">CPU-Metadaten liegen daneben, nicht in derselben Linie.</text>
-<rect x="600" y="200" width="560" height="90" rx="2" fill="#fff" stroke="#B71C1C" stroke-width="1.6"/>
-<text x="612" y="224" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">Fehler: Metadaten in der DMA-Linie</text>
-<text x="612" y="250" font-size="16" font-weight="600" fill="#1D1D1F" text-anchor="start">[ Laenge | DMA-Byte | Flags ]</text>
-<text x="612" y="274" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">Clean oder Invalidate trifft dann fremde Bytes.</text>
-<text x="16" y="320" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">prepare_tx_for_device: neu veroeffentlichen, bevor DMA liest.</text>
-<text x="16" y="346" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">prepare_rx_for_device: schmutzige Kopie entfernen, bevor das Geraet schreibt.</text>
-<text x="16" y="372" font-size="15" font-weight="600" fill="#1B5E20" text-anchor="start">finish_rx_for_cpu: veraltete Kopie verwerfen, bevor die CPU liest.</text>
-<text x="16" y="404" font-size="14" font-weight="400" fill="#5F6368" text-anchor="start">Clean schreibt zurueck. Invalidate verwirft. Flush = Clean plus Invalidate. FENCE ersetzt das nicht.</text>
-<text x="16" y="432" font-size="14" font-weight="400" fill="#5F6368" text-anchor="start">Auch andere nicht kohaerente Modi koennen beim Empfang alte Kopien liefern. Zicbom nur wenn vorhanden.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="333" viewBox="0 0 1000 333" role="img" aria-labelledby="title">
+<title id="title">Neue CPU-Cachewerte sind ohne Veröffentlichung nicht DMA-sichtbar</title>
+<style>text{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:400}</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6" fill="#1D1D1F"/></marker></defs>
+<rect width="1000" height="333" fill="#FFFFFF"/>
+<text x="20" y="35" font-size="24" fill="#1D1D1F" text-anchor="start">Nicht kohärentes Write-Back-Modell · Werte als Hexbytes</text>
+<rect x="20" y="90" width="270" height="75" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="155.0" y="135.5" font-size="24" fill="#1D1D1F" text-anchor="middle">CPU-Cache</text>
+<rect x="365" y="90" width="270" height="75" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="500.0" y="135.5" font-size="24" fill="#1D1D1F" text-anchor="middle">Speicher</text>
+<rect x="710" y="90" width="270" height="75" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="845.0" y="135.5" font-size="24" fill="#1D1D1F" text-anchor="middle">DMA liest</text>
+<text x="155" y="210" font-size="30" fill="#E2001A" text-anchor="middle">22 · Dirty</text>
+<text x="500" y="210" font-size="30" fill="#1D1D1F" text-anchor="middle">11 · alt</text>
+<text x="845" y="210" font-size="30" fill="#1D1D1F" text-anchor="middle">11 · alt</text>
+<line x1="635" y1="199" x2="705" y2="199" stroke="#1D1D1F" stroke-width="2" marker-end="url(#arrow)"/>
+<line x1="290" y1="245" x2="360" y2="245" stroke="#E2001A" stroke-width="3" stroke-dasharray="6 5" marker-end="url(#arrow)"/>
+<text x="500" y="303" font-size="24" fill="#1D1D1F" text-anchor="middle">Erst Clean veröffentlicht 22 in den Speicher</text>
 </svg>

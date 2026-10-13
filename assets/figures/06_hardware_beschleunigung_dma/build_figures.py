@@ -1,424 +1,348 @@
 #!/usr/bin/env python3
-"""Lehrfiguren VL06. Adressen sind fiktiv. Cachezeile 64 B ist nur ein Beispiel."""
+"""Reproduzierbare Lehrdiagramme für VL06; keine Messdaten oder Schaltpläne.
+
+Python-Standardbibliothek für SVG. Optional: Playwright und Chromium für PNG.
+Aufruf: python3 build_figures.py --png [--chromium /usr/bin/chromium]
+"""
+import argparse
+import math
+from html import escape
 from pathlib import Path
 
 OUT = Path(__file__).resolve().parent
-INK, MUTED = "#1D1D1F", "#5F6368"
-CPU, DMA, IRQ, OK, ERR = "#1565C0", "#E65100", "#6A1B9A", "#1B5E20", "#B71C1C"
+INK, MUTED, LIGHT, BG, RED = (
+    "#1D1D1F", "#86868B", "#E5E5EA", "#F5F5F7", "#E2001A"
+)
+W = 1000
 
 
-def svg(w, h):
-    return [
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">',
-        f'<rect width="{w}" height="{h}" fill="#fff"/>',
-        "<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>",
+def text(x, y, label, size=24, color=INK, anchor="start"):
+    return (f'<text x="{x}" y="{y}" font-size="{size}" fill="{color}" '
+            f'text-anchor="{anchor}">{escape(str(label))}</text>')
+
+
+def line(x1, y1, x2, y2, color=INK, width=2, dash=False, arrow=False):
+    extra = ' stroke-dasharray="6 5"' if dash else ""
+    extra += ' marker-end="url(#arrow)"' if arrow else ""
+    return (f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" '
+            f'stroke="{color}" stroke-width="{width}"{extra}/>')
+
+
+def path(points, color=RED, width=3):
+    coords = " ".join(f"{x:.3f},{y:.3f}" for x, y in points)
+    return f'<polyline points="{coords}" fill="none" stroke="{color}" stroke-width="{width}"/>'
+
+
+def rect(x, y, w, h, fill=BG, stroke=LIGHT, radius=8):
+    return (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" '
+            f'rx="{radius}" fill="{fill}" stroke="{stroke}"/>')
+
+
+def box(x, y, w, h, labels):
+    result = [rect(x, y, w, h)]
+    for i, label in enumerate(labels):
+        result.append(text(x+w/2, y+h/2+(i-(len(labels)-1)/2)*30+8,
+                           label, 24, anchor="middle"))
+    return result
+
+
+def save(name, title, height, elements):
+    start = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{height}" '
+        f'viewBox="0 0 {W} {height}" role="img" aria-labelledby="title">',
+        f'<title id="title">{escape(title)}</title>',
+        '<style>text{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:400}</style>',
+        '<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" '
+        'orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6" '
+        f'fill="{INK}"/></marker></defs>',
+        f'<rect width="{W}" height="{height}" fill="#FFFFFF"/>',
     ]
-
-
-def T(x, y, s, size=16, fill=INK, w="600", anchor="start"):
-    s = str(s).replace("&", "&amp;").replace("<", "&lt;")
-    return (
-        f'<text x="{x}" y="{y}" font-size="{size}" font-weight="{w}" '
-        f'fill="{fill}" text-anchor="{anchor}">{s}</text>'
+    (OUT/f"{name}.svg").write_text(
+        "\n".join(start+elements+["</svg>"])+"\n", encoding="utf-8"
     )
 
 
-def line(x1, y1, x2, y2, stroke=INK, sw=2, dash=None):
-    d = f' stroke-dasharray="{dash}"' if dash else ""
-    return (
-        f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{stroke}" '
-        f'stroke-width="{sw}"{d}/>'
-    )
+def axis(x0, x1, y, marks, label):
+    result = [line(x0, y, x1, y, MUTED), text(x1, y+60, label, 22, anchor="end")]
+    for x, value in marks:
+        result += [line(x, y-5, x, y+5, MUTED), text(x, y+29, value, 22, anchor="middle")]
+    return result
 
 
-def rect(x, y, w, h, stroke=INK, fill="#fff", sw=1.6):
-    return (
-        f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="2" fill="{fill}" '
-        f'stroke="{stroke}" stroke-width="{sw}"/>'
-    )
+def digital(intervals, x0, scale, high, low, color=RED):
+    """(start, end, is_high), contiguous half-open intervals."""
+    points = []
+    last_y = None
+    for start, end, active in intervals:
+        y = high if active else low
+        x = x0+scale*start
+        if last_y is not None and y != last_y:
+            points.append((x, last_y))
+        points.extend([(x, y), (x0+scale*end, y)])
+        last_y = y
+    return path(points, color)
 
 
-def save(name, parts):
-    (OUT / name).write_text("\n".join(parts) + "\n</svg>\n", encoding="utf-8")
-    print(name)
+def figures():
+    p = [rect(35, 65, 380, 190), text(225, 160, "320 × 240 Pixel", 30, anchor="middle"),
+         text(225, 210, "2 Bytes je Pixel", anchor="middle"),
+         line(435, 160, 510, 160, arrow=True)]
+    p += box(530, 80, 440, 80, ["153600 Bytes je Vollbild"])
+    p += box(530, 200, 440, 80, ["60 Bilder/s → 9,216 MB/s"])
+    p += [text(20, 35, "RGB565: 16 Bit je Pixel · MB = 10⁶ Bytes"),
+          line(750, 160, 750, 195, arrow=True)]
+    save("budget", "Bildspeicher und erforderliche Nutzdatenrate", 315, p)
 
+    p = [text(20, 30, "Schematisch: gleicher Datenblock · Zeiten nicht maßstäblich")]
+    for y, label in [(70, "Polling"), (155, "Interrupts"), (240, "DMA")]:
+        p += [text(20, y+29, label), line(210, y+45, 945, y+45, MUTED)]
+    p += [rect(210, 70, 705, 42, BG, RED), text(560, 99, "blockierender Aufruf wartet und bedient", 23, anchor="middle")]
+    for x in [210, 355, 500, 645, 790]:
+        p += [rect(x, 155, 42, 42, BG, RED)]
+    p += [text(920, 219, "dazwischen: andere Arbeit", 22, anchor="end"),
+          rect(210, 240, 130, 42, BG, RED), text(275, 270, "Start", 22, anchor="middle"),
+          rect(340, 240, 450, 42), text(565, 270, "andere CPU-Arbeit", 23, anchor="middle"),
+          rect(790, 240, 125, 42, BG, RED), text(852, 270, "Prüfung", 22, anchor="middle"),
+          text(945, 331, "Zeit →", 22, anchor="end")]
+    save("timelines", "Blockierendes Polling, Interruptbedienung und DMA", 355, p)
 
-def box(p, x, y, w, h, title, sub, stroke):
-    p.append(rect(x, y, w, h, stroke))
-    p.append(T(x + 8, y + 20, title, 14, stroke))
-    if sub:
-        p.append(T(x + 8, y + 38, sub, 12, MUTED, "400"))
+    p = [text(20, 30, "CPU-Kopieren")]
+    p += box(20, 55, 235, 75, ["Speicher"])
+    p += box(385, 55, 235, 75, ["CPU-Register"])
+    p += box(750, 55, 230, 75, ["Peripherie"])
+    p += [line(255, 92, 380, 92, arrow=True), line(620, 92, 745, 92, arrow=True),
+          text(20, 183, "DMA-Kopieren")]
+    p += box(20, 210, 235, 75, ["Speicher"])
+    p += box(385, 210, 235, 75, ["DMA-Initiator"])
+    p += box(750, 210, 230, 75, ["Peripherie"])
+    p += [line(255, 247, 380, 247, RED, 3, arrow=True),
+          line(620, 247, 745, 247, RED, 3, arrow=True),
+          text(500, 340, "Beide Wege beanspruchen Speicher- und Busressourcen", 23, anchor="middle")]
+    save("paths", "Daten durch CPU-Register oder einen DMA-Initiator", 365, p)
 
+    p = box(20, 55, 235, 80, ["CPU", "Zugriff mit Cache-Miss"])
+    p += box(20, 235, 235, 80, ["DMA", "Speicherzugriff"])
+    p += box(385, 145, 210, 80, ["Arbiter", "teilt Zugriffe zu"])
+    p += box(750, 145, 230, 80, ["Gemeinsamer", "Speicherpfad"])
+    p += [line(255, 95, 380, 174, arrow=True), line(255, 275, 380, 196, arrow=True),
+          line(595, 185, 745, 185, RED, 3, arrow=True),
+          text(340, 35, "Lokaler Cache-Hit: nicht zwangsläufig dieser Pfad", 23),
+          text(500, 365, "Konkurrenz nur an gemeinsam benutzten Ressourcen", 23, anchor="middle")]
+    save("arbiter", "CPU und DMA konkurrieren am gemeinsamen Speicherpfad", 392, p)
 
-def arrow(x1, y, x2, stroke=INK):
-    return line(x1, y, x2, y, stroke, 2)
+    p = box(20, 115, 260, 100, ["Peripherie", "Register/FIFO bereit"])
+    p += box(410, 115, 255, 100, ["DMA-Controller", "bewegt ein Element"])
+    p += box(780, 115, 200, 100, ["Speicher"])
+    p += [line(280, 140, 405, 140, RED, 3, arrow=True), text(340, 116, "Request", 22, anchor="middle"),
+          line(410, 193, 285, 193, arrow=True), text(340, 242, "Datenzugriff", 22, anchor="middle"),
+          line(780, 165, 670, 165, arrow=True),
+          text(20, 35, "Lokale Bereitschaft ist kein externes Protokoll-ACK"),
+          text(500, 313, "FIFO: First In, First Out · ACK: Acknowledge", 23, anchor="middle")]
+    save("handshake", "Lokaler DMA-Request und Datenzugriff sind getrennte Vorgänge", 340, p)
 
+    p = [text(20, 30, "Senden · Breite 1 Byte · Modelladressen mit 0x-Präfix"),
+         text(190, 76, "Quelle im Speicher", anchor="middle"),
+         text(760, 76, "UART-TX-Register fest", anchor="middle")]
+    p += box(600, 155, 340, 95, ["0x40010004", "jedes Element hierhin"])
+    for i in range(4):
+        y = 100+55*i
+        p += [rect(30, y, 320, 44), text(190, y+30, f"0x2000100{i}", anchor="middle"),
+              line(350, y+22, 595, 175+17*i, RED, 2, arrow=True)]
+    p += [text(500, 364, "Quelladresse +1 je Element · Zieladresse +0", 23, anchor="middle")]
+    save("addrs", "Byteweises Senden mit inkrementierender Quelle und festem Ziel", 390, p)
 
-# 1 Bandbreite
-def fig_budget():
-    p = svg(1200, 430)
-    p.append(T(16, 24, "Engpass liegt auf der SPI-Leitung, nicht nur in der CPU.", 18))
-    p.append(T(16, 46, "Ein Frame RGB565: 320 x 240 x 2 = 153600 Byte. 60 FPS: 9,216 MB/s = 73,728 Mbit/s.", 14, MUTED, "400"))
-    nodes = [
-        (16, "Bildpuffer", "153600 B"),
-        (210, "Speicherbus", "geteilt"),
-        (400, "DMA oder CPU", "Nachfuellen"),
-        (610, "SPI-TX", "Register/FIFO"),
-        (820, "Leitung", "1 Bit/SCK"),
-        (1010, "Display", "Geraet"),
-    ]
-    for x, a, b in nodes:
-        box(p, x, 64, 170, 52, a, b, DMA if a == "Leitung" else CPU)
-    for x in (186, 376, 586, 796, 990):
-        p.append(arrow(x, 90, x + 22, INK))
-    rows = [
-        ("Anforderung 60 FPS", "9,216 MB/s", ERR),
-        ("SPI 10 MHz ideal", "1,25 MB/s, etwa 8,14 FPS", DMA),
-        ("SPI 50 MHz ideal", "6,25 MB/s, etwa 40,69 FPS", OK),
-        ("60 FPS, 1 Bit/SCK", "mindestens 73,728 MHz", ERR),
-    ]
-    y = 150
-    for name, val, col in rows:
-        p.append(rect(16, y, 560, 36, col))
-        p.append(T(28, y + 24, name, 15, col))
-        p.append(T(300, y + 24, val, 15))
-        y += 44
-    p.append(rect(610, 150, 560, 168, MUTED))
-    p.append(T(624, 176, "Wenn die Leitung nicht reicht:", 15))
-    p.append(T(624, 204, "geringere Bildrate", 16, DMA))
-    p.append(T(624, 232, "Teilupdates statt Vollbild", 16, DMA))
-    p.append(T(624, 260, "oder eine breitere Schnittstelle", 16, DMA))
-    p.append(T(624, 296, "Kommandos und Pausen senken den Durchsatz weiter.", 13, MUTED, "400"))
-    p.append(T(16, 400, "Audio getrennt: 44100 Samples/s mono, 16 Bit = 88200 Byte/s. Samples allein sind keine Byte-Rate.", 14, MUTED, "400"))
-    p.append(T(16, 422, "DMA kuerzt Nachfuellpausen. Es hebt das SCK-Limit nicht auf. MB hier dezimal.", 14, IRQ))
-    save("budget.svg", p)
+    p = [text(20, 30, "Empfangen · Breite 2 Bytes · vier Messwerte"),
+         text(225, 77, "ADC-Datenregister fest", anchor="middle"),
+         text(770, 77, "Ziel im Speicher", anchor="middle")]
+    p += box(40, 155, 370, 95, ["0x40011000", "jedes Element von hier"])
+    for i in range(4):
+        y = 100+55*i
+        p += [rect(620, y, 320, 44), text(780, y+30, f"0x2000200{2*i}", anchor="middle"),
+              line(410, 175+17*i, 615, y+22, RED, 2, arrow=True)]
+    p += [text(500, 364, "Quelladresse +0 je Element · Zieladresse +2", 23, anchor="middle")]
+    save("rx-addrs", "Sechzehn-Bit-Empfang mit festem Register und wachsendem Array", 390, p)
 
+    p = box(20, 70, 270, 85, ["CPU-Zeiger", "virtuelle Adresse"])
+    p += box(20, 245, 270, 85, ["DMA-Geräteadresse", "für diesen Initiator"])
+    p += box(430, 155, 210, 85, ["Plattform", "übersetzt/ordnet zu"])
+    p += box(770, 155, 210, 85, ["Derselbe", "Speicherbereich"])
+    p += [line(290, 113, 425, 183, arrow=True), line(290, 287, 425, 211, arrow=True),
+          line(640, 197, 765, 197, RED, 3, arrow=True),
+          text(20, 35, "Gleicher Speicher bedeutet nicht automatisch gleiche Zahl"),
+          text(500, 385, "Ein C-Cast erzeugt keine Geräteabbildung", 24, anchor="middle")]
+    save("address-space", "CPU-Zeiger und DMA-Geräteadresse können unterschiedliche Zahlen haben", 410, p)
 
-# 2 Zeitspuren
-def fig_time():
-    p = svg(1200, 460)
-    p.append(T(16, 24, "Dieselbe Leitung, vier CPU-Spuren. 10 MHz SPI: ein Byte ideal 0,8 us.", 17))
-    p.append(T(16, 46, "1 000 000 Byte mindestens 0,8 s reine Leitungszeit. Ausschnitt, nicht massstaeblich.", 14, MUTED, "400"))
-    lanes = ["Polling", "IRQ/Byte", "IRQ/16 B", "DMA"]
-    # segments: (start, width, color, label) in a 0..100 scale
-    patterns = [
-        [(0, 100, ERR, "Hauptschleife wartet")],
-        [(0, 8, IRQ, "ISR"), (12, 18, CPU, "Nutz"), (34, 8, IRQ, "ISR"), (46, 18, CPU, "Nutz"), (68, 8, IRQ, "ISR"), (80, 16, CPU, "Nutz")],
-        [(0, 10, IRQ, "ISR"), (14, 70, CPU, "Nutzarbeit"), (88, 10, IRQ, "ISR")],
-        [(0, 12, DMA, "Setup"), (14, 74, CPU, "Main rechnet"), (90, 8, IRQ, "TC")],
-    ]
-    y0 = 70
-    for i, (name, segs) in enumerate(zip(lanes, patterns)):
-        y = y0 + i * 62
-        p.append(T(16, y + 22, name, 14, INK))
-        p.append(rect(130, y, 900, 28, MUTED, "#fff", 1))
-        for a, w, col, lab in segs:
-            p.append(rect(130 + a * 9, y + 2, w * 9 - 2, 24, col, col, 0))
-            if w > 12:
-                p.append(T(134 + a * 9, y + 19, lab, 12, "#fff", "400"))
-    p.append(T(130, 330, "Leitung: Bytes ohne Pause    | Luecke = Software-Nachfuellpause, nur bei IRQ/Polling moeglich", 14, DMA))
-    p.append(line(130, 348, 980, 348, DMA, 3))
-    p.append(line(430, 340, 520, 340, ERR, 6))
-    p.append(T(430, 372, "Pause", 13, ERR))
-    p.append(T(16, 404, "Modell: 100-MHz-CPU, 100 Zyklen je Byte-IRQ. 1,25 Mio IRQ/s waeren 125 Prozent. Nicht erreichbar.", 14, ERR))
-    p.append(T(16, 430, "16 Byte je IRQ: derselbe feste Aufwand etwa 7,81 Prozent. Kopieren kommt dazu. Keine Messung.", 14, MUTED, "400"))
-    p.append(T(16, 452, "Polling beschaeftigt die aufrufende Schleife. Aktivierte Interrupts koennen weiterlaufen.", 14, MUTED, "400"))
-    save("timelines.svg", p)
+    p = []
+    for x, labels in [(20, ["CPU", "füllt Puffer"]), (275, ["Übergabe", "sichtbar machen"]),
+                      (530, ["DMA", "greift zu"]), (785, ["CPU", "prüft Ergebnis"])]:
+        p += box(x, 95, 195, 100, labels)
+    for x in [215, 470, 725]:
+        p += [line(x, 145, x+55, 145, RED, 3, arrow=True)]
+    p += [text(500, 35, "Endlicher Auftrag: logischer Besitzwechsel", 26, anchor="middle"),
+          line(882, 210, 882, 265), line(882, 265, 117, 265),
+          line(117, 265, 117, 200, arrow=True),
+          text(500, 303, "Rückgabe erst nach bestätigtem Ende aller Pufferzugriffe", 23, anchor="middle")]
+    save("lifecycle", "Vorbereiten, übergeben, schützen und geprüft zurücknehmen", 333, p)
 
+    x = lambda t: 310+350*t
+    p = [text(20, 30, "UART-Modell · T = Rahmendauer · letztes Byte B steht an")]
+    p += [text(20, 115, "DMA-Auftrag"), line(180, 115, x(0), 115, RED, 3),
+          text(x(0), 77, "TC", 24, anchor="middle"), line(x(0), 85, x(0), 282, MUTED, dash=True),
+          text(20, 186, "FIFO: Byte B"), rect(x(0), 155, 175, 42),
+          text(x(.25), 184, "wartet", 23, anchor="middle"),
+          text(20, 257, "Schieberegister"), rect(x(-.3), 225, 280, 42, BG, RED),
+          text(x(.1), 254, "Rest A", 23, anchor="middle"),
+          rect(x(.5), 225, 350, 42, BG, RED), text(x(1), 254, "Byte B", 23, anchor="middle"),
+          line(x(1.5), 85, x(1.5), 282, RED, 3),
+          text(x(1.5), 77, "Leitungsende", 23, anchor="middle")]
+    p += axis(x(0), 940, 287, [(x(0), "0"), (x(.5), "0,5 T"), (x(1.5), "1,5 T")], "Zeit nach DMA-TC →")
+    save("wire-complete", "DMA-Abschluss vor FIFO-Leerung und Ende des letzten UART-Rahmens", 360, p)
 
-# 3 Pfade
-def fig_paths():
-    p = svg(1200, 420)
-    p.append(T(16, 24, "CPU und DMAC sind Initiatoren. RAM und Peripherieregister sind Ziele.", 17))
-    box(p, 20, 56, 150, 50, "CPU", "Initiator", CPU)
-    box(p, 200, 56, 150, 50, "D-Cache", "optional", IRQ)
-    box(p, 390, 56, 160, 50, "Interconnect", "CPU gegen DMA", ERR)
-    box(p, 590, 56, 140, 50, "RAM", "Ziel", OK)
-    box(p, 20, 140, 150, 50, "DMAC", "Initiator", DMA)
-    box(p, 200, 140, 160, 50, "Kanal-Arbiter", "im DMAC", DMA)
-    box(p, 390, 140, 160, 50, "SPI / UART", "MMIO-Ziel", MUTED)
-    p.append(arrow(170, 80, 198, CPU))
-    p.append(arrow(350, 80, 388, CPU))
-    p.append(arrow(550, 80, 588, CPU))
-    p.append(arrow(170, 164, 198, DMA))
-    p.append(line(360, 164, 470, 90, DMA, 2))
-    p.append(T(16, 220, "DMAMUX routet Requests. Kanaele sind Kontexte, nicht automatisch eigene Datenpfade.", 15))
-    p.append(rect(16, 240, 560, 70, CPU))
-    p.append(T(28, 266, "CPU-Arbeit mit Cache-Hits", 15, CPU))
-    p.append(T(28, 290, "DMA stoert den Speicherbus seltener.", 14, MUTED, "400"))
-    p.append(rect(600, 240, 560, 70, ERR))
-    p.append(T(612, 266, "CPU-Arbeit mit vielen RAM-Zugriffen", 15, ERR))
-    p.append(T(612, 290, "Dieselbe DMA-Last verzoegert deutlich staerker.", 14, MUTED, "400"))
-    p.append(T(16, 340, "Round-Robin, angenommen: CPU, DMA, CPU, DMA. Feste Prioritaet: DMA, DMA, CPU.", 15, IRQ))
-    p.append(T(16, 368, "Nicht: DMA gewinnt immer. Nicht: Stalls sind immer kurz.", 15, ERR))
-    p.append(T(16, 400, "Setup, Cache-Wartung und Abschluss kosten Zeit. Bei kleinen Kopien kann die CPU guenstiger sein.", 14, MUTED, "400"))
-    save("paths.svg", p)
+    p = [text(20, 35, "Nicht kohärentes Write-Back-Modell · Werte als Hexbytes")]
+    for x, title in [(20, "CPU-Cache"), (365, "Speicher"), (710, "DMA liest")]:
+        p += box(x, 90, 270, 75, [title])
+    p += [text(155, 210, "22 · Dirty", 30, RED, "middle"), text(500, 210, "11 · alt", 30, INK, "middle"),
+          text(845, 210, "11 · alt", 30, INK, "middle"), line(635, 199, 705, 199, arrow=True),
+          line(290, 245, 360, 245, RED, 3, dash=True, arrow=True),
+          text(500, 303, "Erst Clean veröffentlicht 22 in den Speicher", 24, anchor="middle")]
+    save("cache", "Neue CPU-Cachewerte sind ohne Veröffentlichung nicht DMA-sichtbar", 333, p)
 
+    p = [text(20, 35, "Fehlerfall: alte Dirty-Zeile bleibt während DMA-Empfang")]
+    p += box(20, 110, 270, 90, ["CPU-Cache", "AA · alt und Dirty"])
+    p += box(365, 110, 270, 90, ["Speicher", "55 · neu"])
+    p += box(710, 110, 270, 90, ["DMA", "schreibt 55"])
+    p += [line(705, 155, 640, 155, RED, 3, arrow=True),
+          line(290, 248, 360, 248, arrow=True), text(325, 285, "späteres Write-Back: AA überschreibt 55", 23, anchor="middle"),
+          text(500, 346, "Vorbereiten und nach Empfang synchronisieren: Plattformregel", 23, anchor="middle")]
+    save("rx-cache", "Eine alte Dirty-Cachekopie kann neu empfangene Daten überschreiben", 373, p)
 
-# 4 Handshake
-def fig_hand():
-    p = svg(1200, 400)
-    p.append(T(16, 24, "Speicher-Burst und Peripherie-Transfer sind zwei Breiten. DREQ/DACK sind Lehrnamen.", 16))
-    steps = [
-        (16, "RAM-Burst", "mehrere Bytes", CPU),
-        (230, "DMAC-FIFO", "wenn vorhanden", DMA),
-        (450, "ein Zugriff", "nur wenn bereit", IRQ),
-        (680, "UART/SPI-FIFO", "wenn vorhanden", OK),
-        (920, "Schiebereg.", "Leitung", ERR),
-    ]
-    for x, a, b, c in steps:
-        box(p, x, 50, 190, 52, a, b, c)
-    for x in (206, 426, 656, 896):
-        p.append(arrow(x, 76, x + 22))
-    p.append(T(16, 140, "Request", 14, IRQ))
-    p.append(T(16, 180, "Zugriff", 14, DMA))
-    p.append(T(16, 220, "FIFO", 14, OK))
-    # request pulses
-    xs = [120, 280, 440, 600, 760]
-    for i, x in enumerate(xs):
-        p.append(line(x, 150, x + 40, 150, IRQ, 3))
-        p.append(line(x + 20, 128, x + 20, 150, IRQ, 2))
-        if i < 4:
-            p.append(rect(x + 8, 164, 24, 16, DMA, DMA, 0))
-    p.append(T(120, 250, "Ein Request erlaubt nicht 16 Words in ein Ein-Byte-TX-Register.", 15, ERR))
-    p.append(T(16, 290, "M2P: RAM -> Peripherie.   P2M: Peripherie -> RAM.   M2M: RAM -> RAM.", 16))
-    p.append(T(16, 322, "P2M verhindert einen Overrun nicht, wenn der Pfad langsamer ist als die Quelle.", 15, ERR))
-    p.append(T(16, 354, "M2M ist kein allgemeines memmove fuer Ueberlappung. DACK ist kein I2C-ACK.", 15, MUTED, "400"))
-    p.append(T(16, 386, "Die zwei FIFOs nur zeichnen, wenn das konkrete Modell sie hat.", 14, MUTED, "400"))
-    save("handshake.svg", p)
+    p = [text(20, 30, "32 Bytes pro Zeile · Ausschnitt ab 0x20001000")]
+    for i in range(4):
+        x0 = 90+i*210
+        p += [rect(x0, 105, 210, 65), text(x0+105, 93, f"+0x{32*i:02X}", 23, anchor="middle")]
+    p += [rect(90+3*840/128, 111, 100*840/128, 53, BG, RED, 0),
+          text(450, 144, "Puffer: 100 Bytes", 24, anchor="middle"),
+          line(90+3*840/128, 180, 90+3*840/128, 235, RED, 2),
+          text(110, 263, "Start +0x03", 23),
+          line(90+103*840/128, 180, 90+103*840/128, 235, RED, 2),
+          text(760, 263, "Ende +0x67", 23, anchor="middle"),
+          text(500, 333, "Wartungsbereich: +0x00 bis ausschließlich +0x80 = 128 Bytes", 23, anchor="middle")]
+    save("cache-lines", "Hundert Bytes berühren vier ganze Cachezeilen mit gemeinsamem Rand", 363, p)
 
+    p = []
+    for x, labels in [(20, ["Sichtbarkeit", "Kohärenz / Cachepflege"]),
+                      (360, ["Erreichbarkeit", "DMA kann adressieren"]),
+                      (700, ["Besitz", "keine fremden Zugriffe"])]:
+        p += box(x, 90, 280, 120, labels)
+    p += [text(500, 35, "Alle drei Bedingungen müssen gleichzeitig gelten", 26, anchor="middle"),
+          line(160, 215, 160, 267), line(500, 215, 500, 267), line(840, 215, 840, 267),
+          line(160, 267, 840, 267, RED, 3),
+          text(500, 315, "RAM_UNCACHED ist nur ein Name, keine Hardwarekonfiguration", 23, anchor="middle")]
+    save("uncached", "Sichtbarkeit, DMA-Erreichbarkeit und Besitz getrennt prüfen", 342, p)
 
-# 5 Adressen
-def fig_addr():
-    p = svg(1200, 460)
-    p.append(T(16, 22, "M2P, fiktiv: 8 Bit, COUNT 16, SRC ab 0x20001000, DST fest 0x4003000C.", 16))
-    headers = ["n", "SRC", "DST", "Rest"]
-    xs = [16, 80, 280, 520]
-    for x, h in zip(xs, headers):
-        p.append(T(x, 52, h, 14, MUTED, "400"))
-    rows = [
-        ("1", "0x20001000", "0x4003000C", "15"),
-        ("2", "0x20001001", "0x4003000C", "14"),
-        ("3", "0x20001002", "0x4003000C", "13"),
-        ("4", "0x20001003", "0x4003000C", "12"),
-    ]
-    for i, row in enumerate(rows):
-        y = 78 + i * 28
-        for x, val in zip(xs, row):
-            col = ERR if x == 280 else INK
-            p.append(T(x, y, val, 16, col))
-    p.append(T(620, 78, "P2M, halfwordfaehig angenommen", 15, OK))
-    p.append(T(620, 106, "ADC 0x40031000, fest", 15))
-    p.append(T(620, 134, "RAM ab 0x20002000, +2", 15))
-    p.append(T(620, 162, "COUNT 8 = 16 Byte", 15, DMA))
-    p.append(T(16, 210, "Ein 16-Bit-I2C-Wert kann zwei Byte-Transfers sein. C-Typ und erlaubte Breite sind verschieden.", 15, ERR))
-    p.append(T(16, 242, "1 000 000 Byte, 8 Bit, COUNT max. 65535: 15 x 65535 + 16975 = 16 Bloecke.", 16, CPU))
-    p.append(T(16, 274, "Adressregister in Bytes zaehlen. uint16_t* p; p += width skaliert doppelt.", 15, IRQ))
-    p.append(T(16, 310, "Getrennt: Bus-Alignment, Cacheline-Alignment, DMA-Erreichbarkeit.", 15))
-    p.append(T(16, 342, "Ziel-Increment auf MMIO kann Nachbarregister beschreiben.", 15, ERR))
-    p.append(T(16, 380, "uint32_t-Cast ist nur eine Adressannahme. uintptr_t macht aus einer CPU-Adresse keine DMA-Adresse.", 14, MUTED, "400"))
-    p.append(T(16, 420, "Alle Adressen in dieser Abbildung sind fiktives Lehrmodell.", 14, MUTED, "400"))
-    p.append(T(16, 446, "Packing nur, wenn Quelle, Ziel und Controller es dokumentieren.", 14, MUTED, "400"))
-    save("addrs.svg", p)
+    p = box(20, 110, 220, 100, ["Speicher", "Burst liefert Daten"])
+    p += box(395, 110, 260, 100, ["DMA-FIFO", "endliche Kapazität"])
+    p += box(790, 110, 190, 100, ["Peripherie", "entnimmt"])
+    p += [line(240, 160, 390, 160, RED, 4, arrow=True), text(317, 132, "gebündelt", 23, anchor="middle"),
+          line(655, 160, 785, 160, arrow=True), text(720, 132, "einzeln", 23, anchor="middle"),
+          line(790, 240, 660, 240, arrow=True), text(725, 271, "Request", 23, anchor="middle"),
+          text(20, 35, "Speicherzugriff und Peripherieverbrauch haben andere Zeitmuster"),
+          text(500, 327, "FIFO puffert kurzzeitig; voller oder leerer FIFO begrenzt den Weg", 23, anchor="middle")]
+    save("burst", "Ein endlicher FIFO entkoppelt Speicherburst und einzelne Requests", 355, p)
 
+    p = [text(20, 35, "Deskriptormodell: SRC · DST · COUNT · NEXT")]
+    for i, x0 in enumerate([20, 370, 720]):
+        p += box(x0, 100, 260, 140, [f"Auftrag {i+1}", "Quelle / Ziel / Anzahl", "NEXT → Folge" if i < 2 else "NEXT → Ende"])
+        if i<2:
+            p += [line(x0+260, 170, x0+345, 170, RED, 3, arrow=True)]
+    p += [text(500, 307, "DMA muss diese Struktur und das definierte Kettenende unterstützen", 23, anchor="middle")]
+    save("descriptors", "Eine unterstützte Deskriptorkette verbindet mehrere Transferaufträge", 335, p)
 
-# 6 Lebenszyklus
-def fig_life():
-    p = svg(1200, 420)
-    p.append(T(16, 24, "Besitz des Puffers und Abschluss der Leitung sind zwei Zeitachsen.", 17))
-    states = [
-        (16, "CPU fuellt", OK),
-        (210, "veroeffentlicht", CPU),
-        (420, "DMA besitzt", DMA),
-        (630, "DMA-TC", IRQ),
-        (820, "CPU darf wieder", OK),
-    ]
-    for x, name, col in states:
-        box(p, x, 48, 180, 40, name, "", col)
-    for x in (196, 406, 616, 806):
-        p.append(arrow(x, 68, x + 12))
-    p.append(T(16, 120, "Waehrend DMA besitzt: CPU aendert den aktiven Quellbereich nicht.", 15, ERR))
-    p.append(T(16, 146, "Ein lokales Array darf nach Rueckkehr der Startfunktion nicht verschwinden.", 15, ERR))
-    p.append(T(16, 190, "DMA schreibt letztes Element", 14, DMA))
-    p.append(T(16, 230, "DMA-TC", 14, IRQ))
-    p.append(T(16, 270, "UART/SPI sendet", 14, CPU))
-    p.append(T(16, 310, "Leitung fertig", 14, OK))
-    marks = [(200, 178, DMA), (360, 218, IRQ), (560, 258, CPU), (760, 298, OK)]
-    p.append(line(180, 330, 1000, 330, MUTED, 1))
-    for x, y, col in marks:
-        p.append(line(x, y, x, 330, col, 2))
-        p.append(rect(x - 6, y - 6, 12, 12, col, col, 0))
-    p.append(T(180, 360, "Abstand nicht festgelegt. Ohne Controllerdokument keine feste Differenz.", 14, MUTED, "400"))
-    p.append(T(16, 390, "Pufferfreigabe, naechster DMA-Start und SPI-CS sind getrennte Entscheidungen.", 15, ERR))
-    p.append(T(16, 414, "Vor Start: Kanal stoppen, Altstatus, Route, Breite, Count, Cache, IRQ. Kein blindes |=.", 14, MUTED, "400"))
-    save("lifecycle.svg", p)
+    p = [text(20, 30, "RGB565 · 2 Bytes/Pixel · Bildbreite 320 Pixel · Quell-Pitch 640 B"),
+         text(310, 73, "Zoom: x = 8 … 15, y = 19 … 23", 23, anchor="middle")]
+    for col in range(8):
+        p += [text(118+col*55, 107, col+8, 22, anchor="middle")]
+    for row in range(5):
+        p += [text(67, 147+row*42, row+19, 22, anchor="end")]
+        for col in range(8):
+            selected = 1<=row<=3 and 2<=col<=5
+            p += [rect(91+col*55, 120+row*42, 54, 40, BG, RED if selected else LIGHT, 0)]
+    p += [text(670, 88, "Gepacktes Ziel", anchor="middle"),
+          text(670, 116, "Pitch = 8 B", 22, anchor="middle"),
+          line(545, 205, 620, 205, RED, 3, arrow=True)]
+    for i in range(3):
+        p += [rect(630, 145+i*52, 300, 42, BG, RED),
+              text(780, 174+i*52, f"4 Pixel · 0x200080{8*i:02X}", 23, anchor="middle")]
+    p += [text(500, 375, "Markiert: x = 10 … 13, y = 20 … 22 · drei Zeilen, insgesamt 24 B", 23, anchor="middle")]
+    save("twod", "Drei Rechteckzeilen aus einem großen Bild werden ins Ziel gepackt", 403, p)
 
+    p = [text(20, 30, "N = 8 · P = 14 geschrieben · C = 5 verarbeitet"),
+         text(20, 90, "Platz"), text(20, 157, "Sample")]
+    values = [8, 9, 10, 11, 12, 13, 6, 7]
+    for i, value in enumerate(values):
+        x0 = 180+i*95
+        p += [text(x0+42, 90, i, 24, anchor="middle"), rect(x0, 115, 84, 62, BG, RED if i==5 else LIGHT),
+              text(x0+42, 156, value, 30, anchor="middle")]
+    p += [text(702, 221, "C mod 8 = 5", 23, anchor="middle"),
+          text(850, 274, "P mod 8 = 6", 23, anchor="middle"),
+          line(702, 198, 702, 181, arrow=True), line(798, 251, 798, 181, arrow=True),
+          text(500, 343, "Rückstand P − C = 9 > 8: Sample 5 wurde durch 13 überschrieben", 23, anchor="middle")]
+    save("ring", "Gesamtrückstand neun trotz Positionsdifferenz eins im Ring", 372, p)
 
-# 7 Cache
-def fig_cache():
-    p = svg(1200, 460)
-    p.append(T(16, 24, "Nicht kohaerenter Write-Back-D-Cache. Werte beispielhaft. Linie hier 64 Byte, nur illustrativ.", 15))
-    p.append(T(16, 70, "TX", 16, DMA))
-    tx = [("Cache 0x22, RAM 0x11", ERR), ("Clean: RAM wird 0x22", CPU), ("DMA liest 0x22", OK)]
-    for i, (t, c) in enumerate(tx):
-        box(p, 70 + i * 300, 48, 270, 40, t, "", c)
-    p.append(T(16, 150, "RX", 16, CPU))
-    rx = [("Cache alt, RAM neu", ERR), ("schmutzige Line kann zurueckschreiben", ERR), ("danach CPU liest neu", OK)]
-    for i, (t, c) in enumerate(rx):
-        box(p, 70 + i * 300, 128, 270, 44, t, "", c)
-    p.append(rect(16, 200, 560, 90, OK))
-    p.append(T(28, 224, "Puffer auf ganzen Linien isoliert", 15, OK))
-    p.append(T(28, 250, "[ DMA-Daten | DMA-Daten ]", 16))
-    p.append(T(28, 274, "CPU-Metadaten liegen daneben, nicht in derselben Linie.", 13, MUTED, "400"))
-    p.append(rect(600, 200, 560, 90, ERR))
-    p.append(T(612, 224, "Fehler: Metadaten in der DMA-Linie", 15, ERR))
-    p.append(T(612, 250, "[ Laenge | DMA-Byte | Flags ]", 16))
-    p.append(T(612, 274, "Clean oder Invalidate trifft dann fremde Bytes.", 13, MUTED, "400"))
-    p.append(T(16, 320, "prepare_tx_for_device: neu veroeffentlichen, bevor DMA liest.", 15, DMA))
-    p.append(T(16, 346, "prepare_rx_for_device: schmutzige Kopie entfernen, bevor das Geraet schreibt.", 15, CPU))
-    p.append(T(16, 372, "finish_rx_for_cpu: veraltete Kopie verwerfen, bevor die CPU liest.", 15, OK))
-    p.append(T(16, 404, "Clean schreibt zurueck. Invalidate verwirft. Flush = Clean plus Invalidate. FENCE ersetzt das nicht.", 14, MUTED, "400"))
-    p.append(T(16, 432, "Auch andere nicht kohaerente Modi koennen beim Empfang alte Kopien liefern. Zicbom nur wenn vorhanden.", 14, MUTED, "400"))
-    save("cache.svg", p)
+    p = [text(20, 30, "Audio-TX-Modell · Rollenwechsel nach einer Halbzeit")]
+    for top, dmahalf, cpuhalf, start, end in [(75, "A", "B", "1.", "Halbzeit"), (200, "B", "A", "2.", "Halbzeit")]:
+        p += [text(20, top+28, f"{start} {end}", 23),
+              rect(210, top, 320, 85, BG, RED),
+              text(370, top+35, f"DMA liest {dmahalf}", 26, anchor="middle"),
+              text(370, top+65, "CPU verändert nicht", 22, anchor="middle"),
+              rect(630, top, 320, 85),
+              text(790, top+35, f"CPU füllt {cpuhalf}", 26, anchor="middle"),
+              text(790, top+65, "danach synchronisieren", 22, anchor="middle")]
+    p += [text(500, 348, "Vor Wiedereintritt des DMA müssen Inhalt und Sichtbarkeit fertig sein", 23, anchor="middle")]
+    save("pingpong", "DMA liest und CPU füllt abwechselnd unterschiedliche Pufferhälften", 377, p)
 
+    x = lambda t: 180+10*t
+    th = 2048/88200*1000
+    p = [text(20, 30, "Halbzeit ≈ 23,22 ms · HT markiert Verlassen von A, nicht heutige Phase")]
+    for start, end, label in [(0, th, "DMA liest A"), (th, 2*th, "DMA liest B"), (2*th, 3*th, "DMA liest A")]:
+        p += [rect(x(start), 105, x(end)-x(start), 70, BG, RED),
+              text((x(start)+x(end))/2, 149, label, 24, anchor="middle")]
+    p += [line(x(th), 85, x(th), 239, MUTED, dash=True), text(x(th), 76, "HT gesetzt", 23, anchor="middle"),
+          line(x(2*th+1), 85, x(2*th+1), 239, RED, 3),
+          text(x(2*th+1), 219, "HT erst jetzt bearbeitet", 23, anchor="middle")]
+    p += axis(x(0), 935, 245, [(x(0), "0"), (x(th), "23,22"), (x(2*th), "46,44"), (x(3*th), "69,66")], "Zeit / ms")
+    p += [text(500, 342, "Bei 47,44 ms ist A bereits wieder belegt", 24, anchor="middle")]
+    save("flag-late", "Ein verspätetes Half-Transfer-Flag gibt keine gerade aktive Hälfte frei", 371, p)
 
-# 8 Uncached
-def fig_uncached():
-    p = svg(1200, 400)
-    p.append(T(16, 24, "Drei Ebenen. Ein Linkername macht Speicher nicht uncached.", 18))
-    layers = [
-        (16, "1 Plattform", "Attribute setzen", "PMA, nicht PMP", CPU),
-        (310, "2 Linker", "Puffer platzieren", ".dma_buffer", DMA),
-        (610, "3 Anwendung", "Adresse uebergeben", "DMA-erreichbar", OK),
-    ]
-    for x, a, b, c, col in layers:
-        box(p, x, 56, 270, 78, a, b + " / " + c, col)
-    p.append(T(16, 170, "Fiktive Karte: 246 KiB ab 0x20000000, 10 KiB ab 0x2003D800, Ende exklusiv 0x20040000.", 15))
-    p.append(rect(16, 190, 760, 28, MUTED, "#E8EEF2"))
-    p.append(rect(16, 190, 620, 28, CPU, "#D6E6F5", 1))
-    p.append(rect(636, 190, 140, 28, DMA, "#F8E0CC", 1))
-    p.append(T(24, 210, "0x20000000  gewoehnlich", 13, CPU))
-    p.append(T(646, 210, "DMA-Zone", 13, DMA))
-    p.append(T(16, 250, "Uncached nur, wenn die Plattform das fuer 0x2003D800 wirklich konfiguriert.", 15, ERR))
-    rows = [("PMP", "Zugriffsrechte", CPU), ("PMA / Plattform", "unter anderem Cacheability", DMA), ("Linker", "nur Platzierung", MUTED)]
-    y = 280
-    for a, b, c in rows:
-        p.append(T(16, y, a, 16, c))
-        p.append(T(220, y, b, 16))
-        y += 28
-    p.append(T(16, 376, "Uncached heisst weder automatisch DMA-erreichbar noch automatisch geordnet.", 14, MUTED, "400"))
-    save("uncached.svg", p)
+    p = [text(20, 30, "Timeout oder Fehler ist kein Beweis für ruhende Speicherzugriffe")]
+    p += box(20, 100, 220, 85, ["Stopp anfordern"])
+    p += box(360, 100, 260, 85, ["Begrenzt warten", "Status prüfen"])
+    p += box(760, 100, 220, 85, ["Ruhe bestätigt", "Puffer zurück"])
+    p += [line(240, 142, 355, 142, arrow=True), line(620, 142, 755, 142, RED, 3, arrow=True),
+          text(695, 116, "ja", 22, anchor="middle"), line(490, 185, 490, 245, arrow=True)]
+    p += box(330, 255, 320, 75, ["Nicht bestätigt:", "Puffer bleibt gesperrt"])
+    p += [text(670, 231, "Frist abgelaufen", 23, anchor="middle")]
+    save("lab", "Abbruch mit bestätigtem Stillstand oder weiterhin gesperrtem Puffer", 365, p)
 
-
-# 9 Burst DRAM
-def fig_burst():
-    p = svg(1200, 440)
-    p.append(T(16, 24, "SoC-Transaktionen und DRAM-Kommandos sind zwei Ebenen.", 17))
-    p.append(T(16, 52, "Bus, angenommen: Einzelbeats brauchen je eine Anfrage. Burst buendelt Beats.", 14, MUTED, "400"))
-    p.append(T(16, 90, "einzeln", 14, CPU))
-    for i in range(6):
-        p.append(rect(120 + i * 70, 70, 28, 22, CPU, CPU, 0))
-        p.append(rect(150 + i * 70, 70, 28, 22, MUTED, "#fff"))
-    p.append(T(16, 140, "Burst", 14, DMA))
-    p.append(rect(120, 120, 40, 22, IRQ, IRQ, 0))
-    for i in range(6):
-        p.append(rect(170 + i * 36, 120, 30, 22, DMA, DMA, 0))
-    p.append(T(560, 110, "dunkle Kaestchen: Adressphase. Helle: Warten der CPU.", 13, MUTED, "400"))
-    p.append(T(16, 180, "DRAM, Open-Page, dieselbe zunaechst geschlossene Zeile:", 15))
-    p.append(T(16, 210, "ACT", 16, ERR))
-    p.append(rect(80, 192, 50, 24, ERR, ERR, 0))
-    for i, name in enumerate(("RD", "RD", "RD", "RD")):
-        p.append(rect(150 + i * 60, 192, 48, 24, OK, OK, 0))
-        p.append(T(158 + i * 60, 210, name, 13, "#fff"))
-    p.append(T(400, 210, "Row-Hits auch bei getrennten SoC-Zugriffen", 14, OK))
-    p.append(T(16, 260, "Zeilenwechsel: RD, PRE, ACT, RD. Offene passende Zeile: kein neues ACT.", 15, IRQ))
-    p.append(T(16, 300, "Nicht: 16 Einzeltransfers bedeuten 16 Row-Aktivierungen.", 16, ERR))
-    p.append(T(16, 334, "Vergleichen: Protokollaufwand, raeumliche Lokalitaet, CPU-Wartezeit. Keine feste Beschleunigung.", 15))
-    p.append(T(16, 368, "Laengere Busbelegung ist der Preis des Bursts. Arbitration je Beat ist nur eine angenommene Politik.", 14, MUTED, "400"))
-    p.append(T(16, 400, "On-Chip-SRAM hat keine DRAM-Zeile. Der Bezug auf Vorlesung 1 gilt nur fuer DRAM.", 14, MUTED, "400"))
-    p.append(T(16, 428, "Eine DMA-Laenge ist nicht automatisch die DRAM-Burstlaenge.", 14, MUTED, "400"))
-    save("burst.svg", p)
-
-
-# 10 Ping-pong
-def fig_ping():
-    p = svg(1200, 430)
-    p.append(T(16, 22, "44100 Hz, mono, 16 Bit: 88200 Byte/s. Puffer 4096 B, Haelften 2048 B = 1024 Samples.", 15))
-    p.append(T(16, 46, "16-Bit-COUNT 2048. HT nach 1024 Elementen. Eine Haelfte ideal etwa 23,22 ms, Runde 46,44 ms.", 14, MUTED, "400"))
-    p.append(T(16, 78, "DMA", 14, DMA))
-    p.append(rect(120, 58, 300, 26, DMA, DMA, 0))
-    p.append(T(230, 76, "A", 14, "#fff", "700", "middle"))
-    p.append(rect(420, 58, 300, 26, IRQ, IRQ, 0))
-    p.append(T(540, 76, "B", 14, "#fff", "700", "middle"))
-    p.append(rect(720, 58, 300, 26, DMA, DMA, 0))
-    p.append(T(860, 76, "A", 14, "#fff", "700", "middle"))
-    p.append(T(16, 130, "CPU", 14, CPU))
-    p.append(rect(420, 110, 300, 26, OK, "#E5F2E6"))
-    p.append(T(500, 128, "bearbeitet A", 14, OK))
-    p.append(rect(720, 110, 300, 26, OK, "#E5F2E6"))
-    p.append(T(800, 128, "bearbeitet B", 14, OK))
-    p.append(T(250, 168, "HT", 13, IRQ, "700", "middle"))
-    p.append(T(560, 168, "TC", 13, IRQ, "700", "middle"))
-    p.append(line(420, 58, 420, 150, IRQ, 1, "4 3"))
-    p.append(line(720, 58, 720, 150, IRQ, 1, "4 3"))
-    p.append(T(16, 210, "Beide Haelften vor dem Start vorbereiten. Danach nur die freigegebene Haelfte anfassen.", 15))
-    p.append(T(16, 240, "IRQ-Verzoegerung + Nachfuellen + Veroeffentlichen + Reserve < Fenster vor der naechsten Nutzung.", 14, ERR))
-    p.append(T(16, 270, "30 ms Nachfuellzeit ueberschreitet die idealen 23,22 ms. TX: Underrun. RX: Overrun.", 15, ERR))
-    p.append(T(16, 304, "ISR: Status lesen, Quelle quittieren, Arbeit signalisieren. Nachfuellen ausserhalb, wenn das Budget traegt.", 14))
-    p.append(T(16, 336, "Zwei boolesche Flags zaehlen keine beliebig vielen Runden. Bei unklarem Besitz neu synchronisieren.", 14, MUTED, "400"))
-    p.append(T(16, 368, "Etwa 43,07 HT-/TC-Ereignisse je Sekunde. Wrap nur, wenn der Controller ihn neu laedt.", 14, MUTED, "400"))
-    p.append(T(16, 400, "Linearer Ring mit HT/TC und Hardware-Doppelpuffer sind verschiedene Implementierungen.", 14, MUTED, "400"))
-    save("pingpong.svg", p)
-
-
-# 11 2D
-def fig_2d():
-    p = svg(1200, 400)
-    p.append(T(16, 24, "RGB565, 320 Pixel, Pitch 640 Byte. Rechteck 4 x 3 bei x=10, y=20.", 16))
-    p.append(rect(16, 48, 420, 200, MUTED))
-    p.append(rect(16 + 80, 48 + 70, 70, 52, DMA, "#F8E0CC"))
-    p.append(T(24, 68, "Framebuffer", 14, MUTED, "400"))
-    p.append(T(100, 100, "4 x 3", 14, DMA))
-    p.append(T(460, 80, "Basis 0x20001000, fiktiv", 16))
-    p.append(T(460, 112, "Erste Zeile: 0x20004214", 18, DMA))
-    p.append(T(460, 144, "8 Byte kopieren, Skip 632 Byte", 16))
-    p.append(T(460, 176, "Naechster Zeilenstart +640 Byte", 16, CPU))
-    p.append(T(460, 214, "Dichtes Ziel: Startabstand 8 Byte", 16, OK))
-    p.append(T(16, 280, "Offsetregister koennen Pixel statt Bytes zaehlen. Datenblatt umrechnen.", 15, IRQ))
-    p.append(T(16, 314, "Scatter-Gather: drei Puffer, Deskriptor mit SRC, DST, Count, Next.", 15))
-    p.append(T(16, 346, "Deskriptoren brauchen Erreichbarkeit, Alignment, Lebensdauer und ggf. Cache-Pflege.", 14, MUTED, "400"))
-    p.append(T(16, 376, "Next = 0 ist kein universeller Stopp. DMA ersetzt kein I2C-START/STOP.", 14, ERR))
-    save("twod.svg", p)
-
-
-# 12 Labor
-def fig_lab():
-    p = svg(1200, 400)
-    p.append(T(16, 24, "Rechenmodell, keine Renode-Messung. 4096 Byte, 115200 Baud, 8N1.", 17))
-    p.append(T(16, 50, "Ideale Leitungszeit: 4096 x 10 / 115200 = 355,56 ms.", 16, DMA))
-    nodes = [
-        (16, "TX-Puffer", OK),
-        (220, "DMAC", DMA),
-        (420, "UART", DMA),
-        (640, "Pruefer", OK),
-        (860, "main", CPU),
-    ]
-    subs = ["lebt weiter", "Request", "FIFO/Shift", "Bytestrom", "Heartbeat"]
-    for (x, a, col), sub in zip(nodes, subs):
-        box(p, x, 76, 180, 52, a, sub, col)
-    p.append(T(16, 170, "Heartbeat schaltet die LED in main(), etwa alle 10 ms nach Zeitvergleich.", 15, CPU))
-    p.append(T(16, 198, "Ein Timer darf die Zeitbasis sein. Der Wechsel darf nicht autonom in Hardware oder Timer-ISR liegen.", 14, ERR))
-    p.append(T(16, 236, "Vergleich nur bei identischen Daten und UART-Einstellungen.", 15))
-    p.append(T(16, 264, "Getrennt protokollieren: korrekter Bytestrom, Main-Fortschritt, Heartbeat-Luecken, DMA-TC, Leitung fertig.", 14))
-    p.append(T(16, 300, "PerformanceInMips ist keine MCU-Taktfrequenz. Hostlaufzeit ist keine Transferzeit.", 15, IRQ))
-    p.append(T(16, 334, "Ohne Baud- und Handshake-Modell bleibt der Lauf ein Funktionstest, keine Entlastungsmessung.", 15, ERR))
-    p.append(T(16, 370, "Im Repository kein DMA-Modell und keine .repl. Diese Adressen bleiben fiktiv.", 14, MUTED, "400"))
-    save("lab.svg", p)
+def rasterize(chromium):
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        browser = p.chromium.launch(executable_path=chromium, headless=True,
+                                   args=["--no-sandbox"])
+        page = browser.new_page(viewport={"width":W, "height":450}, device_scale_factor=2)
+        for source in sorted(OUT.glob("*.svg")):
+            page.set_content('<html><body style="margin:0;background:white">'
+                             +source.read_text(encoding="utf-8")+'</body></html>')
+            page.locator("svg").screenshot(path=str(source.with_suffix(".png")))
+        browser.close()
 
 
 if __name__ == "__main__":
-    for fn in (
-        fig_budget, fig_time, fig_paths, fig_hand, fig_addr, fig_life,
-        fig_cache, fig_uncached, fig_burst, fig_ping, fig_2d, fig_lab,
-    ):
-        fn()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--png", action="store_true")
+    parser.add_argument("--chromium", default="/usr/bin/chromium")
+    args = parser.parse_args()
+    figures()
+    if args.png:
+        rasterize(args.chromium)
+    print("21 Lehrdiagramme geschrieben" + (" (SVG und PNG)." if args.png else " (SVG)."))

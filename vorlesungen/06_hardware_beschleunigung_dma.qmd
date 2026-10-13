@@ -1,1098 +1,885 @@
 ---
 title: "06 · Hardware-Beschleunigung (DMA)"
-subtitle: "Mikrocomputertechnik 3 · Direct Memory Access — die CPU vom Daten-Schaufeln befreien"
+highlight-style: ../assets/styles/dhbw-code.theme
+subtitle: "Mikrocomputertechnik 3 · Daten bewegen, Puffer sicher übergeben"
 author: "Prof. Dr.-Ing. Daniel Klünder"
-lang: de
-# Vortrag:  quarto preview vorlesungen/06_hardware_beschleunigung_dma.qmd
-#           (Notizen nur mit Taste S)
-# Handout:  quarto render vorlesungen/06_hardware_beschleunigung_dma.qmd --profile handout --to pdf
-#           → _handout/vorlesungen/06_hardware_beschleunigung_dma.pdf
 format: revealjs
+title-slide-attributes:
+  data-visibility: hidden
+lang: de
+# Vortrag: quarto render vorlesungen/06_hardware_beschleunigung_dma.qmd --to revealjs
+# Skript: quarto render vorlesungen/06_hardware_beschleunigung_dma.qmd --profile handout --to pdf
 ---
 
-## Willkommen zu Block 6!
+## Vom Datenprotokoll zur Datenbewegung
 
-- Willkommen zur sechsten Vorlesung in Mikrocomputertechnik 3
-- Bisher: Denken (Speicher/Caches), Reagieren (Interrupts), Handeln (PWM), Sprechen (Busse)
-- Heute: Effizienz — den größten Stau im Datenpfad auflösen
-- Ziel: stupide Fleißarbeit von der CPU auf Hardware-Assistenten verlagern
-
-::: notes
-Willkommen zu Block 6 knüpft an den bisherigen Datenpfad an. DMA heißt Direct Memory Access. Neu ist der autonome Transfer zwischen Speicher und Peripherie, nicht die erste Hardware überhaupt. PWM und UART arbeiteten schon selbstständig. Die CPU bereitet Auftrag, Besitz und Fehler vor. Willkommen zur sechsten Vorlesung in Mikrocomputertechnik 3. Bisher: Denken (Speicher/Caches), Reagieren (Interrupts), Handeln (PWM), Sprechen (Busse). Verständnischeck: Was bleibt CPU-Aufgabe? Vorbereitung, gültige Puffer und die Verwendung des Ergebnisses. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Einordnung im Semester
-
-```{mermaid}
-%%| fig-width: 4.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[Bisher: CPU bedient den Datentransfer] -->|Flaschenhals| B[CPU überlastet]
-  C[Heute: Arbeitsteilung] -->|CPU rechnet| D[DMA schaufelt]
-  style C fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+- Vorlesung 5: vollständige Transfers und gültige Sensorwerte
+- Heute: Daten zwischen Speicher und Peripherie bewegen lassen
+- DMA übernimmt Kopierarbeit, nicht die Bedeutung der Daten
+- Vorbereitung, Besitz und Abschluss bleiben Softwareaufgaben
 
 ::: notes
-Einordnung im Semester knüpft an den bisherigen Datenpfad an. Nebenläufig heißt, Rechnung und Transfer können sich überlappen und trotzdem denselben Bus teilen. Zwei Pfeile verdoppeln den Durchsatz nicht. Verständnischeck: Kann DMA die CPU verzögern? Ja, durch konkurrierende Zugriffe. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Vorlesung 5 hat erklärt, wie Bits über UART, Universal Asynchronous Receiver-Transmitter, SPI, Serial Peripheral Interface, und I²C, Inter-Integrated Circuit, übertragen und anschließend interpretiert werden. Ein gültiger Datensatz verlangt mehr als eine gestartete Übertragung. Genau diese Trennung bleibt heute erhalten.
+
+DMA heißt Direct Memory Access, direkter Speicherzugriff. Eine Hardwareeinheit kann Daten zwischen Speicher und Peripherie bewegen, ohne dass der Prozessor jedes Element durch seine allgemeinen Register kopiert. Dies ist eine weitere Arbeitsteilung, nachdem Timer und serielle Controller bereits selbstständig Signale erzeugen konnten.
+
+Die Anwendung legt weiterhin fest, welche Daten gebraucht werden, wann sie gültig sind und wer einen Puffer verwenden darf. Eine fertige Speicherbewegung ist auch nicht automatisch ein abgeschlossenes Leitungsprotokoll. Der Lernweg führt deshalb vom Datenbedarf über einen beschreibbaren Transferauftrag zur sicheren Pufferübergabe. Cache-Sichtbarkeit und fortlaufende Datenströme werden anschließend als zusätzliche Bedingungen behandelt.
 :::
 
-## Anknüpfung: I2C-Labor
+## Voraussetzungen und Lehrmodell
 
-Kurz-Recap aus Block 5 (Vertiefung im Übungsblatt):
-
-- IMU per I2C: Start, Adresse, R/W, ACK/NACK, Stop
-- High/Low-Byte per Shift zu 16-Bit-Werten
-- CPU wartete oft auf die I2C-Hardware (`wait_for_ack` / Polling)
-
-```c
-/* Block 5: zusammenhängender Burst, nicht ein einzelnes X-High-Byte.
-   Polling auf ACK ist bei seltenen Samples tragbar. */
-int read_accel_xyz(uint8_t out[6]);
-```
+- C-Integer, Arrays und Gerätezugriffe
+- Cache und Write-Back aus Vorlesung 2
+- Interrupts, Fristen und gemeinsame Zustände aus Vorlesung 3
+- Serielle Rahmen und Quittungen aus Vorlesung 5
+- DMA-Funktionen sind Plattformmerkmale, kein RISC-V-Registerstandard
 
 ::: notes
-Anknüpfung: I2C-Labor knüpft an den bisherigen Datenpfad an. Das I²C-Beispiel aus Block 5 ist nicht ausgeführt. Sechs Beschleunigungsbytes brauchen Registerzeiger, Repeated START, finales NACK und STOP. out[6] prüft die Puffergröße im Parameter nicht. Negative Werte brauchen Zweierkomplement. DMA ersetzt das Protokoll nicht. IMU per I2C: Start, Adresse, R/W, ACK/NACK, Stop. High/Low-Byte per Shift zu 16-Bit-Werten. Verständnischeck: Ersetzt DMA das finale NACK? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Die Vorlesung setzt die bisher eingeführten Integerzahlen, Arrays, Gerätezugriffe und Zeitrechnungen voraus. MMIO bedeutet Memory-Mapped Input/Output: Gerätefunktionen werden über Register im Prozessoradressraum bedient. Ein Cache speichert lokale Kopien von Speicherblöcken; bei Write-Back können neue Werte zunächst nur in dieser Kopie liegen. Diese Begriffe stammen aus den vorherigen Blöcken.
+
+DMA bedeutet Direct Memory Access. Für Adressrechnungen verwenden wir ausdrücklich vorgegebene zweiunddreißig Bit breite, vom DMA erreichbare Modelladressen. Transferelemente haben dort gleiche Quell- und Zielbreite von einem, zwei oder vier Bytes. Andere Hardware kann andere Breiten, Zählerregeln und Adressübersetzungen besitzen.
+
+Für die Cachebeispiele nehmen wir einen nicht kohärenten Write-Back-Daten-Cache und zweiunddreißig Bytes je Cachezeile an. Nicht kohärent bedeutet hier, dass der DMA die private Cachekopie nicht automatisch mitbeobachtet. Zeitwerte und Geräteadressen sind Rechenannahmen, keine Messungen. RISC-V bezeichnet die Prozessor-Befehlssatzarchitektur; DMA-Kanäle, Request-Zuordnung und Abschlussstatus sind davon getrennte Plattformmerkmale. Die Annahmen werden bei jedem Spezialfall ausdrücklich ergänzt.
+
+RISC in RISC-V steht für Reduced Instruction Set Computer, Rechner mit reduziertem Befehlssatz.
 :::
 
-## Schnelle Schnittstellen, langsames Füttern
+## Vier Schulstunden: Ablauf
 
-- Big 3 beherrscht: UART, SPI, I2C
-- Externe Geräte anschließbar
-- SPI für Displays oft mit SCK im Zehner-MHz-Bereich
-- Ein Bit je Takt: 10 MHz ergeben höchstens 1,25 MB/s, 50 MHz höchstens 6,25 MB/s
-- DMA verkürzt Nachfüllpausen. Die Leitung wird dadurch nicht schneller
+| Stunde | Vorlesung und Besprechung | Arbeitsphase |
+|--------|---------------------------|--------------|
+| 1 | Bedarf, CPU-Aufwand und Datenpfad: 35 min | Aufgabe 1: 10 min |
+| 2 | Transferauftrag und Lebenszyklus: 30 min | Aufgaben 2–3: 15 min |
+| 3 | Cache und Busübertragung: 30 min | Aufgabe 4: 15 min |
+| 4 | Streams und Anwendungen: 15 min | Aufgaben 5–6: 15 min; Quiz: 15 min |
 
 ::: notes
-Schnelle Schnittstellen, langsames Füttern knüpft an den bisherigen Datenpfad an. Ein Bit je SCK: 10 MHz sind 1,25 MB/s, 50 MHz sind 6,25 MB/s. MB ist eine Million Byte. DMA füllt Lücken, ersetzt aber keinen zu langsamen Draht. Big 3 beherrscht: UART, SPI, I2C. Externe Geräte anschließbar. Verständnischeck: Verdoppelt DMA die Maximalrate bei gleichem SCK? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Vier Schulstunden entsprechen hundertachtzig Minuten Unterricht; Pausen kommen hinzu. Der Plan enthält hundertzehn Minuten Erklärung, Denkfragen und Besprechung, fünfundfünfzig Minuten angeleitete Papierübungen und fünfzehn Minuten Abschlussquiz. Die fünfzig Folien haben unterschiedliche Bearbeitungszeiten: Rechenbeispiele und Besitzwechsel benötigen mehr Gespräch als ein kurzer Überblick.
+
+CPU bedeutet Central Processing Unit, Prozessor. DMA, Direct Memory Access, wird zunächst als Entlastung von dessen Kopierarbeit eingeführt. Danach beschreiben wir einen Auftrag über Quelle, Ziel, Breite und Länge. Cache-Sichtbarkeit und Buskonkurrenz erklären, weshalb die Entlastung nicht mit beliebiger Geschwindigkeit oder sofortiger Datenfreigabe gleichgesetzt werden darf.
+
+Die sechs Aufgaben folgen dieser Reihenfolge. Im Unterricht werden die wichtigsten Schritte angeleitet; vollständiges selbstständiges Bearbeiten einschließlich Begründungen benötigt den längeren Richtwert des Übungsblatts. Der letzte Abschnitt behandelt fortlaufende Streams und überträgt die Regeln auf eine Rechteckkopie. Das Quiz prüft die bereits erklärten Unterscheidungen und benötigt keine zusätzliche Simulatorplattform.
 :::
 
-## Das Problem: Datenmenge
+## Drei Budgets getrennt prüfen
 
-![9,216 MB/s gegen 1,25 und 6,25 MB/s. DMA hebt das SCK-Limit nicht auf.](../assets/figures/06_hardware_beschleunigung_dma/budget.png)
+| Budget | Frage |
+|--------|-------|
+| Leitungsbandbreite | Wie viele Nutzdaten passen durch das Protokoll? |
+| CPU-Aufwand | Wie viele Takte kostet die Bedienung? |
+| Speicher und Bus | Wann bekommt ein Transfer seine Zugriffe? |
 
-- Temperaturfühler: wenige Bytes/s — unkritisch
-- Audio braucht Kanalzahl und Samplebreite: mono, 16 Bit, 44100 Samples/s sind 88200 Byte/s
-- TFT $320\times 240$, RGB565, 60 FPS:
+Eine Verbesserung eines Budgets erfüllt die anderen nicht automatisch.
+
+::: notes
+CPU heißt Central Processing Unit, Prozessor. Sein Zeitbudget beschreibt verfügbare Verarbeitungstakte für Bedienung und Anwendung. Die Leitungsbandbreite ist dagegen die pro Zeit übertragbare Datenmenge. Das Speicher- beziehungsweise Busbudget berücksichtigt, dass verschiedene Hardwareeinheiten Zugriffe auf dieselbe Ressource beanspruchen können.
+
+Ein schneller Kopierer kann eine langsame Leitung nicht beliebig beschleunigen. Ebenso beweist eine ausreichend schnelle Leitung nicht, dass eine Software pro Byte rechtzeitig reagieren kann. DMA, Direct Memory Access, adressiert zunächst den zweiten Punkt: Der Prozessor muss nicht jeden Transfer mit einer eigenen Lade- und Speicherfolge begleiten. Trotzdem benötigt die Hardware Zugriff auf Speicher und Peripherie.
+
+Diese Trennung macht Rechnungen prüfbar. Wir bestimmen zuerst einen Display-Datenbedarf, vergleichen ihn mit einer idealen seriellen Obergrenze und berechnen anschließend einen angenommenen Interruptaufwand. Alle drei Zahlen beschreiben unterschiedliche Grenzen. Eine Aussage wie „DMA ist schneller“ wäre ohne benanntes Budget unvollständig. Die spätere Busarbitration kann auch erklären, weshalb der Prozessor bei einer ausgelagerten Übertragung weiterhin Verzögerungen erlebt.
+:::
+
+## Wie groß ist ein Vollbild?
+
+![](../assets/figures/06_hardware_beschleunigung_dma/budget.png){fig-alt="Ein Bild mit 320 mal 240 Pixeln und zwei Bytes je Pixel enthält 153600 Bytes; 60 Bilder je Sekunde verlangen 9,216 MB/s."}
+
+RGB565: $5+6+5=16$ Bit, hier $2$ Byte je Pixel.
 
 $$
-320 \times 240 \times 2 \times 60 = 9\,216\,000\ \mathrm{Bytes/s}
+B_{\mathrm{Bild}}=320\cdot240\cdot2=153600\ \mathrm{Byte}
 $$
 
-- CPU müsste millionenfach RAM lesen und SPI-Register füllen
-
 ::: notes
-Das Problem: Datenmenge knüpft an den bisherigen Datenpfad an. RGB565 sind 16 Bit je Pixel. 320 mal 240 mal 2 sind 153600 Byte. Mal 60 sind 9,216 MB/s oder 73,728 Mbit/s. Mono 16 Bit bei 44100 Hz sind 88200 Byte/s, Stereo 176400. 10 MHz SPI schaffen ideal etwa 8,14 FPS, 50 MHz etwa 40,69. Für 60 FPS fehlen schon die reinen Nutzdaten. Temperaturfühler: wenige Bytes/s — unkritisch. Audio braucht Kanalzahl und Samplebreite: mono, 16 Bit, 44100 Samples/s sind 88200 Byte/s. Verständnischeck: Warum reichen 6,25 MB/s nicht? Der Bedarf ist 9,216 MB/s. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+RGB bedeutet Red, Green, Blue, Rot, Grün und Blau. RGB565 kodiert die drei Farbanteile mit fünf, sechs und fünf Bits, insgesamt sechzehn Bits pro Pixel. Für unser gepacktes Modell sind das zwei Bytes. Ein Pixel ist ein Bildpunkt; weder zusätzliche Zeilenabstände noch Steuerkommandos sind in dieser Nutzdatenmenge enthalten.
+
+Die Abbildung zeigt Bildbreite, Höhe und daraus entstehenden Speicherbedarf. $B_{\mathrm{Bild}}$ ist die Bytezahl eines vollständigen Bildes. Dreihundertzwanzig mal zweihundertvierzig ergeben sechsundsiebzigtausendachthundert Pixel. Mit zwei Bytes je Pixel folgen einhundertdreiundfünfzigtausendsechshundert Bytes. Bei sechzig vollständigen Bildern pro Sekunde werden $9216000$ Bytes pro Sekunde gebraucht.
+
+MB bezeichnet hier dezimal eine Million Bytes. Der Bedarf ist somit $9{,}216$ MB pro Sekunde. Das ist keine Aussage über komprimierte Bilder oder die Größe nur geänderter Ausschnitte. Die gezeichneten Zahlen sind Rechenannahmen, keine Displaymessung. Der nächste Vergleich fragt, ob die Leitung allein diesen Vollbildstrom tragen könnte, selbst bei perfekter Versorgung mit Bytes.
+
+Lesen Sie die Grafik von links nach rechts: Die graue Bildfläche steht für die zweidimensionale Pixelmenge, der erste Pfeil für ihre Umrechnung in Bytes. Der Pfeil nach unten ergänzt die zeitliche Wiederholung. Weder die gezeichnete Fläche noch die Kastenbreite ist eine quantitative Skala.
 :::
 
-## Refresher: Wie die CPU kopiert
+## DMA hebt die Leitungsgrenze nicht auf
 
-- MCT1: Speicherzugriff über Load/Store
-- `lw`: RAM → Register; `sw`: Register → MMIO (z. B. SPI-TX)
-- Kein „direkt von RAM nach SPI“ in einem Befehl
+SPI-Lehrmodell: ein Bit je SCK-Takt, keine Pausen.
 
-```asm
-loop:
-    lw   t0, 0(s1)     /* RAM lesen */
-    sw   t0, 0(s2)     /* Peripherie schreiben */
-    addi s1, s1, 4
-    bne  s1, s3, loop
-```
+| SCK | ideale Byte-Rate | maximale Vollbilder/s |
+|-----|------------------|------------------------|
+| $10$ MHz | $1{,}25$ MB/s | $\approx8{,}14$ |
+| $50$ MHz | $6{,}25$ MB/s | $\approx40{,}69$ |
+
+Für $60$ Vollbilder/s wären allein $73{,}728$ Mbit/s Nutzdaten nötig.
 
 ::: notes
-Refresher: Wie die CPU kopiert knüpft an den bisherigen Datenpfad an. lw lädt, sw speichert, addi addiert, bne verzweigt. s1 wandert als Quelle, s2 bleibt das feste Ziel, s3 ist das exklusive Ende, t0 das Zwischenregister. Vier Byte je Schritt nur bei erlaubten ausgerichteten Words. TX-Bereitschaft fehlt in diesem Ausschnitt. Lehrcode, nicht ausgeführt. MCT1: Speicherzugriff über Load/Store. `lw`: RAM → Register; `sw`: Register → MMIO (z. B. SPI-TX). Verständnischeck: Warum bleibt s2 konstant? Das Ziel ist ein einzelnes Register. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+SPI heißt Serial Peripheral Interface, SCK Serial Clock. Im gegebenen Modell trägt eine vollständige Taktperiode ein Bit. Division der Taktfrequenz durch acht liefert die ideale Byte-Rate. Bei zehn Megahertz sind das $1250000$ Byte pro Sekunde, bei fünfzig Megahertz $6250000$. MB ist hier dezimal eine Million Bytes.
+
+Das vorherige Bild enthält $153600$ Bytes. Daher sind die idealen Vollbildraten $1250000/153600\approx8{,}138$ beziehungsweise $6250000/153600\approx40{,}690$ pro Sekunde. FPS bedeutet Frames Per Second, Bilder pro Sekunde. Sechzig Vollbilder würden $9{,}216$ MB pro Sekunde oder $73{,}728$ Millionen Bits verlangen.
+
+DMA, Direct Memory Access, kann Bytes rechtzeitig bereitstellen, aber diese Leitungsobergrenze nicht überschreiten. Kommandos, Auswahlzeiten und Lücken würden die Nutzrate weiter verringern. Die Zahlen sind keine bereits erzielte Bildrate. Teilbilder, andere Formate oder eine andere Schnittstelle könnten den Bedarf verändern; unser Vergleich bleibt ausdrücklich beim unkomprimierten Vollbildmodell. Danach prüfen wir unabhängig davon, welchen Aufwand die Bedienung auf dem Prozessor verursacht.
 :::
 
-## Agenda
+## Polling beschäftigt den Aufruf
 
-1. CPU-Flaschenhals: Polling und Interrupt-Stürme
-2. DMA: Bypass der CPU und Bus-Mastering
-3. Kanäle und Konfiguration (Source, Destination, Increment)
-4. Burst, Ringpuffer, Double Buffering
-5. Labor-Ausblick (Renode)
+![](../assets/figures/06_hardware_beschleunigung_dma/timelines.png){fig-alt="Schematische Zeitabschnitte vergleichen blockierendes Polling, kurze Interruptbedienung und DMA mit Vorbereitung, paralleler Arbeit und Abschluss."}
+
+Blockierendes Polling wartet; aktivierte Interrupts können trotzdem laufen.
 
 ::: notes
-Agenda knüpft an den bisherigen Datenpfad an. Die Agenda fragt: Wer bewegt Daten, wer bekommt den Bus, welche Parameter gelten, wem gehört der Puffer, was kann ein späteres Modell zeigen? Kleine Transfers können per Software sinnvoll bleiben. Renode ist optional und hier nicht vorhanden. Verständnischeck: Welche zwei Abschlüsse werden getrennt? DMA-Ende und serielles Ende. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Polling fragt den Zustand eines Geräts wiederholt ab. Busy Waiting bedeutet, dass der aufrufende Ablauf während des Wartens Prozessorzeit beansprucht. CPU heißt Central Processing Unit. In der Abbildung ist der Vergleichsaufruf ausdrücklich so definiert, dass er bis zum Leitungsabschluss wartet; andere Schnittstellenaufrufe könnten bereits nach dem letzten Registerschreiben zurückkehren.
+
+Die Zeitrichtung verläuft von links nach rechts. Jede Bahn zeigt die CPU-Bedienung einer Transferart; die Leitung läuft im Hintergrund und besitzt hier keine eigene Bahn. Beim blockierenden Polling besteht die Bahn überwiegend aus Warten und Kopieren. Kurze Interruptbehandlung lässt dazwischen Anwendungsschritte zu. DMA, Direct Memory Access, verwendet dagegen Vorbereitung, eigenständige Datenbewegung und spätere Abschlussarbeit. Die Flächen sind schematisch, keine gemessenen Latenzen.
+
+Eine wartende Hauptschleife verhindert nicht automatisch jeden Interrupt. Freigaben und Behandlung aus Vorlesung 3 bleiben maßgeblich. Umgekehrt kann zu häufige Interruptbedienung den gewonnenen Spielraum wieder verbrauchen. Das Bild erklärt die Aufgabenverteilung; es garantiert noch keinen zeitlichen Gewinn. Deshalb berechnen wir als Nächstes einen bewusst vorgegebenen festen Interruptaufwand.
+
+Die roten Umrandungen kennzeichnen CPU-Bedienungsabschnitte, nicht Leitungssignale. Beim DMA liegt dazwischen ein grauer Abschnitt für andere CPU-Arbeit. Auch in diesen freien Abschnitten kann die Speicherarbitration Wartezeit verursachen; die Zeichnung verspricht deshalb keine vollkommen unabhängige Ausführung.
 :::
 
-## Lernziele Block 6
+## Interruptaufwand hat eine Obergrenze
 
-- Begründen, warum Polling und häufige ISRs den Prozessor auslasten
-- Bus-Mastering und Arbitration im SoC erklären
-- DMA-Kanal: Source, Destination, Increment Mode
-- Cache-Kohärenz bei DMA einordnen
-- Ringpuffer und Double Buffering (Ping-Pong) für Streams erklären
+Lehrannahmen: CPU $100$ MHz, $150$ feste Takte je Interrupt.
+SPI $10$ MHz liefert ideal $1{,}25$ Millionen Byte/s.
+
+| Bytes pro Meldung | Meldungen/s | fester CPU-Bedarf |
+|-------------------|-------------|-------------------|
+| $1$ | $1250000$ | $187{,}5\,\%$ |
+| $16$ | $78125$ | $\approx11{,}72\,\%$ |
+
+Zusätzliche Kopier- und Anwendungsarbeit ist noch nicht enthalten.
 
 ::: notes
-Lernziele Block 6 knüpft an den bisherigen Datenpfad an. Prüfbar sind Rate, CPU-Aufwand, zwei Arbiter, Adresse, Breite, Count, Besitz und Nachfüllfrist. DMA ist eine Option, keine Qualitätsstufe. SRC, DST und COUNT allein genügen nicht. Begründen, warum Polling und häufige ISRs den Prozessor auslasten. Bus-Mastering und Arbitration im SoC erklären. Verständnischeck: Reicht SRC/DST/COUNT? Nein, Breite, Route, Leben und Sichtbarkeit fehlen. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+CPU heißt Central Processing Unit. SPI bedeutet Serial Peripheral Interface. Wir nehmen hundert Millionen verfügbare CPU-Takte pro Sekunde und einen festen Overhead, zusätzlichen Bedienungsaufwand, von einhundertfünfzig Takten je Meldung an. Diese Taktzahl ist eine Modellvorgabe, kein gemessener Interruptpreis eines RISC-V-Kerns. RISC-V bezeichnet dessen Prozessor-Befehlssatzarchitektur.
+
+Bei einem Ereignis pro Byte wäre die angebotene Meldungsrate $1250000$ pro Sekunde. Multiplikation mit hundertfünfzig ergibt $187500000$ benötigte Takte pro Sekunde, also hundertsiebenundachtzig Komma fünf Prozent des Budgets. Das ist ein nicht erfüllbarer Bedarf, keine tatsächlich erreichbare CPU-Auslastung. Daten würden sich verzögern, Meldungen könnten zusammenfallen oder die Übertragung müsste langsamer werden.
+
+Bei einer Meldung je sechzehn Bytes entstehen nur $78125$ Meldungen und $11718750$ feste Takte, ungefähr elf Komma zweiundsiebzig Prozent. Kopierarbeit pro Byte und andere Aufgaben kommen hinzu. Ein FIFO, First In First Out, kann solche Bündelung ermöglichen, bleibt aber endlich. Die Rechnung begründet die Suche nach einer Hardware-Datenbewegung, ohne jede hohe Leitungsrate automatisch als erfolgreichen Interruptbetrieb auszugeben.
+
+RISC in RISC-V steht für Reduced Instruction Set Computer, Rechner mit reduziertem Befehlssatz.
 :::
 
-## Die Leitfrage des Tages
+## DMA verändert den Kopierpfad
 
-- 1 MB Array im SRAM (z. B. Bild) → SPI → Display
-- Parallel: CPU führt schwere Berechnung aus (z. B. Edge-AI)
-- Wie fließen die Bytes RAM → Peripherie, ohne die CPU-Rechnung zu stoppen?
+![](../assets/figures/06_hardware_beschleunigung_dma/paths.png){fig-alt="Beim CPU-Kopieren laufen Daten durch Prozessorregister, beim DMA über einen eigenen Initiator zwischen Speicher und Peripherie; beide nutzen gemeinsame Ressourcen."}
 
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  RAM[(SRAM)] -.->|Tunnel?| SPI[SPI]
-  CPU[CPU] -->|weiterrechnen| KI[Berechnung]
-  style SPI fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+DMA: Direct Memory Access; DMAC: Direct Memory Access Controller.
 
 ::: notes
-Die Leitfrage des Tages knüpft an den bisherigen Datenpfad an. Ein MB ist hier eine Million Byte und passt nicht in die spätere 256-KiB-Karte. Das Bild mit 153600 Byte ist ein anderes Beispiel. Edge-AI ist Motivation, kein vorhandenes Programm. Der Tunnel ist eine offene Architekturfrage. 1 MB Array im SRAM (z. B. Bild) → SPI → Display. Parallel: CPU führt schwere Berechnung aus (z. B. Edge-AI). Verständnischeck: Passt 1 MB in 256 KiB? Nein, getrennte Modelle. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+DMA heißt Direct Memory Access, direkter Speicherzugriff; DMAC ist der Direct Memory Access Controller, die organisierende Hardwareeinheit. CPU bedeutet Central Processing Unit. Die Abbildung stellt zwei Datenpfade gegenüber. Ohne ausgelagerte Kopierarbeit liest die CPU Speicher und schreibt ein Peripherieregister. Mit DMA führt ein eigener Initiator diese Zugriffe aus.
+
+Die Pfeile kennzeichnen Datenbewegung vom Speicher zur Peripherie. Der Vorbereitungsauftrag durch die CPU ist für beide Wege nötig, aber hier nicht als zusätzlicher Pfeil eingezeichnet. Der Pfad muss nicht durch die allgemeinen CPU-Datenregister laufen. Speicher und Peripherie sind trotzdem tatsächliche Zugriffsziele; „direkt“ bedeutet nicht, dass ein beliebiger Sensor ohne Protokoll an jeden Speicher schreiben darf.
+
+Die CPU programmiert einen Auftrag und bearbeitet dessen Erfolg oder Fehler. Sie darf währenddessen andere Aufgaben übernehmen, soweit deren Speicherzugriffe und Fristen es erlauben. Ein Cache-Hit kann lokal bedient werden, ein konkurrierender Speicherzugriff muss eventuell warten. Deshalb ist CPU-Entlastung nicht mit vollständiger Ressourcenunabhängigkeit gleichzusetzen. Das Bild bildet die Grundlage für Quelle, Ziel und Zähler des späteren Auftrags, nicht einen Nachweis beliebiger Parallelgeschwindigkeit.
+
+Oben laufen schwarze Pfeile über CPU-Register, unten rote Pfeile über den DMA-Initiator. Beide Reihen werden von links nach rechts gelesen. Die Farbe hebt den ausgelagerten Datenweg hervor; sie kennzeichnet weder eine andere Datenkodierung noch eine höhere Leitungsgeschwindigkeit.
 :::
 
-## Aufgabe — 60 FPS
+## Kopieren ist keine Interpretation
 
-Warum liefert DMA bei 50-MHz-SPI mit einem Bit je Takt kein RGB565-Vollbild mit 60 FPS?
+- DMAC bewegt vorgegebene Elemente
+- Registerzugriff und Nutzdatenbedeutung sind verschiedene Ebenen
+- Vorzeichen, Skalierung und Plausibilität bleiben Anwendungsschritte
+- Zusätzliche Rechenfunktionen wären eigene Hardwaremerkmale
 
 ::: notes
-Aufgabe — 60 FPS knüpft an den bisherigen Datenpfad an. 153600 mal 60 sind 9216000 Byte/s. 50 MHz geteilt durch 8 sind 6,25 MB/s, also höchstens etwa 40,69 FPS. Der nötige reine SCK-Takt wäre 73,728 MHz, Zusatzaufwand liegt darüber. DMA entfernt nur Nachfüllpausen. Verständnischeck: Wie hoch ist der reine SCK-Bedarf? 73,728 MHz. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+DMAC bedeutet Direct Memory Access Controller. Sein Grundauftrag lautet, eine bestimmte Zahl von Elementen zwischen erreichbaren Adressen zu bewegen. Ein Element kann beispielsweise ein Byte oder ein sechzehn Bit breites Sample sein. Das ist zunächst keine allgemeine Programmausführung und keine automatische fachliche Auswertung.
+
+Aus Vorlesung 5 kennen Sie sechs Sensorbytes, die anschließend als drei vorzeichenbehaftete Werte mit High-Byte zuerst interpretiert werden. DMA, Direct Memory Access, könnte deren Bewegung unterstützen. Der Skalenfaktor und die Entscheidung, ob sie frisch und plausibel sind, entstehen dadurch jedoch nicht automatisch. Ebenso erzeugt eine Kopie eines Bildpuffers keine neue Farbkonvertierung, sofern die Hardware diese Funktion nicht ausdrücklich besitzt.
+
+Einige spezialisierte Beschleuniger kombinieren Datenbewegung und zusätzliche Operationen. Solche Fähigkeiten sind dann zu benennen und aus der Gerätebeschreibung abzuleiten. Unser Grundmodell betrachtet gleiche Quell- und Zielbreite ohne Transformation. Es macht die Zuständigkeiten klar: Die Hardware führt den vorbereiteten Transport aus, die Anwendung entscheidet über Inhalt, Nutzung und Fehlerreaktion.
 :::
 
-## Methode 1: Polling
+## Initiatoren treffen auf einen Arbiter
+
+![](../assets/figures/06_hardware_beschleunigung_dma/arbiter.png){fig-alt="CPU und DMA initiieren Zugriffe; ein Arbiter entscheidet über einen gemeinsam genutzten Speicherpfad. Ein lokaler Cache-Hit nutzt diesen Pfad nicht zwangsläufig."}
+
+Bus-Mastering: einen Zugriff selbst anfordern und organisieren.
+
+::: notes
+CPU heißt Central Processing Unit, DMA Direct Memory Access. Ein Bus-Master oder Initiator kann selbst Transaktionen anfordern. Ein Target beantwortet solche Zugriffe, beispielsweise ein Speicher oder ein Peripherieregister. Bus-Mastering beschreibt diese Rolle, nicht eine automatisch höchste Priorität.
+
+Ein Arbiter entscheidet, welcher konkurrierende Auftrag eine gemeinsam genutzte Ressource erhält. In der Abbildung führen CPU- und DMA-Anforderungen zu diesem Entscheider und anschließend zum Speicherpfad. Der Hinweis über den Kästen verdeutlicht, dass ein lokaler Cache-Hit nicht zwangsläufig diesen gemeinsamen Pfad benötigt. Die Pfeile sind Funktionsbeziehungen, keine Messung eines bestimmten SoCs, System-on-Chip.
+
+Feste Priorität, Round-Robin oder andere Regeln sind mögliche Verfahren. Bei Round-Robin werden wartende Teilnehmer nach einer Umlaufregel berücksichtigt. Eine konkrete Plattform kann mehrere Bussegmente und Speicherports besitzen; das Ein-Pfad-Modell vereinfacht diese Topologie ausdrücklich. DMA ist daher kein garantierter alleiniger Busbesitzer. Die Software muss sowohl Transferanforderungen als auch Auswirkungen auf andere Zugriffe berücksichtigen, bevor eine Echtzeitfrist aus einer bloßen Bytezahl abgeleitet wird.
+
+Die schwarzen Pfeile führen zwei Anforderungen zum Arbiter. Der rote Pfeil dahinter markiert den einen gemeinsam zugeteilten Pfad. Die Zeichnung sagt nicht, dass die Hardware die Anfragen gleichzeitig bedienen kann; genau diese Konkurrenz muss die Zuteilungsregel auflösen.
+:::
+
+## Kanalpriorität ist nicht Buspriorität
+
+- Mehrere DMA-Kanäle besitzen getrennte Aufträge
+- Eine Request-Zuordnung verbindet Peripherie und Kanal
+- Der interne Entscheider wählt zwischen Kanalaufträgen
+- Der Systembus entscheidet zusätzlich zwischen Initiatoren
+
+::: notes
+DMA bedeutet Direct Memory Access. Ein Kanal hält im Modell einen eigenen Auftrag mit Quelle, Ziel, Anzahl und Steuerung. Mehrere Kanäle können denselben DMA-Controller verwenden. Ein interner Arbiter wählt dann zwischen gleichzeitig bereiten Kanalzugriffen. Diese Entscheidung ist von der späteren Buszuteilung zwischen CPU, Central Processing Unit, und DMA-Initiator zu unterscheiden.
+
+Ein Request ist eine Transferanforderung der Peripherie. Manche Plattformen besitzen einen DMAMUX, Direct Memory Access Multiplexer, eine Zuordnungsmatrix zwischen solchen Anforderungen und Kanälen. Andere verwenden feste Verbindungen. Ein richtiger Zielregisterwert genügt daher nicht, wenn die ausgewählte Anforderungsquelle nicht passt.
+
+Kanalpriorität bedeutet nicht automatisch Vorrang vor dem Prozessor am gesamten Systembus. Ebenso legt eine Interruptpriorität aus Vorlesung 3 nicht allein die Reihenfolge der Datenbewegung fest. Zuordnung, interne Transferwahl, Systembuszugriff und Interruptbehandlung sind verschiedene Entscheidungen. Die konkrete Kanalanzahl und Tabellen sind Plattformmerkmale. Das Grundmodell zeigt die Ebenen, ohne eine erfundene Registerbelegung als funktionsfähigen Treiber auszugeben.
+:::
+
+## Cycle Stealing betrifft Konkurrenz
+
+- DMA belegt zeitweise eine gemeinsam genutzte Ressource
+- Ein konkurrierender CPU-Zugriff kann warten
+- Ein lokaler Cache-Hit muss dadurch nicht stoppen
+- Burstlänge und Zuteilungspolitik beeinflussen Wartezeiten
+
+::: notes
+DMA heißt Direct Memory Access, CPU Central Processing Unit. Cycle Stealing bezeichnet hier das Verwenden von Bus- beziehungsweise Speicherzyklen durch den DMA-Initiator. Der Name bedeutet nicht, dass bei jedem einzelnen DMA-Element jede CPU-Instruktion zwangsläufig einen Takt angehalten wird.
+
+Ein Beispiel ist eine Rechnung, deren benötigte Daten im lokalen Cache liegen. Sie kann ohne einen Zugriff auf den gerade gemeinsam belegten Speicherpfad weiterlaufen. Benötigt die CPU dagegen gleichzeitig denselben Port für einen fehlenden Cacheblock, muss die Busentscheidung eine Reihenfolge herstellen. Dabei können Wartezyklen entstehen.
+
+Das Verhalten hängt von Topologie, Cachetreffern, Auftrag und Arbiterregel ab. Eine hohe Kanalpriorität kann eine andere Frist verbessern und gleichzeitig CPU-Wartezeiten erhöhen. Zusammenhängende Bursts können die Ressource länger am Stück beanspruchen; einzelne Zugriffe können mehr Zuteilungsaufwand verursachen. Diese qualitativen Aussagen sind keine allgemeine Formel für einen bestimmten Prozessorstall. Der nächste Baustein erklärt, warum der DMA zusätzlich die Bereitschaft seiner Peripherie beachten muss.
+:::
+
+## Request ist nicht die Busquittung
+
+![](../assets/figures/06_hardware_beschleunigung_dma/handshake.png){fig-alt="Eine Peripherie meldet lokalen Transferbedarf an den DMA-Controller; dieser bewegt ein Element. Diese Bereitschaft ist getrennt von einer seriellen ACK-Quittung des externen Targets."}
+
+Lokale Registerbereitschaft und externe Protokollbestätigung trennen.
+
+::: notes
+DMA steht für Direct Memory Access. Ein Hardware-Request ist eine lokale Anforderung, etwa weil ein Sendepuffer Platz besitzt oder ein Empfangselement bereitliegt. DREQ bedeutet DMA Request; DACK, DMA Acknowledge, bezeichnet in manchen Beschreibungen eine lokale Bestätigung. Nicht jede Plattform verwendet diese Namen oder getrennte sichtbare Signale.
+
+Die Abbildung zeigt die Bereitschaft von Peripherie und DMA-Controller sowie den anschließenden Elementzugriff. Ein FIFO, First In First Out, kann dafür mehrere freie oder belegte Plätze besitzen. „Bereit zum Schreiben“ ist nicht dasselbe wie „Leitung sendet nichts mehr“.
+
+ACK heißt Acknowledge, Quittung. Das ACK eines externen I²C-Targets, Inter-Integrated-Circuit-Targets, aus Vorlesung 5 bestätigt eine andere Ebene: ein übertragenes Adress- oder Datenbyte. Ein lokaler DMA-Zugriff auf ein Controllerregister beweist diese externe Bestätigung nicht. Die Zuordnung zwischen Hardwareanforderung und Kanal muss außerdem stimmen. Erst mit erreichbarem Datenregister, passender Breite und richtigem Request entsteht ein sinnvoll gepaceter Transferauftrag.
+
+Gezeichnet ist ein Sendefall: Der rote Requestpfeil läuft von der Peripherie links zum DMA in der Mitte. Schwarze Datenpfeile laufen dagegen vom Speicher rechts über DMA zum Peripherieregister links. Anforderung und Nutzdaten besitzen hier also unterschiedliche Richtungen.
+:::
+
+## Senden: Quelle wandert, Ziel bleibt
+
+![](../assets/figures/06_hardware_beschleunigung_dma/addrs.png){fig-alt="Vier Bytezugriffe lesen die Modelladressen 20001000 bis 20001003 und schreiben stets dasselbe UART-TX-Register 40010004."}
+
+Lehrmodell: ein Byte je Element, Quelle `0x20001000`,
+festes Ziel `0x40010004`.
+
+::: notes
+DMA bedeutet Direct Memory Access. UART heißt Universal Asynchronous Receiver-Transmitter, TX Transmit oder Senden. Für dieses ausdrücklich fiktive Adressmodell liegt ein Bytearray bei `0x20001000` und ein für Bytezugriffe geeignetes UART-Senderegister bei `0x40010004`. Beide Werte sind vom DMA aus erreichbare Modelladressen, keine Angaben einer Kursplatine.
+
+Die Abbildung zeigt vier nacheinander bewegte Elemente. Die Quelle steigt jeweils um ein Byte: `...1000`, `...1001`, `...1002`, `...1003`. Das Ziel bleibt bei jedem Element identisch. Eine Zielinkrementierung würde benachbarte Geräteadressen ansprechen, nicht „das nächste Zeichen“ desselben Sendepfads.
+
+Ein Gerätedatenregister ist kein gewöhnliches Array im RAM, Random Access Memory. Zugriffe können Nebenwirkungen haben und müssen in der unterstützten Breite erfolgen. Die lokale Anforderung taktet die Bereitstellung entsprechend freiem Platz. Nach dem letzten Registerschreiben kann die Peripherie noch senden. Quelle, Ziel, Breite, Inkrement und Abschlussbedingung gehören deshalb zusammen; die Pfeilrichtung allein beschreibt noch keinen vollständigen Auftrag.
+
+Die roten Pfeile bündeln verschiedene Quellstellen links zu demselben Ziel rechts. Die senkrechte Anordnung listet aufeinanderfolgende Zugriffe von oben nach unten; sie ist keine Darstellung vier gleichzeitiger Leitungen. Jede Adresse bezeichnet den Anfang des jeweiligen Ein-Byte-Zugriffs.
+:::
+
+## Empfangen: Register fest, Array wächst
+
+![](../assets/figures/06_hardware_beschleunigung_dma/rx-addrs.png){fig-alt="Ein ADC-Datenregister bleibt bei 40011000, während vier Sechzehn-Bit-Elemente an 20002000, 20002002, 20002004 und 20002006 gespeichert werden."}
+
+Lehrmodell: $16$ Bit je Element; Quelladresse konstant.
+
+::: notes
+DMA heißt Direct Memory Access. ADC bedeutet Analog-to-Digital Converter, Analog-Digital-Wandler. Sein Modell-Datenregister bei `0x40011000` liefert hier ein sechzehn Bit breites Element pro passender Anforderung. Diese Adresse und die erlaubte Zugriffsbreite sind ausdrückliche Lehrvorgaben.
+
+Das Zielarray beginnt bei `0x20002000`. Jedes Element benötigt zwei Bytes, daher steigen die Zieladressen auf `...2002`, `...2004` und `...2006`. Die Quelle bleibt bei jedem Zugriff dasselbe Datenregister. Eine Quellinkrementierung könnte ein Status- oder Steuerregister statt des nächsten Samples lesen. Ein MMIO-Zugriff, Memory-Mapped-Input/Output-Zugriff, kann außerdem ein Datum entnehmen oder einen Gerätestatus verändern.
+
+Die Grafik liest sich vom festen Register zu den aufeinanderfolgenden Speicherstellen. Vier Elemente belegen acht Bytes. Das nächste noch freie Ziel läge bei `...2008`, die letzte beschriebene Byteadresse bei `...2007`. Bei acht Elementen wären es sechzehn Bytes. Dieses Beispiel trennt Elementanzahl und Bytezahl, bevor der Auftrag über eine Transferlänge beschrieben wird.
+
+Die roten Pfeile laufen vom einzelnen Register links zu den Speicherstellen rechts. Die rechte Liste ist zeitlich von oben nach unten zu lesen. Jede Adresse beginnt ein Zwei-Byte-Element, dessen zweites Byte im gleichen Eintrag mitgemeint ist.
+:::
+
+## Speicher zu Speicher
+
+- Beide Seiten können im Modell inkrementieren
+- Quelle und Ziel müssen erreichbar und passend ausgerichtet sein
+- Hardwareunterstützung ist nicht für jeden Kanal selbstverständlich
+- Überlappende Bereiche brauchen eine ausdrücklich geeignete Kopierregel
+
+::: notes
+DMA steht für Direct Memory Access. Bei Memory-to-Memory, Speicher zu Speicher, können Quelle und Ziel nach jedem gleich breiten Element steigen. Anders als ein Peripherieregister sind hier beide Seiten Arrays oder Speicherbereiche. Eine lokale Peripherieanforderung ist für einen solchen Auftrag nicht in jeder Architektur erforderlich.
+
+Das bedeutet nicht, dass jeder Controller oder Kanal diese Betriebsart unterstützt. Adressbereiche, Breite, Buszugriff und mögliche Kopierfunktionen sind vor dem Start zu prüfen. Auch ein Prozessorzeiger beweist noch keine Erreichbarkeit aus Sicht des Geräts. Diese Adresssicht unterscheiden wir später ausdrücklich.
+
+Eine normale vorwärts laufende Kopie kann bei überlappenden Bereichen Daten überschreiben, bevor sie als Quelle gelesen wurden. Beispiel: Zwei Plätze sollen innerhalb desselben Arrays um eine Position nach rechts verschoben werden. Wird links begonnen, kann das erste neue Ziel bereits die nächste noch benötigte Quelle ersetzen. Die DMA-Grundfunktion ist daher nicht automatisch ein allgemeiner Ersatz für `memmove`, eine überlappungssichere Speicherkopie. Unser Hauptmodell verwendet getrennte gültige Bereiche und verlagert nur die Datenbewegung.
+:::
+
+## Breite und Anzahl bestimmen Bytes
+
+Gleiche Quell- und Zielbreite $w$ im Lehrmodell:
+
+$$
+B=Nw
+$$
+
+| Elemente $N$ | Breite $w$ | Bytezahl $B$ |
+|---------------|------------|--------------|
+| $8$ | $1$ Byte | $8$ |
+| $8$ | $2$ Byte | $16$ |
+| $8$ | $4$ Byte | $32$ |
+
+Ein Zähler für Elemente ist kein universeller Bytezähler.
+
+::: notes
+DMA heißt Direct Memory Access. $N$ bezeichnet die Zahl der Transferelemente, $w$ deren Breite in Bytes und $B$ die gesamte Bytezahl. Ein Element kann im Modell acht, sechzehn oder zweiunddreißig Bit breit sein. Ein Byte enthält acht Bits, sodass diese Breiten einem, zwei oder vier Bytes entsprechen.
+
+Acht Sechzehn-Bit-Samples benötigen daher $8\cdot2=16$ Bytes. Würde ein Treiber irrtümlich die Bytezahl sechzehn als Elementzahl programmieren, bewegte das gleiche Breitenmodell zweiunddreißig Bytes und könnte den vorgesehenen Zielbereich überschreiten. Die Bedeutung eines Registerfelds COUNT muss deshalb aus der konkreten Beschreibung stammen.
+
+Manche Hardware besitzt unterschiedliche Quell- und Zielbreiten sowie Packfunktionen. Dann genügt unsere einfache Formel nicht zur vollständigen Beschreibung aller Zugriffe. Auch die Zahl der Bus-Requests kann von der Elementzahl abweichen. Hier legen wir gleiche Breiten und die elementweise Zählung fest. Diese klare Konvention verbindet Inkrementschritt, Speicherbedarf und Zählerlimit; sie wird in Aufgabe 2 durchgehend verwendet.
+:::
+
+## Ein Zählerlimit verlangt mehrere Blöcke
+
+Lehrlimit: maximal $L=65535$ Elemente je Normalauftrag.
+
+Bei $1000000$ Byte und Ein-Byte-Elementen:
+
+$$
+K=\left\lceil\frac{1000000}{65535}\right\rceil=16
+$$
+
+$$
+1000000=15\cdot65535+16975
+$$
+
+`COUNT = 0` ist kein universelles Rezept für einen leeren Hardwareauftrag.
+
+::: notes
+DMA ist Direct Memory Access. $L$ ist die maximale Elementzahl pro Auftrag, $K$ die erforderliche Anzahl Blöcke. Die aufgerundete Division zählt auch einen noch nicht vollen letzten Block. Wir setzen das Limit fünfundsechzigtausendfünfhundertfünfunddreißig ausdrücklich als Lehrvorgabe fest; es ist keine universelle Eigenschaft der Prozessor-Befehlssatzarchitektur RISC-V.
+
+Bei Ein-Byte-Elementen sind eine Million Bytes genau eine Million Elemente. Fünfzehn volle Blöcke ergeben $983025$ Elemente, übrig bleiben $16975$. Daher werden sechzehn Aufträge gebraucht. Die jeweilige Quelle muss passend weitergeführt und der gesamte Puffer bis zur dokumentierten Freigabe gültig gehalten werden.
+
+Ein anderer Zähler könnte null speziell interpretieren oder eine andere Einheit verwenden. Eine Softwarelänge null sollte deshalb als eigener Fall behandelt werden, statt blind einen Geräteauftrag mit COUNT null zu starten. Ebenso beweist ein späterer Restzähler null allein weder korrekte Cache-Sichtbarkeit noch einen fehlerfreien Abschluss. Der nächste reine C-Helfer berechnet nur die Größe eines solchen nächsten Blocks und bedient bewusst keine Hardware.
+
+RISC in RISC-V steht für Reduced Instruction Set Computer, Rechner mit reduziertem Befehlssatz.
+:::
+
+## Den nächsten Block berechnen
+
+Reine C-Funktion:
 
 ```c
-/* Lehrcode. Ohne Deadline kann die Schleife hängen. */
-void send_bild_polling(const uint8_t *bild, uint32_t length,
-                       uint64_t deadline) {
-    for (uint32_t i = 0; i < length; i++) {
-        while ((SPI_STATUS_REG & TX_EMPTY_FLAG) == 0) {
-            if (now() >= deadline) return; /* Fehlerpfad */
-        }
-        SPI_DATA_REG = bild[i];
-    }
+uint16_t next_block(uint32_t remaining, uint16_t limit) {
+    if (remaining < limit)
+        return (uint16_t)remaining;
+    return limit;
 }
 ```
 
-- TX_EMPTY ist ein Modellstatus, kein universelles FIFO-leer
-- Rückkehr nach dem letzten Store ist nicht automatisch Leitungsende
+Bei Limit $65535$: erst volle Blöcke, zuletzt $16975$ Elemente.
 
 ::: notes
-Methode 1: Polling knüpft an den bisherigen Datenpfad an. Die Schleife wartet auf TX_EMPTY und schreibt dann ein Byte. Ohne Deadline kann sie hängen. const schützt den Quellzeiger im C-Modell, nicht den Bus. Rückkehr nach dem letzten Store ist nicht CS darf HIGH. Bei Full-Duplex entstehen zugleich RX-Daten. TX_EMPTY ist ein Modellstatus, kein universelles FIFO-leer. Rückkehr nach dem letzten Store ist nicht automatisch Leitungsende. Verständnischeck: Was passiert, wenn TX_EMPTY nie kommt? Der alte Ausschnitt wartet endlos; der Lehrvertrag endet mit Fehler. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Die C-Funktion `next_block` liefert den kleineren Wert aus verbleibender Elementzahl und vorgegebenem Limit. `uint32_t` und `uint16_t` aus `stdint.h` sind vorzeichenlose Zweiunddreißig- und Sechzehn-Bit-Typen. `remaining` ist die noch nicht eingeplante Elementzahl, `limit` das zulässige Auftragsmaximum.
+
+Ist `remaining` kleiner, passt es auch in den Sechzehn-Bit-Rückgabetyp, weil `limit` selbst höchstens $65535$ ist. Sonst wird `limit` zurückgegeben. Beispielsweise liefert `next_block(70000, 65535)` den Wert $65535$, danach bleiben rechnerisch $4465$ Elemente. Dieser Rest muss der Aufrufer selbst verwalten; die Funktion verändert ihre Eingabe nicht. Bei einer Million verbleibenden Elementen und Limit $65535$ entstehen zunächst volle Blöcke. Nach fünfzehn Abzügen bleiben $16975$, die die nächste Rückgabe bilden.
+
+Für tatsächliche Arbeit muss der Aufrufer ein positives gültiges Limit verwenden, nur positive Rückgaben starten und den Rest nach bestätigter Planung beziehungsweise Bearbeitung konsistent fortführen. Bei Rest null oder Limit null liefert die Funktion null; daraus entsteht gerade keine Erlaubnis, ein Hardwarefeld mit null zu starten. Die Funktion enthält keinen Gerätezugriff, keine Adressübersetzung und keine Cache-Wartung. Ihre vollständig prüfbare Arithmetik ist nur ein Teil der späteren Lebenszyklusregeln.
 :::
 
-## Die Polling-Falle
+## Ausrichtung ist eine eigene Anforderung
 
-- Beispiel: SPI mit $10\,\mathrm{MHz}$-SCK, ein Bit je Takt → $0{,}8\,\mu\mathrm{s}$ je Byte
-- $10^{6}$ Bytes brauchen mindestens $0{,}8\,\mathrm{s}$ Leitungszeit
-- Bei angenommener 100-MHz-CPU sind das 80 Millionen Takte, nicht pauschal Milliarden
-- Die aufrufende Funktion wartet. Aktivierte Interrupts können weiterlaufen
+- Vier-Byte-Elemente: im Modell Startadresse durch $4$ teilbar
+- `0x20001000` passt, `0x20001001` nicht
+- Gerätezugriffsbreite und Puffergröße ebenfalls prüfen
+- Cachezeilen-Ausrichtung kann zusätzlich strenger sein
 
 ::: notes
-Die Polling-Falle knüpft an den bisherigen Datenpfad an. Acht Bits durch 10 MHz sind 0,8 µs. Eine Million Byte brauchen mindestens 0,8 s. Bei 100 MHz sind das 80 Millionen Takte. SPI hat hier keine UART-Startbits. Aktivierte Interrupts können während der Warteschleife laufen. Nicht jedes Polling blockiert. Beispiel: SPI mit $10\,\mathrm{MHz}$-SCK, ein Bit je Takt → $0{,}8\,\mu\mathrm{s}$ je Byte. $10^{6}$ Bytes brauchen mindestens $0{,}8\,\mathrm{s}$ Leitungszeit. Verständnischeck: Warum ist 0,8 s eine Untergrenze? Zusatzpausen fehlen noch. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+DMA bedeutet Direct Memory Access. Alignment oder Ausrichtung beschreibt hier eine Adresse auf einer zur Elementbreite passenden Grenze. Bei vier Byte breiten Elementen verlangen wir im Modell ein Vielfaches von vier. `0x20001000` erfüllt dies, die unmittelbar folgende Adresse `0x20001001` nicht.
+
+Diese Regel ist eine ausdrücklich vorgegebene Controlleranforderung. Eine CPU, Central Processing Unit, könnte manche unausgerichteten Zugriffe selbst bearbeiten; daraus folgt keine Unterstützung durch ihren DMA-Controller. Ein Compilerattribut oder eine geeignete Speicherzuteilung kann einen Puffer ausrichten, aber keine unpassende Peripherieregisterbreite ändern.
+
+Auch ausreichend viel Speicher und tatsächliche DMA-Erreichbarkeit sind gesondert zu prüfen. Bei nicht kohärenten Caches arbeitet die Wartung häufig mit ganzen Cachezeilen, etwa zweiunddreißig Bytes. Vier-Byte-Ausrichtung erfüllt diese strengere Grenze nicht automatisch. Deshalb unterscheiden wir Elementausrichtung, Cachezeilengrenze und die Geräteadresse. Der nächste Abschnitt erklärt, warum eine passend aussehende C-Zeigerzahl zudem nicht ohne Prüfung zum Geräteadresswert wird.
 :::
 
-## Methode 2: Interrupt-Versand
+## CPU-Zeiger und Geräteadresse
 
-- SPI löst bei TX-leer Interrupt aus (über PLIC)
-- ISR schreibt ein Byte; CPU rechnet dazwischen weiter
+![](../assets/figures/06_hardware_beschleunigung_dma/address-space.png){fig-alt="Ein CPU-Zeiger und eine DMA-Geräteadresse können durch Plattformabbildung auf denselben Speicher zeigen, sind aber nicht automatisch dieselbe Zahl."}
+
+Ein Cast nach `uint32_t` erzeugt keine geprüfte DMA-Abbildung.
+
+::: notes
+CPU heißt Central Processing Unit, DMA Direct Memory Access. Ein C-Zeiger gehört zunächst zur Adresssicht des ausführenden Programms. Eine DMA-Adresse gehört zur Sicht des Geräts beziehungsweise seines Businitiators. Sie können bei einer einfachen Plattform identisch sein, müssen es aber nicht.
+
+Die Abbildung zeigt beide Sichten und ihre Verbindung zu einem Speicherbereich. Eine Plattform kann übersetzen oder Bereiche nur für bestimmte Initiatoren erreichbar machen. IOMMU bedeutet Input/Output Memory Management Unit, eine mögliche Adressübersetzung für Geräte; nicht jedes System besitzt sie. Unser Rechenmodell verwendet ausdrücklich bereits gültige DMA-Adressen und keine solche Übersetzungsaufgabe.
+
+Ein bloßer Cast eines Zeigers nach `uint32_t` prüft diese Eigenschaften nicht und könnte auf einem breiteren Host sogar wichtige Adressbits abschneiden. `uintptr_t` ist, wenn verfügbar, ein Integer-Typ für die Darstellung eines Prozessorzeigers; auch er ist keine automatische Geräteabbildung. Vor einem echten Start sind daher Adresssicht, Reichweite und Breite des Gerätefelds zu klären. Aus einer hexadezimalen Zahl allein folgt weder Gültigkeit noch Cache-Sichtbarkeit.
+
+Schwarze Pfeile verbinden die beiden Adresssichten links mit der Plattformzuordnung in der Mitte. Der rote Pfeil führt zum gemeinsamen Speicher rechts. Die Kästen stellen Rollen dar, keine garantierten zusätzlichen Hardwareblöcke; auch eine einfache Identitätsabbildung könnte den Plattformvertrag erfüllen.
+:::
+
+## Pufferbesitz hat einen Lebenszyklus
+
+![](../assets/figures/06_hardware_beschleunigung_dma/lifecycle.png){fig-alt="Ein Puffer wird von der CPU vorbereitet, an den DMA übergeben, während dessen Zugriff geschützt und erst nach geprüftem Abschluss wieder freigegeben."}
+
+Asynchrone Rückkehr ist keine Freigabe des Puffers.
+
+::: notes
+CPU bedeutet Central Processing Unit, DMA Direct Memory Access. Besitz bezeichnet hier die Berechtigung, einen Puffer zu verändern oder dessen Inhalt als gültig zu verwenden. Vor dem Start bereitet die CPU Daten und Auftrag vor. Danach gelten bis zur dokumentierten Rückgabe die Zugriffsrechte des DMA.
+
+Die Grafik wird von links nach rechts gelesen: vorbereiten, sichtbar übergeben, DMA-Nutzung und Ergebnisprüfung. Die untere Rückverbindung steht für eine bestätigte Rückgabe, nicht für eine automatische Freigabe nach jedem Fehler. Bei einem Sendeauftrag darf die Anwendung die Quelle nicht während des Lesens verändern. Bei Empfang darf sie nicht vor Abschluss schon beliebige neue Elemente als vollständigen Datensatz lesen. Eine kohärente Cachehardware würde solche logischen Besitzregeln ebenfalls nicht aufheben.
+
+Ein lokales Array auf dem Funktionsstack kann nach Rückkehr seine gültige Lebensdauer verlieren, obwohl der DMA noch darauf zugreift. Deshalb muss Speicher über die gesamte tatsächliche Nutzung bestehen und vor Wiederverwendung geschützt sein. Ein gestarteter Auftrag ist nur die Übergabeabsicht; ein Status muss Erfolg, Fehler und verbleibende Aktivität unterscheiden. Diese Lebenszyklusregel verbindet die Byte-Rechenmodelle mit einer nachvollziehbaren Reihenfolge für die Initialisierung.
+
+Die roten Übergänge markieren die geordnete Verantwortungsübergabe, nicht gemessene Transferzeiten. Die schwarze Rückverbindung unter den Kästen schließt den endlichen Lebenszyklus. Bei einem fortlaufenden Ring wird später nur ein geeigneter Teilbereich zeitweise zurückgegeben; dieser normale Gesamtzyklus kann nicht unverändert darauf übertragen werden.
+:::
+
+## Vorbereiten, dann freigeben
+
+Konzeptionelle Startfolge:
+
+1. Kanal stillsetzen und dokumentierten Ruhezustand bestätigen
+2. Puffer, Adressen, Breiten und Request-Zuordnung prüfen
+3. Quelle, Ziel, Anzahl und Modi einstellen
+4. Alte Statusmeldungen passend behandeln; Sichtbarkeit herstellen
+5. Erst danach Kanal und Request-Pfad freigeben
+
+::: notes
+DMA heißt Direct Memory Access. Ein Request-Pfad ist die Zuordnung der lokalen Peripherieanforderung zum Kanal. Die Reihenfolge ist ein konzeptionelles Vorgehen, kein universelles Registerrezept. Einige Plattformen verlangen andere Freigabeschritte oder besondere Bedingungen während der Konfiguration.
+
+Ein gerade aktiver Kanal darf nicht beliebig umprogrammiert werden. Ebenso kann eine alte Abschlussmeldung sonst irrtümlich als Erfolg des neuen Auftrags erscheinen. Statusbits besitzen dokumentierte Löschregeln; ein Write-One-to-Clear-Bit wird durch Schreiben einer Eins quittiert und ist kein gewöhnlicher Speicherwert für beliebiges Read-Modify-Write, Lesen, Verändern und Zurückschreiben. Diese Zugriffsunterscheidung knüpft an Vorlesung 3 an.
+
+Vor der Freigabe müssen neue Daten und Auftragsfelder in der benötigten Sicht vorliegen. Cache-Wartung und eine Plattformregel für Zugriffsreihenfolge können dafür nötig sein. Die CPU, Central Processing Unit, bleibt für diesen Vertragsabschluss verantwortlich. Welche Registeradressen, Statusbits oder Barrieren tatsächlich verwendet werden, muss aus dem Gerätetreiber stammen. Das Modell enthält deshalb vollständige Verantwortlichkeiten, ohne erfundene Bitpositionen als ausführbaren Treiber auszugeben.
+:::
+
+## Eine Meldung ist noch kein Gesamterfolg
+
+| Meldung im Modell | mögliche Aussage |
+|-------------------|------------------|
+| HT | erste Hälfte erreicht |
+| TC | Normalauftrag nach DMA-Regeln beendet |
+| TE | Transferfehler |
+
+Richtung, Betriebsart und Gerätestatus bestimmen die weitere Freigabe.
+
+::: notes
+DMA bedeutet Direct Memory Access. HT steht für Half Transfer, Halbtransfer; TC für Transfer Complete, Transferabschluss; TE für Transfer Error, Übertragungsfehler. Die genaue Definition, Verfügbarkeit und Quittierung dieser Meldungen ist plattformspezifisch.
+
+Im endlichen Normalauftrag kann ein dokumentierter erfolgreicher DMA-Abschluss die Nutzung eines Sendepuffers beenden, obwohl der Peripherieausgang noch Restdaten sendet. Im Circular-Modus kann derselbe TC-Zeitpunkt dagegen den Umlauf markieren, während die Hardware unmittelbar weiterarbeitet. Die ganze Pufferfläche wird dadurch nicht automatisch frei. Ein Fehlerstatus ist wiederum kein erfolgreiches Ende mit gültigem vollständigem Empfangsdatensatz.
+
+Die Software muss daher Betriebsart, Fehler und verbleibende Aktivität auswerten. Ein Restzähler null oder ein einzelnes Interruptbit ist kein allgemeiner Ersatz dafür. Die Tabelle nennt mögliche Rollen und keine universellen Registerbits. Die nächste Zeitachse trennt die besonders leicht verwechselten Abschlüsse: Ende der DMA-Datenbewegung und Ende der tatsächlich ausgegebenen seriellen Leitung.
+:::
+
+## DMA-Abschluss und Leitungsende
+
+![](../assets/figures/06_hardware_beschleunigung_dma/wire-complete.png){fig-alt="Im UART-Lehrbeispiel ist DMA bei Zeit null fertig, während ein Byte noch im Schieberegister und das letzte Byte im FIFO liegen; die Leitung endet erst später."}
+
+Endlicher Normalauftrag: Pufferfreigabe und externe Leitungsfreigabe getrennt prüfen.
+
+::: notes
+DMA heißt Direct Memory Access. UART bedeutet Universal Asynchronous Receiver-Transmitter, FIFO First In First Out. Die Grafik verwendet einen konstruierten Zustand: Bei Zeit null hat der endliche DMA-Auftrag sein letztes Byte B in die Peripherie geschrieben und meldet dokumentierten Erfolg. Byte A wird bereits gesendet und benötigt noch eine halbe Rahmenzeit.
+
+$T$ bezeichnet eine 8N1-Rahmenzeit mit einem Startbit, acht Datenbits, keiner Parität und einem Stopbit. Nach einer halben Rahmenzeit übernimmt das Schieberegister B aus dem FIFO; der FIFO ist dann leer, aber B sendet noch eine volle Rahmenzeit. Erst bei $1{,}5T$ endet in diesem lückenlosen Modell die Leitungsausgabe.
+
+TC bedeutet Transfer Complete. Es kann somit früher auftreten als FIFO-leer und früher als Leitungsende. Bei diesem Normalauftrag darf die Quelle nach bestätigtem Ende der DMA-Nutzung wieder der Anwendung gehören; die externe Verbindung benötigt ihren eigenen Abschlussnachweis. Das Diagramm ist keine reale Timingmessung und setzt keinen weiteren Stopp der UART-Ausgabe voraus. Rückgabe eines Sendepuffers und Rücknahme einer Leitungsfreigabe sind verschiedene Entscheidungen.
+
+Die waagerechte Achse zählt Zeit seit DMA-TC in Einheiten von $T$. Die graue gestrichelte Linie markiert Zeit null, die rote senkrechte Linie das Leitungsende. Rote Umrandungen zeigen die aktive Ausgabe im Schieberegister; die graue FIFO-Fläche zeigt dagegen nur das wartende Byte.
+:::
+
+## Das Protokoll bleibt zuständig
+
+- SPI: Auswahlrahmen und Leitungsabschluss beachten
+- I²C: Adressen, Quittungen und abschließenden NACK nicht ersetzen
+- UART: Rahmenbildung bleibt Aufgabe der Peripherie
+- DMA-Erfolg prüft keine beliebige Nutzdatenplausibilität
+
+::: notes
+SPI steht für Serial Peripheral Interface, I²C für Inter-Integrated Circuit und UART für Universal Asynchronous Receiver-Transmitter. DMA, Direct Memory Access, übernimmt die Datenbewegung zwischen Speicher und einem Controllerpfad. Welche Protokollphasen der Controller zusätzlich automatisch ausführt, ist eine eigene Gerätefähigkeit.
+
+Bei SPI muss CS, Chip Select oder Bausteinauswahl, für den vorgesehenen Transferrahmen passen. Wird die Auswahl allein aufgrund eines frühen DMA-TC, Transfer Complete, zurückgenommen, könnten noch auszugebende Bits abgeschnitten werden. Bei I²C müssen Registerzeiger, Richtungswechsel, ACK, Acknowledge, und der letzte NACK, Not Acknowledge, korrekt entstehen. Sechs bewegte Datenbytes ersetzen diese Phasen nicht.
+
+Der Zusammenhang knüpft an Vorlesung 5 an: Ein Transportstatus ist weder eine universelle Ende-zu-Ende-Prüfung noch eine Interpretation des Inhalts. Die Anwendung braucht einen passenden Controller- und Gerätevertrag und muss nach tatsächlichem Gesamterfolg Vorzeichen, Einheit und Aktualität berücksichtigen. Ein DMA-Request ist nur die lokale Bereitschaft. Die nächste Folie behandelt entsprechend Fehler, bei denen der geplante Besitzwechsel noch nicht vollzogen werden darf.
+:::
+
+## Fehler und Timeout richtig behandeln
+
+- Fehlerstatus und bereits übertragenen Anteil erfassen
+- Weiteren Zugriff dokumentiert beenden
+- Vor Pufferfreigabe Stillstand beziehungsweise Besitzrückgabe bestätigen
+- Unvollständige Empfangsdaten nicht als neuen Datensatz ausgeben
+
+::: notes
+DMA bedeutet Direct Memory Access. Ein Timeout meldet, dass ein erwarteter Zustand nicht rechtzeitig eingetreten ist. Es stoppt nicht allein durch seine Benennung jeden laufenden Speicherzugriff. Auch ein Transferfehler kann einen teilweise bewegten Puffer und eine noch zu behandelnde Peripherie hinterlassen.
+
+Die Software muss Requests und Kanal nach dokumentierter Regel beenden und prüfen, wann keine weiteren relevanten Zugriffe mehr möglich sind. Eine Deadline begrenzt das Warten. Wird diese Grenze selbst bei der Bereinigung verpasst, darf die Anwendung den weiterhin möglicherweise genutzten Speicher nicht blind wiederverwenden. Fehlerdiagnose und nachgewiesene Pufferfreigabe sind getrennte Ergebnisse.
+
+Für Empfang bleiben Teilwerte zunächst unbestätigt. Ein alter gültiger Datensatz kann erhalten bleiben, ist dadurch aber kein neuer Fortschritt. Ein CPU-Reset, Reset der Central Processing Unit, setzt außerdem einen extern versorgten Sensor nicht automatisch zurück. Diese Aussage kennen Sie aus den vorherigen Blöcken. Der genaue Stopp- und Wiederanlaufpfad ist plattformspezifisch; die Folie beschreibt vollständige Zuständigkeiten statt einer erfundenen universellen Abbruchfunktion.
+:::
+
+## MiB, MB und CPU-Zeit trennen
+
+SPI $10$ MHz, ein Bit je Takt, keine Pausen:
+
+$$
+1\ \mathrm{MiB}=1048576\ \mathrm{Byte},\qquad
+T_{\min}=\frac{8\cdot1048576}{10^7}\approx0{,}838861\ \mathrm{s}
+$$
+
+Dezimal $1$ MB braucht ideal $0{,}8$ s.
+
+DMA spart Kopierbedienung; Setup, Abschluss und Buskonkurrenz bleiben.
+
+::: notes
+MiB heißt Mebibyte und bezeichnet $2^{20}$ Bytes, also $1048576$. MB bedeutet hier dezimal $10^6$ Bytes. SPI ist Serial Peripheral Interface. Bei zehn Millionen Takten pro Sekunde und einem Bit je Takt benötigt ein Mebibyte mindestens $8388608/10^7=0{,}8388608$ Sekunden Leitungszeit.
+
+Der Vergleich mit einer Million Bytes ergibt $0{,}8$ Sekunden. Bei hundert Megahertz CPU-Takt, Takt der Central Processing Unit, entsprechen diese $0{,}8$ Sekunden achtzig Millionen verfügbaren Takten. Ein vergleichender blockierender Aufruf, der ausdrücklich bis zum Leitungsende wartet, bleibt ungefähr über diese ideale Zeit beschäftigt. Ein anderer Aufruf könnte bereits früher nach dem letzten Registerschreiben zurückkehren.
+
+DMA, Direct Memory Access, übernimmt die laufende Kopierbedienung. Damit bleibt die CPU nicht automatisch frei von jeder zusätzlichen Arbeit oder Verzögerung: Vorbereitung, Cache-Wartung, Statusauswertung und gemeinsame Buszugriffe kosten weiterhin Zeit. Die Berechnung vergleicht Einheiten und Zuständigkeiten, nicht gemessene Laufzeiten zweier Firmwares. Der nächste Abschnitt erklärt die besonders wichtigen Unterschiede zwischen Speicherinhalt und privater Cachekopie.
+:::
+
+## Nicht kohärent: zwei Sichten auf Daten
+
+![](../assets/figures/06_hardware_beschleunigung_dma/cache.png){fig-alt="Die CPU verändert ihre Write-Back-Cachekopie von 11 auf 22, der Speicher bleibt zunächst 11; im nicht kohärenten Modell liest DMA die alte Speicherkopie."}
+
+Voraussetzung hier: privater Write-Back-Cache ohne automatische DMA-Kohärenz.
+
+::: notes
+CPU bedeutet Central Processing Unit, DMA Direct Memory Access. Ein Write-Back-Cache kann einen Store zunächst nur in seiner lokalen Cachezeile speichern. Dirty bedeutet, dass diese Kopie gegenüber dem darunterliegenden Speicher verändert ist. Nicht kohärent heißt im gegebenen Modell, dass DMA-Zugriffe diese private Änderung nicht automatisch mitbeobachten.
+
+Die Abbildung zeigt einen ursprünglichen Wert `0x11`. Nach einem CPU-Store besitzt der Cache `0x22` und ist dirty, während der Speicher noch `0x11` enthält. Ein DMA-Lesezugriff auf diesen Speicher erhält deshalb den alten Wert. Eine richtige Quelladresse schützt nicht vor dieser Sichtbarkeitslücke.
+
+Das ist ein bewusst ausgewähltes Plattformmodell, keine Aussage, dass jeder Mikrocontroller einen Daten-Cache besitzt oder jeder DMA nicht kohärent ist. Vorlesung 2 hat Write-Back und Dirty-Zeilen erklärt; heute kommt ein anderer Beobachter hinzu. Korrekte Datenübertragung verlangt nun sowohl die logische Pufferübergabe als auch die geeignete Sichtbarkeit zwischen beiden Beobachtern. Für das Senden wird deshalb vor dem Start der aktuelle Wert veröffentlicht.
+
+Lesen Sie die drei Spalten von links nach rechts als Cachekopie, Speicherwert und DMA-Beobachtung. Rot hebt die neue, noch nicht veröffentlichte Kopie hervor. Der gestrichelte Pfeil steht für ein erst noch erforderliches Clean, während der schwarze Pfeil den aktuellen DMA-Leseweg zeigt.
+:::
+
+## Senden: veröffentlichen, dann einfrieren
+
+- Neue Daten im CPU-Puffer vollständig vorbereiten
+- Nicht kohärentes Modell: relevante Dirty-Zeilen nach unten schreiben
+- Plattformregel für Sichtbarkeit und Reihenfolge erfüllen
+- Quelle bis zur dokumentierten DMA-Freigabe unverändert lassen
+
+::: notes
+CPU heißt Central Processing Unit, DMA Direct Memory Access. Bei einem Sendeauftrag benötigt der DMA die von der CPU zuletzt erzeugten Quellwerte. Clean bezeichnet das Zurückschreiben veränderter Cachezeilen in den darunterliegenden Speicher. Im Beispiel der vorigen Folie muss so `0x22` auch dort ankommen, bevor der DMA seine Quelle liest.
+
+Clean ist jedoch keine Sperre gegen weitere Änderungen. Schreibt die CPU danach während des Transfers erneut in den Puffer, kann der DMA einen gemischten zeitlichen Zustand lesen. Logischer Besitz und Cache-Sichtbarkeit sind deshalb eigenständige Anforderungen. Die Quelle wird für die tatsächliche DMA-Nutzung eingefroren, nicht nur für den Augenblick des Starts.
+
+Eine Plattformregel für Reihenfolge stellt zusätzlich sicher, dass Daten und Auftragsfelder vor ihrer Freigabe in der erforderlichen Ordnung sichtbar werden. Die genaue Wartung und Barriere sind keine universellen C-Funktionsnamen. Bei kohärenter Hardware kann die explizite Cacheaktion entfallen, während Besitz und Reihenfolge relevant bleiben. Der Empfang benötigt eine andere Betrachtung: Dort kann eine alte CPU-Kopie sowohl falsche Lesewerte als auch spätere zerstörende Rückschreibungen verursachen.
+:::
+
+## Empfang: Dirty-Daten können zurückschlagen
+
+![](../assets/figures/06_hardware_beschleunigung_dma/rx-cache.png){fig-alt="DMA schreibt 55 in den Speicher, während eine alte Dirty-Cachekopie AA besteht; ein späteres Write-Back könnte 55 wieder überschreiben."}
+
+Vor Übergabe vorbereiten; nach erfolgreichem Empfang für CPU-Lesen synchronisieren.
+
+::: notes
+DMA bedeutet Direct Memory Access, CPU Central Processing Unit. Die Grafik zeigt den Empfangsfall im nicht kohärenten Write-Back-Modell. Der DMA schreibt einen neuen Wert `0x55` in den Speicher. Eine alte gültige Cachekopie `0xAA` kann bei einem CPU-Read weiter als Treffer erscheinen. Stale Data bedeutet solche veralteten Daten.
+
+Ist die alte Cachezeile zusätzlich dirty, kann sie später `0xAA` zurückschreiben und dadurch den bereits empfangenen Wert im Speicher zerstören. Nur die Aussage „nach dem Transfer invalidieren“ schützt deshalb nicht vor jeder vorherigen oder zwischenzeitlichen Rückschreibung. Der Bereich muss schon vor der Übergabe so vorbereitet sein, dass keine schädliche Dirty-Kopie während der DMA-Nutzung nachwirkt.
+
+Nach bestätigtem Abschluss muss die CPU die neue Speicherkopie entsprechend der Plattformregel lesen können. Invalidate verwirft eine lokale gültige Kopie; welche Kombination mit Clean und weiteren Synchronisationsschritten erforderlich ist, bestimmt die Plattform. Blindes spätes Clean einer alten Dirty-Zeile wäre im gezeigten Zustand gerade falsch. Während DMA den Empfangsbereich besitzt, darf die Anwendung dort außerdem keine konkurrierenden Stores erzeugen.
+
+Der rote Pfeil läuft vom DMA rechts zum Speicher in der Mitte und steht für den neuen Empfangswert. Der schwarze Pfeil darunter warnt vor dem späteren Rückschreiben von links nach rechts. Die Hexwerte sind Beispielbytes, keine Adressen oder Statusflags.
+:::
+
+## Clean, Invalidate und Reihenfolge
+
+| Maßnahme | Bedeutung im Grundmodell |
+|----------|--------------------------|
+| Clean | Dirty-Inhalt nach unten schreiben |
+| Invalidate | lokale Kopie ungültig machen |
+| Ordnungsbarriere | erforderliche Zugriffsreihenfolge sichern |
+
+Eine Barriere ist kein universeller Cache-Flush und keine Pufferbesitzrückgabe.
+
+::: notes
+Clean bedeutet das Zurückschreiben veränderter Cachezeilen in die darunterliegende Speichersicht. Invalidate verwirft die lokale Gültigkeit einer Kopie. Dirty heißt verändert; ein ungeeignetes Verwerfen kann benötigte Änderungen verlieren. Manche konkreten Operationen kombinieren Aktionen oder besitzen zusätzliche Regeln. Deshalb ist „Flush“ ohne Definition ein mehrdeutiger Ausdruck.
+
+DMA ist Direct Memory Access. TX, Transmit oder Senden, benötigt im nicht kohärenten Modell die aktuellen Quellwerte vor dem Start. RX, Receive oder Empfangen, benötigt Vorbereitung gegen spätere zerstörende Rückschreibung und nach Abschluss eine passende erneute Lesesicht. Diese Richtungen dürfen nicht durch ein pauschales identisches Wartungsrezept ersetzt werden.
+
+Eine Ordnungsbarriere stellt eine benötigte Reihenfolge her. Der Befehl `fence` der Prozessor-Befehlssatzarchitektur RISC-V ist kein allgemeiner Beweis, dass jede Dirty-Cachezeile bereits zum DMA-Speicher zurückgeschrieben wurde. Cachefunktionen sind Fähigkeiten der Architektur beziehungsweise Plattform und ihres Treibers. Ebenso beendet eine Barriere nicht jeden laufenden DMA-Zugriff. Daten, Zugriffsort, Reihenfolge und logischer Besitz sind getrennt nachzuweisen. Im nächsten Beispiel wird zudem sichtbar, dass die Wartung mehr Bytes erfassen kann als der eigentliche Puffer.
+
+RISC in RISC-V steht für Reduced Instruction Set Computer, Rechner mit reduziertem Befehlssatz.
+:::
+
+## Die Cachezeile ist größer als der Puffer
+
+![](../assets/figures/06_hardware_beschleunigung_dma/cache-lines.png){fig-alt="Ein 100-Byte-Puffer ab Adresse 20001003 berührt vier 32-Byte-Cachezeilen; der umschließende Bereich ist 20001000 bis ausschließlich 20001080."}
+
+Lehrmodell: $32$ Byte je Zeile.
+
+`0x20001003` plus $100$ Byte berührt $128$ Byte Cachebereich.
+
+::: notes
+Eine Cachezeile ist die zusammen verwaltete Kopiereinheit des Caches. Für diese Rechnung beträgt ihre Größe zweiunddreißig Bytes. Der eigentliche Datenbereich beginnt bei `0x20001003` und enthält hundert Bytes, endet also ausschließlich bei `0x20001067`. „Ausschließlich“ bedeutet, dass die letzte enthaltene Byteadresse eine Position davor liegt, hier `...1066`.
+
+Die Abbildung markiert den Datenbereich innerhalb vier aufeinanderfolgender Cachezeilen. Der abgerundete Anfang ist `0x20001000`, das aufgerundete Ende `0x20001080`. Die Differenz ist $128$ Bytes. Drei Bytes vor und fünfundzwanzig Bytes hinter dem Datenbereich gehören damit ebenfalls zu den erfassten Zeilen.
+
+DMA heißt Direct Memory Access. Werden daneben andere veränderte Daten gehalten, kann eine ungeeignete Wartung auch deren Zustand beeinflussen. Nur die Pufferanfangsadresse auszurichten genügt deshalb nicht immer; Zeilen können am Ende geteilt bleiben. Getrennte, passend reservierte ganze Zeilen vereinfachen die Besitzregeln. Die Rechnung beschreibt Bereichsgeometrie und noch keine ausgeführte Cacheoperation. Diese Geometrie lässt sich unabhängig von der Plattform mit einer reinen Integerfunktion prüfen.
+
+Von links nach rechts steigen die Byteadressen. Die grauen Rechtecke sind ganze Zeilen, die rote Umrandung ist nur der Nutzdatenbereich. Die Beschriftungen geben Offsets zur gemeinsamen Basisadresse an, etwa $\texttt{0x20}=32$ Bytes; gleiche Zeichnungsbreiten stehen hier für gleiche Zeilenlängen.
+:::
+
+## Ein exklusives Ende aufrunden
+
+C-Rechenmodell für $32$-Byte-Zeilen:
 
 ```c
-volatile uint32_t bytes_sent;
-
-void spi_tx_empty_isr(void) {
-    if (bytes_sent < 1000000u) {
-        SPI_DATA_REG = bild_array[bytes_sent++];
-    } else {
-        disable_tx_empty_irq(); /* sonst feuert die Quelle weiter */
-    }
-    /* bytes_sent: übergeben, nicht nachweislich auf der Leitung */
+uint64_t covered_end(uint32_t start, uint32_t bytes) {
+    uint64_t end = (uint64_t)start + bytes;
+    return (end + 31u) & ~UINT64_C(31);
 }
 ```
 
+Vorbedingungen für Nutzung: positive Länge, gültiger ursprünglicher Adressbereich.
+
 ::: notes
-Methode 2: Interrupt-Versand knüpft an den bisherigen Datenpfad an. Der Zähler zählt übergebene Bytes, nicht bereits ausgesendete. Ein 1000-Byte-Array ist keine Million Indizes. Beim letzten Byte den Bereitschafts-IRQ abschalten. volatile ist Sichtbarkeit, keine Atomarität. FIFO kann nach dem Zählerstand noch senden. SPI löst bei TX-leer Interrupt aus (über PLIC). ISR schreibt ein Byte; CPU rechnet dazwischen weiter. Verständnischeck: Sind alle Bytes auf der Leitung, wenn der Zähler fertig ist? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Die C-Funktion `covered_end` berechnet das auf zweiunddreißig Bytes aufgerundete exklusive Ende. `start` und `bytes` sind Startadresse und Bytezahl. `uint32_t` und `uint64_t` aus `stdint.h` sind vorzeichenlose Typen mit zweiunddreißig beziehungsweise vierundsechzig Bit. `UINT64_C` erzeugt eine passend breite Integerkonstante.
+
+Der Ausdruck `end + 31` verschiebt einen nicht ausgerichteten Endpunkt in die nächste Zeile. Das bitweise Komplement `~` von einunddreißig besitzt in den untersten fünf Stellen null; das bitweise Und `&` setzt diese Stellen auf null. Ein bereits ausgerichtetes Ende bleibt erhalten. Für `start = 0x20001003` und hundert Bytes ist `end` zunächst `0x20001067`, die Rückgabe `0x20001080`.
+
+Der Cast vor der Addition stellt sicher, dass schon das Addieren in vierundsechzig Bit stattfindet. Eine erst nach der Addition vorgenommene Konvertierung wäre dafür zu spät. Die breite Addition verhindert einen Zweiunddreißig-Bit-Umlauf während der Geometrieberechnung. Das Ergebnis kann als exklusiver Endpunkt auch $2^{32}$ darstellen. Die Funktion prüft weder reale Adressabbildung noch Pufferbesitz und führt keine Cache-Wartung aus. Eine leere Länge wird vom Aufrufer als eigener Fall behandelt; für die Verwendung des Bereichs sind positive Länge und ein gültiger ursprünglicher Bereich ausdrücklich vorausgesetzt.
 :::
 
-## Interrupt-Overhead
+## Kohärent, ungecacht und erreichbar
 
-Pro Interrupt typisch:
+![](../assets/figures/06_hardware_beschleunigung_dma/uncached.png){fig-alt="Cache-Sichtbarkeit, DMA-Erreichbarkeit und logischer Pufferbesitz sind getrennte Anforderungen; ein Linkername allein legt keine Speichereigenschaften fest."}
 
-- Kontext sichern. Ein universelles Leeren der Pipeline gibt es nicht
-- `mepc`/`mcause` setzen
-- Register retten (Stack)
-- Nutzarbeit: ein Byte kopieren
-- Register wiederherstellen, `mret`
-
-Oft Dutzende Takte Overhead für wenige Nutz-Takte.
+Ein Abschnittsname im Linkerskript macht Speicher nicht automatisch ungecacht.
 
 ::: notes
-Interrupt-Overhead knüpft an den bisherigen Datenpfad an. Die Hardware setzt Trap-CSRs, die Software sichert Register. RISC-V hat keine allgemeinen PUSH-Befehle. mret beendet den Trap nach Wiederherstellung. Dutzende Takte sind eine Größenordnung; die Rechnung nutzt 100 Zyklen. Ein IRQ ist kein automatischer Taskwechsel. Kontext sichern. Ein universelles Leeren der Pipeline gibt es nicht. `mepc`/`mcause` setzen. Verständnischeck: Ist ein IRQ ein Taskwechsel? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+DMA bedeutet Direct Memory Access. Kohärente Sichtbarkeit heißt, dass CPU und DMA nach den geltenden Plattformregeln eine abgestimmte Speichersicht erhalten; CPU steht für Central Processing Unit. Ein ungecachter Bereich kann private Cachekopien vermeiden, sofern die Plattform diesen Bereich tatsächlich so bereitstellt. Beide Wege ersetzen nicht automatisch Zugriffsreihenfolge und Pufferbesitz.
+
+Ein Linkerskript ordnet Abschnitte Adressen zu. Die Bezeichnung `RAM_UNCACHED` ist lediglich ein Name, keine Hardwareaktion. RAM heißt Random Access Memory. PMP, Physical Memory Protection, in der Prozessor-Befehlssatzarchitektur RISC-V regelt Zugriffsrechte; Cacheability wird dadurch nicht allgemein gesetzt. PMA, Physical Memory Attributes, bezeichnet physikalische Speichereigenschaften, deren Bereitstellung plattformabhängig ist.
+
+Die Abbildung zeigt getrennte Prüffragen: Ist die Sichtbarkeit passend, kann der DMA den Bereich erreichen und ist seine Nutzung während des Auftrags geschützt? Ein ungecachter Bereich könnte dennoch außerhalb des Geräteadressbereichs liegen. Mehrere Abbildungen desselben Speichers können weitere Konsistenzprobleme erzeugen. Die konkrete Speicherzuteilung muss daher den dokumentierten Plattformvertrag erfüllen; ein hübscher Abschnittsname oder ein bloßer Zeiger-Cast reicht nicht.
+
+Die drei grauen Kästen sind gleichrangige Prüffragen. Der rote gemeinsame Balken verbindet notwendige Bedingungen, keine zeitliche Reihenfolge. Beispielsweise scheitert ein sichtbarer, exklusiver Puffer dennoch, wenn der DMA seine Speicherbank nicht adressieren kann.
+
+RISC in RISC-V steht für Reduced Instruction Set Computer, Rechner mit reduziertem Befehlssatz.
 :::
 
-## Interrupt Storm
+## Ein Burst spart nicht jede Wartezeit
 
-![Vier CPU-Spuren, dieselbe Leitung. 100 Zyklen je Byte-IRQ reichen bei 10 MHz nicht.](../assets/figures/06_hardware_beschleunigung_dma/timelines.png)
+Lehrmodell für $16$ Word-Elemente, je Read und Write ein Zyklus,
+Zuteilung zwei Zyklen:
 
-- SPI meldet „leer“ im Sub-µs- bis µs-Takt
-- Millionen ISRs/s möglich
-- CPU: Zeit geht in Push/Pop statt Nutzarbeit
+$$
+C_{\mathrm{single}}=16(2+1+1)=64
+$$
 
-| Phase | Was passiert |
-|-------|----------------|
-| kurz | KI/Main |
-| lang | ISR-Overhead |
-| kurz | KI/Main |
-| lang | ISR-Overhead |
+$$
+C_{\mathrm{burst}}=2+16(1+1)=34
+$$
+
+Längere zusammenhängende Belegung kann andere Initiatoren länger warten lassen.
 
 ::: notes
-Interrupt Storm knüpft an den bisherigen Datenpfad an. 1,25 Millionen Byte-IRQs je Sekunde mal 100 Zyklen bei 100 MHz sind 125 Prozent und nicht nachhaltig. Bei 16 Byte je IRQ bleiben etwa 7,81 Prozent festen Aufwands, ohne Kopierkosten. Die Spuren sind schematisch. Auch DMA kann die Leitung unterbrechen, wenn der Puffer fehlt. SPI meldet „leer“ im Sub-µs- bis µs-Takt. Millionen ISRs/s möglich. Verständnischeck: Warum reicht 125 Prozent als Gegenbeispiel? Es wird mehr CPU-Zeit verlangt, als vorhanden ist. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+DMA heißt Direct Memory Access. Ein Burst ist eine zusammenhängende Folge von Elementzugriffen. Ein Word ist hier ein vier Byte breites Element. $C_{\mathrm{single}}$ und $C_{\mathrm{burst}}$ sind angenommene Buszyklen, keine CPU-Befehlszahlen oder gemessenen Controllerlaufzeiten.
+
+Im vereinfachten Ein-Ressourcen-Modell kostet jede neue Zuteilung zwei Zyklen, jedes Lesen und Schreiben jeweils einen. Sechzehn einzeln zugeteilte Kopien kosten daher sechzehn mal vier, vierundsechzig Zyklen. Ein gemeinsam zugeteilter Burst kostet zwei plus zweiunddreißig, vierunddreißig Zyklen. Der Nutzumfang ist in beiden Fällen sechzehn Words, vierundsechzig Bytes.
+
+Die ersparte erneute Zuteilung kann den Kopierdurchsatz verbessern. Die länger zusammenhängend belegte Ressource kann gleichzeitig die Wartezeit einer konkurrierenden CPU, Central Processing Unit, erhöhen. Reale Busse können Zugriffe überlappen oder anders bündeln. Das Modell begründet deshalb eine Kosten-Wartezeit-Abwägung, keine universelle Prozentbeschleunigung. Speichertechnik und Peripherietempo fügen anschließend weitere Bedingungen hinzu; insbesondere muss ein langsamer Ausgang nicht jedem schnellen Speicherburst unmittelbar folgen können.
 :::
 
-## CPU als Postbote
+## Ein FIFO verbindet unterschiedliche Tempi
 
-- Polling und ISR: jedes Byte durch CPU-Register
-- Pfad: RAM → Bus → (Cache) → Register → Bus → SPI
-- ALU/Pipeline involviert, obwohl nur 1:1 kopiert wird
+![](../assets/figures/06_hardware_beschleunigung_dma/burst.png){fig-alt="Ein Speicherburst füllt einen endlichen DMA-FIFO, aus dem die Peripherie entsprechend ihren lokalen Requests versorgt wird."}
+
+Ein Zwischenpuffer entkoppelt Schritte, erzeugt aber keine unbegrenzte Bandbreite.
 
 ::: notes
-CPU als Postbote knüpft an den bisherigen Datenpfad an. Der Weg ist Load, Register, Store auf MMIO. Die ALU rechnet Adressen, nicht zwingend den Dateninhalt. Die Postbotenmetapher gilt für große Mengen, nicht für jede kurze Kopie. Beim DMA entfällt die CPU als Zwischenstation jedes Elements. Polling und ISR: jedes Byte durch CPU-Register. Pfad: RAM → Bus → (Cache) → Register → Bus → SPI. Verständnischeck: Welche Station entfällt? Die CPU-Register je Element. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+FIFO bedeutet First In, First Out. DMA steht für Direct Memory Access. Ein interner FIFO kann mehrere schnell aus dem Speicher geholte Elemente halten, während die Peripherie sie langsamer übernimmt. In der Abbildung führt ein Burst vom Speicher in den Puffer; separate lokale Requests bestimmen die Entnahme zum Ausgang.
+
+Der Bus kann nach dem Holen wieder für andere Initiatoren verfügbar sein. Der FIFO muss trotzdem rechtzeitig geleert beziehungsweise bei Empfang gefüllt werden. Seine Kapazität begrenzt die Entkopplung. Eine auf Dauer langsamere Leitung wird durch einen größeren Puffer nicht dauerhaft zu einer schnelleren Nutzdatenquelle.
+
+Bei SRAM, Static Random Access Memory, kann Bündelung unter anderem wiederholte Zuteilung sparen. DRAM, Dynamic Random Access Memory, besitzt zusätzlich Zeilen- und Spaltenzugriffe. Bereits offene Zeilen können auch mehrere getrennte Zugriffe bedienen; „ein Einzelzugriff öffnet immer eine neue Zeile“ wäre falsch. Burstverhalten hängt daher von Speicherabbildung, Politik und Controller ab. Das Bild erklärt den Zwischenpuffer, ohne eine universelle DRAM-Zeilenfolge oder unbegrenzte parallele Übertragung zu behaupten.
+
+Der breite rote Pfeil markiert gebündelten Datennachschub von links nach rechts. Der schwarze Datenpfeil zeigt die einzelne Weitergabe zur Peripherie. Deren Request läuft in Gegenrichtung zurück zum DMA. Die Pufferfüllung bleibt zwischen leer und voll, statt den langsameren Ausgang dauerhaft zu überholen.
 :::
 
-## Bus-Engstelle beim Software-Kopieren
+## Deskriptoren verketten Aufträge
 
-- Auch mit getrennten L1-I/D-Caches teilen sich CPU und Peripherie oft den Systembus zum Hauptspeicher
-- Intensives `lw`/`sw`-Kopieren belegt diesen Pfad
-- Instruction-Fetch und Nutzarbeit konkurrieren → Pipeline stottert
+![](../assets/figures/06_hardware_beschleunigung_dma/descriptors.png){fig-alt="Drei Deskriptoren enthalten Quelle, Ziel, Anzahl und Verweis auf den Folgeauftrag; ein geeigneter DMA-Controller kann diese Auftragskette abarbeiten."}
+
+Scatter-Gather benötigt ausdrückliche Hardwareunterstützung.
 
 ::: notes
-Bus-Engstelle beim Software-Kopieren knüpft an den bisherigen Datenpfad an. Getrennte L1-Caches bedienen Treffer lokal. Misses teilen sich spätere Ressourcen. Ein lw ist nicht automatisch ein DRAM-Zugriff. DMA braucht ebenfalls Bandbreite. Von-Neumann ist hier ein historischer Bezug. Auch mit getrennten L1-I/D-Caches teilen sich CPU und Peripherie oft den Systembus zum Hauptspeicher. Intensives `lw`/`sw`-Kopieren belegt diesen Pfad. Verständnischeck: Verhindern getrennte Caches jeden Konflikt? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+DMA bedeutet Direct Memory Access. Ein Deskriptor ist eine im Speicher abgelegte Auftragsbeschreibung. SRC steht hier für Source, Quelle, DST für Destination, Ziel, COUNT für Elementanzahl und NEXT für einen Verweis auf den Folgeauftrag. Das sind Schemanamen, keine zugesagte Struktur eines bestimmten Controllers.
+
+Scatter-Gather beschreibt das Zusammenführen oder Verteilen von Daten aus mehreren Speicherbereichen. Die Abbildung verknüpft drei Aufträge. Eine geeignete Hardware kann den nächsten Deskriptor selbst lesen, sodass Software nicht nach jedem einzelnen Block zwingend neu konfigurieren muss. Das bedeutet nicht, dass jeder DMA-Kanal diese Betriebsart besitzt.
+
+Auch Deskriptoren sind Speicher, den ein anderer Initiator beobachtet. Ihre Adressen, Ausrichtung, Sichtbarkeit und Lebensdauer müssen deshalb passen. Die CPU, Central Processing Unit, darf einen gerade genutzten Auftrag nicht beliebig verändern. Wo eine Kette endet und wann Teilpuffer freigegeben werden, bestimmt der Controllervertrag. Die Kette spart wiederholte Vorbereitungsarbeit, hebt weder das Leitungsbudget noch die Cache- und Besitzregeln auf. Eine andere Erweiterung beschreibt anschließend regelmäßige Zeilenabstände in Bilddaten.
+
+Die Kette wird von links nach rechts gelesen. Rote Pfeile stehen für die NEXT-Verweise und nicht für Nutzdaten zwischen den Kästen. Der letzte Eintrag endet im Schema ausdrücklich; wie dieses Ende kodiert wird, bleibt dem dokumentierten Controllerformat vorbehalten.
 :::
 
-## Lösung: Hardware-Assistent
+## Ein Rechteck ist nicht linear gepackt
 
-- CPU = Manager (rechnen, entscheiden)
-- Auftrag: Quelle, Ziel, Länge — dann weiterarbeiten
-- Assistent schaufelt und meldet „fertig“
-- Name: Direct Memory Access (DMA) / DMAC
+![](../assets/figures/06_hardware_beschleunigung_dma/twod.png){fig-alt="Ein Ausschnitt mit vier Pixeln je Zeile und drei Zeilen liegt in einem 320-Pixel-RGB565-Bild; die Quelle hat 640 Byte Pitch, das gepackte Ziel acht Byte Pitch."}
+
+Quelle: Start `0x20004214`, Pitch $640$ Byte, Zeileninhalt $8$ Byte.
 
 ::: notes
-Lösung: Hardware-Assistent knüpft an den bisherigen Datenpfad an. Einmal konfigurieren gilt für einen Auftrag. Der Assistent meldet Phasen und Fehler, nicht nur Erfolg. Fertig ohne Bedeutung verwechselt DMA-Ende und Kommunikationsende. CPU = Manager (rechnen, entscheiden). Auftrag: Quelle, Ziel, Länge — dann weiterarbeiten. Verständnischeck: Was ist an fertig problematisch? Der DMA kann enden, während die Peripherie noch sendet. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+RGB565 ist die sechzehn Bit breite Kodierung von Red, Green und Blue mit fünf, sechs und fünf Bits. Ein Pixel benötigt hier zwei Bytes. Das volle Bild hat dreihundertzwanzig Pixel je Zeile, also $640$ Bytes Pitch. Pitch bedeutet Abstand zwischen den Anfängen aufeinanderfolgender Zeilen.
+
+Die Abbildung zeigt ausdrücklich einen Ausschnitt der Pixelkoordinaten. Das Rechteck beginnt bei $x=10$, $y=20$, ist vier Pixel breit und drei Zeilen hoch. Für die Startformel bezeichnet $B$ die Bildbasis, $P$ den Quell-Pitch in Bytes und $x,y$ die Pixelkoordinaten. Bei Bildbasis `0x20001000` ergibt der Start $B+yP+2x$, also `0x20001000` plus $12800$ plus $20$, `0x20004214`. Jede kopierte Zeile enthält acht Bytes.
+
+Zum nächsten Quellzeilenanfang sind es $640$ Bytes, nach den acht kopierten Bytes daher noch $632$ zu überspringen. Ein gepacktes Ziel ab `0x20008000` verwendet dagegen acht Bytes Pitch. Insgesamt sind es vierundzwanzig Nutzbytes. DMA heißt Direct Memory Access; 2D bedeutet zweidimensional. Ein geeigneter 2D-DMA kann solche Strides, Zeilenabstände, unterstützen; alternativ sind getrennte Zeilenaufträge möglich. Die Fähigkeit ist ein Plattformmerkmal und keine automatische Eigenschaft jedes normalen DMA-Kanals.
+
+Im linken Zoom steigen die $x$-Koordinaten nach rechts und die $y$-Koordinaten nach unten. Rote Umrandungen markieren die zwölf ausgewählten Pixel. Rechts stehen drei gepackte Zielzeilen; der Pfeil veranschaulicht die Kopie. Die Zieladressen unterscheiden sich um acht Bytes, nicht um den Quell-Pitch.
 :::
 
-## Fragen? — Flaschenhals
+## Circular Mode wiederholt Adressen
 
-- Warum Interrupt-Sturm bei schnellem SPI?
-- Warum verschwenden `lw`/`sw`-Schleifen ALU/Bus?
-- „Postboten“-Problem klar?
+- Ein endlicher Puffer wird im Kreis genutzt
+- Im Lehrmodell laden Zähler und Adresse nach $N$ Elementen neu
+- Nachschub oder Verarbeitung bleibt Softwarearbeit
+- Ein Umlauf erzeugt nicht automatisch neue gültige Inhalte
 
 ::: notes
-Fragen? — Flaschenhals knüpft an den bisherigen Datenpfad an. Der Sturm ist Rate mal Aufwand. lw und sw führen Elemente durch Register. FIFO-Bündelung ändert das Budget. Vor der Wahl IRQ je Byte rechnet man Ereignisse mal Zyklen geteilt durch den CPU-Takt. Warum Interrupt-Sturm bei schnellem SPI?. Warum verschwenden `lw`/`sw`-Schleifen ALU/Bus?. Verständnischeck: Welche Größe zuerst? Ereignisse je Sekunde mal Zyklen je Ereignis durch die Taktrate. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+DMA heißt Direct Memory Access. Circular Mode oder Ringmodus verwendet einen festen Puffer wiederholt. Im ausdrücklich gewählten Modell setzt die Hardware nach $N$ Elementen Adresse und Restzähler auf den Anfangszustand zurück und arbeitet weiter. Die konkrete Unterstützung und Statusdefinition muss eine reale Plattform bereitstellen.
+
+Beim Senden liest die Hardware nach einem Umlauf dieselben Speicherstellen erneut. Hat die Anwendung sie nicht passend erneuert, werden alte Daten wiederholt. Beim Empfang überschreibt die Hardware nach dem Umlauf ältere Werte; diese könnten noch nicht verarbeitet sein. Ein Ring organisiert also Speicheradressen, nicht automatisch die Aktualität seiner Daten.
+
+TC, Transfer Complete, kann in diesem Modus einen Umlauf markieren, ohne den Zugriff auf den gesamten Puffer zu beenden. Ein momentaner Positionswert wiederholt sich außerdem bei jedem Umlauf. Daraus folgt noch keine Gesamtzahl erzeugter oder verbrauchter Elemente. Für die Software sind Besitz, rechtzeitige Verarbeitung und ein nachvollziehbarer Fortschrittszustand nötig. Das nächste kleine Ringbeispiel trennt deshalb absolute Mengen von bloßen Positionsresten.
 :::
 
-## Was ist DMA?
+## Gleiche Ringposition, anderer Rückstand
 
-- DMA: Direct Memory Access — direkter Speicherzugriff
-- Peripherie (SPI, UART, ADC, …) liest/schreibt RAM ohne CPU-Kopierschleife
-- Steuerung: DMA-Controller (DMAC) als dediziertes Subsystem
+![](../assets/figures/06_hardware_beschleunigung_dma/ring.png){fig-alt="Ein Ring mit acht Plätzen enthält bei 14 erzeugten und fünf verarbeiteten Samples neun ausstehende Elemente; eines wurde schon überschrieben, obwohl die Positionsdifferenz modulo acht nur eins ist."}
+
+$$
+N=8,\quad P=14,\quad C=5,\quad P-C=9>N
+$$
 
 ::: notes
-Was ist DMA knüpft an den bisherigen Datenpfad an. DMA bewegt Daten nach vorbereiteten Aufträgen. Im Modell ist der DMAC der Initiator. Der UART meldet Bereitschaft und ist MMIO-Ziel, nicht selbst Speicherbusmaster. CPU-Kopierfreiheit ist keine Busfreiheit. DMA: Direct Memory Access — direkter Speicherzugriff. Peripherie (SPI, UART, ADC, …) liest/schreibt RAM ohne CPU-Kopierschleife. Verständnischeck: Wer liest das RAM im UART-Modell? Der konfigurierte DMAC. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+$N$ ist die Ringkapazität, $P$ die insgesamt erzeugte und $C$ die bereits verarbeitete Elementzahl. Diese Größen sind im Rechenmodell konsistent bekannte Gesamtzahlen. Beim Empfang beträgt der Rückstand $P-C$. Übersteigt er die Kapazität, wurden noch benötigte ältere Daten überschrieben: Overrun.
+
+Vierzehn erzeugte Elemente tragen die laufenden Nummern null bis dreizehn. Fünf verarbeitete sind null bis vier; benötigt wären noch fünf bis dreizehn, neun Stück. Der Acht-Plätze-Ring hält aber nur sechs bis dreizehn. Sample fünf wurde in Platz fünf durch Sample dreizehn ersetzt. Die Abbildung zeigt die Platznummern und dort vorhandenen Samplezahlen.
+
+Die Positionsdifferenz modulo acht wäre nur eins und verrät den verlorenen Umlauf nicht. Beim Senden heißt fehlender rechtzeitiger Nachschub Underrun; alte oder fehlende Daten können ausgegeben werden. Ein Hardwareflag oder ein zurückgesetzter Restzähler liefert nicht automatisch verlässliche Gesamtzahlen. Überwachter Fortschritt und begrenzte Bearbeitungsfristen sind daher erforderlich. Für eine einfachere planbare Übergabe teilen wir den Puffer anschließend in zwei Bereiche.
+
+Die Plätze stehen links nach rechts in aufsteigender Reihenfolge. Die rote Umrandung an Platz fünf markiert den Konflikt: Dort erwartet der Verbraucher Sample fünf, findet aber schon dreizehn. Die Pfeile zeigen die nächsten logischen Positionen, keine sicheren vollständigen Fortschrittszähler.
 :::
 
-## Bypass der CPU
+## Ping-Pong: zwei Bereiche mit Rollen
 
-![CPU und DMAC sind Initiatoren. Zwei Arbiter: im DMAC und am Interconnect.](../assets/figures/06_hardware_beschleunigung_dma/paths.png)
+![](../assets/figures/06_hardware_beschleunigung_dma/pingpong.png){fig-alt="Bei einem Audio-Sender liest DMA abwechselnd Hälfte A und B; die CPU darf jeweils die gerade verlassene Hälfte vor deren Wiederverwendung nachfüllen."}
 
-- Ohne DMA: RAM → CPU → UART/SPI
-- Mit DMA: RAM → DMAC → Peripherie
-- Der Kopierpfad läuft am Registerfile vorbei. Setup, Cache und Abschluss bleiben
-- Buskonflikte können die CPU trotzdem verzögern
-
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  RAM[(SRAM)] <--> DMAC[DMA-Controller]
-  DMAC <--> SPI[SPI]
-  CPU[CPU] -.->|Auftrag| DMAC
-  style DMAC fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+Getrennte Speicherbereiche verhindern den Konflikt nur bei rechtzeitigem Besitzwechsel.
 
 ::: notes
-Bypass der CPU knüpft an den bisherigen Datenpfad an. Der Datenweg geht vom RAM über den Interconnect zum UART. Der Kanal-Arbiter wählt innerhalb des DMAC, der Interconnect-Arbiter zwischen CPU und DMA. Setup und Cache bleiben CPU-Arbeit. Ohne DMA: RAM → CPU → UART/SPI. Mit DMA: RAM → DMAC → Peripherie. Verständnischeck: Warum zwei Arbiter? Einer wählt Kanäle, einer teilt den gemeinsamen Bus. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+DMA bedeutet Direct Memory Access, CPU Central Processing Unit und TX Transmit, Senden. Ping-Pong oder Double Buffering verwendet zwei wechselnde Pufferbereiche. Unsere Grafik zeigt eine Sendeanwendung mit einem Ring, der logisch in A und B geteilt ist. Während die Hardware A liest, darf die CPU B vorbereiten; nach dem Wechsel werden die Rollen getauscht.
+
+Eine spezielle Hardware-Double-Buffer-Funktion mit zwei getrennten Basisadressen ist eine mögliche andere Implementierung. Sie ist nicht automatisch dieselbe Funktion wie ein einzelner Ring mit zwei Hälften. Die gemeinsame Strategie besteht in getrennten aktiven und bearbeitbaren Bereichen mit nachvollziehbarem Wechsel.
+
+Die erste und zweite Zeile zeigen aufeinanderfolgende Halbzeiten von oben nach unten. Innerhalb einer Zeile stehen links die vom DMA gelesene und rechts die von der CPU vorbereitete Hälfte. Aus dem Bild allein folgt keine unbeschränkte Freigabezeit. Der verlassene Bereich wird später wieder zur Quelle, und die CPU muss vor diesem Zeitpunkt fertig sein. Bei nicht kohärenten Speichern kommt die Sichtbarkeitsherstellung hinzu. Die nächste Rechnung bestimmt daher nicht nur die Audio-Rate, sondern die tatsächlich verfügbare Zeit bis zur Wiederverwendung.
+
+Rot umrandet ist jeweils die aktiv gelesene Hälfte; grau bleibt die bearbeitbare Gegenhälfte. Zwei Bereiche allein verhindern also noch keinen Fehler: Erst die eingehaltene Nachfüllfrist stellt sicher, dass die Rollen beim folgenden Wechsel tatsächlich getauscht werden dürfen.
 :::
 
-## Der DMA-Controller (DMAC)
+## Ein Nachfüllfenster berechnen
 
-- Eigenes Silizium-Modul auf dem SoC
-- Keine allgemeine ALU — spezialisiert auf Adressen und Transfers
-- Merkt sich u. a. Quelle, Ziel, Restlänge
-- Oft mehrere Controller/Kanäle (DMA1, DMA2, …)
+Audio-Lehrmodell: mono, $16$ Bit, $44100$ Samples/s,
+$2048$ Byte je Hälfte.
+
+$$
+T_H=\frac{2048/2}{44100}\approx23{,}22\ \mathrm{ms}
+$$
+
+Latenz $3$ ms + Nachfüllen $18$ ms + Synchronisation $1$ ms
+$=22$ ms; Reserve ungefähr $1{,}22$ ms.
 
 ::: notes
-Der DMA-Controller (DMAC) knüpft an den bisherigen Datenpfad an. Der DMAC hält Quelle, Ziel, Rest, Modus und Status. Keine allgemeine ALU heißt keine Anwendungsrechnung. Bei wenigen Bytes können Setup und Synchronisation teurer sein als eine Kopierschleife. Eigenes Silizium-Modul auf dem SoC. Keine allgemeine ALU — spezialisiert auf Adressen und Transfers. Verständnischeck: Warum kann eine kurze CPU-Kopie günstiger sein? Der DMA-Weg hat festen Aufwand. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Mono bedeutet ein Kanal. Ein sechzehn Bit breites Sample belegt zwei Bytes; die Datenrate ist daher $44100\cdot2=88200$ Byte pro Sekunde. Jede Hälfte besitzt $2048$ Bytes oder $1024$ Samples. $T_H$ ist die Zeit für eine Hälfte und beträgt $1024/44100\approx0{,}02321995$ Sekunden.
+
+Nach dem Verlassen von A liest der DMA, Direct Memory Access, zunächst B. Für das Nachfüllen von A bleibt im idealen kontinuierlichen Modell somit ungefähr eine Halbzeit. Nicht nur die Kopierarbeit zählt: Die angenommene Signallatenz von drei Millisekunden, achtzehn Millisekunden Arbeit und eine Millisekunde Sichtbarkeit ergeben zusammen zweiundzwanzig Millisekunden. Es bleiben etwa eine Komma zweiundzwanzig Millisekunden Reserve.
+
+Dreißig Millisekunden reine Nachfüllarbeit würden dieses Fenster schon ohne zusätzliche Latenz verfehlen. Größere Bereiche vergrößern das Zeitfenster und den Speicherbedarf, können aber zusätzliche Datenlatenz bedeuten. Die Zahlen sind ein deterministisches Lehrbudget, keine garantierte Audiomessung. Eine gemeldete Hälfte darf nur dann bearbeitet werden, wenn ihre Phase und die restliche Frist noch passen; ein altes Flag genügt dafür nicht.
 :::
 
-## Kampf um den Bus
+## Ein spätes Flag macht keine Hälfte frei
 
-- Oft ein gemeinsamer Pfad zum RAM
-- Früher: CPU alleiniger Nutzer
-- DMA will denselben Bus — Konfliktregelung nötig
+![](../assets/figures/06_hardware_beschleunigung_dma/flag-late.png){fig-alt="HT wird beim Verlassen von A nach einer Halbzeit gesetzt; bei Bearbeitung erst nach einem ganzen Umlauf plus einer Millisekunde liest DMA bereits wieder A."}
+
+ISR meldet kurz; Anwendung prüft aktuelle Phase und verbleibendes Budget.
 
 ::: notes
-Kampf um den Bus knüpft an den bisherigen Datenpfad an. Mehrere Initiatoren können dieselbe RAM-Ressource brauchen. Parallel rechnen heißt nicht beliebig viele gleichzeitige Zugriffe auf einen Port. Echte SoCs können weitere Master haben. Oft ein gemeinsamer Pfad zum RAM. Früher: CPU alleiniger Nutzer. Verständnischeck: Warum reicht DMA läuft parallel nicht? Dieselbe Ressource kann der Engpass bleiben. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+HT bedeutet Half Transfer, Halbtransfer, TC Transfer Complete und ISR Interrupt Service Routine. DMA steht für Direct Memory Access. Im gegebenen Ringmodell entsteht HT, wenn die Hardware A verlässt und B beginnt. TC markiert nach B den Umlauf; danach liest die Hardware wieder A.
+
+Die Grafik setzt die Halbzeit auf ungefähr $23{,}22$ Millisekunden. Ein erstes HT bei dieser Zeit bleibt unbedient. Wird es erst bei ungefähr $47{,}44$ Millisekunden ausgewertet, ist ein ganzer Umlauf von $46{,}44$ Millisekunden bereits vorbei und A wieder aktiv. Ein Nachfüllen von A allein aufgrund dieses Flags würde den Besitzvertrag verletzen.
+
+Ein Statusbit kann mehrere gleichartige Ereignisse zusammenfassen. Auch das Zählen behandelter Interrupts rekonstruiert deshalb nicht automatisch jede vergangene Grenze. Die Anwendung benötigt eine geeignet überwachte Phase und genügend Zeit für den gesamten nächsten Arbeitsschritt. Eine kurze ISR kann melden und dokumentiert quittieren, während längere Arbeit später erfolgt. Gemeinsam genutzte Meldungen brauchen passende Synchronisation; `volatile` allein verhindert weder verlorene Hinweise noch einen zu späten Zugriff.
+
+Die horizontale Achse ist Zeit in Millisekunden. Die drei Bereiche zeigen die aufeinanderfolgenden aktiven Hälften A, B und A. Die graue gestrichelte Linie markiert das frühere HT-Ereignis, die rote Linie die späte Bearbeitung; rechts von der zweiten Halbzeitgrenze besitzt DMA bereits wieder A.
 :::
 
-## Bus-Mastering
+## Ein Timeout gibt den Puffer nicht zurück
 
-- Bus-Master: darf selbst Transaktionen starten
-- CPU: Bus-Master
-- DMAC: ebenfalls Bus-Master
-- UART/SPI-Datenregister typisch: Slave (passiv)
+![](../assets/figures/06_hardware_beschleunigung_dma/lab.png){fig-alt="Ein begrenzter Abbruchpfad unterscheidet Stoppanfrage, bestätigten ruhenden DMA und erst danach die Rückgabe des Puffers; ein weiter aktiver Kanal bleibt ein ungeklärter Besitz."}
+
+Erst bestätigter Stillstand beziehungsweise dokumentierte Besitzrückgabe erlaubt Wiederverwendung.
 
 ::: notes
-Bus-Mastering knüpft an den bisherigen Datenpfad an. Ein Bus-Master startet Transaktionen. Der DMAC ist für Konfiguration ein MMIO-Ziel und für Nutzdaten ein Initiator. Das UART-Datenregister nimmt Stores entgegen. Das ist nicht die SPI-Rolle Controller gegen Target. Bus-Master: darf selbst Transaktionen starten. CPU: Bus-Master. Verständnischeck: Ist der DMAC nur Master? Nein, seine Register sind Ziele. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+DMA heißt Direct Memory Access. Die Abbildung beschreibt einen konzeptionellen Fehlerpfad. Nach Fehler oder verpasster Frist wird eine geeignete Stoppaktion angefordert. Erst ein dokumentierter Zustand ohne weitere relevante Zugriffe erlaubt die Rückgabe des Puffers. „Stopp angefordert“ und „wirklich gestoppt“ sind nicht identisch.
+
+Eine Bereinigung benötigt ebenfalls eine begrenzte Frist. Fehlt die Bestätigung, muss dieser Zustand als ungeklärte Nutzung behandelt werden; dieselben Speicherstellen dürfen nicht einfach für einen neuen Auftrag überschrieben werden. Welche weitergehende Reaktion sinnvoll und technisch möglich ist, bestimmt die Plattform. Die Grafik enthält keine erfundene Reset- oder Abbruch-API; API bedeutet Application Programming Interface, Programmierschnittstelle.
+
+Beim Senden kann auch nach ruhendem DMA noch die Peripherieleitung aktiv sein. Beim Empfang können Teilwerte vorliegen, die nicht als neuer vollständiger Datensatz veröffentlicht werden dürfen. Ein Watchdog beobachtet vereinbarte Fortschritte, ersetzt diese Zustandsprüfung aber nicht. Der Zusammenhang ergänzt die Fristen aus Vorlesung 3 und die Gültigkeitsprüfung aus Vorlesung 5. Das Ziel ist eine nachvollziehbare Besitzentscheidung, nicht bloß das Verlassen einer wartenden Schleife.
+
+Die Pfeile werden vom Stoppauftrag links zur Statusprüfung in der Mitte gelesen. Nur der rote Ja-Pfad erreicht die Rückgabe rechts. Der schwarze Abzweig nach unten beschreibt die abgelaufene Bereinigungsfrist und hält den Puffer gesperrt; Zeitablauf ist kein Ersatz für Stillstand.
 :::
 
-## Bus-Arbitration
+## DMA aus dem Bedarf auswählen
 
-- Bus-Matrix / Arbiter steuert den Zugang
-- Gleichzeitiger Zugriff CPU und DMA → Priorität entscheidet
-- Priorität ist eine Politik, kein Naturgesetz. Round-Robin und feste Priorität unterscheiden
-- „DMA gewinnt immer“ und „Stalls sind immer kurz“ gelten nicht allgemein
+| Bedarf | zu prüfender Schwerpunkt |
+|--------|---------------------------|
+| wenige Sensorbytes | Aufwand, Frist und Fehlerreaktion |
+| großes Display-Vollbild | CPU-Bedienung und Leitungsbandbreite |
+| kontinuierlicher Audiostrom | Halbzeit, Nachschub und Besitzwechsel |
+| mehrere Speicherblöcke | Erreichbarkeit und Auftragsorganisation |
 
-```{mermaid}
-%%| fig-width: 3.6
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  CPU[CPU] --> A{Arbiter}
-  DMA[DMA] --> A
-  A --> RAM[(SRAM)]
-  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+Wenig Daten verbieten DMA nicht; viel Daten garantieren keinen ausreichenden Ausgang.
 
 ::: notes
-Bus-Arbitration knüpft an den bisherigen Datenpfad an. Round-Robin wechselt, feste Priorität kann einen niedrigeren Initiator aushungern, wenn keine Fairness gilt. Die CPU hat nicht immer die weichere Frist. Keine maximale Wartezeit ohne Busvertrag. Bus-Matrix / Arbiter steuert den Zugang. Gleichzeitiger Zugriff CPU und DMA → Priorität entscheidet. Verständnischeck: Garantiert DMA-Priorität kurze CPU-Stalls? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+DMA bedeutet Direct Memory Access. Die Auswahl hängt von CPU-Aufwand, benötigter Latenz, Hardwarefähigkeiten und Speichervertrag ab; CPU heißt Central Processing Unit. Ein kleiner Sensortransfer kann mit begrenztem Polling oder Interruptbedienung gut passen. DMA kann trotzdem sinnvoll sein, wenn andere Fristen oder die Plattformorganisation dafür sprechen.
+
+Ein großes Displaybild kann die Kopierbedienung belasten und zugleich eine zu langsame Leitung überfordern. DMA löst nur den ersten Punkt direkt. Ein kontinuierlicher Audiostrom braucht außerdem geeigneten Nachschub und einen rechtzeitigen Wechsel der Pufferrollen. Mehrere verstreute Speicherblöcke können eine unterstützte Deskriptorkette nutzen, müssen aber erreichbar und sichtbar bleiben.
+
+Ein nominell schnellerer Transport allein beantwortet diese Fragen nicht. Vorbereitung, Abschluss und mögliche Busstalls gehören zum Vergleich. Eine universelle Bytezahl, ab der DMA immer besser wäre, wird deshalb nicht behauptet. Die Tabelle verbindet die bisher getrennten Modelle, bevor die Papieraufgaben ihre Grenzen prüfen. Eine begründete Lösung benennt, welches Budget tatsächlich eng ist und welche Voraussetzung die vorgeschlagene Arbeitsteilung benötigt.
 :::
 
-## Cycle Stealing
+## Rechenmodell und Geräteausführung
 
-- DMA „klaut“ gelegentlich Bus-Zyklen
-- Kein ISR-Overhead pro Byte → Störung oft gering
-- Mit L1-Cache rechnet die CPU oft ohne Dauerzugriff auf den Hauptspeicherbus
+- Host-C: Blockgröße und Cachebereichsgeometrie
+- Papier: Adressfolgen, Bandbreiten, Besitz und Zeitfenster
+- Renode: konkrete unterstützte Plattform und Controller nötig
+- Keine Registeradressen oder erfolgreichen Hardwareläufe aus einem Schema ableiten
 
 ::: notes
-Cycle Stealing knüpft an den bisherigen Datenpfad an. Cycle Stealing schiebt DMA-Zugriffe in eine gemeinsame Ressource. Das ist kein IRQ. Ein Cache-Hit kann lokal bleiben. Ein Stall braucht gleichzeitige Konkurrenz. DMA „klaut“ gelegentlich Bus-Zyklen. Kein ISR-Overhead pro Byte → Störung oft gering. Verständnischeck: Muss jeder DMA-Zugriff die CPU stoppen? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Ein Host ist der Rechner, auf dem ein gewöhnlicher C-Compiler die beiden reinen Rechenfunktionen ausführt. Damit lassen sich Blockgrenzen, Integerbereiche und aufgerundete Cacheenden prüfen. Diese Ausführung bewegt keine echten Daten über einen DMA-Kanal; DMA steht für Direct Memory Access.
+
+Renode ist ein Systemsimulator. Eine Untersuchung benötigt eine tatsächlich unterstützte Plattform mit passendem Controller- und Peripheriemodell sowie Firmware. Ein bloßer Registeroffset oder ein erfundener Typname erzeugt diese Unterstützung nicht. Selbst korrekt simulierte Registerzugriffe würden reale Cache-Effekte, Busarbitration und elektrische Leitungszeiten nur nachweisen, wenn das verwendete Modell sie tatsächlich abbildet.
+
+Die Pflichtaufgaben benötigen daher keine zusätzliche Toolchain. Eine echte Firmware für die Prozessor-Befehlssatzarchitektur RISC-V müsste außerdem ihren Startablauf, Gerätezugriffe, Interruptpfad und Speichervertrag konkret erfüllen. Für diese Überarbeitung wird keine ausgeführte DMA-Firmware behauptet. Die getrennten Nachweisarten erklären, warum ein bestandener Integer-Test hilfreich ist, aber keine fertige Plattforminitialisierung ersetzt. Ein späterer Geräteversuch kann auf den sauber benannten Voraussetzungen aufbauen.
+
+RISC in RISC-V steht für Reduced Instruction Set Computer, Rechner mit reduziertem Befehlssatz.
 :::
 
-## Transparent vs. Blocking
+## Abschlussquiz: Grenzen begründen
 
-- Transparent: DMA nutzt Bus, wenn die CPU ihn ohnehin nicht braucht
-- Blocking / Burst: DMA belegt den Bus länger — CPU stottert kurz
-- Immer noch weit günstiger als C-Kopierschleifen
+- Zehn QuizAcademy-Fragen zu Vorlesung 6
+- Zehn Minuten beantworten, fünf Minuten auswerten
+- Bytezahl, Beobachter oder Pufferphase nennen
+- Antwortlänge liefert keinen zuverlässigen Hinweis
 
 ::: notes
-Transparent vs. Blocking knüpft an den bisherigen Datenpfad an. Transparent und Burst sind Vereinfachungen, nicht jeder Controller. Asynchron starten beseitigt geteilte Busressourcen nicht. Ein guter Durchsatz kann die schlechteste Wartezeit verschlechtern. Immer günstiger als C gilt nicht. Transparent: DMA nutzt Bus, wenn die CPU ihn ohnehin nicht braucht. Blocking / Burst: DMA belegt den Bus länger — CPU stottert kurz. Verständnischeck: Kann ein DMA-Burst die CPU warten lassen? Ja. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
+Das Quiz behält seine zehn Fragen. Es prüft die bereits erklärten Unterscheidungen: Leitungsrate gegenüber CPU-Entlastung, Elementzahl gegenüber Bytezahl, feste Peripherieadresse gegenüber Arrayinkrement, Cache-Sichtbarkeit sowie DMA-Abschluss gegenüber Puffer- oder Leitungsfreigabe. CPU bedeutet Central Processing Unit, DMA Direct Memory Access.
+
+Die vorgesehenen fünfzehn Minuten teilen sich in zehn Minuten individuelle Bearbeitung und fünf Minuten gemeinsame Auswertung. Bei Unsicherheit sollte eine konkrete Modellgröße genannt werden. Beispielsweise ergibt eine Byte-Rate geteilt durch 153600 Bytes je Bild die ideale Vollbildrate; die aktuelle Ringphase erklärt dagegen einen erlaubten Nachfüllzugriff.
+
+Jede Frage besitzt vier Optionen und genau eine richtige. Die Antworten bleiben in vergleichbaren Längen und benutzen nur Inhalte dieses Blocks. Die längste Aussage ist weder immer richtig noch immer falsch. Erläuterungen benennen die jeweilige Verwechslung und können zu den passenden Papieraufgaben zurückführen. So wird eine Entscheidung aus Bedingungen begründet und nicht aus einer zufälligen Formulierungslänge erraten.
 :::
 
-## Hardware-Handshake
+## Was Sie jetzt unterscheiden können
 
-![Speicher-Burst und ein peripheriegesteuerter Zugriff haben verschiedene Breiten.](../assets/figures/06_hardware_beschleunigung_dma/handshake.png)
-
-- DMA darf Peripherie nicht überfluten
-- Synchronisation über dedizierte Signale im SoC (ohne CPU)
-
-::: notes
-Hardware-Handshake knüpft an den bisherigen Datenpfad an. DREQ und DACK sind Request und Acknowledge des DMA-Handshakes, kein I²C-ACK. Ein RAM-Burst darf ein Einbyte-TX-Register nicht überfüllen. Ein DMA-FIFO kann Raten entkoppeln, wenn er vorhanden ist. Eine dauerhaft schnellere Quelle bleibt ein Durchsatzproblem. DMA darf Peripherie nicht überfluten. Synchronisation über dedizierte Signale im SoC (ohne CPU). Verständnischeck: Darf ein 16-Word-Burst in ein Byte-Register? Nicht ohne Kapazitätsvertrag. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Request / Acknowledge (Handshake)
-
-- Request (klassisch oft DREQ): Peripherie „Register leer / bereit“
-- DMAC: Transfer RAM → Peripherie
-- Acknowledge (klassisch oft DACK): „geliefert“
-- Signale und Namen sind herstellerspezifisch — das Prinzip bleibt gleich
-
-```{mermaid}
-%%| fig-width: 3.6
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  SPI -->|DREQ| DMAC
-  DMAC -->|Daten| SPI
-  DMAC -->|DACK| SPI
-  style DMAC fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+- Kopierarbeit, Leitungsrate und Buskonkurrenz
+- Elemente, Bytes, Adresssicht und Lebensdauer
+- Clean, Invalidate, Reihenfolge und Pufferbesitz
+- Normalabschluss, Umlauf und externe Ausgabe
+- Aktuelle Phase und bloße Statusmeldung
 
 ::: notes
-Request / Acknowledge (Handshake) knüpft an den bisherigen Datenpfad an. Der Request zeigt Bereitschaft nach Controllervertrag. Puls oder Pegel und ein eigenes DACK sind herstellerspezifisch. DACK beweist nicht das letzte serielle Bit. Der UART erzeugt weiter Frame und Takt. Request (klassisch oft DREQ): Peripherie „Register leer / bereit“. DMAC: Transfer RAM → Peripherie. Verständnischeck: Beweist DACK das letzte Bit? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
+DMA bedeutet Direct Memory Access. Seine Entlastung entsteht durch eine andere Aufgabenverteilung bei der Datenbewegung. Ein vollständiger Auftrag braucht gültige erreichbare Adressen, passende Breiten, begrenzte Länge und einen dokumentierten Lebenszyklus. Die Cache- und Streambeispiele zeigen, dass Sichtbarkeit und zeitlicher Besitz genauso wichtig sind wie die Kopiermenge.
 
-## Richtung: Memory → Peripheral
+Die Grundlagen orientieren sich an Harris/Harris, Digital Design and Computer Architecture — RISC-V Edition. Ergänzend wurden die [Linux-DMA-Einführung](https://github.com/torvalds/linux/blob/master/Documentation/core-api/dma-api-howto.rst), die [DMA-API-Dokumentation](https://github.com/torvalds/linux/blob/master/Documentation/core-api/dma-api.rst) und ein [STMicroelectronics-DMA-Treiberbeispiel](https://github.com/STMicroelectronics/stm32f4xx-hal-driver/blob/master/Src/stm32f4xx_hal_dma.c) herangezogen. API bedeutet Application Programming Interface, Programmierschnittstelle. Diese Quellen beschreiben Plattformverträge beziehungsweise Herstellerbeispiele, keine universellen Register der Prozessor-Befehlssatzarchitektur RISC-V.
 
-- SRAM → UART / SPI / I2C / DAC
-- Quelle: Array (Adresse steigt); Ziel: festes Datenregister
-- Typisch: Audio-Out, Display-Refresh
+Vorlesung 7 behandelt moderne Prozessorarchitekturen und parallele Bearbeitung von Befehlen. Auch dort sind tatsächlich erreichbare Parallelität und gemeinsam genutzte Ressourcen zu unterscheiden; zwei gleichzeitig mögliche Aktivitäten verdoppeln nicht automatisch den Durchsatz.
 
-::: notes
-Richtung: Memory → Peripheral knüpft an den bisherigen Datenpfad an. M2P liest ein Array und schreibt ein festes Register. Die Quelle steigt, das Ziel bleibt. Daten müssen sichtbar sein und der Puffer leben. I²C-Adresse und ACK bleiben Treiberaufgaben. Ein DAC-Takt kommt vom Trigger, nicht vom RAM-Burst. SRAM → UART / SPI / I2C / DAC. Quelle: Array (Adresse steigt); Ziel: festes Datenregister. Verständnischeck: Warum bleibt DST konstant? Jeder Store trifft dasselbe TX-Register. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Richtung: Peripheral → Memory
-
-- UART / SPI / ADC → SRAM
-- z. B. ADC sampelt Mikrofon mit hoher Rate → DREQ → DMA füllt Puffer
-- CPU wertet später aus (Spracherkennung etc.)
-
-::: notes
-Richtung: Peripheral → Memory knüpft an den bisherigen Datenpfad an. P2M hält die Quelle fest und steigert das Ziel. DMA verhindert keinen Overrun, wenn Bus oder Verarbeitung zu spät sind. Die CPU liest erst nach Phasengrenze und nötiger Synchronisation. UART / SPI / ADC → SRAM. z. B. ADC sampelt Mikrofon mit hoher Rate → DREQ → DMA füllt Puffer. Verständnischeck: Verhindert DMA jeden RX-Overrun? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Richtung: Memory → Memory
-
-- SRAM-Array A → Array B
-- Ersetzt/beschleunigt `memcpy`-artige Kopien
-- Oft ohne externes DREQ — so schnell der Bus erlaubt
-
-::: notes
-Richtung: Memory → Memory knüpft an den bisherigen Datenpfad an. M2M steigert beide Adressen, wenn der Controller das kann. Überlappung ist nicht automatisch memmove. Flash braucht mehr als einen Store. Abschluss und gültiger Zielbereich bleiben nötig. SRAM-Array A → Array B. Ersetzt/beschleunigt `memcpy`-artige Kopien. Verständnischeck: Ist überlappendes M2M memmove? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## DMA-Interrupts
-
-![DMA-TC und das leere Schieberegister sind zwei Zeitpunkte.](../assets/figures/06_hardware_beschleunigung_dma/lifecycle.png)
-
-- Anbindung an PLIC / Interrupt-System
-- Typisch: Transfer Complete (TC), Half Transfer (HT), Transfer Error (TE)
-- Ein Interrupt nach $N$ Bytes statt $N$ Interrupts
-
-::: notes
-DMA-Interrupts knüpft an den bisherigen Datenpfad an. HT ist Half Transfer, TC Transfer Complete, TE Transfer Error. Im TX-Modell kann TC das Ende der DMA-Lesearbeit sein, während FIFO und Schieberegister noch senden. SPI-CS folgt dem Gerätevertrag, nicht allein TC. Anbindung an PLIC / Interrupt-System. Typisch: Transfer Complete (TC), Half Transfer (HT), Transfer Error (TE). Verständnischeck: Darf CS allein wegen TC hoch? Nur wenn der Leitungsabschluss zusätzlich belegt ist. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Fragen? — DMA-Grundlagen
-
-- Was bedeutet Bus-Mastering?
-- Wie schlichtet der Arbiter (Cycle Stealing)?
-- Rolle des Hardware-Handshakes (Request/Acknowledge)?
-
-::: notes
-Fragen? — DMA-Grundlagen knüpft an den bisherigen Datenpfad an. Bus-Mastering ist eigenes Starten von Transaktionen. Arbitration wählt Anfragen. Cycle Stealing ist eine Strategie, nicht die einzige. Der Handshake verhindert unzulässige Peripheriebedienung nach seinem Vertrag, nicht jeden Systemfehler. Was bedeutet Bus-Mastering?. Wie schlichtet der Arbiter (Cycle Stealing)?. Verständnischeck: Ist Cycle Stealing die einzige Busregel? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## DMA-Kanäle (Channels / Streams)
-
-- Viele Peripherien wollen parallel Daten bewegen (UART, SPI, I2C, …)
-- Ein DMAC hat daher mehrere Kanäle (z. B. Channel 0–7)
-- Jeder Kanal: eigene Quelle, Ziel, Länge, Priorität
-- Interner DMA-Arbiter: bei gleichzeitigen DREQs entscheidet die Kanalpriorität
-
-```{mermaid}
-%%| fig-width: 4.0
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  SPI -->|DREQ| CH1[Kanal 1]
-  UART -->|DREQ| CH2[Kanal 2]
-  I2C -->|DREQ| CH3[Kanal 3]
-  CH1 --> A{DMA-Arbiter}
-  CH2 --> A
-  CH3 --> A
-  A --> Bus[Systembus]
-  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-DMA-Kanäle (Channels / Streams) knüpft an den bisherigen Datenpfad an. Ein Kanal ist eine gespeicherte Konfiguration, nicht automatisch ein eigener Datenpfad. Acht Kanäle können sich eine Engine teilen. Kanalpriorität ist nicht die PLIC-Priorität. Die Zuordnung Audio und Log ist fiktiv. Viele Peripherien wollen parallel Daten bewegen (UART, SPI, I2C, …). Ein DMAC hat daher mehrere Kanäle (z. B. Channel 0–7). Verständnischeck: Garantieren acht Kanäle acht gleichzeitige Kopien? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Multiplexing der Kanäle (DMAMUX)
-
-- Oft mehr Peripherien als DMA-Kanäle
-- Lösung: Multiplexer-Matrix (häufig DMAMUX) vor dem DMAC
-- Software verbindet z. B. `UART_TX`-Request mit Kanal 3
-- Doppelbelegung desselben Kanals → undokumentiertes / fehlerhaftes Verhalten
-- Referenzhandbuch: Request-Tabellen sind Pflichtlektüre
-
-::: notes
-Multiplexing der Kanäle (DMAMUX) knüpft an den bisherigen Datenpfad an. DMAMUX leitet Requests, er kopiert keine Nutzdaten. Nicht jeder SoC hat einen programmierbaren Multiplexer. Route und Zieladresse müssen beide stimmen. Ein aktiver Kanal wird nicht nebenbei umgeschaltet. Oft mehr Peripherien als DMA-Kanäle. Lösung: Multiplexer-Matrix (häufig DMAMUX) vor dem DMAC. Verständnischeck: Reicht das UART-Mapping bei falschem Ziel? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## MMIO-Register eines Kanals
-
-- Steuerung über Memory-Mapped Register
-- In C oft als `struct` abgebildet
-- Vier Kernfragen: Woher? Wohin? Wie viel? Welche Breite / Modi?
-
-```c
-typedef struct {
-    volatile uint32_t SRC_ADDR;  /* Quelle */
-    volatile uint32_t DST_ADDR;  /* Ziel */
-    volatile uint32_t COUNT;     /* Anzahl */
-    volatile uint32_t CONTROL;   /* Breite, Enable, … */
-} DMA_Channel_TypeDef;
-
-/* fiktiv — Labor: Datenblatt / Renode */
-#define DMA_CH1 ((DMA_Channel_TypeDef *)0x40020000u)
-```
-
-::: notes
-MMIO-Register eines Kanals knüpft an den bisherigen Datenpfad an. volatile betrifft Compilerzugriffe, nicht Kohärenz. Die Struktur bei 0x40020000 ist fiktiv. Ein Cast macht kein gültiges Layout. CONTROL bündelt Modus und Enable und darf nur nach Vertrag geschrieben werden. Steuerung über Memory-Mapped Register. In C oft als `struct` abgebildet. Verständnischeck: Wird eine C-Struktur automatisch ein Registerblock? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Parameter 1: Source Address (SRC)
-
-- Physikalische Startadresse der Quelle in `SRC_ADDR`
-- Senden: oft Adresse eines Arrays im SRAM
-- DMA liest von dort (ggf. mit Auto-Inkrement)
-
-```c
-uint8_t bild_array[1000];
-DMA_CH1->SRC_ADDR = (uint32_t)&bild_array[0];
-```
-
-::: notes
-Parameter 1: Source Address (SRC) knüpft an den bisherigen Datenpfad an. Die Quelle muss für den DMA erreichbar sein und leben. uintptr_t ist eine Pointerdarstellung, kein Mapping und kein Beweis für 32 Bit. Ein 1000-Byte-Array ist nicht der 4096-Byte-UART-Puffer und nicht die Million-Byte-Rechnung. Physikalische Startadresse der Quelle in `SRC_ADDR`. Senden: oft Adresse eines Arrays im SRAM. Verständnischeck: Warum reicht uintptr_t nicht? Er beweist weder Erreichbarkeit noch Wertebereich. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Parameter 2: Destination Address (DST)
-
-- Zieladresse in `DST_ADDR`
-- Senden über SPI/UART: Adresse des Datenregisters (z. B. TX_DATA)
-- DMA schreibt blind auf diese Adresse
-
-```c
-#define SPI_TX_DATA_REG 0x4003000Cu  /* fiktiv */
-
-DMA_CH1->DST_ADDR = SPI_TX_DATA_REG;
-```
-
-::: notes
-Parameter 2: Destination Address (DST) knüpft an den bisherigen Datenpfad an. Das Ziel im UART-Modell ist ein festes TX-Register. 0x4003000C ist hier UART, nicht zugleich SPI. Ein Store übergibt Daten, beendet nicht das letzte Bit. Eine falsche, aber gültige Adresse kann ein Nachbarregister ändern, ohne Busfehler. Zieladresse in `DST_ADDR`. Senden über SPI/UART: Adresse des Datenregisters (z. B. TX_DATA). Verständnischeck: Was kann eine falsche MMIO-Adresse tun? Ein anderes Register still verändern. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Parameter 3: Transfer Count
-
-![Vier fiktive Byte-Transfers. Das UART-Ziel 0x4003000C bleibt fest.](../assets/figures/06_hardware_beschleunigung_dma/addrs.png)
-
-- `COUNT` zählt Transferelemente, nicht automatisch Bytes
-- Beispiel: höchstens 65535 Elemente. 1000000 Byte zu 8 Bit brauchen 16 Blöcke: fünfzehnmal 65535 plus 16975
-- Nach erfolgreichem Transfer: Hardware dekrementiert automatisch
-- COUNT zählt Elemente. Null vor dem Start ist kein allgemeiner Leerauftrag
-- Nach dem letzten Element kann TC folgen; Rest null allein beweist keinen fehlerfreien Abschluss
-
-```{mermaid}
-%%| fig-width: 3.6
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[COUNT = 1000] --> B[Transfer]
-  B --> C[COUNT = 999]
-  C --> D[COUNT = 0]
-  D -->|STOP| E[IRQ an CPU]
-  style E fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Parameter 3: Transfer Count knüpft an den bisherigen Datenpfad an. COUNT zählt Elemente. Bei Start 16 und Bytezugriff steht nach dem ersten Rest 15. Eine Million Byte bei höchstens 65535 Elementen braucht 15 mal 65535 plus 16975, also 16 Blöcke. Rest null allein ist kein fehlerfreier Erfolg. Circular lädt neu, Normal endet. `COUNT` zählt Transferelemente, nicht automatisch Bytes. Beispiel: höchstens 65535 Elemente. 1000000 Byte zu 8 Bit brauchen 16 Blöcke: fünfzehnmal 65535 plus 16975. Verständnischeck: Wie viele Blöcke für eine Million Byte? Sechzehn. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Parameter 4: Data Width
-
-- Pro Transfer: 8, 16 oder 32 Bit — nur wenn Quelle, Ziel und DMA-Pfad das erlauben
-- Ein `uint16_t` im C-Programm rechtfertigt keinen Halfword-Zugriff auf ein Byte-Register
-
-| C-Typ | DMA-Breite | Transfers für 32 Bit Nutzdaten |
-|-------|------------|--------------------------------|
-| `uint8_t` | Byte (8) | 4 |
-| `uint16_t` | Halfword (16) | 2 |
-| `uint32_t` | Word (32) | 1 (oft maximal effizient) |
-
-::: notes
-Parameter 4: Data Width knüpft an den bisherigen Datenpfad an. Die Tabelle rechnet 32 Bit Nutzinhalt um, sie konfiguriert keine Hardware nach C-Typ. Ein 16-Bit-Wert über ein Byte-RX braucht zwei Zugriffe. Word auf ein Byte-Register kann unzulässig sein. uint16_t audio darf nicht automatisch als Halfword in jeden UART. Pro Transfer: 8, 16 oder 32 Bit — nur wenn Quelle, Ziel und DMA-Pfad das erlauben. Ein `uint16_t` im C-Programm rechtfertigt keinen Halfword-Zugriff auf ein Byte-Register. Verständnischeck: Darf jedes uint16_t-Array per Halfword in den UART? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Address Increment Mode
-
-- Arrays: Pointer muss wandern — sonst 1000× dieselbe Adresse
-- INC: nach jedem Transfer $+$ Data-Width auf SRC und/oder DST
-- Hardware-Äquivalent zu `pointer++`
-- Quelle und Ziel getrennt schaltbar
-
-```c
-/* Konzept — in Hardware als Auto-Inkrement */
-*DST_ADDR = *SRC_ADDR;
-SRC_ADDR += width;  /* wenn Memory-Increment aktiv */
-```
-
-::: notes
-Address Increment Mode knüpft an den bisherigen Datenpfad an. Der Ausdruck mit Stern auf einem Adressregister ist kein lauffähiges C. Numerisch steigt die Byteadresse um die Breite in Byte. Ein uint16_t-Zeiger mit p++ steigt schon um zwei Byte; p += 2 steigt um vier. SRC- und DST-Inkrement sind getrennt. Arrays: Pointer muss wandern — sonst 1000× dieselbe Adresse. INC: nach jedem Transfer $+$ Data-Width auf SRC und/oder DST. Verständnischeck: Was tut p += 2 bei uint16_t? Zwei Elemente, typischerweise vier Byte. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Memory → Peripheral: Pointer
-
-- Source Increment: **an** (Array durchlaufen)
-- Destination Increment: **aus** (festes TX-Register)
-- Ziel inkrementieren → Schreiben neben das Register → oft Bus Fault
-
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[SRAM++] -->|INC an| B[UART_TX fest]
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Memory → Peripheral: Pointer knüpft an den bisherigen Datenpfad an. Quellbytes 0x20001000 bis 03, Ziel bleibt 0x4003000C. Nach vier Byteelementen ist DST unverändert. Ein gesetztes Zielinkrement würde Nachbarregister treffen, nicht zuverlässig einen Busfault auslösen. Source Increment: **an** (Array durchlaufen). Destination Increment: **aus** (festes TX-Register). Verständnischeck: Wie ändert sich DST nach vier Bytes? Gar nicht. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Peripheral → Memory: Pointer
-
-- Source Increment: **aus** (festes ADC-/RX-Register)
-- Destination Increment: **an** (Werte im Array ablegen)
-
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  B[ADC_DATA fest] -->|INC an| A[SRAM++]
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Peripheral → Memory: Pointer knüpft an den bisherigen Datenpfad an. Im Halfword-ADC-Modell bleibt 0x40031000 fest, das Ziel startet bei 0x20002000 und steigt um zwei. COUNT acht sind 16 Byte. UART-RX als Byte ist ein anderes Modell. Ein MMIO-Read ist keine wiederholbare RAM-Abfrage. Source Increment: **aus** (festes ADC-/RX-Register). Destination Increment: **an** (Werte im Array ablegen). Verständnischeck: Warum kein Source-Increment? Das nächste Sample kommt aus demselben Register. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Memory Alignment
-
-- Word-Transfers (32 Bit): Startadressen typisch 4-Byte-aligned
-- Unaligned (z. B. `0x20000001`) → oft Bus Error / Transfer Error
-- In C Alignment erzwingen:
-
-```c
-__attribute__((aligned(4))) uint8_t dma_buffer[1000];
-```
-
-::: notes
-Memory Alignment knüpft an den bisherigen Datenpfad an. 0x20000001 ist nicht durch vier teilbar, 0x20000000 schon. aligned(4) ist eine Compilerhilfe, keine RISC-V-Instruktion und keine 64-Byte-Cacheline. Ein 1000-Byte-Puffer braucht im 64-Byte-Modell 1024 Byte isolierte Fläche, die Nutzlänge bleibt 1000. Word-Transfers (32 Bit): Startadressen typisch 4-Byte-aligned. Unaligned (z. B. `0x20000001`) → oft Bus Error / Transfer Error. Verständnischeck: Reicht aligned(4) für 64-Byte-Zeilen? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Cache-Kohärenz und DMA
-
-- Relevant, sobald ein Data-Cache (Write-Back) vorhanden ist — viele einfache MCUs haben keinen
-- Erinnerung Block 2: L1-D-Cache puffert RAM-Inhalte
-- DMA sieht den CPU-D-Cache typischerweise **nicht** — Zugriff auf den physischen Speicher
-- CPU und DMA können unterschiedliche Sicht auf dieselben Adressen haben
-
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  CPU[CPU] <--> Cache[L1 Cache]
-  Cache -.->|Write-Back verzögert| RAM[(SRAM)]
-  DMAC[DMA] <-->|liest/schreibt RAM| RAM
-  style Cache fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Cache-Kohärenz und DMA knüpft an den bisherigen Datenpfad an. Ohne D-Cache, mit kohärentem DMA oder ohne Kohärenz sind drei Fälle. Eine saubere alte RX-Kopie kann falsch sein, nicht nur Write-Back. Write-Back kann eine schmutzige Zeile später zurückschreiben. Das Modell sagt nicht, jeder DMA sehe nie den Cache. Relevant, sobald ein Data-Cache (Write-Back) vorhanden ist — viele einfache MCUs haben keinen. Erinnerung Block 2: L1-D-Cache puffert RAM-Inhalte. Verständnischeck: Kann eine saubere RX-Zeile stören? Ja, wenn sie nach dem DMA-Write noch gelesen wird. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Stale Data (beide Richtungen)
-
-![TX veröffentlicht 0x22 vor dem Start. RX darf eine schmutzige Zeile nicht später zurückschreiben.](../assets/figures/06_hardware_beschleunigung_dma/cache.png)
-
-- Senden (CPU → DMA): frische Daten nur im Cache → DMA sendet alte RAM-Inhalte
-- Empfangen (DMA → CPU): frische Daten im RAM → CPU trifft veralteten Cache-Hit
-- TX: Daten vor dem DMA-Start veröffentlichen. RX: Bereich vor der Übergabe vorbereiten und nach Abschluss synchronisieren
-- Nur „danach invalidieren“ schützt nicht vor einer schmutzigen Zeile, die später zurückschreibt
-
-::: notes
-Stale Data (beide Richtungen) knüpft an den bisherigen Datenpfad an. TX: Cache hält 0x22, RAM noch 0x11, DMA liest ohne Clean 0x11. RX: alte Kopie und zusätzlich eine dirty Rückschreibung können neue Daten zerstören. Vor RX die alte schmutzige Kopie beseitigen, nach RX vor dem CPU-Lesen synchronisieren. Der Puffer darf während des Besitzes nicht erneut dirty werden. Senden (CPU → DMA): frische Daten nur im Cache → DMA sendet alte RAM-Inhalte. Empfangen (DMA → CPU): frische Daten im RAM → CPU trifft veralteten Cache-Hit. Verständnischeck: Warum reicht Invalidieren nach RX nicht allein? Eine alte dirty Zeile kann schon zurückgeschrieben haben. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Cache Clean / Invalidate
-
-- Clean (Flush): vor DMA-Sendestart schmutzige Lines des Puffers in den RAM schreiben
-- Invalidate: vor CPU-Lesen empfangener DMA-Daten Lines verwerfen → nächster Read geht zum RAM
-- API ist plattformabhängig (ARM: Cache-Maintenance; RISC-V: Fence ordnet Zugriffe; für Cache-Kohärenz ggf. Zicbom — `cbo.clean`/`cbo.inval`)
-
-```c
-bild_berechnen();
-/* Konzept: Cache-Bereich in den RAM schreiben */
-cache_clean((uintptr_t)bild_array, sizeof(bild_array));
-dma_start();
-```
-
-::: notes
-Cache Clean / Invalidate knüpft an den bisherigen Datenpfad an. Clean veröffentlicht Änderungen. Invalidate verwirft eine Kopie. Flush meint hier Clean plus Invalidate; APIs können anders heißen. FENCE ordnet und bereinigt den Cache nicht. Zicbom ist optional und hier nicht nachgewiesen. Wenige Takte ohne Längenmodell streichen. Clean (Flush): vor DMA-Sendestart schmutzige Lines des Puffers in den RAM schreiben. Invalidate: vor CPU-Lesen empfangener DMA-Daten Lines verwerfen → nächster Read geht zum RAM. Verständnischeck: Machen volatile oder FENCE den TX-Puffer aktuell? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Uncached DMA-Zonen
-
-![PMP schützt Zugriffe. Cacheability kommt von der Plattform, nicht vom Linkernamen.](../assets/figures/06_hardware_beschleunigung_dma/uncached.png)
-
-- Alternative nur, wenn die Plattform einen nicht gecachten Bereich bereitstellt
-- Standard-RISC-V-PMP regelt Zugriffsrechte, nicht Cacheability. Dafür sind PMAs oder die Plattform zuständig
-- Der Linker legt `.dma_buffer` in einen Bereich, dessen Attribute schon gelten
-- Uncached ist nicht automatisch DMA-erreichbar und nicht die einzige professionelle Lösung
-
-```text
-MEMORY {
-  RAM_CACHED   : ORIGIN = 0x20000000, LENGTH = 246K
-  RAM_UNCACHED : ORIGIN = 0x2003D800, LENGTH = 10K  /* DMA */
-}
-```
-
-::: notes
-Uncached DMA-Zonen knüpft an den bisherigen Datenpfad an. PMA sind Speichereigenschaften, PMP ist Hart-Zugriffsschutz. Der Linkername RAM_UNCACHED setzt keine Attribute. 246 KiB ab 0x20000000 enden exklusiv bei 0x2003D800, danach 10 KiB bis 0x20040000. K im GNU-Linker-Modell ist 1024 Byte. Ein 1-MB-Array passt nicht hinein. Alternative nur, wenn die Plattform einen nicht gecachten Bereich bereitstellt. Standard-RISC-V-PMP regelt Zugriffsrechte, nicht Cacheability. Dafür sind PMAs oder die Plattform zuständig. Verständnischeck: Passt 1 MB in die Karte? Nein, sie hat 256 KiB. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Aufgabe — Adresse und Linker
-
-Welche Adresse bleibt beim UART-TX fest? Macht der Name `RAM_UNCACHED` den Bereich uncached?
-
-::: notes
-Aufgabe — Adresse und Linker knüpft an den bisherigen Datenpfad an. Beim UART-TX wandert die Quelle, das Ziel bleibt. Uncached ist nur ein Name, bis die Plattform das Attribut setzt. Erreichbarkeit, Breite, Besitz und Ordnung bleiben. Verständnischeck: Darf ein platzierter Puffer sofort starten? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Single-Transfer vs. Burst
-
-- Single: ein DREQ → typisch ein Read + ein Write; Bus danach wieder frei
-- Burst: nach einem Request ein Block (z. B. 16 Words) am Stück
-- Burst: höherer Durchsatz, kurz härtere Busbelegung für die CPU
-
-::: notes
-Single-Transfer vs. Burst knüpft an den bisherigen Datenpfad an. Ein Request erlaubt nicht automatisch 16 Words in die Peripherie. Der Controller kann die DMA-Länge in Teilbursts teilen. Längere Belegung kann andere Initiatoren verzögern. Bandbreite ist bedingt, nicht maximal in jedem Fall. Single: ein DREQ → typisch ein Read + ein Write; Bus danach wieder frei. Burst: nach einem Request ein Block (z. B. 16 Words) am Stück. Verständnischeck: Ist die ganze DMA-Länge ein Busburst? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Warum Burst-Transfers?
-
-![Einzelzugriffe können dieselbe DRAM-Zeile treffen. 16 Aktivierungen sind keine Regel.](../assets/figures/06_hardware_beschleunigung_dma/burst.png)
-
-- On-Chip-SRAM: Burst spart vor allem wiederholte Bus-Arbitration
-- Externes DRAM (Block 1): Zeile öffnen kostet; offene Zeile → schnelle Column-Zugriffe
-- Eine offene Zeile kann mehrere Reads bedienen, auch bei getrennten SoC-Zugriffen
-- Ein Zeilenwechsel braucht PRE und ACT. SRAM hat diese Zeilenlogik nicht
-
-| Modus | Typischer Nachteil Single | Vorteil Burst |
-|-------|---------------------------|---------------|
-| On-Chip-SRAM | 16× Arbitration | 1× Arbitration, hoher Durchsatz |
-| DRAM | Zeile kann schon offen sein | Row-Hits hängen von Abbildung und Politik ab |
-
-::: notes
-Warum Burst-Transfers knüpft an den bisherigen Datenpfad an. 16 getrennte Beats können denselben Anfrageaufwand wiederholen. Das ist kein Gesetz jedes Interconnects. Mehrere Reads derselben offenen DRAM-Zeile brauchen nicht je ein ACT. PRE schließt die Zeile, ACT öffnet sie. SRAM hat diese Kommandos nicht. On-Chip-SRAM: Burst spart vor allem wiederholte Bus-Arbitration. Externes DRAM (Block 1): Zeile öffnen kostet; offene Zeile → schnelle Column-Zugriffe. Verständnischeck: Brauchen 16 Reads derselben Zeile 16 Aktivierungen? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## FIFOs im DMAC
-
-- Problem: Burst holt schnell aus dem RAM; SPI/UART sind langsamer
-- Viele DMACs: interner FIFO als Zwischenpuffer
-- Burst → FIFO füllen → Bus freigeben → Peripherie per DREQ aus dem FIFO füttern
-
-```{mermaid}
-%%| fig-width: 3.6
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  RAM[(SRAM)] -->|Burst| FIFO[DMA-FIFO]
-  FIFO -->|DREQ-getaktet| SPI[SPI]
-  style FIFO fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-FIFOs im DMAC knüpft an den bisherigen Datenpfad an. Der FIFO holt einen Speicherburst und gibt den Bus frei, die Peripherie nimmt bei Bereitschaft. Ein endlicher Puffer heilt keinen dauerhaft höheren Eingang. Prefetch trennt DMA-Lesende und tatsächliche Ausgabe. Problem: Burst holt schnell aus dem RAM; SPI/UART sind langsamer. Viele DMACs: interner FIFO als Zwischenpuffer. Verständnischeck: Kann ein FIFO eine dauerhaft höhere Rate unbegrenzt schlucken? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Problem endloser Streams
-
-- Audio-DAC: z. B. $\approx 44\,100$ Samples/s, lange Dauer
-- RAM fasst nicht die ganze Datei
-- Kleiner Normalauftrag endet nach dem letzten Element; Nachschub muss rechtzeitig da sein
-- Ständiges Stoppen/Neustarten in Software → Glitches
-
-::: notes
-Problem endloser Streams knüpft an den bisherigen Datenpfad an. Mono, 16 Bit, 44100 Hz sind 88200 Byte/s. Ein 4096-Byte-Auftrag ist endlich. COUNT null beendet nur den Normalmodus. Circular, Doppelbuffer und Deskriptoren sind Alternativen. Audio-DAC: z. B. $\approx 44\,100$ Samples/s, lange Dauer. RAM fasst nicht die ganze Datei. Verständnischeck: Warum reicht 4096 Byte nicht für beliebig lange Wiedergabe? Die Samplezahl ist endlich. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Circular Mode (Ringpuffer)
-
-- Array fester Größe als Ring (z. B. 4 KiB)
-- Bei `COUNT = 0`: Pointer und Zähler werden in Hardware neu geladen (Wrap)
-- DMA rotiert, bis Software den Kanal stoppt
-
-::: notes
-Circular Mode (Ringpuffer) knüpft an den bisherigen Datenpfad an. Nach dem Ende lädt Circular Adresse und Zähler neu, wenn die Hardware das kann. Bei 16-Bit-Audio ist COUNT 2048, nicht 4096. Wrap beschafft keine neuen Samples. Next gleich null ist kein universelles Stop. Array fester Größe als Ring (z. B. 4 KiB). Bei `COUNT = 0`: Pointer und Zähler werden in Hardware neu geladen (Wrap). Verständnischeck: Warum COUNT 2048? Es zählt Halfwords, nicht Bytes. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Ringpuffer: Software-Pflicht
-
-- DMA-Lesezeiger läuft im Kreis
-- CPU muss den gerade verlassenen Bereich nachfüllen (z. B. aus Flash/Netz)
-- Zu langsam → alte Daten → Stottern (Buffer Underrun)
-
-```{mermaid}
-%%| fig-width: 3.4
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  CPU[CPU schreibt] --> R((Ringpuffer))
-  R --> DMA[DMA liest]
-  DMA -->|Wrap| R
-  style R fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Ringpuffer: Software-Pflicht knüpft an den bisherigen Datenpfad an. Beim TX ist die CPU Produzent und der DMA Konsument. Nur die freie Hälfte darf beschrieben werden. Ein einzelner Zählerstand kann während des Lesens wechseln. Gleichzeitiges Überschreiben mischt alte und neue Werte. DMA-Lesezeiger läuft im Kreis. CPU muss den gerade verlassenen Bereich nachfüllen (z. B. aus Flash/Netz). Verständnischeck: Was passiert beim Überschreiben der aktiven Hälfte? Der DMA liest eine Mischung. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Double Buffering (Ping-Pong)
-
-![Eine Hälfte dauert ideal etwa 23,22 ms. 30 ms Nachfüllen verpasst das Fenster.](../assets/figures/06_hardware_beschleunigung_dma/pingpong.png)
-
-- Ring in zwei Hälften A und B
-- DMA liest A → CPU füllt parallel B (und umgekehrt)
-- Kein Konflikt: getrennte Bereiche
-
-::: notes
-Double Buffering (Ping-Pong) knüpft an den bisherigen Datenpfad an. 1024 Samples geteilt durch 44100 sind etwa 23,22 ms je Hälfte, der Umlauf etwa 46,44 ms. Beide Hälften vor Start füllen. 30 ms Nachfüllen verpasst das Fenster. Getrennte Bytes genügen nicht bei gemeinsamer Cacheline oder verspäteter Bearbeitung. Ring in zwei Hälften A und B. DMA liest A → CPU füllt parallel B (und umgekehrt). Verständnischeck: Wie viel Zeit bleibt ideal? Etwa 23,22 ms, abzüglich Kosten. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Ping-Pong: Interrupt-Logik
-
-- Mitte erreicht → Signal: Hälfte A fertig → CPU füllt A nach
-- Ende erreicht → Signal: Hälfte B fertig → Wrap, CPU füllt B nach
-- Endlos mit klarer Phasengrenze
-
-::: notes
-Ping-Pong: Interrupt-Logik knüpft an den bisherigen Datenpfad an. Nach HT liest der DMA B und die CPU darf A füllen, nach TC umgekehrt, wenn der Vertrag und die Frist stimmen. Ein alter Hinweis A frei gilt nicht mehr, wenn A schon wieder aktiv ist. IRQ-Latenz gehört ins Fenster. Mitte erreicht → Signal: Hälfte A fertig → CPU füllt A nach. Ende erreicht → Signal: Hälfte B fertig → Wrap, CPU füllt B nach. Verständnischeck: Darf ein später HT-Hinweis A füllen? Nein, wenn A wieder aktiv ist. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Half-Transfer-Interrupt (HT)
-
-- Bei vielen Controllern: HT bei exakt 50 % von `COUNT` → erste Hälfte nachfüllen
-- TC (`COUNT = 0`): zweite Hälfte nachfüllen (bei Circular: Wrap)
-- Ein Array + zwei Flags in der ISR (Namen/Bits herstellerspezifisch)
-
-```c
-volatile unsigned ht_count, tc_count;
-
-void dma_isr(void) {
-    if (STATUS_REG & HALF_TRANSFER_FLAG) {
-        clear_ht(); /* Semantik laut Controller, bei W1C kein RMW */
-        ht_count++;
-    }
-    if (STATUS_REG & TRANSFER_COMPLETE_FLAG) {
-        clear_tc();
-        tc_count++;
-    }
-}
-/* Nachfüllen im Worker, nicht als lange Arbeit in der ISR */
-```
-
-::: notes
-Half-Transfer-Interrupt (HT) knüpft an den bisherigen Datenpfad an. Die ISR macht einen Snapshot, quittiert mit der richtigen Clear-Semantik und meldet knapp. W1C ist Write One to Clear, kein blindes Oder. Zähler zählen beobachtete Meldungen. Ein sticky Bit fasst mehrere Ereignisse zusammen. Gleichzeitiges HT und TC braucht den aktuellen Zustand, nicht blindes Nachfüllen. Bei vielen Controllern: HT bei exakt 50 % von `COUNT` → erste Hälfte nachfüllen. TC (`COUNT = 0`): zweite Hälfte nachfüllen (bei Circular: Wrap). Verständnischeck: Rekonstruieren die Zähler jede Runde? Nein, zusammengefasste Ereignisse fehlen. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Ausblick: DMA2D (2D-Kopie)
-
-![Rechteckstart 0x20004214. Acht Byte je Zeile, Quellpitch 640 Byte.](../assets/figures/06_hardware_beschleunigung_dma/twod.png)
-
-- High-End-SoCs: 2D-DMA / Grafik-Accelerator (z. B. Chrom-ART)
-- Versteht Rechtecke ($X$/$Y$), nicht nur lineare Bytes
-- Zeilenoffsets am Ende jeder Zeile — Ausschnitte aus Framebuffer-Layouts
-
-::: notes
-Ausblick: DMA2D (2D-Kopie) knüpft an den bisherigen Datenpfad an. Start ist Basis plus (20 mal 320 plus 10) mal 2, also 0x20004214. Je Zeile acht Byte, Pitch 640, Skip 632. Drei Zeilen sind 24 Nutzbyte. Chrom-ART ist ein Herstellerbeispiel, kein RISC-V-Standard. High-End-SoCs: 2D-DMA / Grafik-Accelerator (z. B. Chrom-ART). Versteht Rechtecke ($X$/$Y$), nicht nur lineare Bytes. Verständnischeck: Warum Skip 632 und nicht 640? Acht Byte wurden schon kopiert. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Scatter-Gather (verkettete Listen)
-
-- Viele kleine Puffer im RAM verstreut
-- Neu-Konfigurieren nach jedem Puffer kostet CPU/IRQs
-- Scatter-Gather: Deskriptor-Liste (SRC, DST, COUNT, Next) im RAM
-- DMA lädt den nächsten Auftrag selbst nach
-
-::: notes
-Scatter-Gather (verkettete Listen) knüpft an den bisherigen Datenpfad an. Ein Deskriptor hält SRC, DST, COUNT und Next. Next ist eine DMA-Adresse, kein beliebiger CPU-Zeiger. Ende ist controllerspezifisch. Auch die Kette muss sichtbar und langlebig sein. Nicht jeder DMAC kann Scatter-Gather. Viele kleine Puffer im RAM verstreut. Neu-Konfigurieren nach jedem Puffer kostet CPU/IRQs. Verständnischeck: Reicht Clean der Nutzdaten, wenn die Deskriptoren nur im Cache sind? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Grenzen von DMA
-
-- Verschiebt Bytes — keine allgemeine Logik
-- Kein `if` auf Nutzdaten, keine Berechnung pro Byte
-- Kein Protokollverständnis (z. B. I2C-ACK): nur Reaktion auf DREQ/Handshake
-- Für Entscheidungen bleibt die CPU zuständig
-
-::: notes
-Grenzen von DMA knüpft an den bisherigen Datenpfad an. Keine allgemeine Anwendungsentscheidung heißt nicht, der Kanal habe keine Kontrolllogik. I²C-NACK bleibt Controllerstatus. Zuverlässig nur mit Konfiguration, Status, Frist und Besitz. DMA beseitigt weder falsche Daten noch zu wenig Bandbreite. Verschiebt Bytes — keine allgemeine Logik. Kein `if` auf Nutzdaten, keine Berechnung pro Byte. Verständnischeck: Wertet der Kanal einen I²C-NACK als Diagnose? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Aufgabe — CS und Audiofenster
-
-Darf CS bei DMA-TC bereits HIGH werden? Was folgt aus 30 ms Nachfüllzeit im Audio-Beispiel?
-
-::: notes
-Aufgabe — CS und Audiofenster knüpft an den bisherigen Datenpfad an. CS wartet auf das Ende der letzten Bitphase, nicht nur auf DMA-TC. Die Halbzeit ist 2048 geteilt durch 88200, etwa 23,22 ms. 30 ms liegen etwa 6,78 ms darüber, vor weiteren Kosten. 20 ms reichen nicht automatisch, wenn IRQ und Veröffentlichung dazukommen. Verständnischeck: Reicht 20 ms Nachfüllen? Nur wenn alle Zusatzzeiten im Fenster bleiben. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Ausblick Labor: DMA in Renode
-
-![4096 Byte, 8N1, 115200 Baud: ideal etwa 355,56 ms. Das ist eine Rechnung, keine Messung.](../assets/figures/06_hardware_beschleunigung_dma/lab.png)
-
-Geplantes Szenario (Details im Übungsblatt):
-
-- Langer String (z. B. HTML-Header) über UART
-- Runde 1: Polling — CPU blockiert sichtbar
-- Runde 2: DMA-Kanal — CPU rechnet/blinkt weiter, Text läuft im Hintergrund
-
-::: notes
-Ausblick Labor: DMA in Renode knüpft an den bisherigen Datenpfad an. 4096 mal 10 geteilt durch 115200 sind etwa 0,3556 s, weil 8N1 zehn Symbole hat. Das ist eine Rechnung, kein Lauf. Virtuelle Zeit ist nicht die Hostuhr. MIPS sind keine MHz. Ein späterer Test bräuchte dasselbe Muster und getrennte Prüfungen. Langer String (z. B. HTML-Header) über UART. Runde 1: Polling — CPU blockiert sichtbar. Verständnischeck: Warum länger als 4096 mal 8 durch 115200? Wegen Start- und Stopbit. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Geplante Variante: Polling (blockierend)
-
-- LED als Heartbeat der `main`-Schleife
-- Klassische UART-Sendeschleife:
-
-```c
-void send_uart_polling(const char *text, uint32_t len) {
-    for (uint32_t i = 0; i < len; i++) {
-        while (!(UART_STATUS_REG & TX_EMPTY)) { }
-        UART_TX_REG = text[i];
-    }
-}
-```
-
-::: notes
-Geplante Variante: Polling (blockierend) knüpft an den bisherigen Datenpfad an. Die Polling-Variante ist geplant, nicht gemessen. TX_EMPTY heißt im Modell Platz für ein Element. Ein Bytepuffer mit Länge darf 0x00 enthalten, strlen nicht. Der Heartbeat kommt aus main. Ein Timer-IRQ während der Schleife zeigt nicht, dass main weiterläuft. LED als Heartbeat der `main`-Schleife. Klassische UART-Sendeschleife:. Verständnischeck: Was zeigt ein Timer-IRQ in der Warteschleife? Dass Interrupts laufen, nicht dass main frei ist. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Geplante Beobachtung des Main-Fortschritts
-
-- Eine LED, die nur in `main` umschaltet, kann eine Pause der Hauptschleife zeigen
-- Timer-ISR oder autonome PWM dürfen nicht als Main-Heartbeat dienen
-- Das ist eine Erwartung, keine bereits beobachtete Messung
-
-::: notes
-Geplante Beobachtung des Main-Fortschritts knüpft an den bisherigen Datenpfad an. Die LED darf nur in main umschalten. Timer-ISR oder PWM wären der falsche Beweis. Eine stehende LED ist ein qualitativer Hinweis, keine Messung von Nutzdaten oder Stalls. Es liegt keine Beobachtung vor. Eine LED, die nur in `main` umschaltet, kann eine Pause der Hauptschleife zeigen. Timer-ISR oder autonome PWM dürfen nicht als Main-Heartbeat dienen. Verständnischeck: Warum taugt eine ISR-LED nicht? Sie blinkt, obwohl main hängt. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Geplanter DMA-Lehrablauf
-
-- Polling-Schleife ersetzen durch MMIO-Konfiguration des DMAC
-- Generisches Rezept in vier Schritten (herstellerübergreifend)
-
-::: notes
-Geplanter DMA-Lehrablauf knüpft an den bisherigen Datenpfad an. Die vier Schritte sind eine Gliederung, kein Herstellerrezept. Vor dem Programmieren muss der Kanal inaktiv sein. Das UART-Modell mit 4096 Byte ist nicht das SPI-Bild und nicht das Audiofenster. Dieselben Felder gibt es nicht auf jedem Chip. Polling-Schleife ersetzen durch MMIO-Konfiguration des DMAC. Generisches Rezept in vier Schritten (herstellerübergreifend). Verständnischeck: Welche Frage vor dem Neuprogrammieren? Ob der alte Auftrag wirklich beendet ist. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Schritt 1: UART für DMA scharfschalten
-
-- Standard: UART erwartet CPU-Writes
-- Enable-Bit für DMA-Request (DREQ), wenn TX-Register Platz hat
-
-```c
-#define UART_CR3     (*(volatile uint32_t *)(UART_BASE + 0x08u))
-#define UART_DMA_EN  (1u << 7)  /* Bitlage fiktiv */
-
-UART_CR3 |= UART_DMA_EN;
-```
-
-::: notes
-Schritt 1: UART für DMA scharfschalten knüpft an den bisherigen Datenpfad an. UART_CR3 und Bit 7 sind fiktiv. Das Oder-Gleich gilt nur bei passender Registersemantik. Enable erzeugt den Request, startet aber keinen Transfer ohne fertigen Kanal. Ein schon anliegender Level kann sofort wirken, deshalb erst nach Vorbereitung freigeben. Standard: UART erwartet CPU-Writes. Enable-Bit für DMA-Request (DREQ), wenn TX-Register Platz hat. Verständnischeck: Reicht UART_DMA_EN allein? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Schritt 2: Kanal konfigurieren
-
-- SRC = String im SRAM, DST = UART-TX-Register (fest)
-- COUNT = Länge; Memory-Increment an, Peripherie-Increment aus
-
-```c
-DMA_CH1->SRC_ADDR = (uint32_t)(uintptr_t)tx_sram; /* Identität angenommen */
-DMA_CH1->DST_ADDR = (uint32_t)(uintptr_t)&UART_TX_REG;
-DMA_CH1->COUNT    = string_laenge; /* Einheit laut Controller */
-DMA_CH1->CONTROL  = DMA_MINC_EN | DMA_DIR_M2P; /* kein blindes |= */
-```
-
-::: notes
-Schritt 2: Kanal konfigurieren knüpft an den bisherigen Datenpfad an. 4096 Byte, 8 Bit, SRC-Inkrement, festes Ziel, Normalmodus. CONTROL setzt Breite und Modus ausdrücklich, keine unbekannten Defaults. Identität von CPU- und DMA-Adresse ist eine Annahme. tx_sram lebt im SRAM, kein Stringliteral im Flash. Vorher Inaktivität und Veröffentlichung. SRC = String im SRAM, DST = UART-TX-Register (fest). COUNT = Länge; Memory-Increment an, Peripherie-Increment aus. Verständnischeck: Welche Felder verhindern Nachbarregister? SRC an, DST aus, Breite festgelegt. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Schritt 3: Interrupts aktivieren
-
-- Transfer-Complete-Enable im DMA
-- PLIC (bzw. Interrupt-Controller) für den Kanal freischalten
-
-```c
-/* TCIE in demselben kontrollierten CONTROL-Wort, nicht per Altzustand. */
-enable_interrupt(DMA_CH1_IRQn);  /* Pseudocode */
-```
-
-::: notes
-Schritt 3: Interrupts aktivieren knüpft an den bisherigen Datenpfad an. TCIE ist die lokale Ereignisfreigabe. enable_interrupt ist Pseudocode, keine RISC-V-API. mcause nennt die externe Klasse, Claim die Quellen-ID, Complete dieselbe ID. Der Softwarezustand steht vor der ersten möglichen Meldung. Transfer-Complete-Enable im DMA. PLIC (bzw. Interrupt-Controller) für den Kanal freischalten. Verständnischeck: Warum reicht TCIE nicht? Controller, Hart und Dispatcher müssen den Handler erreichen. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Schritt 4: Enable (Startschuss)
-
-- ENABLE-Bit setzen → Transfer startet hardwareseitig
-- C-Funktion kehrt sofort zurück — CPU ist frei
-
-```c
-void start_dma_transfer(void) {
-    DMA_CH1->CONTROL = DMA_MINC_EN | DMA_DIR_M2P
-        | DMA_TCIE_EN | DMA_ENABLE_BIT;
-}
-```
-
-::: notes
-Schritt 4: Enable (Startschuss) knüpft an den bisherigen Datenpfad an. Der Start schreibt ein kontrolliertes Wort, nicht blindes Oder auf alte Bits. ACTIVE wird gesetzt, bevor der erste IRQ kommen kann. Die Funktion wartet nicht auf 4096 ausgesendete Bytes. ENABLE-Bit setzen → Transfer startet hardwareseitig. C-Funktion kehrt sofort zurück — CPU ist frei. Verständnischeck: Bedeutet die Rückkehr, dass alles gesendet wurde? Nein. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Erwartung mit DMA
-
-- Text erscheint weiter im Monitor
-- Der Heartbeat kommt aus `main()`, nicht aus einer Timer-ISR und nicht aus Hardware-PWM
-- Die LED kann weiterlaufen und trotzdem Busstalls haben. Das ist kein Beweis für null Last
-- DMA-TC heißt: letztes Element übergeben. FIFO und Schieberegister können noch senden
-
-::: notes
-Erwartung mit DMA knüpft an den bisherigen Datenpfad an. Weiterblinken aus main zeigt höchstens Fortschritt der Schleife. Es beweist keine korrekten Bytes, keine fehlenden Stalls und kein Leitungsende. DMA-TC kann vor dem letzten Stopbit liegen. Der Simulatorlauf ist hypothetisch. Text erscheint weiter im Monitor. Der Heartbeat kommt aus `main()`, nicht aus einer Timer-ISR und nicht aus Hardware-PWM. Verständnischeck: Was erlaubt der Heartbeat? Nur den beobachteten Main-Fortschritt. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Interrupt-Handling am Ende
-
-- DMA-TC meldet das Ende der DMA-Zugriffe, nicht automatisch das letzte UART-Bit
-- Status mit passender Clear-Semantik quittieren; PLIC-Complete bleibt getrennt
-
-```c
-void dma_channel1_isr(void) {
-    if (DMA_STATUS_REG & TRANSFER_COMPLETE) {
-        DMA_CLEAR_REG = CLEAR_TRANSFER_COMPLETE; /* W1C: schreiben, nicht RMW */
-        /* optional: nächsten Transfer starten */
-    }
-}
-```
-
-::: notes
-Interrupt-Handling am Ende knüpft an den bisherigen Datenpfad an. Zuerst Fehler prüfen, dann TC. W1C schreibt die Maske. Die ISR bleibt kurz, Drain und Cache liegen im Service. Der Puffer wird frei, wenn die DMA-Zugriffe belegt beendet sind. UART-Idle ist getrennt. Bei unbestätigter Inaktivität bleibt der Besitz gesperrt. SysTick ist hier kein RISC-V-Register. DMA-TC meldet das Ende der DMA-Zugriffe, nicht automatisch das letzte UART-Bit. Status mit passender Clear-Semantik quittieren; PLIC-Complete bleibt getrennt. Verständnischeck: Was bei Fehler ohne bestätigtes Ende? Puffer nicht freigeben. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Zusammenfassung Block 6
-
-- Die gezeigte Polling-Funktion blockiert ihren Aufrufer; Zustandspolling kann zurückkehren
-- DMA ist ein Transfermodul, kein allgemeiner Coprozessor
-- DMAC als Bus-Master, Cycle Stealing mit dem Arbiter
-- Kanal: SRC, DST, COUNT, Breite, Increment
-- Cache: Richtung, Besitz und Plattformsequenz. PMP ist kein Cache-Schalter
-- Circular Mode, HT/TC → Ringpuffer und Ping-Pong
-
-::: notes
-Zusammenfassung Block 6 knüpft an den bisherigen Datenpfad an. Die Kette ist Engpass, Konfiguration, Sichtbarkeit, Transfer, Status und getrenntes Leitungsende. Zwei Arbiter, Cache-Richtung und Ringfrist gehören dazu. Polling blockiert nur die gezeigte Warteschleife. Neben den Adressen bleiben Breite, Besitz, Fristen und die Bedeutung von fertig. Die gezeigte Polling-Funktion blockiert ihren Aufrufer; Zustandspolling kann zurückkehren. DMA ist ein Transfermodul, kein allgemeiner Coprozessor. Verständnischeck: Welche vier Fragen neben den Orten? Breite, Sichtbarkeit, Fristen und Abschlussbedeutung. Die nächste Folie nimmt die noch offene Modellfrage auf. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-## Ausblick und Abschluss
-
-- Übungsblatt: Polling vs. DMA in Renode nachvollziehen
-- Nächster Block: moderne CPU-Beschleunigung (u. a. Out-of-Order)
-
-Vielen Dank — viel Erfolg im Labor.
-
-::: notes
-Ausblick und Abschluss knüpft an den bisherigen Datenpfad an. Geprüft sind Unterlage, Rechnungen und Verträge. Nicht geprüft sind Firmware, Renode und Messungen. Die fiktiven Adressen stehen auf den Modellfolien. Der nächste Block betrifft die CPU-interne Ausführung. DMA war die Entlastung des Datenpfads. Übungsblatt: Polling vs. DMA in Renode nachvollziehen. Nächster Block: moderne CPU-Beschleunigung (u. a. Out-of-Order). Verständnischeck: Was wurde nicht geprüft? Kompilierung, Emulation und Hardwarezeit. Der nächste Block fragt, wie der Prozessor seine Rechenarbeit effizienter ausführt. Adressen und Zeiten sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert oder ausgeführt.
-:::
-
-::: notes
-Wenn Terminal flüssig schreibt und die LED weiterblinkt, ist die Architektur verstanden. Bis zum nächsten Block!
+RISC in RISC-V steht für Reduced Instruction Set Computer, Rechner mit reduziertem Befehlssatz.
 :::
