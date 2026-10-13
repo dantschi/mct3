@@ -1,25 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 460" width="1200" height="460">
-<rect width="1200" height="460" fill="#fff"/>
-<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>
-<text x="16" y="20" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">Vereinfachtes Write-Back-MESI. Transiente Zustaende ausgeblendet. 64 B nur Beispiel.</text>
-<rect x="40" y="48" width="140" height="44" fill="#fff" stroke="#B71C1C" stroke-width="1.4"/>
-<text x="110" y="76" font-size="18" font-weight="700" fill="#B71C1C" text-anchor="middle">I</text>
-<rect x="300" y="48" width="140" height="44" fill="#fff" stroke="#1565C0" stroke-width="1.4"/>
-<text x="370" y="76" font-size="18" font-weight="700" fill="#1565C0" text-anchor="middle">E</text>
-<rect x="560" y="48" width="140" height="44" fill="#fff" stroke="#1B5E20" stroke-width="1.4"/>
-<text x="630" y="76" font-size="18" font-weight="700" fill="#1B5E20" text-anchor="middle">S</text>
-<rect x="860" y="48" width="140" height="44" fill="#fff" stroke="#E65100" stroke-width="1.4"/>
-<text x="930" y="76" font-size="18" font-weight="700" fill="#E65100" text-anchor="middle">M</text>
-<text x="16" y="130" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">I + lokaler Read, keine Kopie -> E, Speicher liefert</text>
-<text x="16" y="156" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">I + lokaler Read, andere saubere Kopie -> S</text>
-<text x="16" y="182" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">I + lokaler Read, Owner M -> Daten  vom Owner, dann S</text>
-<text x="16" y="208" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">E + lokaler Write -> M, still</text>
-<text x="16" y="234" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">E + Fremdread -> S, Daten teilen</text>
-<text x="16" y="260" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">S + eigener Write -> erst Ownership, Invalidates, dann M</text>
-<text x="16" y="286" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">S + Fremdwrite -> I</text>
-<text x="16" y="312" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">M + Fremdread -> aktuelle Daten liefern, dann S</text>
-<text x="16" y="338" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">M + Fremdwrite -> Daten liefern, dann I</text>
-<text x="16" y="364" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">Eviction von M schreibt zurueck. Eviction von S kann S woanders lassen.</text>
-<text x="16" y="410" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">S heisst sauber und teilbar, nicht nachweislich mehrere Kopien.</text>
-<text x="16" y="438" font-size="14" font-weight="400" fill="#5F6368" text-anchor="start">I heisst lokal ungueltig, nicht zwingend geloeschte Bits. M und E sind exklusiv.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="398" viewBox="0 0 1000 398" role="img" aria-labelledby="title">
+<title id="title">MESI-Gültigkeit, Sauberkeit und Schreibrecht</title>
+<style>text{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:400}</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6" fill="#1D1D1F"/></marker></defs>
+<rect width="1000" height="398" fill="#FFFFFF"/>
+<text x="20" y="30" font-size="24" fill="#1D1D1F" text-anchor="start">MESI: stabile Rechte einer ganzen Cachezeile · Modell K</text>
+<rect x="20" y="100" width="210" height="155" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="125.0" y="155.5" font-size="24" fill="#1D1D1F" text-anchor="middle">M: Modified</text>
+<text x="125.0" y="185.5" font-size="24" fill="#1D1D1F" text-anchor="middle">gültig, geändert</text>
+<text x="125.0" y="215.5" font-size="24" fill="#1D1D1F" text-anchor="middle">exklusiv</text>
+<rect x="270" y="100" width="210" height="155" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="375.0" y="155.5" font-size="24" fill="#1D1D1F" text-anchor="middle">E: Exclusive</text>
+<text x="375.0" y="185.5" font-size="24" fill="#1D1D1F" text-anchor="middle">gültig, sauber</text>
+<text x="375.0" y="215.5" font-size="24" fill="#1D1D1F" text-anchor="middle">exklusiv</text>
+<rect x="520" y="100" width="210" height="155" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="625.0" y="155.5" font-size="24" fill="#1D1D1F" text-anchor="middle">S: Shared</text>
+<text x="625.0" y="185.5" font-size="24" fill="#1D1D1F" text-anchor="middle">gültig, sauber</text>
+<text x="625.0" y="215.5" font-size="24" fill="#1D1D1F" text-anchor="middle">teilbar</text>
+<rect x="770" y="100" width="210" height="155" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="875.0" y="155.5" font-size="24" fill="#1D1D1F" text-anchor="middle">I: Invalid</text>
+<text x="875.0" y="185.5" font-size="24" fill="#1D1D1F" text-anchor="middle">lokal ungültig</text>
+<text x="875.0" y="215.5" font-size="24" fill="#1D1D1F" text-anchor="middle">kein Treffer</text>
+<text x="500" y="322" font-size="23" fill="#1D1D1F" text-anchor="middle">M oder E: keine weitere gültige Kopie · S-Kopien stimmen überein</text>
+<text x="500" y="367" font-size="23" fill="#1D1D1F" text-anchor="middle">S kann allein übrig bleiben · I muss alte Bits nicht löschen</text>
 </svg>

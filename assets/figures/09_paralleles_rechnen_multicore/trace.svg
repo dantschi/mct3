@@ -1,34 +1,51 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360">
-<rect width="1200" height="360" fill="#fff"/>
-<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>
-<text x="16" y="20" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">x startet 0, beide I, RAM 0. Klassischer MESI-Pfad, Write-Back.</text>
-<text x="16" y="52" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">Schritt</text>
-<text x="180" y="52" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">Core0</text>
-<text x="360" y="52" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">Core1</text>
-<text x="540" y="52" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">RAM</text>
-<text x="700" y="52" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">Aktion</text>
-<text x="16" y="86" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">0 Read</text>
-<text x="180" y="86" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">E:0</text>
-<text x="360" y="86" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">I</text>
-<text x="540" y="86" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">0</text>
-<text x="700" y="86" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">Speicher liefert</text>
-<text x="16" y="122" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">1 Read</text>
-<text x="180" y="122" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">S:0</text>
-<text x="360" y="122" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">S:0</text>
-<text x="540" y="122" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">0</text>
-<text x="700" y="122" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">E wird S</text>
-<text x="16" y="158" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">0 Write 5</text>
-<text x="180" y="158" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">M:5</text>
-<text x="360" y="158" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">I</text>
-<text x="540" y="158" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">0</text>
-<text x="700" y="158" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">Invalidate, RAM noch 0</text>
-<text x="16" y="194" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">1 Read</text>
-<text x="180" y="194" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">S:5</text>
-<text x="360" y="194" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">S:5</text>
-<text x="540" y="194" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">5</text>
-<text x="700" y="194" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">Owner liefert 5</text>
-<text x="16" y="250" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">Bei M darf der untere Speicher noch 0 sein. Der folgende Read muss 5 sehen.</text>
-<text x="16" y="280" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Invariante: hoechstens ein M oder E. S-Kopien stimmen ueberein. I ist kein Hit.</text>
-<text x="16" y="310" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">Gleichzeitige Schreiber: der Interconnect serialisiert Ownership.</text>
-<text x="16" y="338" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">Snooping ist nicht an einen einzelnen Draht gebunden. Directory nur als Abgrenzung.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="435" viewBox="0 0 1000 435" role="img" aria-labelledby="title">
+<title id="title">Modell K · x startet 0 · Rechte und Werte getrennt verfolgen</title>
+<style>text{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:400}</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6" fill="#1D1D1F"/></marker></defs>
+<rect width="1000" height="435" fill="#FFFFFF"/>
+<text x="20" y="30" font-size="24" fill="#1D1D1F" text-anchor="start">Modell K · x startet 0 · Rechte und Werte getrennt verfolgen</text>
+<text x="28" y="82" font-size="23" fill="#1D1D1F" text-anchor="start">Aktion</text>
+<text x="388" y="82" font-size="23" fill="#1D1D1F" text-anchor="start">Kern 0</text>
+<text x="618" y="82" font-size="23" fill="#1D1D1F" text-anchor="start">Kern 1</text>
+<text x="848" y="82" font-size="23" fill="#1D1D1F" text-anchor="start">L</text>
+<rect x="20" y="100" width="356" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="28" y="136" font-size="23" fill="#1D1D1F" text-anchor="start">Start</text>
+<rect x="380" y="100" width="226" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="388" y="136" font-size="23" fill="#1D1D1F" text-anchor="start">I</text>
+<rect x="610" y="100" width="226" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="618" y="136" font-size="23" fill="#1D1D1F" text-anchor="start">I</text>
+<rect x="840" y="100" width="136" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="848" y="136" font-size="23" fill="#1D1D1F" text-anchor="start">0</text>
+<rect x="20" y="162" width="356" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="28" y="198" font-size="23" fill="#1D1D1F" text-anchor="start">Read Kern 0</text>
+<rect x="380" y="162" width="226" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="388" y="198" font-size="23" fill="#1D1D1F" text-anchor="start">E:0</text>
+<rect x="610" y="162" width="226" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="618" y="198" font-size="23" fill="#1D1D1F" text-anchor="start">I</text>
+<rect x="840" y="162" width="136" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="848" y="198" font-size="23" fill="#1D1D1F" text-anchor="start">0</text>
+<rect x="20" y="224" width="356" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="28" y="260" font-size="23" fill="#1D1D1F" text-anchor="start">Read Kern 1</text>
+<rect x="380" y="224" width="226" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="388" y="260" font-size="23" fill="#1D1D1F" text-anchor="start">S:0</text>
+<rect x="610" y="224" width="226" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="618" y="260" font-size="23" fill="#1D1D1F" text-anchor="start">S:0</text>
+<rect x="840" y="224" width="136" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="848" y="260" font-size="23" fill="#1D1D1F" text-anchor="start">0</text>
+<rect x="20" y="286" width="356" height="56" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="28" y="322" font-size="23" fill="#1D1D1F" text-anchor="start">Write Kern 0: 5</text>
+<rect x="380" y="286" width="226" height="56" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="388" y="322" font-size="23" fill="#1D1D1F" text-anchor="start">M:5</text>
+<rect x="610" y="286" width="226" height="56" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="618" y="322" font-size="23" fill="#1D1D1F" text-anchor="start">I</text>
+<rect x="840" y="286" width="136" height="56" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="848" y="322" font-size="23" fill="#1D1D1F" text-anchor="start">0</text>
+<rect x="20" y="348" width="356" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="28" y="384" font-size="23" fill="#1D1D1F" text-anchor="start">Read Kern 1</text>
+<rect x="380" y="348" width="226" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="388" y="384" font-size="23" fill="#1D1D1F" text-anchor="start">S:5</text>
+<rect x="610" y="348" width="226" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="618" y="384" font-size="23" fill="#1D1D1F" text-anchor="start">S:5</text>
+<rect x="840" y="348" width="136" height="56" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="848" y="384" font-size="23" fill="#1D1D1F" text-anchor="start">5</text>
 </svg>

@@ -1,17 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320">
-<rect width="1200" height="320" fill="#fff"/>
-<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>
-<text x="16" y="22" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">Deadlock ist ein Wartezyklus. Starvation ist Warten ohne Zyklus. Livelock ist Betrieb ohne Fortschritt.</text>
-<rect x="16" y="52" width="520" height="110" fill="#fff" stroke="#B71C1C" stroke-width="1.4"/>
-<text x="28" y="78" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">Zyklus</text>
-<text x="28" y="106" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">Core0 haelt A, will B</text>
-<text x="28" y="132" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">Core1 haelt B, will A</text>
-<rect x="580" y="52" width="560" height="110" fill="#fff" stroke="#1B5E20" stroke-width="1.4"/>
-<text x="592" y="78" font-size="15" font-weight="600" fill="#1B5E20" text-anchor="start">Ordnung A vor B</text>
-<text x="592" y="106" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">beide erwerben A, dann B</text>
-<text x="592" y="132" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">kein Zyklus</text>
-<text x="16" y="200" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">Timeout allein stellt keinen gueltigen Datenzustand her.</text>
-<text x="16" y="232" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Frage: Die ISR spinnt auf ein Schloss, das der unterbrochene Kern haelt. Was folgt?</text>
-<text x="16" y="264" font-size="14" font-weight="400" fill="#5F6368" text-anchor="start">Antwort in den Notizen: Selbstdeadlock. Atomics ersetzen keine Prioritaetsvererbung.</text>
-<text x="16" y="296" font-size="14" font-weight="400" fill="#5F6368" text-anchor="start">Das Schloss nicht blind freigeben, waehrend der Besitzer noch schreibt.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="364" viewBox="0 0 1000 364" role="img" aria-labelledby="title">
+<title id="title">Zyklisches Warten und feste Lockreihenfolge</title>
+<style>text{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:400}</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6" fill="#1D1D1F"/></marker></defs>
+<rect width="1000" height="364" fill="#FFFFFF"/>
+<text x="20" y="30" font-size="24" fill="#1D1D1F" text-anchor="start">Wartekreis trotz korrekter atomarer Sperrprimitive</text>
+<rect x="80" y="100" width="330" height="100" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="245.0" y="143.0" font-size="24" fill="#1D1D1F" text-anchor="middle">Kern 0 hält A</text>
+<text x="245.0" y="173.0" font-size="24" fill="#1D1D1F" text-anchor="middle">will B</text>
+<rect x="590" y="100" width="330" height="100" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="755.0" y="143.0" font-size="24" fill="#1D1D1F" text-anchor="middle">Kern 1 hält B</text>
+<text x="755.0" y="173.0" font-size="24" fill="#1D1D1F" text-anchor="middle">will A</text>
+<line x1="420" y1="130" x2="580" y2="130" stroke="#E2001A" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="580" y1="170" x2="420" y2="170" stroke="#E2001A" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="500" y="281" font-size="24" fill="#1D1D1F" text-anchor="middle">Einheitliche Reihenfolge A vor B verhindert diesen Kreis</text>
+<text x="500" y="332" font-size="23" fill="#1D1D1F" text-anchor="middle">Timeout darf keine fremde aktive Sperre einfach löschen</text>
 </svg>

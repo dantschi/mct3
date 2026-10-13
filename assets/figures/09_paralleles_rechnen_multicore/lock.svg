@@ -1,15 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360">
-<rect width="1200" height="360" fill="#fff"/>
-<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>
-<text x="16" y="20" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Lehrschloss fuer gewoehnlichen Shared Memory. Kein Cache-Flush als Ersatz.</text>
-<text x="16" y="52" font-size="16" font-weight="600" fill="#1565C0" text-anchor="start">lr.w.aq  pruefen  sc.w  bei Erfolg 0</text>
-<text x="16" y="84" font-size="16" font-weight="600" fill="#1B5E20" text-anchor="start">kritische Daten liegen zwischen Acquire und Release</text>
-<text x="16" y="116" font-size="16" font-weight="600" fill="#E65100" text-anchor="start">fence rw,w    dann sw zero auf das Schloss</text>
-<text x="16" y="156" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Acquire begrenzt spaetere Zugriffe. Release begrenzt fruehere Schreibzugriffe.</text>
-<text x="16" y="188" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">Daten plus Flag: der atomare Flag-Store allein publiziert die Daten nicht.</text>
-<text x="16" y="220" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Spinlock: nicht schlafen, nicht blockierend warten, nicht lang rechnen.</text>
-<text x="16" y="252" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">ISR auf ein Schloss des unterbrochenen Kontexts: Selbstdeadlock.</text>
-<text x="16" y="284" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">Timeout bricht das Schloss nicht sicher, solange der Besitzer noch schreibt.</text>
-<text x="16" y="316" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">MMIO und Compiler-Barrieren sind andere Domaenen. Annahme: RVWMO, A-Extension.</text>
-<text x="16" y="344" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">Diese Sequenz ist hier nicht mit einer RISC-V-Toolchain assembliert.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="280" viewBox="0 0 1000 280" role="img" aria-labelledby="title">
+<title id="title">Übernahme, Nutzdaten und geordnete Freigabe</title>
+<style>text{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:400}</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6" fill="#1D1D1F"/></marker></defs>
+<rect width="1000" height="280" fill="#FFFFFF"/>
+<text x="20" y="30" font-size="24" fill="#1D1D1F" text-anchor="start">Drei Phasen für gewöhnlichen Speicher · kein Cacheflush</text>
+<rect x="20" y="85" width="280" height="95" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="160.0" y="125.5" font-size="24" fill="#1D1D1F" text-anchor="middle">Übernahme</text>
+<text x="160.0" y="155.5" font-size="20" fill="#1D1D1F" text-anchor="middle">lr.w.aq / erfolgreicher SC</text>
+<rect x="355" y="85" width="280" height="95" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="495.0" y="125.5" font-size="24" fill="#1D1D1F" text-anchor="middle">kritischer Abschnitt</text>
+<text x="495.0" y="155.5" font-size="20" fill="#1D1D1F" text-anchor="middle">geschützte Reads / Writes</text>
+<rect x="700" y="85" width="280" height="95" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="840.0" y="125.5" font-size="24" fill="#1D1D1F" text-anchor="middle">Freigabe</text>
+<text x="840.0" y="155.5" font-size="20" fill="#1D1D1F" text-anchor="middle">fence rw,w dann sw 0</text>
+<line x1="300" y1="133" x2="350" y2="133" stroke="#1D1D1F" stroke-width="2" marker-end="url(#arrow)"/>
+<line x1="635" y1="133" x2="695" y2="133" stroke="#E2001A" stroke-width="3" marker-end="url(#arrow)"/>
+<text x="500" y="248" font-size="23" fill="#1D1D1F" text-anchor="middle">Die Freigabeordnung steht vor dem Store des freien Schlosswerts</text>
 </svg>

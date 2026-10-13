@@ -1,18 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320">
-<rect width="1200" height="320" fill="#fff"/>
-<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>
-<text x="16" y="22" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">Hardwaremotiv, keine C11-Ergebnisliste. volatile aendert die Teilung nicht.</text>
-<text x="16" y="60" font-size="14" font-weight="600" fill="#1565C0" text-anchor="start">Hart 0</text>
-<text x="120" y="60" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">liest 0</text>
-<text x="280" y="60" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">schreibt 1</text>
-<text x="480" y="60" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">Abschnitt</text>
-<text x="16" y="100" font-size="14" font-weight="600" fill="#E65100" text-anchor="start">Hart 1</text>
-<text x="120" y="100" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">liest 0</text>
-<text x="280" y="100" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">schreibt 1</text>
-<text x="480" y="100" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">Abschnitt</text>
-<text x="16" y="150" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">Beide sind gleichzeitig im Abschnitt, weil Check und Set getrennt sind.</text>
-<rect x="16" y="180" width="1140" height="70" fill="#fff" stroke="#1B5E20" stroke-width="1.4"/>
-<text x="28" y="210" font-size="15" font-weight="600" fill="#1B5E20" text-anchor="start">Atomare Uebernahme: nur ein SC mit Status 0 betritt den Abschnitt.</text>
-<text x="28" y="236" font-size="15" font-weight="600" fill="#1B5E20" text-anchor="start">Der andere liest 1 und wartet bis zum Release auf 0.</text>
-<text x="16" y="290" font-size="14" font-weight="400" fill="#5F6368" text-anchor="start">Das ist kein Zaehler-RMW. Der Schlosswert bleibt 0 oder 1.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="438" viewBox="0 0 1000 438" role="img" aria-labelledby="title">
+<title id="title">Logische Race Condition und unteilbare Entscheidung</title>
+<style>text{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:400}</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6" fill="#1D1D1F"/></marker></defs>
+<rect width="1000" height="438" fill="#FFFFFF"/>
+<text x="20" y="30" font-size="24" fill="#1D1D1F" text-anchor="start">Links: Check und Set getrennt · rechts: atomare Übernahme</text>
+<rect x="20" y="85" width="430" height="85" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="235.0" y="120.5" font-size="24" fill="#1D1D1F" text-anchor="middle">beide lesen frei 0</text>
+<text x="235.0" y="150.5" font-size="24" fill="#1D1D1F" text-anchor="middle">beide setzen 1</text>
+<rect x="550" y="85" width="430" height="85" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="765.0" y="120.5" font-size="24" fill="#1D1D1F" text-anchor="middle">erster Test-and-Set sieht 0</text>
+<text x="765.0" y="150.5" font-size="24" fill="#1D1D1F" text-anchor="middle">zweiter sieht schon 1</text>
+<line x1="235" y1="180" x2="235" y2="245" stroke="#1D1D1F" stroke-width="2" marker-end="url(#arrow)"/>
+<line x1="765" y1="180" x2="765" y2="245" stroke="#E2001A" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="20" y="255" width="430" height="85" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="235.0" y="290.5" font-size="24" fill="#1D1D1F" text-anchor="middle">zwei vermeintliche Besitzer</text>
+<text x="235.0" y="320.5" font-size="24" fill="#1D1D1F" text-anchor="middle">gegenseitiger Ausschluss verletzt</text>
+<rect x="550" y="255" width="430" height="85" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="765.0" y="290.5" font-size="24" fill="#1D1D1F" text-anchor="middle">genau eine Übernahme</text>
+<text x="765.0" y="320.5" font-size="24" fill="#1D1D1F" text-anchor="middle">anderer wartet</text>
+<text x="500" y="407" font-size="23" fill="#1D1D1F" text-anchor="middle">Status prüfen, dann eintreten · Nutzdatenordnung zusätzlich erforderlich</text>
 </svg>
