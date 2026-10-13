@@ -1,922 +1,792 @@
 ---
 title: "08 · KI-Beschleuniger & Edge AI"
-subtitle: "Mikrocomputertechnik 3 · Von der Memory-Wall neuronaler Netze zu Systolic Arrays und TensorFlow Lite"
+subtitle: "Mikrocomputertechnik 3 · Datenparallelität, lokale Wiederverwendung und Inferenz"
 author: "Prof. Dr.-Ing. Daniel Klünder"
-lang: de
-# Vortrag:  quarto preview vorlesungen/08_ki_beschleuniger_edge_ai.qmd
-#           (Notizen nur mit Taste S)
-# Handout:  quarto render vorlesungen/08_ki_beschleuniger_edge_ai.qmd --profile handout --to pdf
-#           → _handout/vorlesungen/08_ki_beschleuniger_edge_ai.pdf
 format: revealjs
+highlight-style: ../assets/styles/dhbw-code.theme
+title-slide-attributes:
+  data-visibility: hidden
+lang: de
+# Vortrag: quarto render vorlesungen/08_ki_beschleuniger_edge_ai.qmd --to revealjs
+# Skript: quarto render vorlesungen/08_ki_beschleuniger_edge_ai.qmd --profile handout --to pdf
 ---
 
-## Willkommen zu Block 8!
+## KI am Edge: Rechnung braucht Daten
 
-- Willkommen zur achten Vorlesung in Mikrocomputertechnik 3
-- Block 7: OoO und Branch Prediction maximieren die General-Purpose-CPU
-- Heute: Workload Künstliche Intelligenz — und warum Spezialhardware (NPUs) hilft
-- Ziel: Memory Wall bei neuronalen Netzen verstehen und den Weg zu DSAs skizzieren
-
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[Block 7: CPU] -->|Alleskönner| B[Kontrollfluss]
-  C[Heute: NPU] -->|Spezialist| D[Datenfluss / KI]
-  style C fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+- Vorlesung 7: unabhängige Befehle und Speicherzugriffe überlappen
+- Heute: dieselbe Rechnung auf vielen Werten ausführen
+- Daten lokal wiederverwenden, statt jedes Produkt neu zu versorgen
+- Modell, Hardware und Firmware müssen zusammenpassen
 
 ::: notes
-Willkommen zu Block 8 knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Heute stehen regelmäßige Rechnung und Datenbewegung im Mittelpunkt. Eine NPU ist nicht für jede lokale Inferenz nötig. CPU, DSP und Vektoren können kleine Modelle tragen. Willkommen zur achten Vorlesung in Mikrocomputertechnik 3. Block 7: OoO und Branch Prediction maximieren die General-Purpose-CPU. Verständnischeck: Braucht jede lokale Inferenz eine NPU? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+KI bedeutet Künstliche Intelligenz. In dieser Vorlesung betrachten wir daraus die Ausführung bereits trainierter neuronaler Netze. Edge bezeichnet den Rand eines vernetzten Systems, beispielsweise ein Sensorgerät oder ein lokales Gateway. Ein Gateway vermittelt zwischen Geräten und einem übergeordneten Netz. Es muss nicht jede Eingabe an einen entfernten Server weitergeben.
+
+Aus Vorlesung 7 ist bekannt, dass ein Prozessor unabhängige Arbeit überlappen kann. Heute verschiebt sich der Blick: Viele Eingaben verlangen dieselbe Art von Multiplikation und Addition. Das eröffnet Datenparallelität und regelmäßige Datenwege. Zusätzliche Rechenwerke helfen jedoch nur, wenn ihre Operanden rechtzeitig ankommen.
+
+Wir entwickeln diese Frage von einer einzelnen gewichteten Summe über Vektoren bis zu einem kleinen systolischen Gitter. Abschließend verbinden wir den Datenfluss mit Quantisierung und Speicherplanung in einer Firmware. Die Zahlen der Rechen- und Zeitmodelle sind ausdrücklich Lehrannahmen. Sie ersetzen keine Messung an einem KI-Chip.
 :::
 
-## Anknüpfung: Compiler-Labor
+## Was wir aus Vorlesung 7 mitnehmen
 
-Kurz-Recap aus Block 7 (Vertiefung im Übungsblatt):
+- RAW: eine Summe benötigt ihre vorherige Teilsumme
+- OoO kann unabhängige Produkte und Loads vorziehen
+- Ein Compilerlisting zeigt Befehle, kein vollständiges Zeitverhalten
+- Mehr parallele Rechnung hebt eine Bandbreitengrenze nicht auf
 
-- Godbolt zeigt die Übersetzung, kein OoO-Timing
-- `-O3` garantiert weder Unrolling noch kürzere Laufzeit
-- Scheduling und Unrolling sind mögliche, keine sicheren Folgen
-- Eine MAC-Kette bleibt RAW. Mehrere Akkumulatoren können unabhängig sein
+::: notes
+RAW heißt Read After Write, Lesen nach Schreiben: Eine Operation braucht den von einem Vorgänger erzeugten Wert. In einer fortlaufenden Summe ist der neue Akkumulator vom alten abhängig. OoO bedeutet Out of Order, interne Ausführung außerhalb der Programmreihenfolge. Ein Kern kann beispielsweise einen unabhängigen Speicherzugriff beginnen, während er noch auf einen anderen wartet.
+
+Ein Load ist ein Ladebefehl. Er bedeutet nicht automatisch einen Zugriff auf externen Hauptspeicher; sein Wert kann bereits im Cache liegen. Ein Cache ist eine nahe Kopie ausgewählter Speicherblöcke. Bandbreite bezeichnet übertragbare Bytes je Zeiteinheit, Latenz die Zeit bis zum einzelnen Ergebnis. Beides müssen wir auseinanderhalten.
+
+Die vertraute Summenkette bleibt auch bei einer neuronalen Rechnung eine echte Abhängigkeit. Mehrere unabhängige Ausgabesummen können dagegen parallel bearbeitet werden. Ein Compilerlisting zeigt die gewählten Maschinenbefehle. Ob deren Ausführung an Abhängigkeiten, Ports oder Datenversorgung wartet, verlangt weitere Annahmen. Dieser Zusammenhang führt zur Leitfrage: Wie viel gleichartige Rechnung steckt in einem Modell, und wie viele Daten müssen wir dafür bewegen?
+:::
+
+## Vier Schulstunden und Lernziele
+
+| Stunde | Erklärung und Besprechung | Arbeitsphase |
+|--------|---------------------------|--------------|
+| 1 | Dense-Schicht und Speichergrenzen: 35 min | Aufgaben 1–2: 10 min |
+| 2 | SIMD, DSP und Vektorlängen: 30 min | Aufgabe 3: 15 min |
+| 3 | Systolisches Array und Auslastung: 30 min | Aufgabe 4: 15 min |
+| 4 | Quantisierung und Firmware: 15 min | Aufgaben 5–6: 15 min; Quiz: 15 min |
+
+::: notes
+Vier Schulstunden ergeben hundertachtzig Minuten ohne zusätzliche Pausen: hundertzehn Minuten Erklärung, Denkfragen und Lösungsbesprechung, fünfundfünfzig Minuten angeleitete Papierarbeit und fünfzehn Minuten Quiz. Die fünfzig Folien setzen unterschiedliche Schwerpunkte; Datenflussbilder und Rechnungen brauchen mehr Zeit als kurze Übersichten. Das Übungsblatt nennt zusätzlich einen Richtwert für vollständiges selbstständiges Bearbeiten.
+
+Sie sollen danach eine Dense-Schicht berechnen, Parameter von Rechenaufwand unterscheiden und eine Bandbreitengrenze mit benannter Speichergrenze bestimmen können. Dense heißt vollständig verbunden: Jeder Eingang trägt zu jedem betrachteten Ausgang bei. SIMD steht für Single Instruction, Multiple Data, ein gemeinsamer Befehl auf mehreren Daten. DSP bedeutet Digital Signal Processor, Prozessor für digitale Signalverarbeitung.
+
+Weitere Lernziele sind die aktive Vektorlänge, die zeitlich versetzte Einspeisung eines systolischen Arrays und ein getrenntes Budget für Modell- und Arbeitsspeicher. Alle Pflichtaufgaben sind auf Papier lösbar. Das optionale C-Experiment prüft Zahlen und Fehlerfälle auf dem Entwicklungsrechner; ein neuronales Framework ist dafür nicht nötig.
+:::
+
+## Edge ist ein Ort, keine Prozessorpflicht
+
+![](../assets/figures/08_ki_beschleuniger_edge_ai/edge.png){fig-alt="Sensordaten können auf dem Endgerät, einem lokalen Gateway oder einem entfernten Server verarbeitet werden. Die Übertragungswege haben eigene Kosten."}
+
+Reaktionszeit, Energie, Verfügbarkeit und Datenschutz gemeinsam bewerten.
+
+::: notes
+Edge AI bedeutet künstliche Intelligenz am Rand eines vernetzten Systems. AI steht für Artificial Intelligence. Das Bild liest sich vom Sensor nach rechts: Eine Verarbeitung kann auf dem Endgerät stattfinden, auf einem nahen Gateway oder nach einer Netzübertragung auf einem entfernten Server. Die roten kurzen Wege markieren Lokalität, nicht automatisch den geringsten Energieverbrauch.
+
+Eine lokale Entscheidung kann bei ausgefallenem Netz weiter verfügbar sein und Übertragungen sensibler Rohdaten reduzieren. Sie benötigt dafür eigenen Speicher, Energie und eine passende Ausführungszeit. Funkübertragung ist keineswegs immer teurer als lokale Rechnung. Ein kleines Modell auf einem sparsamen Prozessor und ein großes Modell mit langen Rechenphasen führen zu unterschiedlichen Entscheidungen.
+
+NPU heißt Neural Processing Unit, Beschleuniger für neuronale Verarbeitung. Sie ist keine Voraussetzung für Edge AI. Ein Endgerät kann ein Modell auf seiner normalen CPU ausführen; CPU heißt Central Processing Unit, Prozessor. Auch ein klassischer Schwellenwertalgorithmus kann die Anforderung bereits erfüllen. Zuerst ist daher die Aufgabe zu beschreiben, bevor eine Hardwareklasse gewählt wird.
+:::
+
+## Training und Inferenz sind verschiedene Arbeit
+
+- Training: Parameter anhand von Beispieldaten bestimmen
+- Inferenz: neue Eingaben mit festgelegten Parametern auswerten
+- Vorverarbeitung und Entscheidungslogik gehören zur Anwendung
+- Eine Aktivitätsklasse ist noch keine gezählte Schrittzahl
+
+::: notes
+Ein Parameter ist ein beim Training bestimmter Zahlenwert, etwa ein Gewicht oder ein Bias. Training verändert diese Werte mit Hilfe von Beispieldaten und einer Zielfunktion. Inferenz verwendet die danach festgelegten Werte für eine neue Eingabe. Beide Phasen können ähnliche Grundoperationen enthalten, haben aber andere Speicher- und Steuerungsanforderungen. Inferenz findet nicht zwingend auf derselben Maschine wie Training statt.
+
+Als Anwendungsbild verwenden wir ein Fenster von Beschleunigungsmessungen. Ein Fenster ist ein zeitlich begrenzter Ausschnitt. Vorverarbeitung kann Achsen ordnen, Werte normieren oder Merkmale bilden. Ein Modell könnte dem Fenster die Klasse Stehen, Gehen oder Laufen zuordnen. Das liefert keine Anzahl einzelner Schritte. Dafür wäre zusätzliche zeitliche Ereigniserkennung nötig.
+
+Ein Klassifikator entscheidet zwischen Kategorien, ein Regressionsmodell schätzt eine numerische Größe. Auch ein Klassifikator gibt nicht zwingend Wahrscheinlichkeiten aus. Wir behandeln zunächst eine kleine lineare Schicht ohne Training und ohne Klassenaussage. So lässt sich ihre Rechnung vollständig verstehen, bevor die Bedeutung der Modellausgabe hinzukommt.
+:::
+
+## Welche Zahlen speichert ein Netz?
+
+![](../assets/figures/08_ki_beschleuniger_edge_ai/tensors.png){fig-alt="Eingangsvektor x mit drei Werten, Gewichtsmatrix W mit zwei Zeilen und drei Spalten, Biasvektor b und Ausgangsvektor y mit je zwei Werten."}
+
+Gewichte und Bias sind Parameter; Eingaben und Zwischenergebnisse sind Aktivierungen.
+
+::: notes
+Ein Tensor ist ein Zahlenfeld mit festgelegter Form und Datentyp. Ein Vektor hat eine Achse, eine Matrix zwei; der allgemeinere Begriff umfasst auch höherdimensionale Felder. Die Form beschreibt die Elementzahlen entlang der Achsen, noch nicht die Zahl der Speicherbytes. Diese hängt zusätzlich vom Datentyp ab.
+
+Das Bild zeigt den Eingangsvektor $x$ mit drei Werten, die Gewichtsmatrix $W$ mit zwei Zeilen und drei Spalten, den Biasvektor $b$ mit zwei Werten und den Ausgang $y$ mit zwei Werten. Ein Gewicht bestimmt, wie stark ein Eingang zu einer Summe beiträgt. Ein Bias verschiebt diese Summe unabhängig von der Eingabe. Die Leserichtung der Pfeile beschreibt Abhängigkeiten der Rechnung, keine reale Busverdrahtung.
+
+Gewichte und Bias werden während einer gewöhnlichen Inferenz als konstante Parameter verwendet. Aktivierungen sind Eingaben und berechnete Zwischen- oder Ausgangswerte. Die Eingangsdaten eines späteren Layers, einer Schicht, können bereits Ergebnisse der vorherigen sein. Ein Netz braucht deshalb neben seinen gespeicherten Parametern auch Platz für aktive Zwischenwerte. Die rote Ausgangsgruppe markiert die zwei zu berechnenden Summen.
+:::
+
+## Dense-Schicht: zwei gewichtete Summen
+
+$$y_j=b_j+\sum_{i=0}^{N-1}W_{j,i}x_i,\qquad j=0,\ldots,M-1$$
+
+- $N$ Eingänge, $M$ Ausgänge; hier $N=3$, $M=2$
+- Jede Zeile von $W$ bildet eine eigene Summe
+- Eine anschließende Aktivierungsfunktion ist hier ausgeblendet
+
+::: notes
+Dense heißt vollständig verbunden. Jeder der $M$ Ausgänge erhält einen Beitrag von jedem der $N$ Eingänge. $x_i$ ist Eingang $i$, $W_{j,i}$ das Gewicht von diesem Eingang zu Ausgang $j$, $b_j$ dessen Bias und $y_j$ das Ergebnis. Die Summe läuft über die Eingangsspalten, während $j$ die Ausgangszeile auswählt. Alle Indizes beginnen bei null.
+
+Bei drei Eingängen und zwei Ausgängen enthält $W$ sechs Gewichte. Es gibt zwei weitere Parameter für den Bias. Die erste Zeile verwendet alle drei Eingänge und ihre drei Gewichte; die zweite tut dasselbe mit anderen Gewichten. Diese beiden Ausgabesummen sind voneinander unabhängig. Innerhalb einer einzelnen Summe hängt ein fortlaufender Akkumulator dagegen von seiner vorherigen Teilsumme ab.
+
+Eine Aktivierungsfunktion ist eine nachgeschaltete Abbildung, beispielsweise das Ersetzen negativer Werte durch null. Sie kann Nichtlinearität erzeugen. Wir lassen sie hier bewusst weg, um das lineare Rechenmuster zu isolieren. Auch Vorverarbeitung, Training und eine Klassenauswahl sind nicht Teil dieser Formel. Mit konkreten Zahlen wird nun sichtbar, welche Produkte in welchen Ausgang gehören.
+:::
+
+## Rechnen Sie die beiden Ausgänge aus
+
+$$W=\begin{bmatrix}1&2&3\\0&-1&4\end{bmatrix},\quad
+x=\begin{bmatrix}2\\1\\3\end{bmatrix},\quad
+b=\begin{bmatrix}1\\-2\end{bmatrix}$$
+
+Bestimmen Sie $y=Wx+b$. Wie viele Parameter werden verwendet?
+
+::: notes
+Das Beispiel ist ein frei gewähltes Lehrmodell, kein trainiertes Netz. $W$ bezeichnet Gewichte, $x$ Eingaben, $b$ Biaswerte und $y$ Ausgaben. Matrix-Vektor-Multiplikation bedeutet hier das Skalarprodukt jeder Zeile mit dem Eingangsvektor. Ein Skalarprodukt multipliziert einander zugeordnete Werte und addiert die Produkte.
+
+Für die erste Zeile entstehen $1\cdot2=2$, $2\cdot1=2$ und $3\cdot3=9$. Ihre Summe ist dreizehn. Mit Bias eins ergibt sich $y_0=14$. Für die zweite Zeile erhalten wir $0\cdot2=0$, $(-1)\cdot1=-1$ und $4\cdot3=12$. Die Summe elf wird durch Bias minus zwei zu $y_1=9$. Also ist $y=[14,9]^T$; das hochgestellte $T$ bezeichnet Transposition zur Spaltenform.
+
+Die Parameterzahl beträgt sechs Gewichte plus zwei Biaswerte, also acht. Die Eingaben zählen nicht als trainierte Parameter. Ein häufiger Fehler ist das Addieren des Bias zu jedem Produkt; er gehört hier genau einmal zur jeweiligen Ausgangssumme. Lassen Sie vor der Besprechung beide Zeilen auf Papier berechnen. Das Ergebnis wird anschließend zur Kontrolle aller alternativen Datenwege verwendet.
+:::
+
+## MACs, Parameter und Operationen zählen
+
+![](../assets/figures/08_ki_beschleuniger_edge_ai/dense.png){fig-alt="Zwei Ausgangssummen verwenden je drei Produkte und einen Bias. Ergebnisse sind 14 und 9. Es gibt sechs produktbezogene MACs und acht Parameter."}
+
+Konvention: eine MAC zählt als zwei arithmetische Operationen.
+
+::: notes
+MAC bedeutet Multiply-Accumulate, Multiplizieren und zur laufenden Summe addieren: $a\leftarrow a+wx$. $a$ ist der Akkumulator, $w$ ein Gewicht und $x$ ein Eingang. Die Abbildung trennt die beiden Zeilen der Dense-Schicht, einer vollständig verbundenen Schicht. Die roten Endwerte vierzehn und neun sind die vollständigen Ausgänge einschließlich Bias.
+
+Für dieses Beispiel zählen wir sechs produktbezogene MACs, also sechs Multiplikationen mit sechs Akkumulationen. Wenn ein Akkumulator bei null beginnt und der Bias anschließend separat addiert wird, ergeben sich zwölf arithmetische Operationen plus zwei Biasadditionen, insgesamt vierzehn. Wird stattdessen mit dem Bias initialisiert, entfällt diese separate Addition. Wir verwenden die Zählweise deshalb stets ausdrücklich.
+
+Eine MAC kann je nach Befehlssatz als ein Befehl, als mehrere Befehle oder als Teil eines Hardwareauftrags umgesetzt sein. Die zwei gezählten Operationen sind weder zwei garantierte Takte noch zwei Maschinenbefehle. Acht Parameter sind wiederum keine acht MACs. Bei einer Faltung, die dieselben Gewichte an mehreren Positionen nutzt, steigt die Rechenzahl ohne entsprechend neue Parameter. Parameterzahl, arithmetische Arbeit und Laufzeit sind unterschiedliche Größen.
+:::
+
+## Der skalare Kern ist eine Summenkette
 
 ```c
-/* Konzept: Unrolling von for (i = 0; i < 4; i++) a[i] = 0; */
-a[0] = 0;
-a[1] = 0;
-a[2] = 0;
-a[3] = 0;
-```
-
-::: notes
-Anknüpfung: Compiler-Labor knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Vier Arrayzeilen sind manuelles Unrolling, kein Compileroutput. Eine Summe sum plus gleich w mal x behält eine RAW-Kette. Godbolt zeigt Übersetzung, kein OoO-Timing. -O3 garantiert weder Unrolling noch kürzere Laufzeit. Godbolt zeigt die Übersetzung, kein OoO-Timing. `-O3` garantiert weder Unrolling noch kürzere Laufzeit. Verständnischeck: Beweist die Vier-Zeilen-Folge einen -O3-Output? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Grenze der General-Purpose-CPU
-
-- Mehr Issue-Breite verteuert Scheduler, Ports und Bypass. Quadratisch gilt nicht pauschal für ROB, Renaming und Decode zusammen
-- OoO kann Loads überlappen. Es hebt eine einzelne Akkumulatorkette nicht auf
-- DLP ergänzt ILP. SIMD ist eine Umsetzung, keine Definition von DLP
-
-::: notes
-Grenze der General-Purpose-CPU knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. OoO kann Loads und unabhängige Produkte überlappen. Eine einzelne Akkumulatorkette bleibt abhängig. DLP ist gleiche Rechnung an vielen Werten. SIMD ist eine Umsetzung davon, nicht die Definition. Mehr Issue-Breite verteuert Scheduler, Ports und Bypass. Quadratisch gilt nicht pauschal für ROB, Renaming und Decode zusammen. OoO kann Loads überlappen. Es hebt eine einzelne Akkumulatorkette nicht auf. Verständnischeck: Kann OoO bei einem Dot Product helfen? Ja, aber die Summenkette bleibt. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Neuer Workload: Edge AI
-
-- Edge AI umfasst Endgerät und Gateway. Nicht jede lokale Inferenz braucht eine NPU
-- Beispiele: Schrittzählung, Wake-Word, Vibrationsdiagnose an Maschinen
-- Dauerbetrieb auf knappen Ressourcen (Energie, SRAM, Flash)
-
-::: notes
-Neuer Workload: Edge AI knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Edge umfasst Endgerät und Gateway. Training bestimmt Parameter, Inferenz verwendet sie. Eine Aktivitätsklasse ist keine Schrittzahl. Eine Schwellenwertlösung kann reichen. Edge AI umfasst Endgerät und Gateway. Nicht jede lokale Inferenz braucht eine NPU. Beispiele: Schrittzählung, Wake-Word, Vibrationsdiagnose an Maschinen. Verständnischeck: Ist ein lokales Gateway Edge? Ja. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Cloud AI vs. Edge AI
-
-![Lokal und Cloud sind Optionen. Funk ist nicht immer die teurere Seite.](../assets/figures/08_ki_beschleuniger_edge_ai/edge.png)
-
-Warum nicht alles in die Cloud?
-
-1. Latenz — sicherheitskritische Reaktionen dulden keine Funkwartezeit
-2. Privacy — Audio/Video sollen oft lokal bleiben
-3. Energie und Verfügbarkeit sind Anforderungen. Funk ist nicht immer teurer als lokale Rechnung
-
-```{mermaid}
-%%| fig-width: 3.6
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[Sensordaten] -->|lokal| B[Edge-NPU]
-  A -.->|Funk| C[Cloud]
-  style B fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Cloud AI vs. Edge AI knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Lokal kann CPU, DSP, NPU oder Gateway rechnen. Lokalität ist keine Datenschutzgarantie. Kommunikation ist nicht stets teurer als Rechnen. Verständnischeck: Kann lokale Rechnung mehr Energie brauchen als Übertragung? Ja. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Agenda
-
-1. KI-Herausforderung und Memory Wall
-2. DSPs und SIMD
-3. RISC-V Vector Extension (RVV)
-4. NPU und Systolic Arrays
-5. Edge-AI-Software / TensorFlow Lite
-
-::: notes
-Agenda knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Die Agenda fragt nach Bytes, Parallelität, Vektorlänge, lokaler Wiederverwendung und Firmware. Das sind kombinierbare Wege, keine Pflichttreppe. TFLM ist hier nicht als Labor vorhanden. Verständnischeck: Warum Speicher vor dem Array? Weil lokale Wege Verkehr vermeiden sollen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Lernziele Block 8
-
-- Memory Wall bei Matrix-/MAC-Lasten erklären
-- MAC-Operation und ihre Bedeutung benennen
-- ILP vs. DLP unterscheiden
-- Systolic Arrays einordnen
-- TensorFlow Lite Micro Workflow skizzieren
-
-::: notes
-Lernziele Block 8 knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Prüfbar sind die Dense-Ausgabe, Parameter gegen MACs, die Speichergrenze, SIMD gegen DLP, das zurückgegebene VL und die TFLM-Lebensdauer. TOPS brauchen Datentyp und Zählkonvention. Memory Wall bei Matrix-/MAC-Lasten erklären. MAC-Operation und ihre Bedeutung benennen. Verständnischeck: Was zuerst zu TOPS? Datentyp, Ops je MAC und Peak gegen Anwendung. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Die Leitfrage des Tages
-
-- Kleines Netz: z. B. $10^{6}$ Gewichte — Inferenz verrechnet sie mit Aktivierungen
-- SRAM, Cache-Hit, Flash und DRAM haben verschiedene Kosten. Nicht jeder Zugriff ist ein DRAM-Miss
-- Wie rechnet man Millionen MACs/s auf knapper Energie, ohne am Speicher zu ersticken?
-
-```{mermaid}
-%%| fig-width: 3.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  A[RAM: Gewichte] -->|Flaschenhals| B[ALU]
-  B --> C[Ergebnis]
-  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-Die Leitfrage des Tages knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Eine Million Float32-Gewichte sind 4 MB, als Int8 1 MB. Bias und Aktivierungen fehlen. Nicht jede MCU hat DRAM. Eine Million Gewichte sind nur bei einmaliger Nutzung eine Million MACs. Kleines Netz: z. B. $10^{6}$ Gewichte — Inferenz verrechnet sie mit Aktivierungen. SRAM, Cache-Hit, Flash und DRAM haben verschiedene Kosten. Nicht jeder Zugriff ist ein DRAM-Miss. Verständnischeck: Sind eine Million Gewichte eine Million MACs? Nur in diesem Sonderfall. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Aufgabe — Sechs MACs
-
-$W=\begin{bmatrix}1&2&3\\0&-1&4\end{bmatrix}$, $x=\begin{bmatrix}2\\1\\3\end{bmatrix}$, $b=\begin{bmatrix}1\\-2\end{bmatrix}$.
-
-Warum sind sechs Gewichte hier sechs produktbezogene MACs, bei einer Faltung aber nicht? Was ist $y$?
-
-::: notes
-Aufgabe — Sechs MACs knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. W ist [[1,2,3],[0,-1,4]], x ist [2,1,3], b ist [1,-2]. Die erste Zeile ist 1 mal 2 plus 2 mal 1 plus 3 mal 3 plus 1 gleich 14. Die zweite ist 0 plus minus 1 plus 12 minus 2 gleich 9. Sechs Gewichte und zwei Bias sind acht Parameter und sechs produktbezogene MACs. Verständnischeck: Wie viele Parameter? Acht. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Neuronale Netze auf Hardware-Ebene
-
-- Abseits des Hypes: große Zahlenarrays
-- Inputs / Activations: Sensordaten (z. B. $28\times 28$ Pixel)
-- Weights: trainierte Konstanten (oft Flash)
-- Neuron: gewichtete Summe der Eingänge (+ Aktivierung, hier ausgeblendet)
-
-::: notes
-Neuronale Netze auf Hardware-Ebene knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Aktivierungen sind auch Zwischenergebnisse. 28 mal 28 ist 784 nur bei einem Kanal. Gewichte können im Flash liegen, Summen oft in SRAM oder Registern. Eine Matrix ist nicht das ganze Netz. Abseits des Hypes: große Zahlenarrays. Inputs / Activations: Sensordaten (z. B. $28\times 28$ Pixel). Verständnischeck: Sind alle Aktivierungen Sensorwerte? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Mathematik: Matrix / Dot Product
-
-![y0 = 14 und y1 = 9. Sechs MACs, acht Parameter, 14 arithmetische Operationen.](../assets/figures/08_ki_beschleuniger_edge_ai/dense.png)
-
-```c
-float sum = 0.0f;
-for (int i = 0; i < N; i++) {
-    sum += input[i] * weights[i];
+/* Eine Zeile mit drei Eingängen.
+   Eingänge/Gewichte: int8_t, Bias: int32_t. */
+int64_t sum = bias;
+for (size_t i = 0; i < 3; ++i) {
+    sum += (int64_t)input[i] * weight[i];
 }
 ```
 
-- Kein Kontrollfluss-Chaos: vorhersagbarer Datenstrom
-- Naive Lehrzählung ohne Registerreuse: zwei Loads, eine Multiplikation, eine Addition. Das ist keine Übersetzung in Assembler
+Zwei Zeilen erlauben unabhängige Summen; jede einzelne Summe bleibt abhängig.
 
 ::: notes
-Mathematik: Matrix / Dot Product knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Sechs MACs sind in der benannten Konvention zwölf arithmetische Ops plus zwei Biasadditionen, also vierzehn. Das sind keine Takte. Int8-Gewichte, Int32-Bias und Int8-Eingaben sind 6 plus 8 plus 3 gleich 17 Byte, optional plus zwei Ausgaben 19. Elf Byte wäre ein anderes, unvollständiges Budget. Kein Kontrollfluss-Chaos: vorhersagbarer Datenstrom. Pro Iteration: zwei Loads + Mul + Add. Verständnischeck: Warum nicht acht MACs? Die Biaswerte werden separat addiert. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Der Ausschnitt ist C und zeigt den Rechenkern der Hostdatei `labs/src/lab08_dense.c`. `int8_t` ist eine vorzeichenbehaftete Acht-Bit-Ganzzahl, `int32_t` eine Zweiunddreißig-Bit-Ganzzahl und `int64_t` eine Vierundsechzig-Bit-Ganzzahl. `size_t` ist der für Objektgrößen und Indizes verwendete vorzeichenlose C-Typ. Die vollständige Datei enthält die benötigten Header, Fehlerprüfung und Beispielwerte; hier sind nur die drei Iterationen einer Zeile sichtbar.
+
+`input[i]` und `weight[i]` wählen die zueinander gehörenden Elemente. Die Umwandlung vor der Multiplikation sorgt dafür, dass das Produkt im breiten Ganzzahltyp berechnet wird. `sum` startet mit dem Bias, enthält nach jeder Iteration eine weitere Produktsumme und wird vor der Ausgabe auf den zulässigen Ergebnisbereich geprüft. Das ist eine Integer-Modellrechnung mit Nullpunkten null, kein vollständiger quantisierter Netzwerkkernel.
+
+RAW steht für Read After Write: Jede Akkumulation liest den zuvor geschriebenen Wert von `sum`. Produkte oder die zweite Zeile können trotzdem unabhängige Arbeit bieten. OoO, Out of Order, kann solche Arbeit intern vorziehen. GCC, GNU Compiler Collection, übersetzt das Programm; daraus folgt noch keine Zeitmessung eines RISC-V-Kerns. RISC-V ist die im Kurs verwendete Befehlssatzfamilie.
 :::
 
-## MAC-Operation
+## Rechenintensität braucht eine Speichergrenze
 
-- Multiply-Accumulate: $a \leftarrow a + (w \times x)$
-- $w$: Gewicht, $x$: Activation, $a$: Akkumulator
-- KI-Chips: oft in TOPS (viele MAC-Äquivalente / s) spezifiziert — nicht nur in MHz
+$$I=\frac{O}{D}\quad[\text{Operationen/Byte}]$$
+
+- $O$: gezählte arithmetische Arbeit
+- $D$: übertragene Bytes über eine ausdrücklich benannte Grenze
+- Lehrmodell R: externer Speicher → lokaler Operandenpuffer
+- Zunächst nur Eingangsverkehr; Bias und Ausgaben ausgeschlossen
 
 ::: notes
-MAC-Operation knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. a gleich 5, w gleich 2, x gleich 3 ergibt 11. Eine MAC kann eine Instruktion und trotzdem zwei Ops sein. Float-FMA rundet einmal, getrennte Mul und Add zweimal. Eine MAC ist nicht automatisch ein Takt. Multiply-Accumulate: $a \leftarrow a + (w \times x)$. $w$: Gewicht, $x$: Activation, $a$: Akkumulator. Verständnischeck: Ist eine MAC immer ein Takt? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Arithmetic Intensity, arithmetische Rechenintensität, setzt Rechenarbeit zum Datenverkehr ins Verhältnis. $I$ ist die Intensität, $O$ die Anzahl arithmetischer Operationen und $D$ die darüber versorgten Bytes. Ein Byte besteht aus acht Bit. Wir zählen eine MAC, Multiply-Accumulate, als Multiplikation plus Addition, also zwei Operationen.
+
+Die Speichergrenze ist entscheidend. Ein Wert kann einmal aus externem Speicher kommen und danach mehrfach aus einem lokalen Puffer gelesen werden. Das sind unterschiedliche Verkehre. Lehrmodell R betrachtet nur Transfers vom externen Speicher zum lokalen Operandenpuffer. Es unterstellt Vier-Byte-Operanden. Zwei neue Operanden je MAC bedeuten acht Byte für zwei Operationen, daher $I=2/8=0{,}25$ Operationen je Byte.
+
+Dies ist zunächst ein Eingangsmodell ohne Biasverkehr und ohne Ausgabeschreiben. Bei einer anderen Grenze oder Zählbasis kann dieselbe Rechnung eine andere Intensität besitzen. Auf einem Mikrocontroller kann der relevante langsame Speicher auch Flash statt externem DRAM sein. DRAM heißt Dynamic Random Access Memory, dynamischer Arbeitsspeicher. Wir legen hier keine bestimmte Platine zugrunde. Erst eine zusätzlich gegebene Rechenrate und Bandbreite machen aus der Intensität eine Leistungsgrenze.
 :::
 
-## Anatomie einer MAC auf RISC-V
+## Roofline: zwei ideale Obergrenzen
 
-Vereinfachte Befehlsfolge:
+![](../assets/figures/08_ki_beschleuniger_edge_ai/roofline.png){fig-alt="Roofline-Modell mit Peak acht Operationen pro Takt und Bandbreite acht Byte pro Takt. Die Grenze steigt bis Intensität eins linear und bleibt danach bei acht. Punkte bei 0,25 und 0,5 ergeben zwei und vier."}
+
+$$P\leq\min(P_{\mathrm{peak}},B\,I),\qquad
+I_{\mathrm{Knick}}=P_{\mathrm{peak}}/B$$
+
+::: notes
+Roofline bedeutet Dachlinie. Das Diagramm zeigt eine idealisierte Obergrenze, keine Messkurve. Die waagerechte Achse trägt Intensität $I$ in Operationen je Byte, die senkrechte Rate $P$ in Operationen je Takt. $P_{\mathrm{peak}}$ ist die maximale Rechenrate bei vollständig versorgten Einheiten; $B$ ist die Bandbreite über die betrachtete Speichergrenze in Byte je Takt.
+
+In Lehrmodell R sind $P_{\mathrm{peak}}=8$ Operationen je Takt und $B=8$ Byte je Takt. Die schräge Grenze $BI$ beschreibt, wie viel Rechnung der Datenstrom höchstens versorgen kann. Die horizontale Grenze acht beschreibt das Rechenlimit. Bei $I=0{,}25$ ergibt sich $\min(8,8\cdot0{,}25)=2$, bei $I=0{,}5$ vier. Der Knick liegt bei $8/8=1$ Operation je Byte.
+
+Unterhalb dieses Knicks ist die Bandbreitengrenze enger. Eine Intensität kleiner als eins bedeutet aber nicht auf jeder Hardware Speicherbegrenzung: Der Knick verschiebt sich mit Peak und Bandbreite. Abhängigkeiten, Anlauf, Konflikte oder unpassende Operationen können die reale Rate weiter reduzieren. Eine obere Schranke zu erreichen ist eine zusätzliche Frage. Deshalb untersuchen wir nun, wie lokale Wiederverwendung die betrachteten Bytes verändert.
+:::
+
+## Dieselbe Matrixrechnung mit Wiederverwendung
+
+![](../assets/figures/08_ki_beschleuniger_edge_ai/tile.png){fig-alt="A gleich [[1,2],[3,4]], B gleich [[5,6],[7,8]], C gleich [[19,22],[43,50]]. Acht MACs verwenden dieselben acht Eingangswerte mehrfach."}
+
+Ein Tile ist ein lokal bearbeiteter Matrixausschnitt. Auch eine CPU kann Tiles nutzen.
+
+::: notes
+Ein Tile ist ein begrenzter Ausschnitt einer größeren Matrix, der gemeinsam in einen nahen Speicher passt. CPU bedeutet Central Processing Unit, Prozessor. Tiling ist eine Softwaretechnik ebenso wie eine Organisationsidee für Beschleuniger. Es ist kein exklusives Merkmal einer NPU, Neural Processing Unit.
+
+Im Bild gilt $C=AB$. $A$ und $B$ sind Eingabematrizen mit je zwei Zeilen und zwei Spalten, $C$ enthält vier Ausgabesummen. $C_{00}=1\cdot5+2\cdot7=19$, $C_{01}=1\cdot6+2\cdot8=22$, $C_{10}=3\cdot5+4\cdot7=43$ und $C_{11}=3\cdot6+4\cdot8=50$. Jede Summe startet bei null. Acht produktbezogene MACs, Multiply-Accumulate, ergeben nach unserer Konvention sechzehn Operationen.
+
+Jeder Wert von $A$ wird für zwei Spalten und jeder Wert von $B$ für zwei Zeilen benötigt. Ohne lokales Halten lädt das naive Modell beide Operanden jeder MAC neu: sechzehn Vier-Byte-Transfers, also vierundsechzig Byte. Werden die acht verschiedenen Eingabewerte einmal geladen und lokal wiederverwendet, sind es zweiunddreißig Byte über dieselbe Grenze. Die Zahlenwerte sind hier kleine ganze Zahlen; für diese Transferrechnung nehmen wir dennoch je vier Speicherbytes an. Ausgabeverkehr kommt gesondert hinzu.
+:::
+
+## Was ändert das Ausgabeschreiben?
+
+| Zählbasis für $C=AB$ | Naiv | Mit lokalem Tile |
+|--------------------|------|------------------|
+| Nur Eingangsbytes | $64$ B | $32$ B |
+| Zusätzlich vier Ausgaben zu je $4$ B | $80$ B | $48$ B |
+| Intensität mit Ausgaben | $16/80=0{,}2$ | $16/48\approx0{,}333$ |
+
+Kein anfängliches Lesen von $C$; alle vier Summen starten bei null.
+
+::: notes
+B bezeichnet hier Byte. Ein Tile ist ein lokal gehaltener Matrixausschnitt. Die Tabelle erweitert bewusst die bisherige Zählbasis: Neben den Eingaben werden vier fertige Ausgaben mit je vier Byte über die betrachtete Grenze zurückgeschrieben. Wir bilden $C=AB$, nicht $C\leftarrow C+AB$, und benötigen daher kein anfängliches Laden einer alten Matrix $C$. Biaswerte gibt es in diesem Beispiel nicht.
+
+Die acht MACs, Multiply-Accumulate, bleiben sechzehn Operationen. Naiv fallen vierundsechzig Eingangsbytes plus sechzehn Ausgabebytes an, zusammen achtzig. Mit Wiederverwendung sind es zweiunddreißig plus sechzehn, also achtundvierzig Byte. Die Intensitäten sinken gegenüber dem reinen Eingangsmodell auf $0{,}2$ und ein Drittel Operation je Byte. Die Ersparnis beträgt weiterhin zweiunddreißig Byte, der relative Anteil am Gesamtverkehr ist jetzt jedoch vierzig statt fünfzig Prozent.
+
+Für eine Rechnung mit beiden Transferrichtungen müsste außerdem eine dazu passende Bandbreitenannahme gelten. Die vorherige Roofline benutzte ausdrücklich nur Eingangsverkehr; ihre Punkte werden nicht stillschweigend umbenannt. Ein häufiges Klausurproblem ist das Vergleichen von Zahlen mit unterschiedlichen Speichergrenzen oder ausgeschlossenen Anteilen. Geben Sie daher zuerst an, was gezählt wird, und setzen Sie erst anschließend Zahlen ein.
+:::
+
+## Bandbreite, Latenz und Abhängigkeit trennen
+
+- Bandbreite: wie viele Bytes pro Zeit ankommen können
+- Latenz: wann ein einzelner benötigter Wert bereitsteht
+- RAW: wann die nächste abhängige Summe starten kann
+- Überlappung hilft beim Warten; Wiederverwendung senkt Verkehr
+
+::: notes
+RAW heißt Read After Write, Lesen nach Schreiben. Eine Akkumulation braucht den zuvor erzeugten Summenwert. Dieser Wartegrund unterscheidet sich sowohl von der Latenz eines Speicherzugriffs als auch von der Bandbreite einer Leitung. Bandbreite misst eine Rate, Latenz eine Dauer.
+
+Angenommen, ein Transfer benötigt drei Takte, aber ein neuer unabhängiger Transfer kann in jedem Takt beginnen. Vier Starts in den Takten eins bis vier liefern bei dieser Zählweise Ergebnisse am Ende von drei bis sechs. Vier seriell gestartete Transfers würden dagegen am Ende von drei, sechs, neun und zwölf fertig. Die einzelne Latenz bleibt drei; die Überlappung verbessert den Durchsatz. Das ist ein vereinfachtes Zeitmodell, keine Speicher- oder Prozessorangabe.
+
+OoO bedeutet Out of Order, interne Ausführung außerhalb der Programmreihenfolge. Sie kann unabhängige Zugriffe überlappen und damit vorhandene Bandbreite besser nutzen. Sie erzeugt weder unbegrenzte Bandbreite noch hebt sie die echte Summenabhängigkeit auf. Tiling, lokales Halten eines Matrixausschnitts, reduziert dagegen die angeforderte Datenmenge. Diese Maßnahmen können zusammenwirken. Welche davon hilft, hängt davon ab, welcher Engpass im konkreten Zeitfenster wirksam ist.
+:::
+
+## Papierphase 1: Rechnung und Speichergrenze
+
+Übungsblatt, Aufgaben 1–2 · 10 Minuten
+
+- Dense: Ausgänge, Parameter und MACs getrennt zählen
+- Roofline: Grenze und Knick aus den Modellwerten bestimmen
+- Tile: Wiederverwendung erklären und Ausgaben gesondert zählen
+
+::: notes
+Dense ist eine vollständig verbundene Schicht; MAC heißt Multiply-Accumulate, Produkt zur Summe addieren. Roofline ist das Modell einer durch Rechenpeak und Bandbreite begrenzten Rate. Ein Tile ist ein lokal bearbeiteter Matrixausschnitt. Diese Arbeitsphase verbindet die drei Begriffe, ohne einen Compiler oder ein Framework vorauszusetzen.
+
+Aufgabe 1 führt zu den Ausgängen vierzehn und neun, acht Parametern und sechs produktbezogenen MACs. Bei sechs Int8-Gewichten, zwei Int32-Biaswerten und drei Int8-Eingaben ergeben sich sechs plus acht plus drei, also siebzehn gespeicherte Byte vor den Ausgaben. Int8 und Int32 sind vorzeichenbehaftete Ganzzahlen mit acht beziehungsweise zweiunddreißig Bit. Das ist ein Datenbudget, noch keine vollständige Datei- oder Laufzeitgröße.
+
+Aufgabe 2 benutzt die Eingangsgrenze von Lehrmodell R: Peak acht Operationen je Takt, Bandbreite acht Byte je Takt, Grenzen zwei und vier bei Intensität $0{,}25$ und $0{,}5$. Beide liegen unter dem Knick eins. Mit Ausgaben entstehen beim Tile andere Intensitäten. Besprechen Sie besonders, warum mehr Rechenwerke im unveränderten Eingangsmodell den engeren Transfergrenzwert nicht verschieben. Vollständige Lösungen stehen im Lösungsprofil des Übungsblatts.
+:::
+
+## ILP und DLP können gleichzeitig auftreten
+
+![](../assets/figures/08_ki_beschleuniger_edge_ai/ilp.png){fig-alt="Eine Summenkette enthält abhängige Akkumulationen. Zwei Ausgabesummen sind voneinander unabhängig, mehrere elementweise Produkte bieten Datenparallelität."}
+
+DLP beschreibt das Rechenmuster; SIMD ist eine mögliche Umsetzung.
+
+::: notes
+ILP bedeutet Instruction-Level Parallelism, Parallelität zwischen Maschinenbefehlen. DLP heißt Data-Level Parallelism, Parallelität gleicher Arbeit an unterschiedlichen Daten. SIMD bedeutet Single Instruction, Multiple Data, eine Befehlssteuerung für mehrere Datenoperationen. Diese Begriffe beschreiben verschiedene Ebenen: Das Programm kann Datenparallelität anbieten, während eine bestimmte Architektur sie mit SIMD nutzt.
+
+Die obere Zeile zeigt eine fortlaufende Summenkette. Jeder Akkumulator benötigt seinen Vorgänger; diese Abhängigkeit ist rot verbunden. Darunter stehen zwei unabhängige Ausgabesummen. Innerhalb jeder bleiben Ketten, zwischen den Zeilen besteht jedoch kein Wertfluss. Die Gruppe unabhängiger Produkte zeigt gleiche Multiplikation auf mehreren Eingangspaaren.
+
+ILP verlangt nicht unterschiedliche Rechenarten: Zwei unabhängige Additionsbefehle können ebenso parallel ausgeführt werden. Umgekehrt definiert DLP noch keinen Maschinenbefehl. Ein Compiler kann das Datenmuster skalar, mit festen SIMD-Gruppen oder mit Vektoren umsetzen. Hundert unabhängige Produkte bedeuten weder hundert physische Rechenwerke noch Fertigstellung in einem Takt. Die passende Hardware muss die Datenkapazität, tatsächlichen Rechenressourcen und späteres Zusammenführen der Produkte organisieren.
+:::
+
+## Packed SIMD: Grenzen zwischen den Bytes
+
+![](../assets/figures/08_ki_beschleuniger_edge_ai/simd.png){fig-alt="Vier unsigned Acht-Bit-Lanes addieren 1+2,16+32,127+1,255+1 getrennt zu 3,48,128,0. Es fließt kein Übertrag in die Nachbarlane."}
+
+Ein gewöhnliches 32-Bit-`add` auf gepackten Bytes hat andere Übertragsregeln.
+
+::: notes
+SIMD steht für Single Instruction, Multiple Data. Packed bedeutet, dass mehrere kleine Elemente in einem breiteren Register liegen. Eine Lane ist dabei ein getrennt behandeltes Datenfeld; sie muss nicht einem dauerhaft eigenen physischen Rechenwerk entsprechen. Das Diagramm verwendet vier vorzeichenlose Acht-Bit-Felder und ausdrücklich Addition modulo $256$, also mit Verwerfen des Überlaufs innerhalb jedes Feldes.
+
+Die Ergebnisse sind $1+2=3$, $16+32=48$, $127+1=128$ und $255+1=0$ modulo $256$. In Hexadezimalnotation erscheinen sie als 03, 30, 80 und 00. Die senkrechten Feldgrenzen verhindern einen Übertrag in das Nachbarfeld. Ein gewöhnliches Zweiunddreißig-Bit-`add` addiert dagegen eine ganze Zahl und kann einen Byteübertrag weitergeben.
+
+Das Beispiel ist kein behaupteter SIMD-Befehl der RISC-V-Basis. RISC-V ist die Befehlssatzfamilie des Kurses. Vorzeichenbehaftete Addition oder Sättigung, Begrenzen statt Umklappen, wären andere Verträge. Eine Produktsumme für ein Netz ist nochmals etwas anderes: Schon $20\cdot20=400$ passt nicht in ein Acht-Bit-Feld. Wir müssen daher Breite der Operanden und Breite des Akkumulators getrennt wählen.
+:::
+
+## Schmale Operanden, breitere Produktsumme
+
+![](../assets/figures/08_ki_beschleuniger_edge_ai/wide.png){fig-alt="Zwei Int8-Operanden mit Wert 20 ergeben Produkt 400. Drei solche Produkte ergeben Summe 1200. Der Akkumulator braucht mehr als acht Bit."}
+
+Int8 beschreibt gespeicherte Operanden, nicht automatisch die Ergebnisbreite.
+
+::: notes
+Int8 bedeutet eine vorzeichenbehaftete Ganzzahl mit acht Bit und Bereich minus hundertachtundzwanzig bis hundert siebenundzwanzig. Ein Akkumulator hält die laufende Summe. Im Bild werden zwei schmale Operanden mit Wert zwanzig zunächst multipliziert. Das Produkt vierhundert benötigt einen breiteren Zahlenbereich. Drei solche Produkte ergeben zwölfhundert, ebenfalls weit außerhalb des Int8-Bereichs.
+
+Bei neuronalen Integerkerneln sind Int8-Eingaben und Gewichte mit einem Int32-Akkumulator verbreitet; Int32 bedeutet vorzeichenbehaftete Zweiunddreißig-Bit-Ganzzahl. Das ist keine Garantie gegen jeden Überlauf. Anzahl der Produkte, Nullpunktkorrektur und Biasbereich müssen zum Kernel passen. Unser kleines Hostbeispiel summiert zur sicheren Bereichsprüfung zunächst in Int64, einer Vierundsechzig-Bit-Ganzzahl, und prüft anschließend die Ausgabe.
+
+Widening, Verbreitern, bedeutet das Rechnen mit einem größeren Typ, nicht das nachträgliche Wiederherstellen bereits verlorener Bits. Die Umwandlung muss vor einer zu schmalen Rechnung erfolgen. Requantisierung ist die spätere Skalierung und Begrenzung auf einen Ausgangsdatentyp. Sie ist ein eigener Schritt und keine gewöhnliche Int8-MAC. MAC steht für Multiply-Accumulate. Schmale gespeicherte Daten sparen also Bytes, verlangen aber weiterhin eine sauber geplante Arithmetik.
+:::
+
+## DSP: bekannte Muster der Signalverarbeitung
+
+![](../assets/figures/08_ki_beschleuniger_edge_ai/dsp.png){fig-alt="Koeffizienten und ein gleitendes Eingangsfenster versorgen einen MAC-Akkumulator über getrennte lokale Pfade. Zwei Produkte 1 mal 3 und 2 mal 4 ergeben 11."}
+
+Mehrere Speicherpfade und Hardware-Schleifen sind mögliche DSP-Merkmale.
+
+::: notes
+DSP heißt Digital Signal Processor, Prozessor für digitale Signalverarbeitung. Ein FIR-Filter, Finite Impulse Response, Filter mit endlicher Impulsantwort, berechnet eine gewichtete Summe eines zeitlichen Eingangsfensters: $y[n]=\sum_k h[k]x[n-k]$. $n$ ist der Zeitpunkt, $k$ die Verzögerung und $h[k]$ ein Filterkoeffizient. Mit Koeffizienten eins und zwei sowie den zugehörigen Eingangswerten drei und vier ergibt sich $1\cdot3+2\cdot4=11$.
+
+Das Bild zeigt getrennte lokale Pfade für Koeffizienten und Eingangswerte, die eine MAC-Einheit versorgen. MAC steht für Multiply-Accumulate, Produkt zur Summe addieren. Zusätzliche Pfade können zwei benötigte Operanden gleichzeitig bereitstellen, wenn Speicherbänke und Ports dies tatsächlich erlauben. Zwei gezeichnete Busse sind keine Garantie gegen Bankkonflikte, konkurrierende Zugriffe auf dieselbe Ressource.
+
+Hardware-Schleifen können die wiederholte Steuerung von Start, Ende und Zähler übernehmen. Das spart bestimmte Zähler- und Sprungbefehle, beseitigt aber keine Datenwartezeit. Diese Merkmale gehören nicht zwingend zu jedem DSP. Die Nähe zur Dense-Schicht liegt in der häufigen Produktsumme; Zeitfenster und Modellbedeutung bleiben unterschiedlich. Ob ein eigener MAC-Pfad genügend Durchsatz hat, klärt nun die Trennung von Latenz und Startabstand.
+:::
+
+## Ein Start pro Takt ist nicht Latenz eins
+
+![](../assets/figures/08_ki_beschleuniger_edge_ai/pipeline.png){fig-alt="Vier unabhängige Operationen beginnen in Takten eins bis vier. Bei Ergebnislatenz drei enden sie in Takten drei bis sechs. Latenz drei und Initiierungsintervall eins sind verschieden."}
+
+Lehrmodell: Ergebnislatenz $3$, Initiierungsintervall $1$.
+
+::: notes
+Ergebnislatenz ist die Zahl der Takte vom Start einer Operation bis zu ihrem fertigen Ergebnis. Das Initiierungsintervall ist der minimale Abstand zweier zulässiger Starts. Die Abbildung verwendet eine hypothetische gepipelinete Recheneinheit: Jede Operation durchläuft drei Schritte, während schon weitere unabhängige Operationen nachrücken können.
+
+Die waagerechte Achse zeigt Takte eins bis sechs. Operationen eins bis vier starten in eins, zwei, drei und vier. Ihre Ergebnisse liegen jeweils am Ende von drei, vier, fünf und sechs vor. Die rote letzte Stufe markiert Fertigstellung. Es sind vier Operationen in einem sechs Takte langen Fenster; der längere stationäre Strom könnte trotzdem ein Ergebnis je Takt liefern. Latenz drei wird dadurch nicht zu eins.
+
+Eine MAC, Multiply-Accumulate, verbindet Produkt und Summenaddition. Bei einer abhängigen Akkumulatorkette genügt das Initiierungsintervall allein nicht, weil der nächste Start den vorigen Wert benötigt. Dafür sind passende Weiterleitung und Abhängigkeitsregeln entscheidend. Die Abbildung ist daher ausdrücklich ein Modell unabhängiger Operationen, keine Zusage eines DSP, Digital Signal Processor. Dieselbe Vorsicht benötigen wir bei einem Vektorbefehl: Seine Elementzahl verrät noch nicht seine tatsächliche Laufzeit.
+:::
+
+## RVV: Registerbreite ist eine Kapazität
+
+![](../assets/figures/08_ki_beschleuniger_edge_ai/rvv.png){fig-alt="Ein 128-Bit-Vektorregister enthält bei 32-Bit-Elementen vier Plätze. VL drei aktiviert die ersten drei, der vierte ist Tail. Es gibt 32 Vektorregister v0 bis v31."}
+
+VLEN in Bit · SEW in Bit/Element · VL in Elementen
+
+::: notes
+RVV bedeutet RISC-V Vector Extension, Vektorerweiterung der RISC-V-Befehlssatzarchitektur. RISC steht für Reduced Instruction Set Computer. RVV stellt zweiunddreißig architektonische Vektorregister `v0` bis `v31` bereit. VLEN, Vector Register Length, ist die implementierte Bitzahl eines solchen Registers. SEW, Selected Element Width, ist die konfigurierte Breite eines Elements.
+
+Das Bild nimmt VLEN hundertachtundzwanzig Bit und SEW zweiunddreißig Bit an. LMUL, Vector Register Group Multiplier, ist hier eins und bezeichnet eine Gruppe von einem Register. Damit ergeben sich vier Elementplätze. VL, Vector Length, ist die aktuell aktive Zahl von Elementen. Hier sind es drei; der vierte Platz ist Tail, der inaktive Rest hinter der aktiven Länge. Rot markiert aktive Plätze, hellgrau den Rest. Die Zeichnung zeigt Datenplätze, keine vier physischen Rechenwerke.
+
+Ein langes Array kann mehr Elemente besitzen, als in diese Registergruppe passen. Es wird dann in mehreren Abschnitten bearbeitet. Die Vektorerweiterung erlaubt, die aktive Länge für jeden Abschnitt zu wählen und vom Befehl zurückzugeben. Dafür müssen wir die maximale Kapazität von der angeforderten und der tatsächlichen Länge unterscheiden. Diese Größen werden auf der nächsten Folie mit ihren Einheiten berechnet.
+:::
+
+## VLMAX berechnen
+
+$$\mathrm{VLMAX}=\mathrm{LMUL}\,\frac{\mathrm{VLEN}}{\mathrm{SEW}}$$
+
+| Registergruppe | Registerbreite | Elementbreite | Kapazität |
+|----------------|----------------|---------------|-----------|
+| LMUL $=1$ | VLEN $=128$ Bit | SEW $=32$ Bit | $4$ Elemente |
+| LMUL $=1$ | VLEN $=1024$ Bit | SEW $=32$ Bit | $32$ Elemente |
+
+VL kann kleiner sein als diese Kapazität.
+
+::: notes
+VLMAX heißt maximale aktive Vektorlänge für die gewählte Konfiguration. VLEN, Vector Register Length, ist die Registerbreite in Bit. SEW, Selected Element Width, gibt Bit je Element an. LMUL, Vector Register Group Multiplier, beschreibt die Größe einer Vektorregistergruppe relativ zu einem Register. Wir verwenden im weiteren Beispiel ausschließlich LMUL eins.
+
+Die Division Bit durch Bit je Element liefert Elemente. Hundertachtundzwanzig geteilt durch zweiunddreißig ergibt vier; eintausendvierundzwanzig geteilt durch zweiunddreißig ergibt zweiunddreißig. Eine Registergruppe fasst also unterschiedlich viele Elemente, obwohl die Programmlogik gleich sein kann. VL, Vector Length, bezeichnet anschließend nur die tatsächlich aktivierten Elemente des aktuellen Abschnitts.
+
+Die Gleichung gilt für eine unterstützte Element- und Gruppenkonfiguration. Ein Kern muss nicht jede denkbare Kombination unterstützen. Die vollständige Vektorerweiterung und eine minimale eingebettete Teilmenge sind zudem unterschiedliche Zielvoraussetzungen. Wir setzen für die folgenden Beispiele Unterstützung der gezeigten Zweiunddreißig-Bit-Konfiguration voraus. Weder VLEN noch VLMAX bestimmen die Zahl gleichzeitig arbeitender physischer Lanes. Die nächste Frage lautet deshalb zuerst, welche Länge die Software für einen noch unbearbeiteten Arrayrest erhält.
+:::
+
+## `vsetvli` liefert die aktive Länge zurück
+
+| Angeforderter Rest | Zulässige aktive Länge |
+|--------------------|------------------------|
+| $\mathrm{AVL}\leq\mathrm{VLMAX}$ | $\mathrm{VL}=\mathrm{AVL}$ |
+| $\mathrm{VLMAX}<\mathrm{AVL}<2\mathrm{VLMAX}$ | $\lceil\mathrm{AVL}/2\rceil\leq\mathrm{VL}\leq\mathrm{VLMAX}$ |
+| $\mathrm{AVL}\geq2\mathrm{VLMAX}$ | $\mathrm{VL}=\mathrm{VLMAX}$ |
+
+Software verwendet den zurückgegebenen Wert, nicht eine angenommene Breite.
+
+::: notes
+`vsetvli` ist ein Konfigurationsbefehl der RISC-V Vector Extension, kurz RVV. Er setzt unter anderem Elementbreite und Gruppengröße, bestimmt das Längenregister `vl` und kann dieselbe aktive Elementzahl in ein normales Integerregister zurückgeben. AVL bedeutet Application Vector Length, die von der Anwendung angeforderte Zahl noch zu verarbeitender Elemente. VLMAX ist die maximale Elementzahl der gewählten Registergruppe; VL die tatsächlich aktivierte Zahl.
+
+Die Fallunterscheidung folgt den Längenregeln der RVV-Spezifikation 1.0 für eine unterstützte Konfiguration. Passt der Rest vollständig, wird er exakt bearbeitet. Ist er mindestens doppelt so groß wie die Kapazität, wird ein voller Abschnitt verwendet. Dazwischen ist eine ganzzahlige Länge von der aufgerundeten Hälfte des Restes bis zur Kapazität erlaubt. Im mittleren Fall ist jeder Integer innerhalb der Grenzen zulässig; eine einzelne garantierte Wahl gibt es dort nicht.
+
+Die Regel erlaubt, die letzten beiden Abschnitte gleichmäßiger zu verteilen. Eine Implementierung wählt bei gleichen Eingangswerten deterministisch, also reproduzierbar. Bei AVL null ist VL null; bei positivem AVL ist VL positiv. Die Schleife muss Zeiger und Restzähler um die zurückgegebene Länge verändern. Die vereinfachte Behauptung, VL sei immer das Minimum von AVL und VLMAX, ist im mittleren Fall zu eng.
+:::
+
+## Rest 40 bei Kapazität 32
+
+![](../assets/figures/08_ki_beschleuniger_edge_ai/strip.png){fig-alt="Vierzig Elemente können bei VLMAX 32 als 32 plus 8 oder als 20 plus 20 bearbeitet werden. Eine erste VL 16 ist unzulässig, weil mindestens 20 nötig sind."}
+
+Bei $1000$ Elementen: $30\cdot32=960$, dann zwei Restabschnitte.
+
+::: notes
+VLMAX ist die maximale aktive Vektorlänge, VL die gewählte aktive Länge und AVL der angeforderte Rest. Bei AVL vierzig und VLMAX zweiunddreißig liegt der Rest zwischen einfacher und doppelter Kapazität. Die erste VL muss daher mindestens $\lceil40/2\rceil=20$ und höchstens zweiunddreißig sein.
+
+Die oberen Streifen zeigen zwei zulässige Strategien: zuerst zweiunddreißig, danach acht, oder zuerst zwanzig, danach zwanzig. Nach dem ersten Abschnitt passt der Rest vollständig und wird exakt gewählt. Eine erste VL sechzehn ist verboten; die vermeintliche Folge sechzehn plus vierundzwanzig beginnt daher mit einer unzulässigen Länge. Bei Zweiunddreißig-Bit-Elementen rückt jeder Zeiger um vier mal VL Byte: hundertachtundzwanzig und zweiunddreißig beziehungsweise zweimal achtzig Byte.
+
+Für eintausend Elemente sind zunächst dreißig volle Abschnitte erzwungen, weil der Rest vor jedem dieser Starts mindestens vierundsechzig beträgt. Danach bleiben vierzig. Diese benötigen zwei weitere Abschnitte, insgesamt also zweiunddreißig Iterationen. Die genaue Aufteilung der letzten zwei kann variieren. Beide Streifen bearbeiten jedes Element genau einmal. Eine tragfähige Schleife benötigt deshalb keinen fest einprogrammierten Wert für die Registerbreite.
+:::
+
+## Eine Schleife für elementweise Addition
 
 ```asm
-# Konzept — RV32IM (mul); Adressen schematisch
-lw  t0, 0(s1)    # x
-lw  t1, 0(s2)    # w
-mul t2, t0, t1
-add t3, t3, t2   # a += w*x
-```
-
-- `mul`/`add` sind hier Ganzzahl, die C-Schleife darüber ist Float. Das ist eine Analogie, keine Float-ISA
-- Zwei Loads und zwei Ops gelten nur ohne Wiederverwendung und ohne FMA
-
-::: notes
-Anatomie einer MAC auf RISC-V knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. lw lädt ein 32-Bit-Muster. mul und add sind hier Integer der M-Erweiterung, keine Float-Rechnung. Zwei Loads sind nicht zwei DRAM-Misses. Der Akkumulator muss vorher gesetzt sein. Lehrcode, nicht assembliert. `mul`/`add` sind hier Ganzzahl, die C-Schleife darüber ist Float. Das ist eine Analogie, keine Float-ISA. Zwei Loads und zwei Ops gelten nur ohne Wiederverwendung und ohne FMA. Verständnischeck: Warum reicht RV32I nicht für mul? Es braucht die M-Erweiterung. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Arithmetic Intensity: Zahlenbeispiel
-
-![Knick bei 1 Op/Byte. Naiv 0,25, mit Wiederverwendung 0,5. Lehrwerte, keine Messung.](../assets/figures/08_ki_beschleuniger_edge_ai/roofline.png)
-
-- $\mathrm{AI} = \mathrm{Ops}/\mathrm{Bytes}$
-- Grenze dieses Beispiels: DRAM zum On-Chip-Speicher. Output und Bias zählen hier noch nicht
-- $2$ Ops und $8$ Byte ergeben $0{,}25$ Ops/Byte. Das ist nicht allgemein „unter 1 = memory-bound“
-- Erreichbar ist $\min(P_{peak}, Bandbreite \times AI)$. Der Knick liegt bei $P_{peak}/Bandbreite$
-
-::: notes
-Arithmetic Intensity: Zahlenbeispiel knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. I_arith ist Ops je Byte über die Grenze DRAM nach On-Chip. Peak 8 Ops je Takt, Bandbreite 8 Byte je Takt, Knick bei 1 Op je Byte. Bei 0,25 sind höchstens 2 Ops je Takt erreichbar, bei 0,5 höchstens 4. Das ist eine Obergrenze, keine Messung. $\mathrm{AI} = \mathrm{Ops}/\mathrm{Bytes}$. Grenze dieses Beispiels: DRAM zum On-Chip-Speicher. Output und Bias zählen hier noch nicht. Verständnischeck: Warum liegt der Knick bei 1? 8 Ops geteilt durch 8 Byte. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Datenproblem: Gewichte
-
-![Dieselbe 2×2-Rechnung: 64 Byte naiv, 32 Byte aus einem Tile.](../assets/figures/08_ki_beschleuniger_edge_ai/tile.png)
-
-- Modelle wie ResNet-50: Millionen Parameter — Megabyte-Bereich
-- L1 oft nur Dutzende KiB → Matrizen passen nicht
-- Ein Streaming-Datensatz erzeugt nicht bei jedem Skalarzugriff einen Capacity Miss. Cachezeilen und Prefetch bündeln Zugriffe
-
-::: notes
-Datenproblem: Gewichte knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. A ist [[1,2],[3,4]], B ist [[5,6],[7,8]], C ist [[19,22],[43,50]]. Acht MACs sind 16 Ops. Ohne Halten 16 mal 4 Byte gleich 64 Byte, mit Tile 32 Byte. Outputs fehlen in dieser Zahl. Auch eine CPU kann Tiles bilden. Modelle wie ResNet-50: Millionen Parameter — Megabyte-Bereich. L1 oft nur Dutzende KiB → Matrizen passen nicht. Verständnischeck: Warum halbieren sich die Eingangsbytes? Jeder Wert wird einmal geladen und lokal wiederverwendet. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Memory Wall bei KI
-
-| Phase | Typische Dauer (schematisch) |
-|-------|------------------------------|
-| Load $x$, $w$ (DRAM) | viele Takte |
-| MUL + ADD | wenige Takte |
-| nächster Load | wieder viele Takte |
-
-- ALU oft idle; Energie geht in Wartezeit und Datentransport
-
-::: notes
-Memory Wall bei KI knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Die Tabelle ist ein pessimistischer serieller Pfad, nicht jede echte Latenz. Requests können sich überlappen. Vier Transfers mit Latenz 3: seriell bis Takt 12, gepipelinet bis Takt 6, wenn ein Start je Takt erlaubt ist. ALU oft idle; Energie geht in Wartezeit und Datentransport. Verständnischeck: Warum nicht jede Miss-Latenz addieren? Zugriffe können sich überlappen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Rechenbeispiel: $10^{6}$ MACs
-
-- $10^{6}$ Gewichte sind nur dann $10^{6}$ MACs, wenn jedes Gewicht genau einmal multipliziert wird
-- Eine Faltung nutzt Gewichte mehrfach. Sequenz, Bild und Batch ändern den Aufwand
-- Einzelne Miss-Latenzen darf man nicht zu einer Summe addieren, wenn Zugriffe überlappen
-
-::: notes
-Rechenbeispiel: $10^{6}$ MACs knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Eine Million MACs, einmal je Gewicht, sind zwei Millionen Ops. Naiv zwei Float32-Operanden sind acht Millionen Byte. Bei 8 Ops und 8 Byte je Takt sind das 250000 Rechen- und eine Million Transfertakte. Kein Boardwert. $10^{6}$ Gewichte sind nur dann $10^{6}$ MACs, wenn jedes Gewicht genau einmal multipliziert wird. Eine Faltung nutzt Gewichte mehrfach. Sequenz, Bild und Batch ändern den Aufwand. Verständnischeck: Welche Untergrenze dominiert? Der Transfer. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Warum OoO hier wenig hilft
-
-- OoO/Predictor: stark bei unregelmäßigem Kontrollfluss
-- MAC-Schleife: linear, hoch vorhersagbar
-- Der Predictor ist bei einer festen Schleife nicht wertlos, aber selten der Engpass
-- Unabhängige Akkumulatoren kann OoO ausführen. Die Speichergrenze bleibt, wenn die Arithmetic Intensity niedrig ist
-
-::: notes
-Warum OoO hier wenig hilft knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. OoO hilft bei Überlappung, hebt aber die Bandbreitengrenze nicht. Eine Summe bleibt RAW-abhängig. Niedrige Intensity beweist nicht, dass der Scheduler nutzlos ist. OoO/Predictor: stark bei unregelmäßigem Kontrollfluss. MAC-Schleife: linear, hoch vorhersagbar. Verständnischeck: Beweist niedrige Intensity Nutzlosigkeit? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Fazit: CPU vs. KI-Last
-
-- ALU-Auslastung bei naiver Matrixrechnung oft gering
-- Viel Zeit/Energie in Transport und Instruktionsverwaltung
-- Spezialhardware kann passen, wenn Operatoren, Form und Auslastung sie nutzen
-
-::: notes
-Fazit: CPU vs. KI-Last knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Geringe Auslastung folgt hier aus Versorgung oder Abhängigkeit, nicht aus jeder KI auf der CPU. Tiling kann helfen, bevor neue Hardware kommt. ALU-Auslastung bei naiver Matrixrechnung oft gering. Viel Zeit/Energie in Transport und Instruktionsverwaltung. Verständnischeck: Welche Softwaretechnik zuerst? Tiling innerhalb der Speichergrenze. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Lösung: Data-Level Parallelism (DLP)
-
-- Weg von „viele verschiedene Instruktionen“ (ILP)
-- DLP: dieselbe Rechnung an vielen Werten. SIMD ist eine mögliche Umsetzung, nicht die Definition
-- Hundert unabhängige Produkte brauchen weder hundert Rechenwerke noch einen Takt
-
-::: notes
-Lösung: Data-Level Parallelism (DLP) knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Hundert unabhängige Produkte sind DLP. Sie brauchen weder hundert Units noch einen Takt. Ein Befehl für viele Daten ist SIMD, nicht die Definition von DLP. Weg von „viele verschiedene Instruktionen“ (ILP). DLP: dieselbe Rechnung an vielen Werten. SIMD ist eine mögliche Umsetzung, nicht die Definition. Verständnischeck: Garantiert ein Befehl hundert Produkte im selben Takt? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Domain-Specific Architecture (DSA)
-
-- Eine DSA kann Formate und Operatoren einschränken. Programmierbarkeit muss nicht vollständig entfallen
-- DSA: Silizium für eine Domäne (z. B. Matrizen) — oft deutlich effizienter
-- Evolutionsschritte: SIMD → DSP-Tricks → Vektoren → NPUs
-
-::: notes
-Domain-Specific Architecture (DSA) knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Eine DSA passt Silizium an ein Muster an und kann Operatoren einschränken. SIMD, DSP, RVV und NPU können im SoC zusammenarbeiten. Kein Ersatzpfad ist vorgeschrieben. Extreme DLP-Optimierung → Verlust der Allzweck-Fähigkeit. DSA: Silizium für eine Domäne (z. B. Matrizen) — oft deutlich effizienter. Verständnischeck: Muss der DSP durch eine NPU ersetzt werden? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Fragen? — MAC und Memory Wall
-
-- Was leistet die MAC-Operation im Netz?
-- Warum kehrt die Memory Wall bei KI zurück?
-- ILP vs. DLP?
-
-::: notes
-Fragen? — MAC und Memory Wall knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. MAC verbindet Produkt und Summe. ILP und DLP können zugleich vorliegen. Die Memory Wall ist hier Transport, die RAW-Kette ist Abhängigkeit. Was leistet die MAC-Operation im Netz?. Warum kehrt die Memory Wall bei KI zurück?. Verständnischeck: Kann ein Programm beides haben? Ja. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Was bedeutet SIMD?
-
-- SIMD: Single Instruction, Multiple Data
-- Paradebeispiel für DLP
-- Ein Fetch/Decode → intern mehrere parallele Operationen
-
-::: notes
-Was bedeutet SIMD knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Ein Decode steuert gleiche Operationen auf getrennten Lanes. Vier Lanes sind nicht vier Befehle. Weniger Fetch garantiert keine Gesamtenergieeinsparung. SIMD: Single Instruction, Multiple Data. Paradebeispiel für DLP. Verständnischeck: Sind vier Lanes vier Befehle? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## SIMD-Prinzip
-
-![Vier 8-Bit-Lanes addieren getrennt. Ein Int8-Produkt braucht einen breiteren Akkumulator.](../assets/figures/08_ki_beschleuniger_edge_ai/simd.png)
-
-- Skalar (SISD): `add` → eine Addition
-- SIMD: ein Befehl → mehrere parallele Adds auf Daten-Lanes
-
-```{mermaid}
-%%| fig-width: 3.8
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart LR
-  A[SIMD Add] --> B{Verteiler}
-  B --> A1[ALU1]
-  B --> A2[ALU2]
-  B --> A3[ALU3]
-  B --> A4[ALU4]
-  style A fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
-
-::: notes
-SIMD-Prinzip knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Unsigned modulo 256: 01 plus 02 ist 03, 10 plus 20 ist 30, 7F plus 01 ist 80, FF plus 01 ist 00. Das ist Addition, kein Dot Product. 20 mal 20 gleich 400 passt nicht in ein Byte. Signed und Sättigung sind andere Verträge. Skalar (SISD): `add` → eine Addition. SIMD: ein Befehl → mehrere parallele Adds auf Daten-Lanes. Verständnischeck: Warum kein Übertrag in die Nachbarlane? Jede Lane rechnet modulo 256 für sich. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Packed SIMD
-
-- Problem: schmale ISA-Register, breite Parallelität?
-- Lösung: Register in Lanes zerlegen (z. B. 32 Bit → $4\times 8$ Bit)
-- SIMD-Op: Lane für Lane parallel, ohne Carry zwischen Lanes
-
-::: notes
-Packed SIMD knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Ein normales 32-Bit-add darf Bytes überlaufen. Packed SIMD braucht eine Instruktion mit Lanevertrag. Vier gepackte Bytes und ein gewöhnliches add genügen nicht. Problem: schmale ISA-Register, breite Parallelität?. Lösung: Register in Lanes zerlegen (z. B. 32 Bit → $4\times 8$ Bit). Verständnischeck: Genügt normales add? Nein, Überträge vermischen die Felder. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Digital Signal Processors (DSPs)
-
-- Vor dem KI-Boom: DSPs für Audio, Modem, Filter
-- Algorithmen (FIR etc.): wie KI stark Array-/Skalarprodukt-lastig
-- Vorläufer vieler NPU-Ideen
-
-::: notes
-Digital Signal Processors (DSPs) knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Ein FIR ist y von n gleich Summe h von k mal x von n minus k. Mit h gleich 1 und 2 und Fenster 3 und 4 ist das 11. Dense ähnelt der Summe, der zeitliche Kontext kann anders sein. Vor dem KI-Boom: DSPs für Audio, Modem, Filter. Algorithmen (FIR etc.): wie KI stark Array-/Skalarprodukt-lastig. Verständnischeck: Was teilen FIR und Dense? Viele Produkte in einer Summe. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## DSP: dedizierte MAC-Einheit
-
-- Mul und Add oft fest verdrahtet als eine MAC
-- $a + (x \times w)$ in wenigen Takten / oft einem Zyklus (je nach Design)
-- Weniger Instruktionsfolge als auf skalarer RISC-ALU
-
-::: notes
-DSP: dedizierte MAC-Einheit knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Initiierungsintervall 1 erlaubt einen neuen unabhängigen Start je Takt. Die Ergebnislatenz kann trotzdem mehrere Takte sein. Eine abhängige Summe braucht Weiterleitung oder Warten. Mul und Add oft fest verdrahtet als eine MAC. $a + (x \times w)$ in wenigen Takten / oft einem Zyklus (je nach Design). Verständnischeck: Beweist ein Start je Takt Latenz 1? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Super-Harvard in DSPs
-
-- Mehrere parallele Speicherpfade gegen die Memory Wall
-- Typisch: Code-Bus + getrennte Datenbusse für $x$ und $w$
-- Loads und MAC können im selben Takt überlappen
-
-::: notes
-Super-Harvard in DSPs knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Super-Harvard ist eine benannte DSP-Idee, nicht jeder DSP. Zwei Busse garantieren nicht zwei Operanden, wenn dieselbe Bank kollidiert. Mehrere parallele Speicherpfade gegen die Memory Wall. Typisch: Code-Bus + getrennte Datenbusse für $x$ und $w$. Verständnischeck: Garantieren zwei Busse zwei Operanden? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Zero-Overhead Loops
-
-- Hardware-Schleifenzähler: Start, Ende, Count
-- Kein `beq` pro Iteration — kein Predictor-Overhead
-- PC-Wrap in Hardware bis Count abgelaufen
-
-::: notes
-Zero-Overhead Loops knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Ein Hardwareloop spart bestimmte Branch- und Zählerbefehle. Er entfernt keine Speicherwartezeit. Die spätere RVV-Schleife mit bnez ist Software. Hardware-Schleifenzähler: Start, Ende, Count. Kein `beq` pro Iteration — kein Predictor-Overhead. Verständnischeck: Entfernt der Hardwareloop Speicherwarten? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Grenze: Packed SIMD skaliert schlecht
-
-- Feste Vektorbreite in der ISA (z. B. 128 / 256 / 512 Bit)
-- Alter Code nutzt neue breitere Units nicht automatisch
-- Oft Neukompilieren / Intrinsics für jede Generation
-
-::: notes
-Grenze: Packed SIMD skaliert schlecht knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. 128 Bit fassen vier Int32-Werte. Alter Code bleibt korrekt, nutzt breitere Befehle aber nicht automatisch. Neukompilieren ist eine Möglichkeit, keine Pflicht für Korrektheit. Feste Vektorbreite in der ISA (z. B. 128 / 256 / 512 Bit). Alter Code nutzt neue breitere Units nicht automatisch. Verständnischeck: Wie viele Int32 in 128 Bit? Vier, ohne Taktaussage. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Instruction-Fetch-Overhead bleibt
-
-- Auch breites SIMD: weiterhin viele Instruktionen für große Matrizen
-- Decode und I-Cache kosten Energie
-- Wunsch: „rechne lange auf diesen Daten“ mit weniger Instruction Stream
-
-::: notes
-Instruction-Fetch-Overhead bleibt knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. SIMD senkt Befehle je Element, nicht den Fetch auf null. Loads und Schleifen bleiben. Weniger Fetch ist kein Joule-Nachweis. Auch breites SIMD: weiterhin viele Instruktionen für große Matrizen. Decode und I-Cache kosten Energie. Verständnischeck: Verschwindet Fetch? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Übergang zu Vektoren
-
-- Packed SIMD hat eine feste Breite. RVV wählt die aktive Elementzahl zur Laufzeit
-- RISC-V Vector Extension (RVV): Ansatz für skalierbare Vektor-ISAs
-- Code-Idee: dieselbe Software auf schmalen und breiten Implementierungen
-
-::: notes
-Übergang zu Vektoren knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. RVV wählt die aktive Länge zur Laufzeit. Ein Register bleibt endlich. Ein langes Array wird in Stücken verarbeitet. Dieselbe Binärdatei braucht passende ISA und ABI. Weg von starrem Packed SIMD → flexible Vektorlängen. RISC-V Vector Extension (RVV): Ansatz für skalierbare Vektor-ISAs. Verständnischeck: Kann ein Register das ganze Array halten? Nicht beliebig lang. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Kurzfazit: DSP und SIMD
-
-- DLP ist die Datenparallelität. SIMD nutzt sie mit einem gemeinsamen Operationstyp
-- Packed SIMD: breite Register, starre Breiten
-- DSPs: MAC, Multi-Bus, Zero-Overhead Loops
-- Vektoren und NPUs können bei passenden Operatoren helfen. Ein DSP ist dadurch nicht veraltet
-
-::: notes
-Kurzfazit: DSP und SIMD knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. DLP ist nicht der Name von SIMD. Packed SIMD hat feste Breite. DSP-MAC, Busse und Hardwareloops sind getrennte Merkmale. Vektoren sind kein Beweis, dass DSPs veraltet sind. DLP ist die Datenparallelität. SIMD nutzt sie mit einem gemeinsamen Operationstyp. Packed SIMD: breite Register, starre Breiten. Verständnischeck: Ist DLP nur ein anderer Name für SIMD? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Fragen? — SIMD und DSP
-
-- Wie senkt SIMD den Fetch/Decode-Overhead?
-- Warum ist eine Hardware-MAC für Signalverarbeitung wertvoll?
-- Warum muss Packed-SIMD-Code oft neu angepasst werden?
-
-::: notes
-Fragen? — SIMD und DSP knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. SIMD senkt Fetch je Lanegruppe. Die Hardware-MAC passt zur Produktsumme, wenn die Daten da sind. Feste Breite wird nicht automatisch größer, nur weil neue Hardware breiter ist. Wie senkt SIMD den Fetch/Decode-Overhead?. Warum ist eine Hardware-MAC für Signalverarbeitung wertvoll?. Verständnischeck: Warum ist die MAC wertvoll? Sie bündelt die häufige Rechnung, wenn die Versorgung passt. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Echte Vektor-Architektur
-
-- Verarbeitet lineare Arrays (Vektoren), nicht nur Skalare
-- Anders als Packed SIMD: Vektorlänge flexibel, nicht in feste Registerhäppchen geschnitten
-- Befehlssatz abstrahiert: „Addiere Vektor A und B“ — unabhängig von der Implementierungsbreite
-
-::: notes
-Echte Vektor-Architektur knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Ein Vektorbefehl hat eine konfigurierte Länge. Ist N größer als VLMAX, folgen mehrere Stücke. VLEN ist nicht die Lanezahl. Ein Load ist keine Garantie, dass alles in einem Takt fertig ist. Verarbeitet lineare Arrays (Vektoren), nicht nur Skalare. Anders als Packed SIMD: Vektorlänge flexibel, nicht in feste Registerhäppchen geschnitten. Verständnischeck: Was passiert bei zu langem Array? Mehrere VL-Stücke. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Vektor-Register-File
-
-- Neben `x0`–`x31`: Vektorregister `v0`–`v31`
-- Jedes `v`-Register hält viele Elemente gleichzeitig
-- Kapazität hängt von der Implementierung ab ($\mathrm{VLEN}$ = Vector Length)
-
-::: notes
-Vektor-Register-File knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Es gibt 32 Vektorregister zu je VLEN Bit. Bei VLEN 128, SEW 32 und LMUL 1 ist VLMAX 4, nicht 128. VL ist die aktive Elementzahl. Eine Lanegruppe kann diese Elemente über mehrere Takte rechnen. Neben `x0`–`x31`: Vektorregister `v0`–`v31`. Jedes `v`-Register hält viele Elemente gleichzeitig. Verständnischeck: Ist VLEN 128 gleich 128 Elemente? Nein, bei 32 Bit sind es vier. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## RISC-V Vector Extension (RVV)
-
-- Offizielle RISC-V-Erweiterung für Vektormathematik (u. a. ML, Krypto)
-- Neue Instruktionen, z. B. `vadd.vv`
-- Software kennt die physische Breite oft nicht (Watch vs. Server)
-- Frage: ein Binary für unbekannte $\mathrm{VLEN}$?
-
-::: notes
-RISC-V Vector Extension (RVV) knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. vadd.vv addiert Integer-Vektoren. Krypto und Int8-TinyML brauchen passende Erweiterungen. Dieselbe Binärdatei läuft nicht auf jeder Uhr und jedem Server. Offizielle RISC-V-Erweiterung für Vektormathematik (u. a. ML, Krypto). Neue Instruktionen, z. B. `vadd.vv`. Verständnischeck: Läuft dasselbe Binary überall nur wegen RVV? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## `vsetvli` / hardware-agnostisch
-
-- Software: „Array mit $N$ Elementen“
-- Bei LMUL $= 1$ ist $\mathrm{VLMAX} = \mathrm{VLEN}/\mathrm{SEW}$. Allgemein $\mathrm{VLMAX} = \mathrm{LMUL}\times\mathrm{VLEN}/\mathrm{SEW}$
-- `vsetvli` liefert nicht immer $\min(AVL, VLMAX)$
-- Schleife läuft in Hardware-Schritten durch das Array
-
-```asm
-# RVV 1.0, LMUL=1, e32, ta, ma. Nicht in diesem Repo assembliert.
+# RVV 1.0; a0=N, a1=A, a2=B, a3=C; uint32_t-Arrays
+beqz a0, done
 loop:
     vsetvli t0, a0, e32, m1, ta, ma
-    vle32.v v1, (a1)
-    vle32.v v2, (a2)
-    vadd.vv v3, v1, v2
-    vse32.v v3, (a3)
+    vle32.v v0, (a1)
+    vle32.v v1, (a2)
+    vadd.vv v2, v0, v1
+    vse32.v v2, (a3)
     slli t1, t0, 2
     add a1, a1, t1
     add a2, a2, t1
     add a3, a3, t1
     sub a0, a0, t0
     bnez a0, loop
+done:
+    ret
 ```
 
 ::: notes
-`vsetvli` / hardware-agnostisch knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. a0 ist der Rest, a1 und a2 sind Quellen, a3 das Ziel, t0 das zurückgegebene VL. slli mal 4 rechnet Bytes, nicht Datenwerte. Ist AVL höchstens VLMAX, ist VL gleich AVL. Liegt AVL zwischen VLMAX und dem Doppelten, liegt VL zwischen der Hälfte aufgerundet und VLMAX. Ab dem Doppelten ist VL gleich VLMAX. Bei N gleich 0 passiert nichts. ta und ma dürfen nicht als neue Ergebnisse gelesen werden. Lehrcode, nicht assembliert. Software: „Array mit $N$ Elementen“. Bei LMUL $= 1$ ist $\mathrm{VLMAX} = \mathrm{VLEN}/\mathrm{SEW}$. Allgemein $\mathrm{VLMAX} = \mathrm{LMUL}\times\mathrm{VLEN}/\mathrm{SEW}$. Verständnischeck: Warum um VL vorrücken? Die Hardware darf im mittleren Bereich kürzer wählen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Der Ausschnitt ist eine RISC-V-Assembler-Lehrfolge für RVV, RISC-V Vector Extension, Version 1.0. Er wurde nicht mit einer RISC-V-Toolchain assembliert. `uint32_t` bedeutet vorzeichenlose Zweiunddreißig-Bit-Ganzzahl. `a0` enthält die noch zu bearbeitende Elementzahl, `a1`, `a2` und `a3` gültige ausgerichtete Adressen der Arrays A, B und C. Die Arrays haben mindestens N Elemente; C überschneidet sich hier nicht mit den Quellen. Zeigeraddition und Bytezahl müssen im Zieladressraum darstellbar sein.
+
+`beqz` überspringt bei N null sämtliche Zugriffe. `vsetvli` wählt `e32`, Zweiunddreißig-Bit-Elemente, und `m1`, eine Registergruppe von einem Register. Es gibt die aktive Länge VL in `t0` zurück. `ta` und `ma` erlauben, inaktive Tail- beziehungsweise maskierte Plätze nicht zu erhalten; unser unmaskierter Code verwendet diese Inhalte nicht. `vle32.v` lädt aktive Elemente nach `v0` und `v1`, `vadd.vv` addiert sie elementweise modulo $2^{32}$ nach `v2`, `vse32.v` speichert nur die aktiven Ergebnisse.
+
+`slli` verschiebt VL um zwei Bit nach links, berechnet also vier mal VL Byte in `t1`. Die drei `add`-Befehle rücken die Zeiger um diese Bytezahl. `sub` reduziert den Rest um VL; `bnez` wiederholt bei positivem Rest. `ret` kehrt zum Aufrufer zurück. Die Folge zeigt kein Skalarprodukt und keine MAC, Multiply-Accumulate. Ihre Korrektheit hängt von der zurückgegebenen Länge ab, ihre Laufzeit zusätzlich von der Mikroarchitektur und Datenversorgung.
 :::
 
-## Ein Binary, viele $\mathrm{VLEN}$
+## Vier aktive Elemente brauchen nicht vier Lanes
 
-![128 Bit: 250 Schritte zu VL 4. 1024 Bit: 31 Schritte zu VL 32 plus VL 8.](../assets/figures/08_ki_beschleuniger_edge_ai/rvv.png)
+![](../assets/figures/08_ki_beschleuniger_edge_ai/lanes.png){fig-alt="Dieselben vier aktiven Vektorelemente können in einem Modell mit einer Lane in vier Schritten oder mit zwei Lanes in zwei Schritten gerechnet werden. Datenkapazität und Rechenbreite sind verschieden."}
 
-Beispiel: 1000 Elemente, `vadd.vv` (schematisch)
-
-| Plattform | Breite (schematisch) | $\mathrm{VL}$ (e32) | Schleifenläufe |
-|-----------|----------------------|---------------------|----------------|
-| Edge | schmal (z. B. 128 Bit) | 4 | 250 |
-| Server | 1024 Bit, LMUL 1 | 32, dann 20+20 oder 32+8 | 32 |
-
-Gleiche RVV-Schleifenidee skaliert mit $\mathrm{VLEN}$ — ohne feste Packed-SIMD-Breite im Quelltext.
+Gleiche ISA-Wirkung; unterschiedliche interne Umsetzung und Zeit.
 
 ::: notes
-Ein Binary, viele $\mathrm{VLEN}$ knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. 1000 Elemente, e32, m1: VLEN 128 ergibt VLMAX 4 und 250 Iterationen. VLEN 1024 ergibt VLMAX 32. Nach 30 vollen Stücken bleiben 40. Die erste VL darf 20 bis 32 sein, der Rest ist dann exakt. 20 plus 20, 24 plus 16 und 32 plus 8 sind zulässige Policies mit 32 Iterationen. Je Zeiger insgesamt 4000 Byte. 31 mal 32 plus 8 ist nur eine Policy. Verständnischeck: Ist bei AVL 40 und VLMAX 32 zwingend VL 32? Nein, 20 bis 32 sind erlaubt. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+ISA bedeutet Instruction Set Architecture, Befehlssatzarchitektur. Sie beschreibt die Wirkung einer Instruktion, etwa elementweise Addition der aktiven Vektorplätze. VL, Vector Length, bestimmt deren Anzahl. Eine physische Lane ist hier ein tatsächlich verfügbarer elementweiser Rechenpfad. Im Bild betrachten wir VL vier und abstrahieren Laden, Speichern und Startkosten vollständig weg.
+
+Die obere Modellumsetzung besitzt eine Lane und verarbeitet die vier unabhängigen Additionen in vier Schritten. Die untere besitzt zwei und benötigt zwei Schritte. Die kleinen nummerierten Felder stellen Elemente dar; ihre horizontalen Gruppen bilden einen internen Schritt. Die Zahlen vier und zwei sind Lehrzeiten unter der Annahme eines Ergebnisses je Lane und Schritt, keine Laufzeitgarantie von RVV, RISC-V Vector Extension.
+
+Beide Umsetzungen können dieselben vier Ergebnisse liefern. Ein großes Register kann somit von wenigen Rechenpfaden über mehrere Takte bearbeitet werden. Umgekehrt braucht eine breite Umsetzung genügend Speicherbandbreite. Portable Vektorlängen machen die Programmlogik weniger abhängig von der Registerkapazität, garantieren jedoch keine gleiche Zeit oder Energie. Zusätzliche Weiterleitung zwischen verschiedenen Rechenoperationen ist eine weitere, davon getrennte Möglichkeit der Überlappung.
 :::
 
-## Energie: weniger Instruction Fetch
+## Chaining: Ergebnisse elementweise weitergeben
 
-- Architektonisch viele Elemente je Befehl. Physisch kann dieselbe Lane sie über mehrere Takte rechnen
-- Skalar: dutzende Loads/Adds/Branches aus dem I-Cache
-- Weniger Fetch kann Energie sparen und garantiert keinen geringeren Gesamtverbrauch
+![](../assets/figures/08_ki_beschleuniger_edge_ai/chain.png){fig-alt="Vier Multiplikationen enden in Takten zwei bis fünf. Mit Weitergabe starten die zugehörigen Additionen in drei bis sechs, ohne Weitergabe erst in sechs bis neun."}
+
+Lehrmodell: Multiplikationslatenz $2$, Additionslatenz $1$, je ein Start pro Takt.
 
 ::: notes
-Energie: weniger Instruction Fetch knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Weniger Befehle können den Front-End-Anteil senken. Loads, Register und Laufzeit bleiben. Weniger Instruktionen sind nicht automatisch weniger Joule. Ein Vektorbefehl → viele Elemente parallel. Skalar: dutzende Loads/Adds/Branches aus dem I-Cache. Verständnischeck: Garantieren weniger Befehle weniger Energie? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Chaining ist die direkte elementweise Weitergabe fertiger Ergebnisse zwischen Rechenpfaden. Das Modell bildet für vier Elemente erst ein Produkt und danach eine separate Addition. Es ist keine fused multiply-add, verschmolzene Multiplikation und Addition, und keine Zusage der RVV-Spezifikation; RVV bedeutet RISC-V Vector Extension.
+
+Die waagerechte Achse trägt Kerntakte. Vier unabhängige Multiplikationen starten in eins bis vier, ihre Ergebnisse entstehen bei Latenz zwei am Ende von zwei bis fünf. Eine Addition hat Latenz eins. Mit Weitergabe kann sie für das jeweilige Element im Folgetakt beginnen: drei, vier, fünf und sechs. Die vier letzten Ergebnisse stehen daher am Ende von drei bis sechs bereit.
+
+Ohne Chaining verlangt dieses Vergleichsmodell, dass erst alle vier Produkte fertig sind. Die Additionen starten dann in sechs bis neun und enden jeweils im selben Takt. Der gesamte Ausschnitt endet mit Chaining in sechs, ohne in neun. Die Rechnung umfasst in beiden Fällen vier Multiplikationen und vier Additionen. Rot markiert die früheren Endergebnisse; eine gültige Weiterleitung braucht passende Ports und Ressourcen. Wir addieren unabhängige Elemente, keine einzige abhängige Akkumulatorkette. Diese Unterscheidung verhindert, dass das Bild als allgemeine Beschleunigung jeder Summe gelesen wird.
 :::
 
-## Vector Load/Store
+## Papierphase 2: Vektorlängen und Ablauf
 
-- Breite Speicherpfade zum D-Cache / SRAM
-- `vle32.v`: zusammenhängender Block → Vektorregister
-- Ähnlich Burst-Idee: DRAM-/Bus-Lokalität besser ausnutzen
+Übungsblatt, Aufgabe 3 · 15 Minuten
+
+- VLMAX aus Bitbreiten berechnen
+- Zulässige VL-Folgen für den Rest unterscheiden
+- Zeigerinkrement und Elementzahl getrennt angeben
+- Kapazität und physische Rechenbreite auseinanderhalten
 
 ::: notes
-Vector Load/Store knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. vle32.v mit VL 4 lädt vier 32-Bit-Werte, also 16 Byte, nicht vier Byte. Der Befehl darf intern mehrere Takte brauchen. Eine Cachezeile ist keine garantierte DRAM-Transaktion. Breite Speicherpfade zum D-Cache / SRAM. `vle32.v`: zusammenhängender Block → Vektorregister. Verständnischeck: Lädt VL 4 vier Bytes? Nein, 16 Nutzbytes. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+VLMAX ist die maximale aktive Elementzahl einer Registergruppe. VLEN, Vector Register Length, ist deren Registerbreite in Bit, SEW, Selected Element Width, die Bitzahl je Element und LMUL, Vector Register Group Multiplier, die Gruppengröße. VL ist die aktive Länge; AVL, Application Vector Length, die angeforderte Restzahl.
+
+Bei VLEN hundertachtundzwanzig, SEW zweiunddreißig und LMUL eins folgt VLMAX vier. Das ist keine Angabe von vier physischen Rechenpfaden. Im zweiten Teil der Aufgabe gilt separat VLMAX zweiunddreißig. Für AVL vierzig sind erste Längen zwanzig bis zweiunddreißig zulässig. Mit VL vierundzwanzig bleiben sechzehn; die Zeiger bewegen sich um sechsundneunzig, anschließend vierundsechzig Byte. Die Anfangswahl sechzehn ist dagegen unzulässig.
+
+Für eintausend Elemente entstehen dreißig volle und zwei Restiterationen. Besprechen Sie abschließend die Chaining-Zeitpunkte sechs und neun unter den gegebenen Modellbedingungen. Chaining bedeutet direkte elementweise Weiterleitung und ist keine garantierte Vektorbefehlseigenschaft. Die Aufgabe prüft damit sowohl die Befehlssatzregeln als auch die Grenze zwischen diesen Regeln und einem angenommenen Zeitmodell.
 :::
 
-## Chaining
+## CPU, GPU und NPU kombinieren
 
-![Gleiche Achse 1–9. Ohne Chaining letztes Ergebnis Ende Takt 9, mit Chaining Ende Takt 6.](../assets/figures/08_ki_beschleuniger_edge_ai/chain.png)
+| Einheit | Häufiger Schwerpunkt | Auswahlfrage |
+|---------|----------------------|--------------|
+| CPU | Kontrollfluss, flexible Aufgaben | Reicht sie für das kleine Modell? |
+| GPU | viele parallele Daten und Threads | Passen Auslastung und Datentransfer? |
+| NPU | unterstützte neuronale Operatoren | Werden Form und Datentyp unterstützt? |
 
-- MAC: Mul dann Add — Zwischenergebnis sonst zurück ins Registerfile
-- Chaining ist eine Option des Kerns. Eine FMA ist eine andere Instruktion mit einer Rundung
-- Weniger Registerverkehr, höherer Durchsatz
+Eine NPU ist keine einheitliche ISA und nicht immer ein systolisches Array.
 
 ::: notes
-Chaining knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Mul startet in den Takten 1 bis 4 und endet 2 bis 5. Ohne Chaining startet Add in 6 bis 9 und endet dort. Mit elementweisem Weiterreichen startet Add in 3 bis 6. Das erste Ergebnis ist Ende Takt 3 statt 6, das letzte Ende Takt 6 statt 9. Die Rechenzahl bleibt gleich. Das ist kein RVV-Zeitversprechen und keine FMA. MAC: Mul dann Add — Zwischenergebnis sonst zurück ins Registerfile. Chaining ist eine Option des Kerns. Eine FMA ist eine andere Instruktion mit einer Rundung. Verständnischeck: Was spart das Modell? Wartezeit, nicht Multiplikationen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+CPU bedeutet Central Processing Unit, allgemeiner Prozessor; GPU Graphics Processing Unit, Grafikprozessor mit breiten parallelen Ausführungsmöglichkeiten; NPU Neural Processing Unit, Beschleuniger für neuronale Verarbeitung. Ein Thread ist ein eigener Ausführungsfaden. ISA heißt Instruction Set Architecture, Befehlssatzarchitektur. NPU ist eine Produkt- und Architekturklasse, kein einheitlicher Standard für Befehle oder interne Gitter.
+
+Die Tabelle nennt häufige Schwerpunkte, keine absoluten Grenzen. Eine CPU kann ein kleines Modell mit kurzer Gesamtlatenz ausführen. Eine GPU kann bei großen gut parallelen Aufgaben viel Durchsatz liefern, verlangt aber ebenfalls Datenversorgung und passende Auslastung. Eine NPU unterstützt bestimmte Operatoren, Datentypen und Formen besonders gut. Ein Operator ist eine Modelloperation wie vollständig verbundene Schicht oder Faltung.
+
+Nicht unterstützte Teile können auf der CPU bleiben; dann kommen Übergaben und Kopien hinzu. Ein System kann alle drei Klassen kombinieren. Energieangaben lassen sich ohne dieselbe Aufgabe, Messgrenze und Betriebsweise nicht vergleichen. Wir untersuchen nun als ein mögliches NPU-Prinzip ein systolisches Array. Seine Stärke entsteht nicht durch den Namen, sondern durch lokale Wiederverwendung und regelmäßige Nachbarverbindungen.
 :::
 
-## RVV und TinyML
+## Eine Zelle rechnet und reicht weiter
 
-- TinyML: Inferenz auf sehr knappen Energie-/SRAM-Budgets
-- RVV-fähige Kerne: flexibel (noch volle CPU) + Vektor-Durchsatz
-- Typisch: Keyword Spotting, kleine Sensor-Modelle am Edge
+![](../assets/figures/08_ki_beschleuniger_edge_ai/cell.png){fig-alt="Eine Modellzelle empfängt A von links und B von oben, addiert A mal B zur lokalen Summe C und reicht unverändertes A nach rechts und B nach unten."}
+
+Output-Stationary: Die Teilsumme bleibt während des Tiles in der Zelle.
 
 ::: notes
-RVV und TinyML knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. TinyML ist Inferenz bei knappem Speicher und Energie. RVV beschleunigt nur, wenn der Kernel sie benutzt. Firmware kann ohne Betriebssystem laufen. Ein vorhandenes TFLM-RVV-Build liegt hier nicht vor. TinyML: Inferenz auf sehr knappen Energie-/SRAM-Budgets. RVV-fähige Kerne: flexibel (noch volle CPU) + Vektor-Durchsatz. Verständnischeck: Nutzt TFLM automatisch RVV? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Ein systolisches Array ist ein regelmäßiges Gitter von Rechenzellen mit getakteter Datenweitergabe. Systole bezeichnet die rhythmische Pumpbewegung des Herzens; das Namensbild beschreibt eine Wertwelle durch Nachbarzellen. Eine MAC, Multiply-Accumulate, multipliziert ein Eingangspaar und addiert das Produkt zur lokalen Summe.
+
+In unserem Output-Stationary-Lehrmodell bleibt die Ausgabeteilsumme $C$ während eines Tiles, eines lokal bearbeiteten Matrixausschnitts, in der Zelle. $A$ kommt von links und wird unverändert nach rechts weitergegeben. $B$ kommt von oben und wandert unverändert nach unten. Die Zelle leitet also nicht das Produkt als neuen A- oder B-Wert weiter. Die rote Umrandung markiert die lokal gehaltene Summe.
+
+Wir nehmen für ein gültiges Eingangspaar eine vollständige MAC pro Takt an. Ein Operand erreicht den Nachbarn erst im nächsten Takt. Ohne zwei gültige passend indizierte Werte erfolgt keine MAC. Die Summe beginnt vor dem ersten Takt bei null. Das sind explizite Modellannahmen, keine Vorgabe für jede NPU, Neural Processing Unit. Ein tatsächliches System braucht zusätzlich Puffer, gültige Kennzeichnungen und einen Ausleseweg. Nun verbinden wir vier solcher Zellen zur bekannten Matrixrechnung.
 :::
 
-## Grenzen von Vektoren
+## Vier Zellen für die bekannte 2×2-Rechnung
 
-- Registerfile bleibt: lesen/schreiben kostet Energie und limitiert Skalierung
-- Ein großes Modellfile beweist den Registerengpass nicht. Form und Reuse entscheiden
-- Nächste Stufe: Daten fließen ohne ständiges Zurückschreiben — Systolic Arrays
+![](../assets/figures/08_ki_beschleuniger_edge_ai/array.png){fig-alt="Vier Zellen C00,C01,C10,C11 bilden ein 2-mal-2-Gitter. A fließt zeilenweise rechts, B spaltenweise unten, C bleibt lokal."}
+
+Alle Summen starten bei null; Vorladen und Auslesen sind ausgeklammert.
 
 ::: notes
-Grenzen von Vektoren knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Registerports kosten Energie. Ein großes Modellfile beweist nicht, dass das Registerfile der Engpass ist. Ein systolisches Gitter ist eine andere Entscheidung, keine Pflichtstufe. Registerfile bleibt: lesen/schreiben kostet Energie und limitiert Skalierung. Sehr große Modelle: Pfad ALU → Register wird Engpass. Verständnischeck: Beweist die Dateigröße den Engpass? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Die Abbildung zeigt ein Output-Stationary-Array: Die vier Ausgabesummen $C_{00}$, $C_{01}$, $C_{10}$ und $C_{11}$ bleiben während der Rechnung in ihren Zellen. Die Indizes bezeichnen Zeile und Spalte und beginnen bei null. $A$ wird links je Zeile eingespeist, $B$ oben je Spalte. Pfeile zeigen Nachbarweitergabe, keine Systembuszugriffe für jede einzelne MAC. MAC bedeutet Multiply-Accumulate.
+
+Wir verwenden exakt die Matrizen des Tile-Beispiels: $A=[[1,2],[3,4]]$, $B=[[5,6],[7,8]]$ und $C=AB$. Eine Zelle $C_{ij}$ benötigt für beide Summenschritte den passenden Wert $A_{ik}$ und $B_{kj}$ mit demselben inneren Index $k$. Für $C_{01}$ sind das $1\cdot6$ und $2\cdot8$. Für $C_{10}$ sind es $3\cdot5$ und $4\cdot7$. Alle Summen starten bei null, jedes gültige Paar wird im aktuellen Takt verarbeitet und erst im nächsten Takt weitergereicht.
+
+Ein geometrisch richtiges Gitter allein stellt noch nicht sicher, dass zusammengehörige Werte gleichzeitig eintreffen. Würden alle Zeilen und Spalten ungeordnet starten, könnten falsche Indexpaare zusammentreffen. Die Randeinspeisung muss deshalb um Zeilen- beziehungsweise Spaltenposition versetzt werden. Diese Staffelung erklärt den Anlauf und wird als nächster Schritt ausdrücklich auf einer Zeitachse gezeigt.
 :::
 
-## Kurzfazit RVV
+## Die Randeinspeisung wird gestaffelt
 
-- Die Software verarbeitet lange Arrays in Stücken der Länge VL
-- VLEN ist die Registerbreite in Bit, VL die aktive Elementzahl
-- Dieselbe Binärdatei braucht passende ISA, XLEN und ABI
-- Weniger Befehlsstrom kann helfen. DLP ist die Datenparallelität, nicht der Befehl selbst
-- Loads und Chaining können Wartezeit senken. Chaining ist keine RVV-Garantie
+![](../assets/figures/08_ki_beschleuniger_edge_ai/skew.png){fig-alt="Randwerte: A-Zeile0 erhält 1,2 in Takten1,2, A-Zeile1 3,4 in2,3. B-Spalte0 erhält5,7 in1,2, B-Spalte1 6,8 in2,3. Leere Felder sind ungültig."}
+
+Ankunft in Zelle $(i,j)$: Takt $1+k+i+j$, mit $i,j,k\in\{0,1\}$.
 
 ::: notes
-Kurzfazit RVV knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Die Schleife benutzt das zurückgegebene VL, nicht eine feste VLEN. Loads heben die Bandbreite nicht auf. Chaining ist optional. Physische Parallelität folgt nicht aus der Bitbreite. Ein Befehl, lange Arrays. $\mathrm{VLEN}$/$\mathrm{VL}$ abstrahiert Hardwarebreite. Verständnischeck: Welche Größe rückt den Zeiger? VL mal 4 Byte. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Die Zeitachse zeigt die an den Rändern verfügbaren Werte, noch nicht alle Zellwerte. Zeilen- und Spaltenindizes $i$ und $j$ sowie Summenindex $k$ beginnen bei null. $A_{ik}$ wird links in Takt $1+k+i$ eingespeist, $B_{kj}$ oben in Takt $1+k+j$. Ein Schritt nach rechts beziehungsweise unten benötigt jeweils einen zusätzlichen Takt.
+
+Damit erreichen beide passenden Operanden Zelle $(i,j)$ in Takt $1+k+i+j$. Für $C_{00}$ treffen eins und fünf in Takt eins sowie zwei und sieben in Takt zwei zusammen. Für $C_{11}$ benötigen A-Wert drei und B-Wert sechs jeweils noch einen Nachbarschritt nach ihrer Einspeisung in zwei; sie treffen in drei ein. Vier und acht treffen entsprechend in vier ein.
+
+Leere Felder sind ungültige Plätze, keine numerischen Nullen. Die Modellzelle führt dort keine MAC, Multiply-Accumulate, aus. Die grauen Felder markieren diese Leerstellen; rote Einspeisewerte zeigen den verzögerten Start der zweiten Zeile und Spalte. Die Staffelung wird manchmal Skewing genannt, zeitliches Versetzen. Sie sorgt dafür, dass nicht nur die Werte, sondern auch ihre inneren Indizes zusammenpassen. Genau deshalb füllt sich das Gitter wellenartig statt sofort vollständig.
 :::
 
-## Aufgabe — AVL 40
+## Die gültigen Paare wandern als Welle
 
-VLMAX ist 32. Nach 30 Schritten mit VL 32 bleiben 40 Elemente. Welche letzten VL-Werte sind zulässig, und wie viele Iterationen ergeben 1000 Elemente?
+![](../assets/figures/08_ki_beschleuniger_edge_ai/wave.png){fig-alt="Takt1 rechnet C00, Takt2 C00,C01,C10, Takt3 C01,C10,C11, Takt4 C11. Die aktiven Zellen ergeben pro Takt1,3,3,1 MACs."}
+
+Acht gültige MACs in vier Takten; leere Zellen erledigen keine Arbeit.
 
 ::: notes
-Aufgabe — AVL 40 knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. AVL 40 und VLMAX 32 liegen zwischen 32 und 64. Die Untergrenze ist aufgerundet 20. VL 16 wäre zu klein. Danach ist der Rest exakt die nächste VL. 20 plus 20 sind je 80 Byte, 32 plus 8 sind 128 dann 32 Byte. Verständnischeck: Wäre 16 plus 24 zulässig? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+MAC heißt Multiply-Accumulate, Produkt zur lokalen Summe addieren. Die vier kleinen Gitter zeigen aufeinanderfolgende Takte desselben Output-Stationary-Modells, bei dem die Summe in ihrer Zelle bleibt. Rot umrandet sind Zellen mit einem gültigen passenden Eingangspaar. Grau bleiben Zellen, die in diesem Takt keine gültige Rechnung ausführen.
+
+In Takt eins arbeitet nur $C_{00}$ mit eins mal fünf. In zwei verarbeitet diese Zelle ihr zweites Paar; zugleich beginnen $C_{01}$ und $C_{10}$. In drei erhalten diese beiden ihre zweiten Paare und $C_{11}$ beginnt. In vier bleibt nur noch das zweite Paar von $C_{11}$. Die Zahl gültiger MACs ist also eins, drei, drei, eins, zusammen acht. Vier vorhandene Rechenzellen ergeben nicht automatisch vier nutzbare MACs in jedem Takt.
+
+Das Bild illustriert Anlauf und Auslaufen eines kleinen Tiles, eines Matrixausschnitts. Es enthält keine Zeit für Vorladen aus externem Speicher und kein anschließendes Auslesen der Summen. Die lokale Datenbewegung kostet in realer Hardware ebenfalls Energie. Die Welle ist somit ein Datenflussprinzip mit offen benannter Grenze. Zur Ergebnisprüfung verfolgen wir nun zusätzlich die Zahlen, nicht nur die aktiven Zellpositionen.
 :::
 
-## Was ist eine NPU?
+## Wann ist welche Summe fertig?
 
-- Neural Processing Unit: Beschleuniger für Inferenz (manchmal Training)
-- Namen: TPU (Google), Neural Engine (Apple), NVDLA, …
-- Nicht jede NPU ist ein systolisches Gitter oder nur für Matrizen. Kontrolle bleibt im System
-- CPU füttert Adressen/Puffer (ähnlich DMA-Aufträgen)
+| Taktende | $C_{00}$ | $C_{01}$ | $C_{10}$ | $C_{11}$ |
+|----------|----------|----------|----------|----------|
+| 1 | $5$ | $0$ | $0$ | $0$ |
+| 2 | $19$ fertig | $6$ | $15$ | $0$ |
+| 3 | $19$ | $22$ fertig | $43$ fertig | $18$ |
+| 4 | $19$ | $22$ | $43$ | $50$ fertig |
+
+Fertig in der Zelle bedeutet noch nicht nach außen ausgelesen.
 
 ::: notes
-Was ist eine NPU knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. NPU ist eine Beschleunigerklasse, kein einheitlicher Befehlssatz. Nicht jede NPU ist ein systolisches Gitter oder nur Matrizen. DMA und Aufträge sind eine mögliche Organisation. Neural Processing Unit: Beschleuniger für Inferenz (manchmal Training). Namen: TPU (Google), Neural Engine (Apple), NVDLA, …. Verständnischeck: Ist NPU ein fester Befehlssatz? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+$C_{ij}$ ist die lokale Akkumulation in Zeile $i$ und Spalte $j$ des Arrays; alle vier beginnen vor Takt eins bei null. Die Tabelle gibt Werte am Taktende an. Eine unveränderte Null vor dem ersten gültigen Paar ist daher der Anfangswert, kein gerade ausgeführtes Nullprodukt.
+
+$C_{00}$ enthält nach eins $1\cdot5=5$, nach zwei zusätzlich $2\cdot7=14$, also neunzehn. $C_{01}$ startet in zwei mit $1\cdot6=6$ und endet in drei mit $6+2\cdot8=22$. $C_{10}$ startet in zwei mit $3\cdot5=15$ und endet in drei mit $15+4\cdot7=43$. $C_{11}$ beginnt erst in drei mit $3\cdot6=18$ und endet in vier mit $18+4\cdot8=50$.
+
+Damit ist die Ergebnismatrix wieder $[[19,22],[43,50]]$. Die letzten Summenschritte liegen in den Takten zwei, drei, drei und vier. Es gibt hier also keine stetige Folge von genau einem neuen Ausgang pro Takt. Fertig bedeutet, dass alle zugehörigen Produkte lokal addiert wurden. Ein anschließender Readout, Auslesen, verlangt einen eigenen Datenweg und Zeitannahmen. Diese werden nicht in die vier internen Rechentakte hineinerfunden. Die Trennung ist für eine spätere End-to-End-Bewertung entscheidend.
 :::
 
-## NPU vs. GPU vs. CPU
+## Stationary: welcher Wert bleibt lokal?
 
-| | Optimierung | Stärke | Schwäche |
-|---|-------------|--------|----------|
-| CPU | Latenz, Kontrollfluss | flexibel, auch kleine Modelle | braucht passende Datenversorgung |
-| GPU | Durchsatz, viele Threads | programmierbar, breite Lasten | Energie hängt von Modell und Batch ab |
-| NPU | unterstützte neuronale Operatoren | viele lokale MACs bei passender Form | unpassende Operatoren bleiben auf der CPU |
+![](../assets/figures/08_ki_beschleuniger_edge_ai/stationary.png){fig-alt="Output-Stationary hält eine Teilsumme in der Zelle und bewegt Operanden. Weight-Stationary hält ein Gewicht während eines Nutzungsabschnitts und bewegt Eingaben und Teilsummen."}
 
-Kombination ist möglich. Milliwatt gegen Watt ohne Messung bleibt offen.
+Ein Wechsel des Tiles kann neue Gewichte und andere Datenwege verlangen.
 
 ::: notes
-NPU vs. GPU vs. CPU knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Eine CPU kann für ein kleines Modell passen. Eine GPU ist nicht automatisch am Edge unbrauchbar. Milliwatt gegen Watt ohne Messung streichen. Latenz und Durchsatz sind verschieden. Verständnischeck: Kann die CPU reichen? Ja. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Stationary bedeutet ortsfest für einen benannten Nutzungsabschnitt. Output-Stationary hält eine Ausgabeteilsumme lokal, während Operanden zu ihr gelangen. Weight-Stationary hält ein Gewicht lokal, während Aktivierungen und Teilsummen entsprechend dem jeweiligen Datenfluss bewegt werden. Aktivierungen sind Eingangswerte oder berechnete Zwischenwerte eines Netzes. Das Bild zeigt zwei alternative Organisationsprinzipien, keinen direkten Taktvergleich.
+
+Der rote Wert in der linken Zelle ist die bleibende Summe, rechts das bleibende Gewicht. Graue Pfeile kennzeichnen weiter bewegte Werte. Unser bisheriger Vier-Takte-Plan gilt ausschließlich für die linke Output-Stationary-Variante. Er darf nicht ohne neuen Ablauf auf die rechte übertragen werden.
+
+Ein konstantes Gewicht kann für viele Eingaben wiederverwendet werden. Trotzdem muss es zunächst geladen werden; bei einem neuen Tile, einem anderen Matrixausschnitt, kann erneutes Laden nötig sein. Auch ein vollständiges Netz enthält unterschiedliche Schichten und Formen. Welche Organisation den Verkehr reduziert, hängt von diesen Wiederverwendungsbeziehungen und lokalen Speicherkapazitäten ab. Ortsfeste Werte beseitigen weder Eingaben, Ausgaben noch den Speicherbedarf aller Zwischenwerte. Die Wahl des Datenflusses ist damit eine konkrete Optimierung, keine allgemeine Zusage von kostenfreier Bewegung.
 :::
 
-## Flaschenhals: Register / Verdrahtung
+## Kleine Tiles nutzen große Arrays schlecht aus
 
-- Wunsch: zehntausende MACs/Takt
-- Jede MAC braucht Operanden — unmöglich, unendlich viele Ports zum SRAM
-- Routing und Multiplexer begrenzen die Breite
-- Lösung: Daten lokal zwischen Zellen weiterreichen
+![](../assets/figures/08_ki_beschleuniger_edge_ai/util.png){fig-alt="Ein isoliertes2-mal-2-Tile nutzt im2-mal-2-Array acht von sechzehn Zell-Takten,50Prozent. Im4-mal-4-Array mit sonst leeren Zellen acht von64,12,5Prozent. Räumliche Belegung dort25Prozent."}
+
+$U=\text{gültige MACs}/(\text{Zellen}\cdot\text{Takte})$
 
 ::: notes
-Flaschenhals: Register / Verdrahtung knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. 65536 MACs mal zwei Int8-Operanden wären ohne Reuse 131072 Byte je Takt. Das ist ein hypothetischer Bedarf, keine TPU-Messung. Mehr Multiplizierer brauchen Datenwege. Wunsch: zehntausende MACs/Takt. Jede MAC braucht Operanden — unmöglich, unendlich viele Ports zum SRAM. Verständnischeck: Warum nicht nur mehr Multiplizierer? Die Operanden müssen ankommen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+$U$ ist die zeitlich gemittelte Auslastung im ausdrücklich abgegrenzten Rechenfenster. MAC bedeutet Multiply-Accumulate. Der Nenner zählt verfügbare Zell-Takte, also mögliche Rechengelegenheiten bei höchstens einer MAC je Zelle und Takt. Der Zähler zählt tatsächlich gültige Produkte. Das Bild setzt voraus, dass nur unser einzelnes kleines Tile läuft und sonst keine weiteren Tiles oder Aufgaben überlappt werden.
+
+Im Zwei-mal-zwei-Array sind über vier Takte sechzehn Zell-Takte verfügbar. Die acht gültigen MACs ergeben $U=8/(4\cdot4)=0{,}5$, also fünfzig Prozent. Wird dasselbe Tile in den oberen linken vier Zellen eines Vier-mal-vier-Arrays ausgeführt und bleiben alle anderen leer, sind es acht von vierundsechzig, also zwölf Komma fünf Prozent. Die räumliche Belegung beträgt dort vier von sechzehn Zellen, fünfundzwanzig Prozent. Sie ist nicht dieselbe Größe wie die zeitliche Auslastung.
+
+Weitere Belegung oder Überlappung könnte den Vergleich ändern. Vorladen und Readout sind wie zuvor ausgeschlossen. Die Prozentwerte sind keine Kennwerte einer konkreten NPU, Neural Processing Unit. Sie zeigen, warum eine hohe Zahl vorhandener MAC-Zellen allein noch wenig über eine kleine Endgeräteaufgabe aussagt. Peakangaben setzen eine passend gefüllte und versorgte Nutzung voraus.
 :::
 
-## Systolic Arrays
+## TPU v1: Peak mit Zählkonvention
 
-- 2D-Gitter aus MAC-Zellen
-- Nur der Rand spricht mit dem Speicher
-- Ergebnisse/Operanden wandern zu Nachbarn — ohne Systembus pro Schritt
+![](../assets/figures/08_ki_beschleuniger_edge_ai/tops.png){fig-alt="256mal256 Int8-MACs bei700MHz ergeben45,8752 TMAC/s und bei zwei Operationen je MAC91,7504 TOPS, gerundet92. Es handelt sich um Rechenpeak."}
+
+Datacenter-Beispiel aus Jouppi et al. (2017), keine Edge-Energiemessung.
 
 ::: notes
-Systolic Arrays knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Im Lehrgitter wandert A nach rechts und B nach unten, C bleibt in der Zelle. Der Rand ist ein vereinfachtes Modell. Nachbarverbindungen ersetzen Vorladen und Readout nicht. 2D-Gitter aus MAC-Zellen. Nur der Rand spricht mit dem Speicher. Verständnischeck: Verschwindet der Speicher? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+TPU heißt Tensor Processing Unit, Googles Bezeichnung für einen Beschleuniger neuronaler Tensorrechnung. Die erste Generation ist in der Originalarbeit von Jouppi und Mitautoren als Datacenter-Baustein beschrieben, also für ein Rechenzentrum. Int8 sind Acht-Bit-Integeroperanden; MAC heißt Multiply-Accumulate, Produkt zur Summe addieren. MHz bedeutet Millionen Takte pro Sekunde, TMAC/s Billionen MACs pro Sekunde und TOPS Tera Operations Per Second, Billionen gezählte Operationen pro Sekunde.
+
+Die dokumentierten $256\cdot256=65\,536$ MAC-Einheiten und siebenhundert MHz führen rechnerisch zu $65\,536\cdot700\cdot10^6=45{,}8752\cdot10^{12}$ MACs je Sekunde. Bei zwei arithmetischen Operationen pro MAC verdoppelt sich die Zahl auf $91{,}7504$ TOPS, gerundet zweiundneunzig. Die Abbildung zeigt diese Zählkette, nicht eine gemessene Anwendungsrate.
+
+Datentyp, Versorgung, Auslastung und unterstützte Operationen bestimmen, ob eine Anwendung diesen Peak annähern kann. TOPS sind keine Inferenzen je Sekunde und enthalten keine Wattzahl. Für Energieeffizienz müssten zusätzlich gemessene Leistung und dieselbe Systemgrenze bekannt sein. Das Rechenzentrum-Beispiel erklärt die Größenordnung regelmäßiger Spezialhardware; daraus folgt keine Milliwatt-Angabe für ein Endgerät.
 :::
 
-## „Systolisch“ — Namensbild
+## Beschleunigte Teilrechnung und Gesamtzeit
 
-- Systole: rhythmische Pumpwelle
-- Takt pumpt Werte wellenartig durch das Gitter
-- Pro Zyklus: Daten eine Zelle weiter (rechts/unten je nach Dataflow)
+![](../assets/figures/08_ki_beschleuniger_edge_ai/speed.png){fig-alt="Modellzeiten: CPU-Pfad Vorverarbeitung2ms, Dense10ms, übrige Operatoren3ms, Nachverarbeitung1ms, gesamt16. Beschleunigerpfad zusätzlich Kopie1ms, Dense1ms, gesamt8. Teilfaktor10, Gesamtfaktor2."}
+
+Lehrannahme: serielle Phasen, gleicher Input und gleiche Ausgabe.
 
 ::: notes
-„Systolisch“ — Namensbild knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Ein Takt schiebt im Modell eine Zelle weiter. Leere Plätze rechnen nicht. Gleiche k-Indizes müssen in derselben Zelle zusammentreffen. Systole: rhythmische Pumpwelle. Takt pumpt Werte wellenartig durch das Gitter. Verständnischeck: Warum nicht alles ungeordnet einspeisen? Die Paare müssen sich treffen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+CPU heißt Central Processing Unit, Prozessor. Dense ist eine vollständig verbundene Schicht. Die Balken zeigen eine fiktive End-to-End-Latenz vom bereitstehenden Sensorfenster bis zur fertigen Entscheidung, gemessen in Millisekunden. End-to-End bedeutet, dass sämtliche hier definierten Phasen zählen, nicht nur die Rechnung im Beschleuniger. Die Phasen laufen in diesem Modell seriell, ohne Überlappung.
+
+Der reine CPU-Pfad benötigt zwei Millisekunden Vorverarbeitung, zehn für die beschleunigbare Dense-Rechnung, drei für übrige Operatoren und eine für Nachverarbeitung: insgesamt sechzehn. Im zweiten Pfad bleibt Vorverarbeitung bei zwei, eine zusätzliche Kopier- und Übergabephase kostet eine, Dense sinkt auf eine, übrige Operatoren bleiben drei und Nachverarbeitung eins. Die Summe ist acht.
+
+Die Teilrechnung wird um Faktor zehn schneller, die Gesamtaufgabe nur um Faktor $16/8=2$. Der rote Abschnitt im Bild markiert die veränderte Rechnung, graue Abschnitte die übrige Arbeit. Nicht unterstützte Operatoren können auf der CPU verbleiben. Diese Lehrrechnung ist keine Messung und sagt nichts über Energie. Sie begründet, warum Operatorabdeckung, Übergaben und übrige Firmwareaufgaben zur Hardwareauswahl gehören.
 :::
 
-## Eine systolische Zelle
+## Papierphase 3: das Array selbst verfolgen
 
-Pro Takt typisch:
+Übungsblatt, Aufgabe 4 · 15 Minuten
 
-1. Empfängt $x$ (links) und $w$ (oben)
-2. MAC auf interne Teilsumme
-3. Reicht $x$ nach rechts und $w$ nach unten weiter
-
-```{mermaid}
-%%| fig-width: 3.2
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#FFFFFF', 'primaryColor': '#FFFFFF', 'primaryBorderColor': '#E5E5EA', 'primaryTextColor': '#1D1D1F', 'lineColor': '#86868B', 'secondaryColor': '#F5F5F7', 'tertiaryColor': '#FFFFFF', 'mainBkg': '#FFFFFF', 'nodeBorder': '#E5E5EA', 'clusterBkg': '#F5F5F7', 'clusterBorder': '#E5E5EA', 'titleColor': '#1D1D1F', 'edgeLabelBackground': '#FFFFFF'}}}%%
-flowchart TD
-  W[w von oben] --> Z[MAC-Zelle]
-  X[x von links] --> Z
-  Z --> R[x nach rechts]
-  Z --> U[w nach unten]
-  style Z fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important
-```
+- Randwerte zeitlich versetzen und gültige Paare zuordnen
+- Teilsummen nach jedem Takt eintragen
+- Auslastung von räumlicher Belegung unterscheiden
+- Peak und Gesamtlatenz getrennt bewerten
 
 ::: notes
-Eine systolische Zelle knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. C startet bei null. Ein gültiges Paar addiert A mal B. A wird original weitergereicht, nicht als Produkt. Für C00 erst 1 mal 5 gleich 5, dann plus 2 mal 7 gleich 19. Verständnischeck: Warum A weiterreichen? Die Nachbarzelle braucht dasselbe A. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Ein systolisches Array gibt Operanden getaktet an Nachbarzellen weiter. Im verwendeten Output-Stationary-Modell bleiben Ausgabesummen in ihren Zellen. MAC heißt Multiply-Accumulate, ein Produkt zur laufenden Summe addieren. Diese Papieraufgabe verlangt das Nachvollziehen des Datenflusses und nicht nur das Erinnern der Endmatrix.
+
+Die Musterlösung ergibt acht MACs, verteilt als eins, drei, drei und eins auf vier Takte. Die Teilsummen lauten nach eins $[[5,0],[0,0]]$, nach zwei $[[19,6],[15,0]]$, nach drei $[[19,22],[43,18]]$ und nach vier $[[19,22],[43,50]]$. Für $C_{11}$ treffen die Paare drei und sechs in drei sowie vier und acht in vier zusammen. Die Summe fünfzig ist erst am Ende von vier intern fertig.
+
+Vier Zellen mal vier Takte ergeben sechzehn Zell-Takte; acht gültige MACs bedeuten fünfzig Prozent. Ein größeres isoliertes Array kann schlechter ausgelastet sein. Beim Besprechen sollte außerdem ausdrücklich die Frage gestellt werden, ob fertige interne Summen schon nach außen übertragen sind. Die Antwort ist nein: Dafür fehlt im Lehrmodell ein angenommener Ausleseweg. Die nachfolgenden Software- und Speicherfragen setzen genau an dieser Systemgrenze an.
 :::
 
-## Weniger RAM-Zugriffe
+## Vom trainierten Modell zur Firmware
 
-- Ein Wert wird einmal eingespeist und wandert durch viele Zellen
-- Viele MACs ohne erneuten Cache-/DRAM-Load
-- Im Lehrfall steigt die Intensity von 0,25 auf 0,5 Op/Byte. Der Knick liegt bei 1
+![](../assets/figures/08_ki_beschleuniger_edge_ai/flow.png){fig-alt="Offline entstehen trainiertes Modell und geprüfte tflite-Modelldaten. Firmware verbindet diese Daten mit Operator-Kerneln und Laufzeit. Auf dem Gerät werden Eingaben vorverarbeitet, Operatoren ausgeführt und Ausgaben interpretiert."}
+
+Ein exportiertes C-Byte-Array enthält Modelldaten, keinen Modell-Maschinencode.
 
 ::: notes
-Weniger RAM-Zugriffe knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. 16 Ops auf 64 Byte sind 0,25 Op je Byte, auf 32 Byte 0,5. Der Knick liegt bei 1. Beide Punkte bleiben speicherbegrenzt. Lokale Bewegung kostet ebenfalls Energie. Ein Wert wird einmal eingespeist und wandert durch viele Zellen. Viele MACs ohne erneuten Cache-/DRAM-Load. Verständnischeck: Beseitigt die doppelte Intensity die Grenze? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+TFLM bedeutet TensorFlow Lite for Microcontrollers, eine kleine C++-Laufzeit für neuronale Modelle auf Mikrocontrollern. Eine Runtime, Laufzeitbibliothek, organisiert die Modelloperationen. Ein Kernel ist der ausführende Code eines Operators, beispielsweise einer vollständig verbundenen Schicht. Das Bild trennt Vorbereitung außerhalb des Geräts von wiederholter Ausführung innerhalb der Firmware.
+
+Offline werden Parameter trainiert, Datentypen und Quantisierung festgelegt und eine kompatible `.tflite`-Datei erzeugt. Sie enthält strukturierte Modelldaten. Ein Export als C-Byte-Array ändert deren Darstellung, verwandelt sie aber nicht in Maschinenbefehle. Die Firmware muss zusätzlich passende Operator-Kernel und die Laufzeit einbinden. Ein NPU-Backend, eine Anbindung an eine Neural Processing Unit, ist eine eigene Integrationsfrage.
+
+Auf dem Gerät werden Eingaben passend vorbereitet, Operatoren mit ihren Parametern ausgeführt und Ausgaben gemäß dem Modellvertrag interpretiert. Ein Modellvertrag beschreibt Form, Datentyp, Reihenfolge, Skalierung und Bedeutung der Tensoren. Ein bekanntes Dateikennzeichen allein beweist kein gültiges Modell. Dieses Repository enthält für die Pflichtübung kein trainiertes TFLM-Modell und keine TFLM-Abhängigkeit. Der Workflow ist eine konzeptionelle Einordnung; das optionale Hostprogramm prüft die hier vollständig definierten Zahlenbeispiele.
 :::
 
-## Datenfluss füllt das Array
+## Quantisierung: reale Werte mit Int8 darstellen
 
-![C00 fertig in Takt 2, C01 und C10 in Takt 3, C11 in Takt 4.](../assets/figures/08_ki_beschleuniger_edge_ai/array.png)
+$$r\approx s(q-z),\qquad
+q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right)$$
 
-$2\times 2$-Idee (schematisch):
-
-- Takt 1: erste Paare treffen sich, Summen starten
-- Takt 2: Wellen wandern, neue Werte am Rand
-- Im 2×2-Output-Stationary-Beispiel enden die vier Summen in den Takten 2, 3, 3 und 4
-- Das ist kein Ergebnis je Takt ab Takt 3. Readout der lokalen Summen kommt danach
+- $s>0$: Skalierung; $z$: ganzzahliger Nullpunkt
+- Lehrregel: auf den nächsten Integer, Halbfälle weg von null
+- Rundung und Begrenzung können Information verlieren
 
 ::: notes
-Datenfluss füllt das Array knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. A kommt in Zeile i zur Zeit 1 plus k plus i, B in Spalte j zur Zeit 1 plus k plus j. C00 ist in Takt 1 gleich 5 und in Takt 2 fertig mit 19. C11 wird in Takt 3 gleich 18 und in Takt 4 gleich 50. Acht gültige MACs, nicht ein Ergebnis je Takt ab Takt 3. Takt 1: erste Paare treffen sich, Summen starten. Takt 2: Wellen wandern, neue Werte am Rand. Verständnischeck: Warum startet C11 später? Zeile und Spalte sind gestaffelt. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Quantisierung bildet einen größeren oder kontinuierlich betrachteten Zahlenbereich auf endlich viele darstellbare Werte ab. Int8 bezeichnet die vorzeichenbehaftete Acht-Bit-Ganzzahl von minus hundertachtundzwanzig bis hundert siebenundzwanzig. $r$ ist der reale Ausgangswert, $q$ der gespeicherte Integercode, $s$ eine positive Skalierung in realen Einheiten je Codeschritt und $z$ der Integercode der realen Null.
+
+Zum Kodieren teilen wir zunächst durch $s$, runden und addieren anschließend den ganzzahligen Nullpunkt. Clip bedeutet Begrenzen auf den Int8-Bereich. Unsere Lehrregel rundet auf die nächste ganze Zahl und exakte Halbfälle vom Nullpunkt der zu rundenden Zahl weg. Sie ist die Regel des begleitenden Hostprogramms; konkrete Bibliotheken können eine andere festgelegte Rundung verwenden. Zum Rückrechnen subtrahieren wir $z$ und multiplizieren mit $s$.
+
+Bei $z=-3$ wird reale Null als minus drei kodiert: $s((-3)-(-3))=0$. Das ist nicht dasselbe wie ein negativer realer Wert. Ohne Begrenzung beträgt der Rundungsfehler höchstens einen halben Skalierungsschritt. Bei Werten außerhalb des darstellbaren Bereichs gilt diese kleine Fehlergrenze nicht. Ein ungültiges $s$, etwa null, darf nicht als normale Quantisierung verarbeitet werden. Nun rechnen wir beide Fehlerarten mit Zahlen nach.
 :::
 
-## Weight-Stationary
+## Rundungsfehler und Sättigung unterscheiden
 
-![Output-Stationary hält C. Weight-Stationary hält das Gewicht und muss es trotzdem laden.](../assets/figures/08_ki_beschleuniger_edge_ai/stationary.png)
+![](../assets/figures/08_ki_beschleuniger_edge_ai/quant.png){fig-alt="Bei Skala0,1 und Nullpunkt0 wird1,24 zu Code12 und rückgerechnet1,2, Fehler0,04. Wert20 wird auf127 begrenzt und zu12,7 rückgerechnet, Fehler7,3."}
 
-- Gewichte während einer Inferenz oft konstant
-- Variante: Weights in Zellen „parken“, nur Activations durchschieben
-- Weniger Bewegungen der großen Konstanten-Matrizen
+Die Auswahl der Skala beeinflusst Auflösung und darstellbaren Bereich.
 
 ::: notes
-Weight-Stationary knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Weight-Stationary hält Gewichte nur für den benannten Zeitraum. Ein Tilewechsel kann neu laden. Aktivierungen und Teilsummen bewegen sich weiter. Gewichte während einer Inferenz oft konstant. Variante: Weights in Zellen „parken“, nur Activations durchschieben. Verständnischeck: Werden Gewichte nie wieder geladen? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+$s$ ist die Quantisierungsskala, $z$ der Nullpunkt, $q$ der Int8-Code und $\hat r=s(q-z)$ der rekonstruierte reale Wert. Int8 bedeutet vorzeichenbehaftete Acht-Bit-Ganzzahl. Das Diagramm stellt zwei getrennte Fehlerbilder gegenüber. Im Lehrbeispiel gilt $s=0{,}1$, $z=0$ und die auf der vorherigen Folie definierte Rundung.
+
+Für $r=1{,}24$ ist $r/s=12{,}4$, gerundet zwölf. Der Rückwert ist $0{,}1\cdot12=1{,}2$, der absolute Fehler $|1{,}24-1{,}2|=0{,}04$. Der negative Wert minus eins Komma vierundzwanzig würde zu minus zwölf und zurück minus eins Komma zwei. Für zwanzig entsteht vor Begrenzung zweihundert. Clip begrenzt auf hundert siebenundzwanzig, der Rückwert ist zwölf Komma sieben und der absolute Fehler sieben Komma drei. Minus zwanzig wird entsprechend auf minus hundertachtundzwanzig begrenzt und zu minus zwölf Komma acht.
+
+Der rote Rand markiert Sättigung, Begrenzen am zulässigen Bereich. Ein größerer Skalierungsschritt könnte mehr Wertebereich abdecken, würde aber die feine Auflösung verschlechtern. Geeignete Skalen werden deshalb anhand repräsentativer Daten gewählt. Ob die resultierenden Fehler die Modellgüte verschlechtern, muss mit passenden Testdaten bewertet werden; kleine Gewichtbytes beweisen keine unveränderte Genauigkeit.
 :::
 
-## Beispiel: Google TPU v1
+## Quantisierte Produkte brauchen ihre Skalen
 
-![91,75 TOPS Peak bei zwei Ops je MAC. Ein 2×2-Tile nutzt 4 von 16 gedachten Zellen.](../assets/figures/08_ki_beschleuniger_edge_ai/tops.png)
+$$a=\sum_i(q_{x,i}-z_x)(q_{w,i}-z_w)+q_b$$
+$$r_y\approx s_xs_w\,a$$
 
-- $256\times 256 = 65\,536$ Int8-MACs. Bei 700 MHz sind das 45,8752 TMAC/s
-- Mit zwei Ops je MAC: 91,7504 TOPS, in der Originalarbeit oft 92 TOPS. Das ist Peak, kein End-to-End
-- TPU v1 ist ein Datacenter-Baustein, kein Milliwatt-Edge-Teil
+Beispiel: $q_x=[12,-4]$, $z_x=-3$, $q_w=[2,3]$, $z_w=0$.
+
+Bei $s_x=0{,}1$, $s_w=0{,}2$, $q_b=5$: $a=32$, $r_y\approx0{,}64$.
 
 ::: notes
-Beispiel: Google TPU v1 knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. 256 mal 256 ist 65536. Mal 700 MHz sind 45,8752 Billionen MACs je Sekunde. Mal zwei Ops sind 91,75 TOPS, gerundet 92. Das ist Peak, keine Inferenzrate. Ein 2 mal 2 Tile in 4 mal 4 belegt räumlich 25 Prozent. Über vier Takte sind zeitlich 8 durch 64 gleich 12,5 Prozent. Auf dem 2 mal 2 selbst sind es 50 Prozent. $256\times 256 = 65\,536$ Int8-MACs. Bei 700 MHz sind das 45,8752 TMAC/s. Mit zwei Ops je MAC: 91,7504 TOPS, in der Originalarbeit oft 92 TOPS. Das ist Peak, kein End-to-End. Verständnischeck: Was sind 92 TOPS? Ein gerundeter Rechenpeak, kein End-to-End-Wert. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Dies ist ein eigenes Zwei-Eingang-Lehrbeispiel, nicht eine Umkodierung der vorherigen Drei-Eingang-Dense-Schicht. $q_x$ und $q_w$ sind gespeicherte Integercodes für Eingaben und Gewichte, $z_x$ und $z_w$ deren Nullpunkte und $s_x$, $s_w$ ihre Skalen. $a$ ist die breite Integerakkumulation. $q_b$ ist ein Biascode mit Nullpunkt null und Skala $s_xs_w$. Bias heißt eingangsunabhängiger Summenoffset.
+
+Nach Nullpunktkorrektur sind die Eingaben $12-(-3)=15$ und $-4-(-3)=-1$. Die Gewichte bleiben zwei und drei. Die Produktsumme ist $15\cdot2+(-1)\cdot3=27$. Bias fünf ergibt $a=32$. Die kombinierte Skala beträgt $0{,}1\cdot0{,}2=0{,}02$, also ist der rekonstruierte Ausgang $32\cdot0{,}02=0{,}64$. Die realen Einzelprodukte sind $1{,}5\cdot0{,}4$ und $(-0{,}1)\cdot0{,}6$, zusätzlich Bias $0{,}1$; auch das ergibt $0{,}64$.
+
+Soll der Ausgang selbst wieder Int8, eine Acht-Bit-Ganzzahl, werden, braucht er seine eigene Skala und seinen Nullpunkt. Mit $s_y=0{,}05$, $z_y=-2$ folgt $q_y=\operatorname{round}(0{,}64/0{,}05)-2=13-2=11$, rückgerechnet $0{,}65$. Diese Requantisierung ist ein weiterer Rundungsschritt. Int32-Biaswerte und breite Summen dürfen beim Speicherbudget nicht als Ein-Byte-Werte gezählt werden. Das Beispiel verwendet eine Skala je Tensor; andere Operatorvarianten können kanalweise Skalen benötigen.
 :::
 
-## NPUs am Edge
+## Flash und Tensor Arena getrennt planen
 
-- SoCs mit kleineren Arrays (z. B. $32\times 32$ / $64\times 64$)
-- CPU, Vorverarbeitung und NPU gehören zusammen. Ein Betriebssystem ist optional
-- Die CPU schläft nur, wenn Versorgung, Wakeup und übrige Aufgaben das erlauben
+![](../assets/figures/08_ki_beschleuniger_edge_ai/arena.png){fig-alt="Fiktives Budget:128KiB Flash mit40KiB Firmware,24KiB Modell und64KiB frei.32KiB SRAM mit12KiB Arena,1,5KiB Quellfenster,6KiB Stack,4KiB übrigen Daten und8,5KiB frei."}
+
+$250\,000$ reine Gewichte: Float32 $1$ MB, Int8 $0{,}25$ MB.
 
 ::: notes
-NPUs am Edge knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. 32 mal 32 ist eine Schemazeichnung, keine SoC-Konfiguration. Die CPU schläft nur, wenn Versorgung, Steuerung und übrige Aufgaben das erlauben. SoCs mit kleineren Arrays (z. B. $32\times 32$ / $64\times 64$). CPU: OS, Netz; NPU: Bild/Audio-Inferenz (oft per DMA gefüttert). Verständnischeck: Schläft die CPU bei jeder Inferenz? Nicht zwingend. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Flash ist nichtflüchtiger Programmspeicher. SRAM heißt Static Random Access Memory, statischer flüchtiger Arbeitsspeicher. Eine Tensor Arena ist ein bereitgestellter zusammenhängender Arbeitsbereich für Tensoren, temporäre Kernelpuffer und Verwaltungsdaten. Die Belegung hängt von Modell, Operator-Kerneln und ihrer Speicherplanung ab; sie folgt nicht allein aus der Modelldateigröße. Stack ist der Speicher für Aufrufrahmen und lokale Daten.
+
+Die Grafik verwendet ausdrücklich ein fiktives Budget: hundertachtundzwanzig KiB Flash enthalten vierzig KiB Firmware und vierundzwanzig KiB vollständige Modelldaten, frei bleiben vierundsechzig KiB. Ein KiB, Kibibyte, sind eintausendvierundzwanzig Byte. Zweiunddreißig KiB SRAM enthalten zwölf KiB Arena, ein Komma fünf KiB Float-Quellfenster, sechs KiB Stackreserve und vier KiB übrige Daten. Die Summe dreiundzwanzig Komma fünf lässt acht Komma fünf KiB frei. Der spätere Int8-Eingangstensor liegt hier bereits in der Arena und wird nicht nochmals addiert.
+
+Unabhängig davon benötigt ein hypothetisches Feld mit zweihundertfünfzigtausend reinen Gewichten bei Float32, Zweiunddreißig-Bit-Gleitkomma, vier Byte je Wert, eine Million Byte, also ein dezimales MB, Megabyte. Int8 braucht zweihundertfünfzigtausend Byte, ein Viertel. Die fünfundsiebzig Prozent Ersparnis gelten für diese Gewichtbytes, nicht für die ganze Datei oder Arena. `const` in C verhindert gewöhnliche Veränderung; erst Linkerplatzierung und Startcode bestimmen, wo das Modell physisch liegt und ob es kopiert wird.
 :::
 
-## Grenzen systolischer Arrays
+## Initialisierung und Inferenz sind zwei Phasen
 
-- Starr an Array-/Tile-Größen — Padding bei ungünstigen Layern
-- Dense-Matrizen stark; Sparse (viele Nullen) weniger effizient
-- Kein General Purpose — kein TCP/IP-Stack auf der NPU
+![](../assets/figures/08_ki_beschleuniger_edge_ai/runtime.png){fig-alt="Setup prüft Modell und Operatoren, plant Arena und prüft Tensorvertrag. Danach werden Eingaben geschrieben, Invoke geprüft und nur bei Erfolg Ausgaben gelesen. Fehler führt zum Fehlerpfad, nicht zur neuen Entscheidung."}
+
+Interpreter, Arena und Modell müssen während ihrer Nutzung gültig bleiben.
 
 ::: notes
-Grenzen systolischer Arrays knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. 25 Prozent belegte Zellen sind nicht 25 Prozent zeitliche Auslastung. Dichte Nullen sparen nur mit passender Sparse-Ausführung MACs. Nicht jede NPU ist gleich starr. Starr an Array-/Tile-Größen — Padding bei ungünstigen Layern. Dense-Matrizen stark; Sparse (viele Nullen) weniger effizient. Verständnischeck: Sind Belegung und Auslastung gleich? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+TFLM heißt TensorFlow Lite for Microcontrollers. Ein Interpreter ist das Objekt, das die Operationen eines Modells über passende Kernel ausführt. Ein Resolver ordnet Operatoren solchen Kerneln zu. Eine Arena ist der zusammenhängende Arbeitsbereich. Das Ablaufbild ist eine konzeptionelle Zustandsfolge, kein ausgeführtes TFLM-Programm und keine eigene erfundene Bibliotheksschnittstelle.
+
+Zuerst muss eine vertrauenswürdige vollständige Modelldatei mit passender Struktur vorliegen. Das Lesen einer Schema-Version allein validiert keine beliebige beschädigte Bytefolge. Danach sind kompatible Operatoren, langlebige Objekte und eine ausreichend große Arena nötig. `AllocateTensors()` heißt in der dokumentierten TFLM-Schnittstelle die Planung und Bereitstellung der Tensorpuffer. Ihr Status muss geprüft werden; erst anschließend werden Eingabeform, Datentyp und Quantisierungsparameter kontrolliert.
+
+Im wiederholten Zyklus werden vorbereitete Eingaben geschrieben. `Invoke()` führt die Modelloperationen aus. Nur nach Erfolg wird der Ausgang entsprechend seinem Vertrag gelesen. Ein Fehler ist kein neuer Klassenscore; alte Pufferwerte dürfen nicht als frisch berechnet ausgegeben werden. Die roten Fehlerpfeile markieren diese Abzweigung. Ein lokaler Interpreter, der am Ende einer Setup-Funktion zerstört wird, kann nicht später weiterverwendet werden. Gleiches gilt für eine ausgelaufene lokale Arena. Ein Heap ist dynamisch zugeteilter Arbeitsspeicher. TFLM kann ohne Betriebssystem arbeiten; daraus folgt keine Heapfreiheit der gesamten Firmware.
 :::
 
-## Kurzfazit NPU
+## Sensorfenster und Ausgabe brauchen einen Vertrag
 
-- Systolic Arrays: lokale Weitergabe statt Von-Neumann-Pendeln
-- Wellenartiger Datenfluss, hohe Wiederverwendung
-- Weight-Stationary spart Bewegungen
-- TOPS je Watt brauchen gemessene Leistung derselben Grenze, nicht nur den Peak
+![](../assets/figures/08_ki_beschleuniger_edge_ai/sensor.png){fig-alt="128Zeitpunkte mit drei Achsen ergeben384Elemente. Float32-Quelle braucht1536Byte, Int8-Ziel384Byte. Die Ausgabe wird erst nach erfolgreicher Inferenz anhand von Form, Skala und Bedeutung ausgewertet."}
+
+Klassenindex, Score, Wahrscheinlichkeit und Fehlerstatus sind verschiedene Größen.
 
 ::: notes
-Kurzfazit NPU knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Lokale Weitergabe senkt bestimmten Verkehr. TOPS je Watt brauchen gemessene Watt derselben Grenze. 92 TOPS ohne Leistung sind keine TOPS je Watt. Systolic Arrays: lokale Weitergabe statt Von-Neumann-Pendeln. Wellenartiger Datenfluss, hohe Wiederverwendung. Verständnischeck: Kann man TOPS je Watt ohne Watt rechnen? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Ein Sensorfenster enthält im fiktiven Beispiel hundertachtundzwanzig aufeinanderfolgende Zeitpunkte mit je drei Achsen. Das ergibt $128\cdot3=384$ Elemente. Float32 bedeutet hier einen Vier-Byte-Gleitkommawert; das Quellfenster braucht daher $384\cdot4=1536$ Byte, ein Komma fünf KiB. Int8 bedeutet einen Ein-Byte-Integercode; der Eingabetensor benötigt dreihundertvierundachtzig Byte. Seine Elemente müssen in der vom Modell verlangten Reihenfolge, beispielsweise Zeitpunkt dann Achse, geschrieben werden.
+
+Ein Zeiger auf das Fenster enthält dessen Adresse. `sizeof` dieses Zeigers liefert die Größe der Adresse, nicht dreihundertvierundachtzig Elemente. Die Elementzahl muss aus dem Vertrag oder einer expliziten Längenangabe kommen. Normalisierung und Quantisierung müssen außerdem dieselben Regeln wie bei der Modellvorbereitung verwenden.
+
+Drei Ausgabebytes beweisen weder drei bestimmte Klassen noch Wahrscheinlichkeiten. Ein Score kann ein beliebiger Bewertungswert sein. Eine Wahrscheinlichkeit erfordert eine dafür definierte Ausgabe, beispielsweise eine geeignete Normalisierung. Ein Klassenindex benennt eine Kategorie, ein Fehlerstatus den Erfolg der Ausführung. Ein Grenzwert von null Komma acht ist nur mit entsprechender Bedeutung und Rückskalierung sinnvoll. Selbst eine korrekt erkannte Klasse Gehen liefert keine gezählte Schrittzahl. Form, Skalierung und Semantik gehören deshalb ebenso zum Modellvertrag wie die Bytezahl.
 :::
 
-## Aufgabe — Takt 4
+## Eine brauchbare Edge-Lösung prüfen
 
-Wann ist C11 im 2×2-Output-Stationary-Beispiel fertig? Ist 92 TOPS eine End-to-End-Leistung?
+- Passende Operatoren, Formen und Datentypen
+- Vollständige Zeit- und Speicherbudgets
+- Modellgüte mit repräsentativen Daten prüfen
+- Nullgewichte sparen erst mit passender Darstellung oder Ausführung
+- Funktionaler Simulatorlauf und Hardwaremessung beantworten andere Fragen
 
 ::: notes
-Aufgabe — Takt 4 knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. C11 erhält 3 mal 6 gleich 18 in Takt 3 und 4 mal 8 gleich 32 in Takt 4, Summe 50. Der Readout ist ein eigener Schritt. Die TOPS-Rechnung ist 65536 mal 700 Millionen mal 2. Verständnischeck: Ist C11 dann schon außen gelesen? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Edge ist die Verarbeitung am Endgerät oder lokalen Gateway. Ein Operator ist eine Modelloperation, ein Datentyp deren Zahlenformat. Vor der Wahl eines Beschleunigers ist zu prüfen, ob das Modell überhaupt auf dessen Kernel passt und ob nicht unterstützte Teile teure Übergaben verursachen. Zeitbudget meint die ganze definierte Reaktionskette; Speicherbudget umfasst Modell, Arbeitsbereich, Sensorpuffer, Stack als Aufrufspeicher und übrige Firmwaredaten.
+
+Pruning ist das gezielte Entfernen oder Nullsetzen von Gewichten. Ein dicht gespeichertes Int8-Feld mit vier Elementen braucht weiterhin vier Byte, auch wenn zwei Codes null sind und diese im verwendeten Gewichtformat reale Null bedeuten. Eine dünnbesetzte, sparse Darstellung benötigt zusätzliche Positionsinformation. Ein Kernel spart nur dann Rechenarbeit, wenn er nicht benötigte Produkte tatsächlich überspringt. Dateiersparnis und weniger ausgeführte MACs, Multiply-Accumulate, sind verschiedene Aussagen.
+
+Renode ist der im Kurs verwendete Simulator für Systeme mit Prozessor, Speicher und Peripherie. Ein korrektes funktionales Ergebnis kann die Daten- und Steuerungslogik prüfen. Es belegt ohne validiertes Zeitmodell keine Hardwarelatenz und keine Energieeffizienz. Das hier enthaltene Hostprogramm läuft auf dem Entwicklungsrechner und prüft numerische Beispiele. Es liefert keinen Vergleich realer CPUs oder NPUs; CPU bedeutet Central Processing Unit, NPU Neural Processing Unit. Repräsentative Modellgüte und tatsächliche Systemleistung bleiben eigene Messaufgaben.
 :::
 
-## Edge-AI-Software: das Problem
+## Papierphase 4 und Quiz
 
-- Training oft in Python (TensorFlow/PyTorch) auf GPUs — große Float32-Modelle
-- MCU: kein Python, knappes SRAM, oft keine FPU
-- Wie wird das Cloud-Modell zu Bare-Metal-C?
+Aufgaben 5–6: 15 Minuten · anschließend Quiz: 15 Minuten
+
+- Quantisierung mit Rundung, Nullpunkt und Begrenzung
+- Modellbytes und Arbeitsspeicher getrennt budgetieren
+- Fehlerpfad und gültige Lebensdauer begründen
+- Rückblick: Datenmuster → Versorgung → Hardware → Gesamtsystem
 
 ::: notes
-Edge-AI-Software: das Problem knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Das Modellarray ist Daten. Kernel in der Firmware führen Operatoren aus. Cloud ist nicht unbegrenzt. Nicht jede MCU hat eine FPU. Training oft in Python (TensorFlow/PyTorch) auf GPUs — große Float32-Modelle. MCU: kein Python, knappes SRAM, oft keine FPU. Verständnischeck: Wird aus dem Array automatisch ein C-Programm? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Die letzte Papierphase führt zunächst die Quantisierungsrechnung vollständig aus. Bei Skala null Komma eins und Nullpunkt null ergibt eins Komma vierundzwanzig Code zwölf, Rückwert eins Komma zwei und absoluten Fehler null Komma null vier. Zwanzig wird auf hundert siebenundzwanzig begrenzt. Ein negativer Nullpunkt verschiebt den Code der realen Null, nicht die Rechenbedeutung der Null.
+
+Im Speicherbudget werden Flash, nichtflüchtiger Programmspeicher, und SRAM, Static Random Access Memory, getrennt bilanziert. Die Tensor Arena ist der geplante Arbeitsbereich; ihr bereits enthaltener Eingabetensor darf nicht doppelt gerechnet werden. Das Übungsblatt verbindet diese Bilanz mit der Lebensdauer eines Interpreters und der Bedeutung eines Fehlerstatus. Vollständige Musterlösungen sind im Lösungsprofil enthalten.
+
+Das Quiz prüft anschließend zehn Unterscheidungen aus derselben Vorlesung: Parameter gegen MACs, Multiply-Accumulate, Bandbreitengrenze gegen Peak, Vektorkapazität gegen aktive Länge, interne Fertigstellung gegen Gesamtsystem und Gewichtbytes gegen Arbeitsspeicher. Geben Sie nach einer Antwort jeweils eine kurze Begründung. Die gemeinsame Erkenntnis ist, dass gleichartige Rechenarbeit erst mit passenden Datenwegen, Zahlenformaten und einer korrekten Firmwareintegration zur nutzbaren Anwendung wird.
 :::
 
-## TensorFlow Lite for Microcontrollers (TFLM)
+## Quellen und sinnvoller nächster Versuch
 
-- Kleine C++-Runtime. Ohne verpflichtendes OS und mit Arena möglich. Der übrige Stack ist nicht automatisch heapfrei
-- Nimmt kompaktes Modell, interpretiert Layer (Conv2D, Dense, …)
-- Rechnet mit Firmware-Kerneln. Eine NPU braucht ein passendes Backend, nicht nur das Silizium
-
-::: notes
-TensorFlow Lite for Microcontrollers (TFLM) knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. TFLM ist eine kleine C++-Runtime. Sie kann ohne Betriebssystem mit einer Arena arbeiten. Das ganze Firmwareprojekt ist dadurch nicht heapfrei. Ein NPU-Backend ist extra. Hier liegt kein Commit vor. Kleine C++-Runtime für MCUs (ohne OS, ohne `malloc`). Nimmt kompaktes Modell, interpretiert Layer (Conv2D, Dense, …). Verständnischeck: Wer rechnet: Bytes oder Kernel? Die Kernel. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Workflow Embedded AI
-
-![Das C-Array sind Modelldaten. Invoke läuft über Kernel, nicht als Modell-Maschinencode.](../assets/figures/08_ki_beschleuniger_edge_ai/flow.png)
-
-1. Trainieren (Cloud / Python)
-2. Konvertieren → `.tflite`
-3. Export als C-Byte-Array (`xxd` o. Ä.)
-4. Linken in Flash (`.rodata`)
-5. Firmware: `Invoke()` / Interpreter
+- Harris & Harris: *Digital Design and Computer Architecture — RISC-V Edition*
+- Patterson & Hennessy: *Computer Organization and Design — RISC-V Edition*
+- [RVV 1.0: Regeln für aktive Längen](https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc)
+- [Jouppi et al.: TPU v1 (2017)](https://arxiv.org/abs/1704.04760)
+- [TFLM: Speicherplanung](https://github.com/tensorflow/tflite-micro/blob/main/tensorflow/lite/micro/docs/memory_management.md) und [Int8-Spezifikation](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/lite/g3doc/performance/quantization_spec.md)
 
 ::: notes
-Workflow Embedded AI knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Offline entstehen geprüfte Bytes, online laufen Kernel. .rodata ist ein Linkerbereich, nicht automatisch Flash. Der Export allein genügt nicht. Verständnischeck: Warum genügt das Array nicht? Operatoren, Laufzeit und Speicher fehlen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
+Die beiden im Modul empfohlenen Bücher liefern den Bezugsrahmen für Befehlssatz, Datenpfad, Speicherhierarchie und Parallelität. Die Vektorlängenregeln sind an der Spezifikation 1.0 der RISC-V Vector Extension, kurz RVV, ausgerichtet. Die TPU-Arbeit von Jouppi und Mitautoren, Tensor Processing Unit, dokumentiert die erste Generation und ihre Peakzählung. Die verlinkten TFLM-Dokumente, TensorFlow Lite for Microcontrollers, erläutern Arbeitsbereich und quantisierte Zahlenformate. Die TensorFlow-Int8-Spezifikation wurde als Primärquelle für Nullpunkte, breite Biaswerte und Skalen herangezogen; konkrete Operatorvarianten können unterschiedliche Granularität verlangen.
 
-## Quantisierung
+Unsere Matrizen, Zeitpläne, Roofline-Raten, Flash-/SRAM-Budgets und Quantisierungszahlen sind ausdrücklich eigene Lehrmodelle. Flash ist nichtflüchtiger Speicher; SRAM bedeutet Static Random Access Memory. Der zugehörige C-Quellcode bietet einen nachvollziehbaren numerischen Versuch auf dem Hostrechner. Er trainiert kein Netz, lädt kein TFLM-Modell und beansprucht keine RISC-V- oder Renode-Zeitmessung.
 
-![1,24 wird 12 und zurück 1,2. 20 wird auf 127 begrenzt. Flash und SRAM bleiben getrennt.](../assets/figures/08_ki_beschleuniger_edge_ai/quant.png)
-
-- Float32: 4 Byte/Gewicht, teuer ohne FPU
-- Reine Float32-Gewichte werden als Int8 um 75 Prozent kleiner. Bias, Aktivierungen und Arena nicht automatisch
-- Integer ist nicht auf jeder CPU schneller. Den Accuracy-Verlust messen, nicht annehmen
-
-::: notes
-Quantisierung knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. real gleich s mal (q minus z). Bei s 0,1 und z 0 wird 1,24 zu 12 und zurück 1,2, Fehler 0,04. 20 wird auf 127 geklemmt, Rückwert 12,7, Fehler 7,3. Minus 20 wird minus 128, Rückwert minus 12,8. Bei z minus 3 ist die kodierte Null minus 3. 75 Prozent gelten nur für reine Gewichtbytes von 4 auf 1. Float32: 4 Byte/Gewicht, teuer ohne FPU. Reine Float32-Gewichte werden als Int8 um 75 Prozent kleiner. Bias, Aktivierungen und Arena nicht automatisch. Verständnischeck: Warum ist die Null bei z minus 3 gleich minus 3? Weil s mal null bleibt null. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Pruning
-
-- Viele Gewichte nahe null nach dem Training
-- Pruning braucht eine sparsityfähige Darstellung und einen passenden Kernel
-- Flash-Ersparnis und weniger ausgeführte MACs sind zwei verschiedene Folgen
-
-::: notes
-Pruning knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Vier dichte Bytes bleiben vier Bytes, auch wenn zwei null sind. Sparse-Speicher braucht Indizes. Ein Nullgewicht spart nur dann eine MAC, wenn der Kernel sie überspringt. Viele Gewichte nahe null nach dem Training. Pruning braucht eine sparsityfähige Darstellung und einen passenden Kernel. Verständnischeck: Spart eine Null automatisch eine MAC? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Geplante Aktivitätserkennung
-
-Geplanter Anwendungsfall, kein vorhandenes Labor:
-
-- Unter 20 KB ist ein hypothetisches Modellziel, kein vorhandenes Modell
-- Ein 3-Achsen-Fenster wäre später an die I2C-Pipeline anzuschließen
-- Klassen Stehen, Gehen, Laufen sind noch kein Schrittzähler
-- Renode, `.repl` und Runtime liegen hier nicht vor
-
-::: notes
-Geplante Aktivitätserkennung knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Stehen, Gehen und Laufen sind Fensterklassen, keine gezählten Schritte. Unter 20 KB ist ein hypothetisches Ziel, kein vorhandenes Modell. Es gibt keine .repl. Kleines quantisiertes Modell ($< 20\,\mathrm{KB}$). Eingabe: 3-Achsen-Beschleunigung (Anknüpfung I2C, Block 5). Verständnischeck: Ist jedes Gehen-Fenster ein Schritt? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Modell als C-Array
-
-```c
-/* Platzhalter, kein gültiges Modell und keine Lizenzdatei. */
-const unsigned char step_model_tflite[]
-    __attribute__((aligned(4))) = {
-    0x1c, 0x00, 0x00, 0x00, 0x54, 0x46, 0x4c, 0x33,
-    /* … weitere Bytes … */
-};
-```
-
-::: notes
-Modell als C-Array knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Die acht Bytes mit TFL3 sind kein gültiges Modell und kein Maschinencode. const legt nicht allein ins Flash. Eine Ausrichtung ist compilerspezifisch. Verständnischeck: Beweist TFL3 ein Netz? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Tensor Arena
-
-```cpp
-/* Pseudocode. Kein TFLM-Build und kein gültiges Modell.
-   Ein Kontext bleibt über Setup und Run gültig. */
-static int ready;
-
-int setup(void) {
-    if (model_blob_invalid()) return -1;
-    if (plan_tensors() != 0) return -3;
-    ready = 1;
-    return 0;
-}
-```
-
-- 1024 Byte Arena sind eine Lehrannahme
-- Der lokale Interpreter der alten Fassung endete mit der Funktion
-
-::: notes
-Tensor Arena knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Der alte lokale Interpreter endete mit return. Setup und Run brauchen denselben langlebigen Kontext. 1024 Byte sind eine Lehrannahme, kein Budget für ein 20-KB-Modell. Ohne gültigen Blob wird nicht dereferenziert. Ein zu kleiner Puffer lässt die Planung scheitern. 1024 Byte Arena sind eine Lehrannahme. Der lokale Interpreter der alten Fassung endete mit der Funktion. Verständnischeck: Warum genügt return 0 nicht? Das Objekt und das Budget bleiben sonst offen. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Inferenz-Zyklus
-
-```cpp
-/* Pseudocode. src hat m Float32-Werte, das Ziel m Int8-Elemente. */
-int run_window(const float *src, size_t m) {
-    if (!ready || src == 0) return -1;
-    if (input_elements() != m) return -6;
-    for (size_t i = 0; i < m; i++)
-        input_i8[i] = quantize_f32(src[i]);
-    if (invoke() != 0) return -8;
-    return status_only(); /* Klasse und Score getrennt */
-}
-```
-
-- `sizeof` eines Zeigers zählt nicht die Fensterelemente
-- Drei Ausgabebytes beweisen keine drei Klassen und keine Schrittzahl
-
-::: notes
-Inferenz-Zyklus knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. m Float32-Werte brauchen 4m Quellbytes und m Int8-Ziele. sizeof eines Zeigers zählt den Puffer nicht. Invoke ohne Erfolg liefert keinen Score. Drei Bytes beweisen keine Klasse Gehen. Status, Index und Score bleiben getrennt. Zwölf Floatwerte wären 48 Quellbytes und 12 Int8-Ziele. `sizeof` eines Zeigers zählt nicht die Fensterelemente. Drei Ausgabebytes beweisen keine drei Klassen und keine Schrittzahl. Verständnischeck: Brauchen 12 Floatwerte 12 Bytes? Nein, 48. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Renode: virtuelle Stimuli
-
-- Geplanter späterer Ausblick. Keine .repl und kein Modell liegen vor
-- Eine Konsole wäre eine funktionale Beobachtung, keine Zyklusmessung
-
-::: notes
-Renode: virtuelle Stimuli knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Ohne Plattform, Firmware und Modell gibt es keine Konsole und kein .resc. Eine spätere Klasse wäre funktional, keine Energiezahl. Geplanter späterer Ausblick. Keine .repl und kein Modell liegen vor. Eine Konsole wäre eine funktionale Beobachtung, keine Zyklusmessung. Verständnischeck: Beweist die Konsole Zyklen? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Erwartung: CPU ohne NPU
-
-- RV32IM ohne FPU kann Float in Software rechnen. Der Aufwand ist hier nicht gemessen
-- Eine funktionale Simulation belegt weder die Memory Wall noch eine NPU-Beschleunigung
-- Int8 auf der CPU kann sinnvoll sein. Eine CPU ohne NPU ist nicht automatisch falsch
-
-::: notes
-Erwartung: CPU ohne NPU knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. RV32IM ohne FPU kann Float in Software rechnen. Der Aufwand ist nicht gemessen. Int8 auf der CPU kann passen. MIPS sind keine Megahertz. RV32IM ohne FPU kann Float in Software rechnen. Der Aufwand ist hier nicht gemessen. Eine funktionale Simulation belegt weder die Memory Wall noch eine NPU-Beschleunigung. Verständnischeck: Ist die CPU ohne NPU falsch? Nein. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Zusammenfassung Block 8
-
-- DLP ist Datenparallelität. SIMD und RVV sind Umsetzungen, keine Definition
-- Systolische Arrays reduzieren bestimmten globalen Verkehr und brauchen Fill und Readout
-- TFLM-Bytes sind Modelldaten. Die Kernel führen die Operatoren aus
-- Quantisierung spart bestimmte Gewichtbytes, keine garantierte Genauigkeit
-
-::: notes
-Zusammenfassung Block 8 knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Die Ansätze eint passende Datenversorgung und lokale Wiederverwendung. DLP, RVV und systolische Arrays bleiben verschiedene Mechanismen. DLP ist Datenparallelität. SIMD und RVV sind Umsetzungen, keine Definition. Systolische Arrays reduzieren bestimmten globalen Verkehr und brauchen Fill und Readout. Verständnischeck: Welche Aussage verbindet sie? Gleichartige Rechnung braucht passende Versorgung. Die nächste Folie nimmt die noch offene Frage auf. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
-:::
-
-## Ausblick und Abschluss
-
-- Geplante Aktivitätserkennung, hier nicht ausgeführt
-- Es fehlen Modell, Tensorvertrag, Kernel und Plattform
-
-Vielen Dank.
-
-::: notes
-Ausblick und Abschluss knüpft an die bisherige Frage nach Rechnung und Datenbewegung an. Geprüft sind Rechnungen und Semantik. Nicht geprüft sind Kompilierung, Inferenz und Renode. Eine spätere Integration braucht Modell, Vertrag, Kernel und Plattform. Geplante Aktivitätserkennung, hier nicht ausgeführt. Es fehlen Modell, Tensorvertrag, Kernel und Plattform. Verständnischeck: Was wurde nicht ausgeführt? Firmware, Training und Simulation. Ein späterer Versuch braucht Modell, Kernel und Plattform. Zahlen sind Lehrannahmen. Code ist Lehrcode und wurde nicht kompiliert, trainiert oder ausgeführt.
+Ein späterer vollständiger Geräteversuch braucht ein festgelegtes Modell mit Testdaten, einen geprüften Tensorvertrag, passende Runtime-Kernel und eine dokumentierte Plattform. Zuerst wären Referenzausgaben und Speicherbelegung zu validieren; anschließend könnten Laufzeit und Energie unter derselben Systemgrenze gemessen werden. Dieser nächste Versuch folgt aus den heutigen Unterscheidungen und braucht keine ungesicherte Leistungsannahme.
 :::

@@ -1,25 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360">
-<rect width="1200" height="360" fill="#fff"/>
-<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>
-<text x="16" y="22" font-size="16" font-weight="600" fill="#1D1D1F" text-anchor="start">Packed Add ist kein Int8-Dot-Product. Lanes haben getrennte Uebertraege.</text>
-<text x="16" y="60" font-size="14" font-weight="400" fill="#5F6368" text-anchor="start">Lane</text>
-<rect x="80" y="44" width="220" height="70" fill="#fff" stroke="#1565C0" stroke-width="1.4"/>
-<text x="92" y="70" font-size="16" font-weight="600" fill="#1565C0" text-anchor="start">01 + 02</text>
-<text x="92" y="96" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">Ergebnis 03</text>
-<rect x="330" y="44" width="220" height="70" fill="#fff" stroke="#1565C0" stroke-width="1.4"/>
-<text x="342" y="70" font-size="16" font-weight="600" fill="#1565C0" text-anchor="start">10 + 20</text>
-<text x="342" y="96" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">Ergebnis 30</text>
-<rect x="580" y="44" width="220" height="70" fill="#fff" stroke="#1565C0" stroke-width="1.4"/>
-<text x="592" y="70" font-size="16" font-weight="600" fill="#1565C0" text-anchor="start">7F + 01</text>
-<text x="592" y="96" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">Ergebnis 80/sat</text>
-<rect x="830" y="44" width="220" height="70" fill="#fff" stroke="#1565C0" stroke-width="1.4"/>
-<text x="842" y="70" font-size="16" font-weight="600" fill="#1565C0" text-anchor="start">FF + 01</text>
-<text x="842" y="96" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">Ergebnis 00/sat</text>
-<text x="16" y="150" font-size="15" font-weight="600" fill="#E65100" text-anchor="start">Int8-MAC: Produkt, dann breiter Akkumulator. Signed/Unsigned und Saettigung festlegen.</text>
-<text x="16" y="178" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Beispiel: 20 * 20 passt nicht in int8. Akkumulator hier int32.</text>
-<text x="16" y="214" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">Ein neuer MAC je Takt ist ein Initiationsintervall, nicht die Ergebnis-Latenz.</text>
-<text x="16" y="246" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Zwei Speicherbusse helfen nur ohne Bankkonflikt.</text>
-<text x="16" y="274" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Zero-Overhead-Loop entfernt den Schleifenzweig, nicht jeden Daten-Stall.</text>
-<text x="16" y="310" font-size="14" font-weight="400" fill="#5F6368" text-anchor="start">SIMD, RVV und NPU sind kombinierbar, keine Pflicht-Reihenfolge.</text>
-<text x="16" y="338" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">Die letzten beiden Lanes zeigen Wrap ohne Saettigung beziehungsweise den Saettigungsfall als Alternative.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="365" viewBox="0 0 1000 365" role="img" aria-labelledby="title">
+<title id="title">Vier getrennte Byte-Additionen mit definiertem Überlauf</title>
+<style>text{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:400}</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6" fill="#1D1D1F"/></marker></defs>
+<rect width="1000" height="365" fill="#FFFFFF"/>
+<text x="20" y="30" font-size="24" fill="#1D1D1F" text-anchor="start">Packed SIMD · unsigned 8-Bit-Addition modulo 256 · ohne Carry zwischen Lanes</text>
+<text x="45" y="110" font-size="24" fill="#1D1D1F" text-anchor="start">A</text>
+<rect x="230" y="70" width="164" height="60" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="312" y="109" font-size="27" fill="#1D1D1F" text-anchor="middle">01</text>
+<rect x="400" y="70" width="164" height="60" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="482" y="109" font-size="27" fill="#1D1D1F" text-anchor="middle">10</text>
+<rect x="570" y="70" width="164" height="60" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="652" y="109" font-size="27" fill="#1D1D1F" text-anchor="middle">7F</text>
+<rect x="740" y="70" width="164" height="60" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="822" y="109" font-size="27" fill="#1D1D1F" text-anchor="middle">FF</text>
+<text x="45" y="185" font-size="24" fill="#1D1D1F" text-anchor="start">B</text>
+<rect x="230" y="145" width="164" height="60" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="312" y="184" font-size="27" fill="#1D1D1F" text-anchor="middle">02</text>
+<rect x="400" y="145" width="164" height="60" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="482" y="184" font-size="27" fill="#1D1D1F" text-anchor="middle">20</text>
+<rect x="570" y="145" width="164" height="60" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="652" y="184" font-size="27" fill="#1D1D1F" text-anchor="middle">01</text>
+<rect x="740" y="145" width="164" height="60" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="822" y="184" font-size="27" fill="#1D1D1F" text-anchor="middle">01</text>
+<text x="45" y="260" font-size="24" fill="#1D1D1F" text-anchor="start">A + B</text>
+<rect x="230" y="220" width="164" height="60" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="312" y="259" font-size="27" fill="#1D1D1F" text-anchor="middle">03</text>
+<rect x="400" y="220" width="164" height="60" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="482" y="259" font-size="27" fill="#1D1D1F" text-anchor="middle">30</text>
+<rect x="570" y="220" width="164" height="60" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="652" y="259" font-size="27" fill="#1D1D1F" text-anchor="middle">80</text>
+<rect x="740" y="220" width="164" height="60" rx="8" fill="#F5F5F7" stroke="#E2001A"/>
+<text x="822" y="259" font-size="27" fill="#1D1D1F" text-anchor="middle">00</text>
+<text x="500" y="335" font-size="23" fill="#1D1D1F" text-anchor="middle">Hexwerte · FF + 01 wird 00 in dieser Lane · kein Übertrag zum Nachbarfeld</text>
 </svg>

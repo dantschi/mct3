@@ -1,215 +1,413 @@
 ---
 title: "Übungsblatt 8: KI-Beschleuniger & Edge AI"
-subtitle: "Mikrocomputertechnik 3 (MCT3)"
+subtitle: "Mikrocomputertechnik 3 · Datenfluss, Vektorlängen und Speicherplanung auf Papier"
+highlight-style: ../assets/styles/dhbw-code.theme
+header-includes: |
+  \usepackage{needspace}
 ---
 
 ::: {.content-visible when-profile="solution"}
 > **Musterlösung**
 :::
 
-## Zielsetzung
+## Ziel und Arbeitsweise
 
-Sie vertiefen Vorlesung 8: Memory Wall bei neuronalen Netzen, Data-Level Parallelism / RVV, Systolic Arrays (NPUs) sowie Edge-AI-Praxis mit TensorFlow Lite Micro (Quantisierung, Arena, Inferenz).
+Die sechs Pflichtaufgaben sind vollständig auf Papier lösbar.
+Geben Sie Rechenweg, Einheiten und Zählgrenze an.
+Alle Architekturzeiten und Speicherbudgets sind Lehrannahmen.
 
-**Bearbeitungszeit:** ca. 45–60 Min. | **Orientierungspunkte:** Aufgabe 1: 12 P, Aufgabe 2: 12 P (Gesamt: 24 P)
+**Bearbeitungszeit:** etwa 60–75 Minuten selbstständig.
+**Orientierungspunkte:** 32.
+Im Unterricht: Aufgaben 1–2 (10 min), Aufgabe 3 (15 min),
+Aufgabe 4 (15 min), Aufgaben 5–6 (15 min).
+Lösungsbesprechungen sind in die Vorlesungsphasen eingeplant.
 
-## Teil 1: Theorie — Von der CPU zum KI-Beschleuniger
+MAC heißt Multiply-Accumulate und zählt hier zwei Operationen.
+Int8: $1$ B, Int32/Float32: $4$ B je Element.
+KiB $=1024$ B, MB $=10^6$ B.
 
-### Aufgabe 1.1: Die Memory Wall bei neuronalen Netzen
+## Aufgabe 1: Dense-Schicht und Datenbudget (5 Punkte)
 
-Neuronale Netze bestehen hardwareseitig primär aus großen Matrizen. Die grundlegendste Operation ist die MAC-Operation (Multiply-Accumulate).
+Eine Dense-Schicht, vollständig verbundene Schicht, berechnet $y=Wx+b$.
+Eine anschließende Aktivierungsfunktion ist ausgeblendet.
 
-1. Erläutern Sie die Struktur $a \leftarrow a + (w \times x)$ und die Bedeutung der Variablen.
-2. Warum „verhungert“ eine klassische OoO-CPU an der *Memory Wall*? Argumentieren Sie mit der *Arithmetic Intensity* (Rechnen vs. Speicherzugriffe).
-3. Warum helfen Branch Prediction und Reservation Stations bei Matrix-Multiplikationen kaum und verschwenden oft Energie?
+$$W=\begin{bmatrix}1&2&3\\0&-1&4\end{bmatrix},\quad
+x=\begin{bmatrix}2\\1\\3\end{bmatrix},\quad
+b=\begin{bmatrix}1\\-2\end{bmatrix}$$
+
+1. Berechnen Sie beide Ausgänge einschließlich Zwischenrechnungen. (2 P)
+2. Zählen Sie trainierbare Parameter und produktbezogene MACs.
+   Warum sind diese Zahlen verschieden? (1 P)
+3. Gewichte und Eingaben liegen als Int8, Biaswerte als Int32 vor.
+   Wie viele gespeicherte Byte benötigen $W$, $b$ und $x$ zusammen?
+   Wie verändert sich diese Summe, wenn zwei Int8-Ausgänge hinzukommen?
+   Ist dies bereits die Größe der Modelldatei oder der Arena? (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+\Needspace{10\baselineskip}
 
-*(Notieren Sie Ihre Lösung hier.)*
+**Ihre Ausgänge, Zählung und Bytebilanz:**
+
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 1.1**
+\Needspace{18\baselineskip}
 
-1. $w$ = Gewicht, $x$ = Eingabe/Activation, $a$ = Akkumulator (laufende Summe). Eine MAC multipliziert und addiert in einem Schritt.
-2. Pro MAC typisch zwei Loads ($w$, $x$) für eine Mul+Add → geringe Arithmetic Intensity. Die ALU ist schnell fertig, wartet dann oft viele Takte auf DRAM/Cache → Memory Wall, geringe ALU-Auslastung.
-3. Matrix-Schleifen sind linear und hoch vorhersagbar: der Predictor rät ohnehin meist richtig (wenig Mehrwert). Reservation Stations / OoO verbrauchen Energie, um Abhängigkeiten zu managen — obwohl viele MACs voneinander unabhängig sind und eher DLP brauchen.
+**Musterlösung 1**
+
+1. $y_0=1\cdot2+2\cdot1+3\cdot3+1=2+2+9+1=14$.
+   $y_1=0\cdot2+(-1)\cdot1+4\cdot3-2=0-1+12-2=9$.
+   Also $y=[14,9]^T$. (je 1 P)
+2. Sechs Gewichte plus zwei Biaswerte ergeben acht Parameter.
+   Die sechs Produkte ergeben sechs produktbezogene MACs.
+   Bias ist ein Parameter, wird aber nicht mit einem Eingang multipliziert. (1 P)
+3. $W$: $6$ B, $b$: $2\cdot4=8$ B, $x$: $3$ B.
+   Zusammen $17$ B, mit den zwei Ausgängen $19$ B. (1 P)
+   Diese Bilanz enthält keine Strukturmetadaten, Skalen, Ausrichtung,
+   temporären Kernelpuffer oder Laufzeitverwaltung.
+   Sie ist weder vollständige Modelldatei noch Arena. (1 P)
+
+Die Null im Gewichtsfeld zählt in dieser dichten Ausführung als gespeicherter
+Wert und als Produkt. Ein besonderer Sparse-Kernel wurde nicht angenommen.
 :::
 
 {{< pagebreak >}}
 
-### Aufgabe 1.2: Vektoren und die RISC-V Vector Extension (RVV)
+## Aufgabe 2: Roofline und Wiederverwendung (5 Punkte)
 
-1. Beschreiben Sie *Data-Level Parallelism* (DLP) im Kontrast zu ILP. Warum spart DLP Energie in Fetch/Decode?
-2. RVV gilt als hardware-agnostisch. Wie ermöglicht `vsetvli`, dass derselbe Maschinencode auf schmaler Edge-CPU und breitem Server-Node läuft, ohne Neu-Kompilierung?
+Lehrmodell R betrachtet zunächst nur Operandenverkehr vom externen Speicher
+zum lokalen Puffer. Jede MAC zählt zwei Operationen, jeder Operand vier Byte.
+Bias und Ausgabeschreiben sind zunächst ausgeschlossen.
+Rechenpeak $P_{\mathrm{peak}}=8$ Ops/Takt, Bandbreite $B=8$ Byte/Takt.
+Roofline ist das Modell $P\leq\min(P_{\mathrm{peak}},B I)$,
+$I$ die Intensität in Ops/Byte.
+
+1. Berechnen Sie die ideale Obergrenze für $I=0{,}25$ und $I=0{,}5$.
+   Wo liegt der Knick, und welche Grenze ist an beiden Punkten enger? (2 P)
+2. Ein $2\times2$-Produkt $C=AB$ benötigt acht MACs.
+   Naiv lädt jede MAC beide Operanden neu.
+   Mit lokalem Halten wird jeder der acht verschiedenen Eingangswerte einmal geladen.
+   Berechnen Sie beide Eingangsbytezahlen und Intensitäten.
+   Nun werden zusätzlich vier Ausgaben zu je vier Byte geschrieben,
+   ohne vorher ein altes $C$ zu lesen. Wie ändern sich Bytezahlen und Intensitäten? (2 P)
+3. Der Rechenpeak wird auf $16$ Ops/Takt erhöht, die Bandbreite bleibt $8$ Byte/Takt.
+   Wird bei der ursprünglichen Eingangsintensität $0{,}25$ die Grenze größer?
+   Begründen Sie. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+\Needspace{10\baselineskip}
 
-*(Notieren Sie Ihre Lösung hier.)*
+**Ihre Obergrenzen und Transferbilanz:**
+
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 1.2**
+\Needspace{20\baselineskip}
 
-1. **ILP:** mehrere *verschiedene* Instruktionen parallel. **DLP:** *eine* Instruktion (z. B. Vector-Add) auf viele Datenelemente. Fetch/Decode läuft einmal pro Vektorbefehl statt pro Skalar-Addition → weniger Front-End-Energie.
-2. `vsetvli` fragt zur Laufzeit die effektive Vektorlänge (VLEN) ab; die Schleife passt die Chunk-Größe an. Schmale Hardware braucht mehr Iterationen, breite weniger — gleicher Code.
-:::
+**Musterlösung 2**
 
-### Aufgabe 1.3: Systolic Arrays (NPUs)
+1. $\min(8,8\cdot0{,}25)=2$ und $\min(8,8\cdot0{,}5)=4$ Ops/Takt.
+   Knick $I=8/8=1$ Op/Byte. Beide Punkte liegen darunter;
+   die Bandbreitengrenze ist enger. Dies sind Obergrenzen, keine Messwerte. (2 P)
+2. Acht MACs ergeben sechzehn Ops.
+   Naiv: $8\cdot2\cdot4=64$ B, $I=16/64=0{,}25$.
+   Lokal gehalten: $8\cdot4=32$ B, $I=16/32=0{,}5$. (1 P)
+   Zusätzlich $4\cdot4=16$ Ausgabebytes ergeben $80$ beziehungsweise $48$ B.
+   Intensitäten $16/80=0{,}2$ und $16/48=1/3\approx0{,}333$ Ops/Byte. (1 P)
+3. Nein: $\min(16,8\cdot0{,}25)=2$ Ops/Takt.
+   Zusätzliche Rechenkapazität ändert die unveränderte Versorgung nicht. (1 P)
 
-1. Erklären Sie den Aufbau eines Systolic Arrays. Wie durchbricht es den Von-Neumann-Flaschenhals bezüglich RAM-Zugriffen?
-2. Was ist *Weight-Stationary* Dataflow, und warum spart das Energie?
-3. Nennen Sie einen entscheidenden Nachteil gegenüber einer General-Purpose-CPU.
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-*(Notieren Sie Ihre Lösung hier.)*
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 1.3**
-
-1. 2D-Gitter vieler einfacher MAC-Zellen; oft nur Randzellen am Speicherbus. Daten werden taktsynchron von Zelle zu Zelle weitergereicht (Eimerkette). Ein DRAM-Load speist viele MACs → Wiederverwendung, weniger Bus-Last.
-2. Gewichte werden einmal geladen und in lokalen Registern der Zellen gehalten; nur Activations fließen weiter. Weniger Datenbewegung auf dem Die → Energieeinsparung.
-3. Extrem domänenspezifisch / starr: kaum klassischer Kontrollfluss — ungeeignet für OS, Netzwerkstack oder allgemeine C-Logik.
+Die Intensitäten mit Ausgaben verwenden eine erweiterte Zählbasis.
+Die eingangsbezogene Roofline darf nicht ohne eine neue Bandbreitenannahme
+für beide Transferrichtungen als dieselbe Messgrenze ausgegeben werden.
 :::
 
 {{< pagebreak >}}
 
-## Teil 2: Praxis — Edge AI mit TensorFlow Lite Micro
+## Aufgabe 3: Vektorlänge und Zeitmodell (6 Punkte)
 
-**Szenario:** Ein trainiertes Modell (Schrittklassifikation) soll auf einem RISC-V-MCU laufen. Eingabe: 3-Achsen-Beschleunigung (Anknüpfung an I2C aus VL5).
+RVV bedeutet RISC-V Vector Extension.
+VLEN ist die Registerbreite in Bit, SEW die Elementbreite,
+LMUL die Registergruppengröße und VLMAX die Elementkapazität.
+AVL ist die angeforderte Restzahl, VL die aktive zurückgegebene Länge.
 
-### Aufgabe 2.1: Das Modell im Flash-Speicher
+Es gelten die RVV-1.0-Regeln für eine unterstützte Konfiguration:
+Bei $\mathrm{AVL}\leq\mathrm{VLMAX}$ ist VL exakt AVL,
+bei $\mathrm{AVL}\geq2\mathrm{VLMAX}$ exakt VLMAX,
+dazwischen ein Integer von $\lceil\mathrm{AVL}/2\rceil$ bis VLMAX.
 
-1. Warum quantisiert man Modelle für MCUs (Float32 → Int8)? Nennen Sie zwei Vorteile.
-2. Das `.tflite`-Modell liegt als C-Byte-Array vor. Mit welchem Keyword und welchem Linker-Verhalten landet es im Flash statt im SRAM?
+1. VLEN $=128$ Bit, SEW $=32$ Bit, LMUL $=1$.
+   Bestimmen Sie VLMAX. Folgt daraus dieselbe Zahl physischer Rechen-Lanes? (1 P)
+2. Separates Beispiel: VLMAX $=32$, AVL $=40$.
+   Prüfen Sie die Folgen $32+8$, $24+16$, $20+20$, $16+24$.
+   Geben Sie für $24+16$ beide Zeigerinkremente bei Vier-Byte-Elementen an. (2 P)
+3. Wie viele Iterationen verarbeitet ein Array mit $1000$ Elementen
+   bei dieser Kapazität? Begründen Sie auch die letzten Abschnitte. (1 P)
+4. Ein eigenes Chaining-Modell startet vier unabhängige Multiplikationen in
+   Takten eins bis vier. Latenz zwei, Ergebnis jeweils am Taktende.
+   Die zugehörigen unabhängigen Additionen haben Latenz eins und Startabstand eins.
+   Mit Weitergabe darf jede Addition im Takt nach ihrem Produkt beginnen;
+   ohne Weitergabe erst nach Fertigstellung aller vier Produkte.
+   Wann endet das letzte Ergebnis in beiden Fällen? Ist das eine RVV-Zeitgarantie? (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+\Needspace{10\baselineskip}
 
-*(Notieren Sie Ihre Lösung hier.)*
+**Ihre Längenfolgen und Zeitachse:**
+
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 2.1**
+\Needspace{20\baselineskip}
 
-1. **Footprint:** ca. $4\times$ kleiner (4 Byte → 1 Byte). **Performance/Energie:** Integer-ALU oft schneller/effizienter als Float-Emulation ohne FPU.
-2. Keyword `const` → typisch `.rodata`; das Linker-Skript mappt Read-Only-Daten in den NOR-Flash (XIP/ROM), ohne das Array beim Start in den SRAM zu kopieren.
-:::
+**Musterlösung 3**
 
-### Aufgabe 2.1b: Modellgröße Float32 vs. Int8
-
-Ein kleines Netz habe $250\,000$ Gewichte (Biases vernachlässigt).
-
-1. Berechnen Sie den Speicherbedarf der Gewichte in Float32 (4 Byte/Gewicht) und in Int8 (1 Byte/Gewicht).
-2. Um welchen Faktor schrumpft der Gewichtsspeicher durch Int8-Quantisierung?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-*(Notieren Sie Ihre Lösung hier.)*
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 2.1b**
-
-1. Float32: $250\,000 \times 4\,\mathrm{B} = 1\,000\,000\,\mathrm{B} = 1\,\mathrm{MB}$.  
-   Int8: $250\,000 \times 1\,\mathrm{B} = 250\,000\,\mathrm{B} = 250\,\mathrm{KB}$.
-
-2. Faktor $4$ (Float32 ist viermal so groß) bzw. Int8 benötigt $1/4$ des Float32-Speichers.
+1. $\mathrm{VLMAX}=\mathrm{LMUL}\cdot\mathrm{VLEN}/\mathrm{SEW}
+   =1\cdot128/32=4$ Elemente.
+   Physische Rechen-Lanes und ihre Startabstände sind eine Implementierungsfrage. (1 P)
+2. Für AVL vierzig muss die erste VL zwischen zwanzig und zweiunddreißig liegen.
+   $32+8$, $24+16$ und $20+20$ sind erlaubt;
+   $16+24$ beginnt unzulässig unter zwanzig. (1 P)
+   Bei $24+16$ sind die Inkremente $24\cdot4=96$ und $16\cdot4=64$ Byte. (1 P)
+3. Dreißig erzwungene volle Iterationen bearbeiten $960$ Elemente.
+   Der Rest vierzig braucht zwei zulässige Abschnitte.
+   Insgesamt zweiunddreißig Iterationen. (1 P)
+4. Produkte enden in zwei bis fünf.
+   Mit Chaining, elementweiser Weitergabe, starten und enden Additionen in drei bis sechs.
+   Ohne Chaining in sechs bis neun. Letztes Ergebnis: Ende sechs beziehungsweise neun. (1 P)
+   Dies folgt aus dem gegebenen Modell, nicht aus der Befehlssatzspezifikation.
+   Es sind in beiden Fällen vier Multiplikationen und vier separate Additionen. (1 P)
 :::
 
 {{< pagebreak >}}
 
-### Aufgabe 2.2: TFLM-Inferenzzyklus (C++)
+## Aufgabe 4: Systolische Teilsummen (6 Punkte)
 
-Vervollständigen Sie das Snippet. Hilfsobjekte `resolver`, `error_reporter`, `input`, `output` und `read_i2c_sensor()` seien gegeben.
+$$A=\begin{bmatrix}1&2\\3&4\end{bmatrix},\quad
+B=\begin{bmatrix}5&6\\7&8\end{bmatrix},\quad C=AB$$
 
-Hinweis: Das Snippet nutzt Float-Tensoren (`data.f`). Bei einem Int8-quantisierten Modell greifen Sie typisch auf `data.int8` zu und skalieren mit den Quantisierungsparametern (`scale`, `zero_point`) — hier didaktisch als Float belassen.
+Vier Zellen $C_{ij}$ halten ihre Ausgabesumme lokal (Output-Stationary).
+Anfangs sind alle Summen null. Eine gültige MAC wird im aktuellen Takt fertig.
+$A$ wandert je Takt eine Zelle rechts, $B$ eine unten.
+Indizes $i,j,k$ beginnen bei null.
+$A_{ik}$ wird links in Takt $1+k+i$ eingespeist,
+$B_{kj}$ oben in Takt $1+k+j$.
+Vorladen und Auslesen sind nicht Teil dieses Zeitfensters.
 
-```cpp
-#include "tensorflow/lite/micro/all_ops_resolver.h"
-#include "tensorflow/lite/micro/micro_interpreter.h"
-/* Modell-Array step_model_tflite ist inkludiert */
+1. Tragen Sie die vier Teilsummen nach jedem Takt ein.
+   Markieren Sie deren letzte gültige MAC. (3 P)
+2. Welche beiden Paare erreichen $C_{11}$ in welchen Takten?
+   Warum ist die Summe nicht schon in Takt zwei fertig? (1 P)
+3. Berechnen Sie die mittlere Auslastung über vier Takte im $2\times2$-Array.
+   Dasselbe Tile läuft nun isoliert in vier Zellen eines $4\times4$-Arrays,
+   alle anderen bleiben leer. Berechnen Sie zeitliche Auslastung und räumliche Belegung.
+   Ist interne Fertigstellung bereits Readout? (2 P)
 
-/* 1. Tensor Arena: 10 KiB, global */
-/* TODO */
+| Taktende | $C_{00}$ | $C_{01}$ | $C_{10}$ | $C_{11}$ |
+|----------|----------|----------|----------|----------|
+| 1 | | | | |
+| 2 | | | | |
+| 3 | | | | |
+| 4 | | | | |
 
-void setup_and_run_ai() {
-    const tflite::Model *model = tflite::GetModel(step_model_tflite);
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
 
-    tflite::MicroInterpreter interpreter(
-        model, resolver, tensor_arena, 10 * 1024, error_reporter);
+**Ihre Begründung und Auslastungsrechnung:**
 
-    /* 2. Arena vorbereiten */
-    /* TODO: interpreter.... */
+\vspace*{3cm}
+:::
 
-    while (1) {
-        /* 3. Input: 128 Werte via read_i2c_sensor() */
-        /* TODO */
+::: {.content-visible when-profile="solution"}
+\Needspace{21\baselineskip}
 
-        /* 4. Inferenz starten */
-        /* TODO: interpreter.... */
+**Musterlösung 4**
 
-        float score_laufen = output->data.f[2];
-        /* 5. bei Wahrscheinlichkeit > 80 % melden */
-        /* TODO: if (...) { printf(...); } */
-    }
-}
+| Taktende | $C_{00}$ | $C_{01}$ | $C_{10}$ | $C_{11}$ | gültige MACs |
+|----------|----------|----------|----------|----------|--------------|
+| 1 | $5$ | $0$ | $0$ | $0$ | 1 |
+| 2 | $19$ fertig | $6$ | $15$ | $0$ | 3 |
+| 3 | $19$ | $22$ fertig | $43$ fertig | $18$ | 3 |
+| 4 | $19$ | $22$ | $43$ | $50$ fertig | 1 |
+
+1. $C_{00}$: $1\cdot5=5$, dann $+2\cdot7=19$.
+   $C_{01}$: $1\cdot6=6$, dann $+2\cdot8=22$.
+   $C_{10}$: $3\cdot5=15$, dann $+4\cdot7=43$.
+   $C_{11}$: $3\cdot6=18$, dann $+4\cdot8=50$.
+   Letzte MACs in zwei, drei, drei und vier. (3 P)
+2. In Zelle $(i,j)$ treffen passende Operanden in $1+k+i+j$ ein.
+   $C_{11}$ erhält drei und sechs in Takt drei, vier und acht in vier.
+   Zeilen- und Spaltenversatz verhindern einen früheren Start. (1 P)
+3. Acht MACs bei sechzehn Zell-Takten ergeben $8/16=50\,\%$.
+   Im größeren Array: $8/(16\cdot4)=12{,}5\,\%$ zeitlich,
+   $4/16=25\,\%$ räumlich. (1 P)
+   Fertige lokale Summen benötigen weiterhin einen Ausleseweg;
+   dessen Zeit wurde nicht angenommen. (1 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 5: Quantisierung und Zahlenformate (6 Punkte)
+
+Int8 hat Bereich $[-128,127]$.
+Wir verwenden $q=\operatorname{clip}(\operatorname{round}(r/s)+z)$
+und $\hat r=s(q-z)$.
+$s>0$ ist die Skala, $z$ der ganzzahlige Nullpunkt.
+Rundung: nächster Integer, exakte Halbfälle weg von null.
+
+1. Mit $s=0{,}1$, $z=0$: Bestimmen Sie Code, Rückwert und absoluten Fehler
+   für $r=1{,}24$ und $r=20$. Welche Fehlerart liegt jeweils vor? (2 P)
+2. Mit $z=-3$: Welcher Code repräsentiert reale Null? Begründen Sie. (1 P)
+3. Separates Skalarprodukt:
+   $q_x=[12,-4]$, $z_x=-3$, $s_x=0{,}1$,
+   $q_w=[2,3]$, $z_w=0$, $s_w=0{,}2$.
+   Biascode $q_b=5$ hat Skala $s_xs_w$ und Nullpunkt null.
+   Bestimmen Sie die korrigierte Integerakkumulation und den realen Rückwert.
+   Quantisieren Sie diesen mit $s_y=0{,}05$, $z_y=-2$ erneut. (2 P)
+4. $250\,000$ reine Gewichte wechseln von Float32 zu Int8.
+   Berechnen Sie beide Bytezahlen und die prozentuale Ersparnis.
+   Gilt sie auch für komplette Modelldatei und Arena? (1 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{10\baselineskip}
+
+**Ihre Codes, Fehler und breite Produktsumme:**
+
+\vspace*{4cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{22\baselineskip}
+
+**Musterlösung 5**
+
+1. $1{,}24/0{,}1=12{,}4\to12$, Rückwert $1{,}2$, Fehler $0{,}04$: Rundung.
+   $20/0{,}1=200\to127$, Rückwert $12{,}7$, Fehler $7{,}3$: Begrenzung.
+   Die halbe-Schritt-Fehlergrenze gilt im zweiten Fall nicht. (je 1 P)
+2. $q=z=-3$, denn $s((-3)-(-3))=0$. (1 P)
+3. Korrigierte Eingaben $15$ und $-1$.
+   $a=15\cdot2+(-1)\cdot3+5=30-3+5=32$.
+   $\hat r_y=(0{,}1\cdot0{,}2)\cdot32=0{,}64$. (1 P)
+   $q_y=\operatorname{round}(0{,}64/0{,}05)-2=13-2=11$.
+   Rückwert $0{,}05(11+2)=0{,}65$, Fehler $0{,}01$. (1 P)
+4. Float32: $1\,000\,000$ B, Int8: $250\,000$ B.
+   Ersparnis $1-1/4=75\,\%$ nur für Gewichtbytes.
+   Bias, Metadaten und Arbeitsspeicher folgen anderen Regeln. (1 P)
+
+Skalen und Nullpunkte sind Bestandteil des Tensorvertrags.
+Breite Akkumulation verhindert Informationsverlust durch zu schmale Zwischenergebnisse;
+sie ersetzt nicht die Prüfung auf einen möglichen Bereichsüberlauf.
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 6: Firmware als Gesamtsystem (4 Punkte)
+
+CPU bedeutet Central Processing Unit, Prozessor.
+SRAM ist Static Random Access Memory, statischer Arbeitsspeicher.
+Flash ist nichtflüchtiger Speicher, die Arena ein Tensor-Arbeitsbereich.
+
+1. Fiktive Plattform: $128$ KiB Flash, $32$ KiB SRAM.
+   Firmware $40$ KiB, vollständige Modelldatei $24$ KiB liegen im Flash.
+   SRAM: Arena $12$ KiB, Float-Quellfenster $1{,}5$ KiB,
+   Stackreserve $6$ KiB, übrige Daten $4$ KiB.
+   Der Int8-Eingabetensor liegt schon in der Arena.
+   Bestimmen Sie beide freien Restbudgets. (1 P)
+2. Das Fenster enthält $128$ Zeitpunkte mit je drei Achsen.
+   Bestimmen Sie Elementzahl, Float32-Quellbytes und Int8-Zielbytes.
+   Warum liefert `sizeof` eines Zeigers nicht diese Quellgröße? (1 P)
+3. Eine Setup-Funktion erzeugt Arena und Interpreter als lokale Objekte
+   und kehrt zurück. Eine spätere Run-Funktion verwendet sie weiter.
+   Zusätzlich liest sie nach einem fehlgeschlagenen `Invoke()` den alten Ausgang
+   als neue Wahrscheinlichkeit.
+   Nennen Sie beide Fehler und die nötigen Korrekturen. (1 P)
+4. Serielle Lehrzeiten: CPU-Pfad Vorverarbeitung $2$ ms,
+   Dense-Rechnung $10$ ms, übrige Operatoren $3$ ms, Nachverarbeitung $1$ ms.
+   Beschleunigerpfad: zusätzlich Kopie $1$ ms, Dense nur $1$ ms,
+   alle übrigen Phasen unverändert.
+   Bestimmen Sie Gesamtzeiten, Teilfaktor und Gesamtfaktor. (1 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{10\baselineskip}
+
+**Ihre Budgets, Fehleranalyse und Zeitbilanz:**
+
+\vspace*{4cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{19\baselineskip}
+
+**Musterlösung 6**
+
+1. Flash: $128-40-24=64$ KiB frei.
+   SRAM: $32-12-1{,}5-6-4=8{,}5$ KiB frei.
+   Int8-Zieltensor nicht doppelt zählen. Arena ist ein separates Arbeitsbudget. (1 P)
+2. $128\cdot3=384$ Elemente,
+   Quelle $384\cdot4=1536$ B, Ziel $384$ B.
+   Ein Zeiger enthält eine Adresse; seine Größe zählt weder Elemente noch Pufferbytes. (1 P)
+3. Die lokalen Objekte leben nach dem Funktionsende nicht weiter.
+   Modell, Interpreter und Arena müssen über alle Nutzungsphasen gültig bleiben.
+   Nach einem Fehler darf keine neue Entscheidung aus alten Ausgangsbytes entstehen:
+   Status prüfen, Fehler behandeln, Ausgabe nur nach Erfolg gemäß Vertrag lesen.
+   Eine Wahrscheinlichkeit muss außerdem vom Modell als solche definiert sein. (1 P)
+4. CPU: $2+10+3+1=16$ ms.
+   Beschleuniger: $2+1+1+3+1=8$ ms.
+   Dense-Teilfaktor $10/1=10$, Gesamtfaktor $16/8=2$. (1 P)
+
+Ein funktionaler Renode-Lauf wäre ohne validiertes Zeitmodell
+kein Nachweis dieser Hardwarezeiten oder einer Energieersparnis.
+:::
+
+{{< pagebreak >}}
+
+## Optional: Zahlenbeispiele auf dem Host prüfen
+
+Die Datei `src/lab08_dense.c` enthält ein vollständiges C-Programm.
+Sie prüft die Dense-Ausgänge, Matrixprodukte, Quantisierung und Fehlerfälle.
+Sie benötigt weder Modellblob noch TensorFlow Micro oder Renode.
+Vom Repository-Hauptordner aus:
+
+```bash
+gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+    labs/src/lab08_dense.c -lm -o /tmp/lab08_dense
+/tmp/lab08_dense
 ```
 
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+Erwartete Ausgabe:
 
-*(Notieren Sie Ihre Lösung hier.)*
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 2.2**
-
-Im Repository liegt kein TFLM-Stand und kein Modell. Der folgende Schnitt folgt dem Konstruktor ohne `ErrorReporter` und prüft Rückgaben. 10 KiB sind keine gemessene Arena. 128 einzelne Sensorwerte sind keine 3-Achsen-Serie. Die Klassen beschreiben eine Aktivität, keinen Schrittzähler.
-
-```cpp
-const int kTensorArenaSize = 10 * 1024; /* nicht gemessen */
-alignas(16) uint8_t tensor_arena[kTensorArenaSize];
-
-void setup_and_run_ai() {
-    const tflite::Model *model = tflite::GetModel(model_data);
-    if (model->version() != TFLITE_SCHEMA_VERSION) return;
-    tflite::MicroInterpreter interpreter(
-        model, resolver, tensor_arena, kTensorArenaSize);
-    if (interpreter.AllocateTensors() != kTfLiteOk) return;
-    if (input->type != kTfLiteInt8) return;
-    /* Fenster, Achsen und scale aus dem Modell, nicht 128 Floats. */
-    if (interpreter.Invoke() != kTfLiteOk) return;
-    int8_t logit = output->data.int8[2];
-    (void)logit; /* kein Schwellenwert 0,8 ohne Outputsemantik */
-}
+```text
+Dense: 14 9
+Matrix: 19 22 43 50
+Quantisierung: 12 127 -128
+Alle Prueffaelle bestanden.
 ```
 
-`labs/src/lab08_dense.c` prüft nur das Dense- und Quantisierungsbeispiel auf dem Host.
-:::
-
-### Aufgabe 2.3: System-Auswirkungen in Renode
-
-Sie führen das Programm in Renode auf einem RISC-V-SoC *ohne* NPU/RVV aus.
-
-1. Was beobachten Sie bezüglich der Ausführungszeit von `Invoke()`?
-2. Warum unterstreicht das die Notwendigkeit domänenspezifischer Architekturen am Edge?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-*(Notieren Sie Ihre Lösung hier.)*
-:::
+1. Lesen Sie zuerst die Verträge der beiden Hilfsfunktionen.
+   Warum wird vor dem schmalen Cast begrenzt beziehungsweise der Bereich geprüft?
+2. Vergleichen Sie die zurückgerechneten Werte mit Ihren Papierlösungen.
+3. Prüfen Sie optional mit `-fsanitize=address,undefined`, `-O1` und `-g`.
+   Welche Fehlerarten kann dieser Lauf prüfen, und welche Systemaussagen fehlen weiterhin?
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 2.3**
+**Hinweise zur optionalen Aufgabe**
 
-1. Ohne ein im Repository vorhandenes Modell und ohne validiertes Timingmodell gibt es keine gemessene Invoke-Zeit. Eine funktionale Emulation wäre kein Beweis für die Memory Wall oder eine NPU.
-2. Ob ein Beschleuniger nötig ist, hängt von Datentyp, Auslastung und Transferkosten ab. Eine NPU entsteht nicht dadurch, dass der Chip eine besitzt.
+`dense_2x3` rechnet eine feste Zwei-mal-drei-Schicht mit Int8-Operanden,
+Int32-Bias und Nullpunkten null. Sie akkumuliert in Int64 und prüft vor
+Int32-Ausgabe, ob alle Ergebnisse passen. Ausgaben bleiben bei Fehler unverändert.
+Das ist kein vollständiger quantisierter Netzwerkoperator.
+
+`quantize_i8` verlangt endlichen realen Wert, endliche positive Skala,
+Int8-Nullpunkt und einen gültigen Ausgabepointer. Sie rundet nach der Lehrregel
+und begrenzt vor dem Integercast. Auch ein durch Division entstandener
+unendlicher Zwischenwert wird am Bereichsrand begrenzt.
+
+Ein Sanitizer prüft im durchlaufenen Programm unter anderem ungültige
+Speicherzugriffe und undefinierte Integeroperationen. Er beweist weder
+Modellgüte noch NPU-Geschwindigkeit oder RISC-V-Zykluszahlen.
+RISC-V GCC wäre eine eigene Zielübersetzung; Renode bräuchte passende
+Firmware, Plattform und für Zeitangaben ein validiertes Zeitmodell.
 :::

@@ -1,18 +1,38 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360">
-<rect width="1200" height="360" fill="#fff"/>
-<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>
-<text x="16" y="22" font-size="16" font-weight="600" fill="#1D1D1F" text-anchor="start">Dieselbe 2x2-Matmul. Lokaler Speicher fasst A und B, 8 Elemente.</text>
-<rect x="16" y="48" width="520" height="140" fill="#fff" stroke="#1565C0" stroke-width="1.4"/>
-<text x="28" y="74" font-size="15" font-weight="600" fill="#1565C0" text-anchor="start">Naiv, kein Halten</text>
-<text x="28" y="102" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">8 Produkte, jedes A und B neu</text>
-<text x="28" y="128" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">16 Float32-Loads = 64 Byte</text>
-<rect x="580" y="48" width="560" height="140" fill="#fff" stroke="#1B5E20" stroke-width="1.4"/>
-<text x="592" y="74" font-size="15" font-weight="600" fill="#1B5E20" text-anchor="start">Ein Tile, alles lokal</text>
-<text x="592" y="102" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">A und B einmal laden: 8 Floats</text>
-<text x="592" y="128" font-size="14" font-weight="600" fill="#1D1D1F" text-anchor="start">32 Byte extern, Produkte aus dem Tile</text>
-<text x="16" y="220" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Gewichte, Aktivierungen und Teilsummen getrennt zaehlen.</text>
-<text x="16" y="248" font-size="15" font-weight="600" fill="#B71C1C" text-anchor="start">Zwischenaktivierungen koennen mehr Speicher brauchen als die Gewichte.</text>
-<text x="16" y="276" font-size="15" font-weight="600" fill="#1D1D1F" text-anchor="start">Systolische Weitergabe hilft lokal. Den externen Verkehr beseitigt sie nicht.</text>
-<text x="16" y="310" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">Annahme: Element bleibt im Tile, kein Write-Allocate, Output-Bytes zunaechst getrennt.</text>
-<text x="16" y="338" font-size="13" font-weight="400" fill="#5F6368" text-anchor="start">CPU und GPU koennen dasselbe Blocking. Das Array ist eine Hardwareform davon.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="362" viewBox="0 0 1000 362" role="img" aria-labelledby="title">
+<title id="title">Dieselbe Matrixmultiplikation mit lokaler Wiederverwendung</title>
+<style>text{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:400}</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6" fill="#1D1D1F"/></marker></defs>
+<rect width="1000" height="362" fill="#FFFFFF"/>
+<text x="20" y="30" font-size="24" fill="#1D1D1F" text-anchor="start">A und B werden wiederverwendet · jedes Element belegt hier 4 Byte</text>
+<text x="142" y="72" font-size="24" fill="#1D1D1F" text-anchor="middle">A</text>
+<rect x="70" y="90" width="68" height="68" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="104.0" y="133" font-size="27" fill="#1D1D1F" text-anchor="middle">1</text>
+<rect x="142" y="90" width="68" height="68" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="176.0" y="133" font-size="27" fill="#1D1D1F" text-anchor="middle">2</text>
+<rect x="70" y="162" width="68" height="68" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="104.0" y="205" font-size="27" fill="#1D1D1F" text-anchor="middle">3</text>
+<rect x="142" y="162" width="68" height="68" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="176.0" y="205" font-size="27" fill="#1D1D1F" text-anchor="middle">4</text>
+<text x="462" y="72" font-size="24" fill="#1D1D1F" text-anchor="middle">B</text>
+<rect x="390" y="90" width="68" height="68" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="424.0" y="133" font-size="27" fill="#1D1D1F" text-anchor="middle">5</text>
+<rect x="462" y="90" width="68" height="68" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="496.0" y="133" font-size="27" fill="#1D1D1F" text-anchor="middle">6</text>
+<rect x="390" y="162" width="68" height="68" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="424.0" y="205" font-size="27" fill="#1D1D1F" text-anchor="middle">7</text>
+<rect x="462" y="162" width="68" height="68" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="496.0" y="205" font-size="27" fill="#1D1D1F" text-anchor="middle">8</text>
+<text x="812" y="72" font-size="24" fill="#1D1D1F" text-anchor="middle">C = AB</text>
+<rect x="740" y="90" width="68" height="68" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="774.0" y="133" font-size="27" fill="#1D1D1F" text-anchor="middle">19</text>
+<rect x="812" y="90" width="68" height="68" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="846.0" y="133" font-size="27" fill="#1D1D1F" text-anchor="middle">22</text>
+<rect x="740" y="162" width="68" height="68" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="774.0" y="205" font-size="27" fill="#1D1D1F" text-anchor="middle">43</text>
+<rect x="812" y="162" width="68" height="68" rx="8" fill="#F5F5F7" stroke="#E5E5EA"/>
+<text x="846.0" y="205" font-size="27" fill="#1D1D1F" text-anchor="middle">50</text>
+<text x="305" y="177" font-size="32" fill="#1D1D1F" text-anchor="middle">×</text>
+<text x="650" y="177" font-size="32" fill="#1D1D1F" text-anchor="middle">=</text>
+<text x="500" y="290" font-size="24" fill="#1D1D1F" text-anchor="middle">8 MACs = 16 Ops · Eingangsverkehr: naiv 64 B, lokal gehalten 32 B</text>
+<text x="500" y="332" font-size="23" fill="#1D1D1F" text-anchor="middle">Ein A-Wert dient zwei Spalten · ein B-Wert dient zwei Zeilen</text>
 </svg>

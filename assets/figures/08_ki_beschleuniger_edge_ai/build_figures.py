@@ -1,344 +1,398 @@
 #!/usr/bin/env python3
-"""Lehrfiguren VL08. Roofline, TOPS und Arraytakte sind ein Modell, keine Messung."""
+"""Reproduzierbare Lehrdiagramme für VL08; keine Messdaten oder Schaltpläne.
+
+Python-Standardbibliothek für SVG. Optional: Playwright und Chromium für PNG.
+Aufruf: python3 build_figures.py --png [--chromium /usr/bin/chromium]
+"""
+import argparse
+import math
+from html import escape
 from pathlib import Path
 
 OUT = Path(__file__).resolve().parent
-INK, MUTED = "#1D1D1F", "#5F6368"
-W, ACT, ACC, MEM = "#E65100", "#1565C0", "#1B5E20", "#6A1B9A"
-ERR = "#B71C1C"
-
-A = [[1, 2], [3, 4]]
-B = [[5, 6], [7, 8]]
-# C = A @ B
-C = [[19, 22], [43, 50]]
+INK, MUTED, LIGHT, BG, RED = (
+    "#1D1D1F", "#86868B", "#E5E5EA", "#F5F5F7", "#E2001A"
+)
+W = 1000
 
 
-def svg(w, h):
-    return [
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">',
-        f'<rect width="{w}" height="{h}" fill="#fff"/>',
-        "<style>text{font-family:Arial,Helvetica,sans-serif;fill:#1D1D1F}</style>",
+def text(x, y, label, size=24, color=INK, anchor="start"):
+    return (f'<text x="{x}" y="{y}" font-size="{size}" fill="{color}" '
+            f'text-anchor="{anchor}">{escape(str(label))}</text>')
+
+
+def line(x1, y1, x2, y2, color=INK, width=2, dash=False, arrow=False):
+    extra = ' stroke-dasharray="6 5"' if dash else ""
+    extra += ' marker-end="url(#arrow)"' if arrow else ""
+    return (f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" '
+            f'stroke="{color}" stroke-width="{width}"{extra}/>')
+
+
+def path(points, color=RED, width=3):
+    coords = " ".join(f"{x:.3f},{y:.3f}" for x, y in points)
+    return f'<polyline points="{coords}" fill="none" stroke="{color}" stroke-width="{width}"/>'
+
+
+def rect(x, y, w, h, fill=BG, stroke=LIGHT, radius=8):
+    return (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" '
+            f'rx="{radius}" fill="{fill}" stroke="{stroke}"/>')
+
+
+def box(x, y, w, h, labels):
+    result = [rect(x, y, w, h)]
+    for i, label in enumerate(labels):
+        result.append(text(x+w/2, y+h/2+(i-(len(labels)-1)/2)*30+8,
+                           label, 24, anchor="middle"))
+    return result
+
+
+def save(name, title, height, elements):
+    start = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{height}" '
+        f'viewBox="0 0 {W} {height}" role="img" aria-labelledby="title">',
+        f'<title id="title">{escape(title)}</title>',
+        '<style>text{font-family:Inter,Arial,Helvetica,sans-serif;font-weight:400}</style>',
+        '<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" '
+        'orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6" '
+        f'fill="{INK}"/></marker></defs>',
+        f'<rect width="{W}" height="{height}" fill="#FFFFFF"/>',
     ]
-
-
-def T(x, y, s, size=15, fill=INK, weight="600", anchor="start"):
-    s = str(s).replace("&", "&amp;").replace("<", "&lt;")
-    return (
-        f'<text x="{x}" y="{y}" font-size="{size}" font-weight="{weight}" '
-        f'fill="{fill}" text-anchor="{anchor}">{s}</text>'
+    (OUT/f"{name}.svg").write_text(
+        "\n".join(start+elements+["</svg>"])+"\n", encoding="utf-8"
     )
 
 
-def R(x, y, w, h, stroke=INK, fill="#fff"):
-    return (
-        f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{fill}" '
-        f'stroke="{stroke}" stroke-width="1.4"/>'
-    )
+def axis(x0, x1, y, marks, label):
+    result = [line(x0, y, x1, y, MUTED), text(x1, y+60, label, 22, anchor="end")]
+    for x, value in marks:
+        result += [line(x, y-5, x, y+5, MUTED), text(x, y+29, value, 22, anchor="middle")]
+    return result
 
 
-def L(x1, y1, x2, y2, stroke=INK, sw=1.6, dash=None):
-    d = f' stroke-dasharray="{dash}"' if dash else ""
-    return (
-        f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{stroke}" '
-        f'stroke-width="{sw}"{d}/>'
-    )
+def digital(intervals, x0, scale, high, low, color=RED):
+    """(start, end, is_high), contiguous half-open intervals."""
+    points = []
+    last_y = None
+    for start, end, active in intervals:
+        y = high if active else low
+        x = x0+scale*start
+        if last_y is not None and y != last_y:
+            points.append((x, last_y))
+        points.extend([(x, y), (x0+scale*end, y)])
+        last_y = y
+    return path(points, color)
 
 
-def save(name, p):
-    (OUT / name).write_text("\n".join(p) + "\n</svg>\n", encoding="utf-8")
-    print(name)
+def marked_box(x, y, w, h, labels):
+    result = box(x, y, w, h, labels)
+    result[0] = rect(x, y, w, h, BG, RED)
+    return result
 
 
-def fig_a():
-    p = svg(1200, 360)
-    p.append(T(16, 22, "Lokale und Cloud-Inferenz. Keine Aussage, Funk sei immer teurer.", 16))
-    for x, title, lines, col in (
-        (16, "Lokal", ["Sensor", "Vorverarbeitung", "Inferenz", "Ergebnis"], ACT),
-        (620, "Cloud", ["Sensor", "Funk", "Server-Inferenz", "Antwort"], W),
-    ):
-        p.append(R(x, 48, 520, 150, col))
-        p.append(T(x + 16, 74, title, 16, col))
-        for i, line in enumerate(lines):
-            p.append(T(x + 16 + i * 120, 120, line, 14))
-    p.append(T(16, 230, "Anforderungen: Latenz, Energie, Datenschutz, Verfuegbarkeit. Jede kann ausfallen.", 15))
-    p.append(T(16, 258, "Edge umfasst auch Gateways. Nicht jede lokale Inferenz braucht eine NPU.", 15))
-    p.append(T(16, 286, "Lokal bleiben heisst nicht automatisch datenschutzkonform oder sicher.", 15, ERR))
-    p.append(T(16, 320, "OoO kann Load-Latenzen und mehrere Akkumulatoren nutzen. Eine einzelne Kette bleibt RAW.", 14, MUTED, "400"))
-    p.append(T(16, 346, "-O3 garantiert weder Unrolling noch kuerzere Laufzeit.", 14, MUTED, "400"))
-    save("edge.svg", p)
+def cycle_grid(name, title, rows, cycles, events, caption):
+    x0, bw, bh, top = 175, 800/cycles, 44, 92
+    p = [text(20, 30, title)]
+    for c in range(1, cycles+1):
+        p += [text(x0+(c-.5)*bw, 72, c, 22, anchor="middle")]
+    for r, label in enumerate(rows):
+        y = top+r*bh
+        p += [text(20, y+29, label, 23)]
+        for c in range(1, cycles+1):
+            p += [rect(x0+(c-1)*bw, y, bw-3, bh-4, "#FFFFFF", LIGHT, 0)]
+    for row, cycle, label, final in events:
+        x=x0+(cycle-1)*bw; y=top+row*bh
+        p += [rect(x+2, y+2, bw-7, bh-8, BG, RED if final else LIGHT, 5),
+              text(x+(bw-3)/2, y+28, label, 22, anchor="middle")]
+    bottom=top+len(rows)*bh
+    p += [text(980, bottom+35, "Takt →", 22, anchor="end"),
+          text(500, bottom+76, caption, 23, anchor="middle")]
+    save(name, title, bottom+105, p)
 
 
-def fig_b():
-    p = svg(1200, 420)
-    p.append(T(16, 22, "Dense y = Wx+b. W ist 2x3, x hat 3, b und y haben 2. Integer-Analogie, kein Float-mul.", 15))
-    p.append(T(16, 48, "W = [[1,2,3],[0,-1,4]], x = [2,1,3], b = [1,-2]", 16, W))
-    p.append(T(16, 78, "y0 = 1*2 + 2*1 + 3*3 + 1 = 14", 16, ACT))
-    p.append(T(16, 104, "y1 = 0*2 + (-1)*1 + 4*3 + (-2) = 9", 16, ACT))
-    p.append(T(16, 140, "Parameter 6+2 = 8. MACs nur die Produkte: 6. Nicht allgemein Parameter = MACs.", 15, ERR))
-    p.append(T(16, 168, "1 MAC = 2 arithmetische Ops in dieser TOPS-Konvention. Bias-Add ist extra.", 15))
-    rows = [("Parameter", "8"), ("MACs", "6"), ("Arithmetik", "14"), ("Int8-Bytes Daten", "11")]
-    for i, (a, b) in enumerate(rows):
-        p.append(R(16 + i * 280, 190, 250, 50, MEM))
-        p.append(T(28 + i * 280, 212, a, 13, MEM))
-        p.append(T(28 + i * 280, 230, b, 16))
-    p.append(T(16, 270, "14 = 6*2 + 2 Bias-Additionen. Schleife und Pointer zaehlen hier nicht mit.", 14))
-    p.append(T(16, 298, "RV32IM mul/add sind Ganzzahl. Eine Float32-MAC waere eine andere ISA.", 15, ERR))
-    p.append(T(16, 326, "FMA rundet einmal. Getrennte Mul und Add runden zweimal.", 14))
-    p.append(T(16, 354, "Convolution: ein Gewicht wird mehrfach benutzt. Dann sind MACs groesser als die Parameterzahl.", 14, MUTED, "400"))
-    p.append(T(16, 386, "10^6 Gewichte sind nur unter der Annahme ein Gewicht pro MAC auch 10^6 MACs.", 14, MUTED, "400"))
-    save("dense.svg", p)
+
+def matrix(x, y, values, label, cell=72):
+    p = [text(x+cell, y-18, label, 24, anchor="middle")]
+    for i,row in enumerate(values):
+        for j,value in enumerate(row):
+            p += [rect(x+j*cell,y+i*cell,cell-4,cell-4),
+                  text(x+j*cell+(cell-4)/2,y+i*cell+43,value,27,anchor="middle")]
+    return p
 
 
-def fig_c():
-    p = svg(1200, 400)
-    p.append(T(16, 20, "Lehr-Roofline, keine Chipmessung. Grenze: DRAM zu On-Chip. Peak 8 Ops/Takt, Band 8 Byte/Takt.", 14))
-    p.append(T(16, 44, "Knick bei Peak/Bandbreite = 1 Op/Byte.", 16, MEM))
-    # axes
-    p.append(T(80, 250, "0,25", 13, ACT))
-    p.append(R(140, 200, 80, 40, ACT, "#E3F2FD"))
-    p.append(T(150, 224, "naiv", 13, ACT))
-    p.append(T(280, 180, "0,5", 13, ACC))
-    p.append(R(330, 160, 80, 40, ACC, "#E8F5E9"))
-    p.append(T(338, 184, "Reuse", 13, ACC))
-    p.append(L(80, 250, 520, 80, ACT, 3))
-    p.append(L(520, 80, 1100, 80, ERR, 3))
-    p.append(T(80, 270, "Bandbreite", 12, ACT))
-    p.append(T(700, 72, "Peak 8 Ops/Takt", 12, ERR))
-    p.append(T(16, 280, "Naiv: 2 Ops / 8 Byte = 0,25. Erreichbar min(8, 8*0,25) = 2 Ops/Takt.", 15))
-    p.append(T(16, 308, "2x2 ohne Wiederverwendung: 64 Byte, untere Schranke 8 Takte bei 8 Byte/Takt.", 15))
-    p.append(T(16, 336, "Mit lokalem Tile: 32 Byte, Schranke 4 Takte. Rechnung min(Peak, Band*AI).", 15, ACC))
-    p.append(T(16, 368, "Nicht jeder Zugriff ist ein DRAM-Miss. SRAM, Cache-Hit und Prefetch sind andere Faelle.", 14, MUTED, "400"))
-    save("roofline.svg", p)
+def figures():
+    p = [text(20,30,"Edge: Verarbeitung am Gerät oder lokalen Gateway")]
+    for x,labels in [(20,["Sensor"]),(210,["Endgerät","CPU / DSP"]),
+                     (465,["Gateway","lokal"]),(750,["Server","entfernt"])]:
+        p += box(x,100,150 if x==20 else 220,100,labels)
+    for x1,x2,c in [(170,205,RED),(430,460,RED),(685,745,MUTED)]:
+        p += [line(x1,150,x2,150,c,2,arrow=True)]
+    p += [text(320,245,"kurzer lokaler Weg",23,anchor="middle"),
+          text(825,245,"Netzübertragung",23,anchor="middle"),
+          text(500,295,"Ort allein bestimmt weder Energie noch Modellgüte",24,anchor="middle")]
+    save("edge","Lokale und entfernte Verarbeitungsorte",325,p)
 
+    p=[text(20,30,"Tensorform: Elemente und Parameter getrennt betrachten")]
+    for x,labels in [(20,["x: 3 Eingänge","[2, 1, 3]"]),(270,["W: 2 × 3 Gewichte","b: 2 Biaswerte"]),
+                     (650,["y: 2 Ausgänge","[14, 9]"])]:
+        p += box(x,100,210 if x==20 else 300,105,labels)
+    p += [line(230,152,265,152,arrow=True),line(570,152,645,152,RED,3,arrow=True),
+          text(500,265,"6 Gewichte + 2 Bias = 8 Parameter · x und y sind Aktivierungen",24,anchor="middle")]
+    save("tensors","Formen des Dense-Lehrbeispiels",298,p)
 
-def fig_d():
-    p = svg(1200, 360)
-    p.append(T(16, 22, "Dieselbe 2x2-Matmul. Lokaler Speicher fasst A und B, 8 Elemente.", 16))
-    p.append(R(16, 48, 520, 140, ACT))
-    p.append(T(28, 74, "Naiv, kein Halten", 15, ACT))
-    p.append(T(28, 102, "8 Produkte, jedes A und B neu", 14))
-    p.append(T(28, 128, "16 Float32-Loads = 64 Byte", 14))
-    p.append(R(580, 48, 560, 140, ACC))
-    p.append(T(592, 74, "Ein Tile, alles lokal", 15, ACC))
-    p.append(T(592, 102, "A und B einmal laden: 8 Floats", 14))
-    p.append(T(592, 128, "32 Byte extern, Produkte aus dem Tile", 14))
-    p.append(T(16, 220, "Gewichte, Aktivierungen und Teilsummen getrennt zaehlen.", 15))
-    p.append(T(16, 248, "Zwischenaktivierungen koennen mehr Speicher brauchen als die Gewichte.", 15, ERR))
-    p.append(T(16, 276, "Systolische Weitergabe hilft lokal. Den externen Verkehr beseitigt sie nicht.", 15))
-    p.append(T(16, 310, "Annahme: Element bleibt im Tile, kein Write-Allocate, Output-Bytes zunaechst getrennt.", 13, MUTED, "400"))
-    p.append(T(16, 338, "CPU und GPU koennen dasselbe Blocking. Das Array ist eine Hardwareform davon.", 13, MUTED, "400"))
-    save("tile.svg", p)
+    p=[text(20,30,"Dense · drei Produkte je Ausgang · Bias einmal hinzufügen")]
+    for y,terms,result in [(100,["1 · 2 = 2","2 · 1 = 2","3 · 3 = 9"],14),
+                           (225,["0 · 2 = 0","−1 · 1 = −1","4 · 3 = 12"],9)]:
+        for i,label in enumerate(terms):p += box(20+i*210,y,190,60,[label])
+        p += [line(640,y+30,690,y+30,arrow=True)]
+        p += marked_box(700,y-10,275,80,["Bias +1" if result==14 else "Bias −2",f"Ausgang {result}"])
+    p += [text(500,345,"6 produktbezogene MACs · 8 Parameter · Ausgabe [14, 9]",24,anchor="middle")]
+    save("dense","Zwei vollständige Produktsummen mit Bias",375,p)
 
+    p=[text(20,30,"Modell R · Peak 8 Operationen/Takt · Bandbreite 8 Byte/Takt")]
+    x=lambda i:130+360*i
+    y=lambda v:290-28*v
+    p += [line(130,40,130,290,MUTED),line(130,290,910,290,MUTED),
+          text(20,365,"Ops/Takt",22),text(900,365,"Intensität I [Ops/Byte]",22,anchor="end")]
+    for v in [0,2,4,6,8]:p += [text(112,y(v)+8,v,21,anchor="end"),line(127,y(v),910,y(v),LIGHT)]
+    for v in [0,.25,.5,1,2]:p += [text(x(v),320,str(v).replace('.',','),21,anchor="middle")]
+    p += [path([(x(0),y(0)),(x(1),y(8)),(x(2),y(8))]),
+          text(790,105,"Rechenlimit 8",23,anchor="middle")]
+    for i,v in [(.25,2),(.5,4)]:
+        p += [f'<circle cx="{x(i)}" cy="{y(v)}" r="6" fill="{INK}"/>',
+              text(x(i)+15,y(v)+25,f"{i} → {v}".replace('.',','),22)]
+    p += [text(x(1)+10,55,"Knick I = 1",22)]
+    save("roofline","Ideale Obergrenze durch Versorgung und Rechenpeak",390,p)
 
-def fig_e():
-    p = svg(1200, 360)
-    p.append(T(16, 22, "Packed Add ist kein Int8-Dot-Product. Lanes haben getrennte Uebertraege.", 16))
-    lanes = [("0x01", "0x02", "0x03"), ("0x7F", "0x01", "sat?")]
-    p.append(T(16, 60, "Lane", 14, MUTED, "400"))
-    for i, (a, b, s) in enumerate([("01", "02", "03"), ("10", "20", "30"), ("7F", "01", "80/sat"), ("FF", "01", "00/sat")]):
-        p.append(R(80 + i * 250, 44, 220, 70, ACT))
-        p.append(T(92 + i * 250, 70, f"{a} + {b}", 16, ACT))
-        p.append(T(92 + i * 250, 96, f"Ergebnis {s}", 14))
-    p.append(T(16, 150, "Int8-MAC: Produkt, dann breiter Akkumulator. Signed/Unsigned und Saettigung festlegen.", 15, W))
-    p.append(T(16, 178, "Beispiel: 20 * 20 passt nicht in int8. Akkumulator hier int32.", 15))
-    p.append(T(16, 214, "Ein neuer MAC je Takt ist ein Initiationsintervall, nicht die Ergebnis-Latenz.", 15, ERR))
-    p.append(T(16, 246, "Zwei Speicherbusse helfen nur ohne Bankkonflikt.", 15))
-    p.append(T(16, 274, "Zero-Overhead-Loop entfernt den Schleifenzweig, nicht jeden Daten-Stall.", 15))
-    p.append(T(16, 310, "SIMD, RVV und NPU sind kombinierbar, keine Pflicht-Reihenfolge.", 14, MUTED, "400"))
-    p.append(T(16, 338, "Die letzten beiden Lanes zeigen Wrap ohne Saettigung beziehungsweise den Saettigungsfall als Alternative.", 13, MUTED, "400"))
-    save("simd.svg", p)
+    p=[text(20,30,"A und B werden wiederverwendet · jedes Element belegt hier 4 Byte")]
+    p += matrix(70,90,[[1,2],[3,4]],"A")+matrix(390,90,[[5,6],[7,8]],"B")
+    p += matrix(740,90,[[19,22],[43,50]],"C = AB")
+    p += [text(305,177,"×",32,anchor="middle"),text(650,177,"=",32,anchor="middle"),
+          text(500,290,"8 MACs = 16 Ops · Eingangsverkehr: naiv 64 B, lokal gehalten 32 B",24,anchor="middle"),
+          text(500,332,"Ein A-Wert dient zwei Spalten · ein B-Wert dient zwei Zeilen",23,anchor="middle")]
+    save("tile","Dieselbe Matrixmultiplikation mit lokaler Wiederverwendung",362,p)
 
+    p=[text(20,30,"Wertabhängigkeit und gleiche Arbeit auf getrennten Daten")]
+    p += [text(20,106,"eine Summe",23)]
+    for i,v in enumerate([0,2,4,13]):
+        x=260+i*180;p += box(x,65,125,65,[v])
+        if i<3:p += [line(x+125,97,x+175,97,RED,3,arrow=True)]
+    p += [text(20,210,"zwei Ausgänge",23)]
+    p += box(270,160,300,70,["Summe y0: 14"])+box(635,160,300,70,["Summe y1: 9"])
+    p += [text(20,314,"viele Produkte",23)]
+    for i,label in enumerate(["1 · 2","2 · 1","3 · 3","0 · 2"]):p += box(260+i*180,265,150,65,[label])
+    p += [text(500,380,"Getrennte Summen sind unabhängig · Produkte bieten Datenparallelität",23,anchor="middle")]
+    save("ilp","Summenabhängigkeit und unabhängige Datenarbeit",410,p)
 
-def fig_f():
-    p = svg(1200, 420)
-    p.append(T(16, 20, "LMUL=1, e32. VLMAX = VLEN/SEW. VLEN ist nicht die Lane-Zahl.", 16))
-    p.append(R(16, 48, 540, 90, ACT))
-    p.append(T(28, 74, "VLEN 128 Bit, VLMAX 4", 16, ACT))
-    p.append(T(28, 100, "1000 Elemente: 250 mal VL=4, Rest 0", 14))
-    p.append(R(600, 48, 560, 90, W))
-    p.append(T(612, 74, "VLEN 1024 Bit, VLMAX 32", 16, W))
-    p.append(T(612, 100, "Eine Policy: 30 mal 32, dann 32+8", 14))
-    p.append(T(16, 170, "31*32+8 = 1000. Zusammen 32 Schleifen, nicht 31.", 16, ERR))
-    p.append(T(16, 202, "vsetvli liefert nicht immer min(AVL, VLMAX), wenn AVL zwischen VLMAX und 2*VLMAX liegt.", 15))
-    p.append(T(16, 234, "Ist der Rest 8 und VLMAX 32, ist VL genau 8, nicht frei gewaehlt.", 14))
-    p.append(T(16, 270, "Eine physische Lane-Gruppe kann VLMAX Elemente ueber mehrere Takte rechnen.", 15, MEM))
-    p.append(T(16, 302, "Ein Binary braucht passende ISA, Erweiterung, ABI und einen RVV-Kern.", 15))
-    p.append(T(16, 334, "Pointer += VL * 4 Byte. Zaehler -= VL. Ende bei AVL 0.", 15, ACC))
-    p.append(T(16, 370, "Policy im Beispiel: ta, ma, m1. Spezifikation RVV 1.0.", 14, MUTED, "400"))
-    p.append(T(16, 398, "Keine Toolchain in diesem Repository hat die Schleife assembliert.", 13, MUTED, "400"))
-    save("rvv.svg", p)
+    p=[text(20,30,"Packed SIMD · unsigned 8-Bit-Addition modulo 256 · ohne Carry zwischen Lanes")]
+    vals=[[1,16,127,255],[2,32,1,1],[3,48,128,0]]
+    for r,label in enumerate(["A","B","A + B"]):
+        p += [text(45,110+r*75,label,24)]
+        for j,v in enumerate(vals[r]):
+            p += [rect(230+j*170,70+r*75,164,60, BG,RED if r==2 else LIGHT),
+                  text(312+j*170,109+r*75,f"{v:02X}",27,anchor="middle")]
+    p += [text(500,335,"Hexwerte · FF + 01 wird 00 in dieser Lane · kein Übertrag zum Nachbarfeld",23,anchor="middle")]
+    save("simd","Vier getrennte Byte-Additionen mit definiertem Überlauf",365,p)
 
+    p=[text(20,30,"Int8-Eingaben bedeuten nicht Int8-Produkte oder Int8-Summen")]
+    p += box(20,95,180,80,["20","8-Bit-Eingabe"])+box(260,95,180,80,["20","8-Bit-Gewicht"])
+    p += [text(230,146,"×",28,anchor="middle"),line(440,135,505,135,arrow=True)]
+    p += marked_box(520,90,180,90,["400","Produkt"])
+    p += [line(700,135,775,135,arrow=True)]
+    p += marked_box(790,90,190,90,["1200","3 Produkte"])
+    p += [text(500,255,"Vor der Rechnung verbreitern · anschließend Ergebnisbereich prüfen",24,anchor="middle")]
+    save("wide","Breite des Produkts und Akkumulators",285,p)
 
-def fig_g():
-    p = svg(1200, 430)
-    x0, cw = 230, 100
-    p.append(T(16, 22, "Gleiche Achse Takte 1-9. Mul-Latenz 2, Add-Latenz 1, II 1. Keine RVV-Messung.", 14))
-    for c in range(1, 10):
-        x = x0 + (c - 1) * cw
-        p.append(T(x + cw / 2, 52, str(c), 13, MUTED, "600", "middle"))
-        p.append(L(x, 60, x, 330, MUTED, 0.6, "3 4"))
-    p.append(L(x0 + 9 * cw, 60, x0 + 9 * cw, 330, MUTED, 0.6, "3 4"))
+    p=[text(20,30,"DSP-Lehrbild · FIR: zwei Koeffizienten und ein Eingangsfenster")]
+    p += box(30,75,260,85,["Koeffizienten","1, 2"])+box(30,210,260,85,["Fensterwerte","3, 4"])
+    p += [line(290,117,445,117,arrow=True),line(290,252,445,252,arrow=True)]
+    p += box(460,100,270,175,["MAC","1 · 3 + 2 · 4","Akkumulator 11"])
+    p += [text(500,350,"Getrennte Pfade helfen nur bei passenden Speicherbänken und Ports",23,anchor="middle")]
+    save("dsp","Zwei lokale Operandenpfade für eine gewichtete Summe",380,p)
 
-    def bar(row_y, start, span, label, color):
-        x = x0 + (start - 1) * cw + 6
-        p.append(R(x, row_y, span * cw - 12, 28, color))
-        p.append(T(x + 8, row_y + 19, label, 12))
+    events=[(i,i+j+1,str(j+1),j==2) for i in range(4) for j in range(3)]
+    cycle_grid("pipeline","Unabhängige Starts · Latenz 3 · Startabstand 1",
+               ["Op 1","Op 2","Op 3","Op 4"],6,events,
+               "Ergebnisse Ende 3, 4, 5, 6 · Taktzahl ist eine Lehrannahme")
 
-    p.append(T(16, 92, "Ohne, Mul", 13, ACT))
-    p.append(T(16, 142, "Ohne, Add", 13, ACC))
+    p=[text(20,30,"32 Vektorregister v0–v31 · ein Register hat hier VLEN = 128 Bit")]
     for i in range(4):
-        bar(74, i + 1, 2, f"e{i}", ACT)
-        bar(124, i + 6, 1, f"e{i}", ACC)
-    p.append(T(16, 214, "Mit, Mul", 13, ACT))
-    p.append(T(16, 264, "Mit, Add", 13, W))
+        p += [rect(80+i*215,100,210,90,BG,RED if i<3 else LIGHT),
+              text(185+i*215,155,f"Element {i}" if i<3 else "Tail",25,anchor="middle"),
+              text(185+i*215,224,"32 Bit",23,anchor="middle")]
+    p += [text(500,280,"LMUL = 1 · SEW = 32 Bit · VLMAX = 4 Elemente · VL = 3 Elemente",24,anchor="middle")]
+    save("rvv","Vektorkapazität und drei aktive Elementplätze",310,p)
+
+    p=[text(20,30,"AVL = 40 · VLMAX = 32 · erste VL muss zwischen 20 und 32 liegen")]
+    for y,lengths in [(95,[32,8]),(210,[20,20])]:
+        x=120
+        for length in lengths:
+            p += [rect(x,y,length*20-5,65,BG,RED if x==120 else LIGHT),
+                  text(x+length*10-2,y+42,length,28,anchor="middle")]
+            x += length*20
+    p += [text(500,325,"Zulässig: 32 + 8 oder 20 + 20 · unzulässig: zuerst 16",24,anchor="middle")]
+    save("strip","Zwei gültige Aufteilungen desselben Vektorrestes",355,p)
+
+    p=[text(20,30,"VL = 4 aktive Elemente · reine Modellrechnung ohne Load/Store")]
+    p += [text(20,110,"1 Lane",24),text(20,245,"2 Lanes",24)]
     for i in range(4):
-        bar(196, i + 1, 2, f"e{i}", ACT)
-        bar(246, i + 3, 1, f"e{i}", W)
-    # e0: Mul endet Ende Takt 2, Add mit Chaining startet Takt 3
-    xfwd = x0 + 2 * cw
-    p.append(L(xfwd, 102, xfwd, 246, ERR, 1.8))
-    p.append(T(xfwd + 6, 180, "e0 weiter", 12, ERR))
-    p.append(T(16, 370, "Ohne Chaining letztes Ergebnis Ende Takt 9. Mit Chaining erstes Ende Takt 3, letztes Ende Takt 6.", 14))
-    p.append(T(16, 398, "Vier Mul und vier Add bleiben. RVV garantiert das nicht. Zwei Instruktionen sind keine FMA.", 14, ERR))
-    save("chain.svg", p)
+        p += box(220+i*185,75,150,60,[f"Element {i}"])
+        p += [text(295+i*185,174,f"Schritt {i+1}",23,anchor="middle")]
+    for i in range(4):
+        x=260+(i//2)*350;y=200+(i%2)*70
+        p += box(x,y,250,60,[f"Element {i}"])
+    p += [text(385,377,"Schritt 1",23,anchor="middle"),text(735,377,"Schritt 2",23,anchor="middle")]
+    save("lanes","Gleiche Vektorwirkung mit unterschiedlicher Rechenbreite",410,p)
 
+    events=[]
+    for i in range(4):
+        events += [(0,i+2,f"p{i}",False),(1,i+3,f"y{i}",True),(2,i+6,f"y{i}",True)]
+    cycle_grid("chain","Multiplikation: Latenz 2 · Addition: Latenz 1 · Startabstand jeweils 1",
+               ["Produkt fertig","Add direkt","Add warten"],9,events,
+               "Direkte Weitergabe endet in 6 · Warten auf alle Produkte endet in 9")
 
-def systolic():
-    """Return per clock list of (i,j,k,prod,acc). clocks 1..4."""
-    acc = [[0, 0], [0, 0]]
-    out = []
-    for t in range(4):
-        step = []
+    p=[text(20,30,"Output-Stationary · lokale Summe bleibt während des Tiles")]
+    p += marked_box(360,125,280,125,["C hält die Summe","C neu: C + A · B"])
+    p += [text(70,198,"A von links",24),line(230,185,350,185,arrow=True),
+          text(500,82,"B von oben",24,anchor="middle"),line(500,92,500,115,arrow=True),
+          line(650,185,750,185,arrow=True),text(790,194,"A weiter",24),
+          line(500,258,500,300,arrow=True),text(500,337,"B weiter",24,anchor="middle"),
+          text(500,393,"Nur gültige Paare rechnen · unveränderte Operanden gehen zum Nachbarn",23,anchor="middle")]
+    save("cell","Lokale Akkumulation und gerichtete Nachbarweitergabe",422,p)
+
+    p=[text(20,30,"2 × 2 Output-Stationary · A rechts · B unten · C bleibt lokal")]
+    for i in range(2):
+        for j in range(2):p += box(330+j*300,95+i*150,180,100,[f"C{i}{j}","Startwert 0"])
+    for i in range(2):p += [text(30,158+i*150,f"A{i}: " + ["1, 2", "3, 4"][i],24),line(200,145+i*150,320,145+i*150,arrow=True),line(515,145+i*150,620,145+i*150,arrow=True)]
+    for j in range(2):p += [text(420+j*300,70,f"B{j}: " + ["5, 7", "6, 8"][j],24,anchor="middle"),line(420+j*300,77,420+j*300,87,arrow=True),line(420+j*300,200,420+j*300,235,arrow=True)]
+    save("array","Vier Ausgabesummen in Nachbarzellen",380,p)
+
+    rows=["A Zeile 0","A Zeile 1","B Spalte 0","B Spalte 1"]
+    events=[]
+    for row,vals,offset in [(0,[1,2],0),(1,[3,4],1),(2,[5,7],0),(3,[6,8],1)]:
+        events += [(row,k+1+offset,str(v),bool(offset)) for k,v in enumerate(vals)]
+    cycle_grid("skew","Zeitlich versetzte Randwerte · leer bedeutet ungültig",rows,4,events,
+               "Gleicher Summenindex k trifft in derselben Zelle zusammen")
+
+    p=[text(20,30,"Gültige MAC-Paare · unveränderte Operanden wandern je Takt eine Zelle")]
+    for t in range(1,5):
+        x0=20+(t-1)*245
+        p += [text(x0+108,80,f"Takt {t}",25,anchor="middle")]
+        count=0
         for i in range(2):
             for j in range(2):
-                for k in range(2):
-                    if k + i + j == t:
-                        prod = A[i][k] * B[k][j]
-                        acc[i][j] += prod
-                        step.append((i, j, k, prod, acc[i][j]))
-        out.append(step)
-    return out
+                active=any(t==1+k+i+j for k in range(2));count+=active
+                p += [rect(x0+j*110,110+i*85,100,75,BG,RED if active else LIGHT),
+                      text(x0+j*110+50,155+i*85,f"C{i}{j}",25,anchor="middle")]
+        p += [text(x0+108,325,f"{count} MAC"+("s" if count!=1 else ""),25,anchor="middle")]
+    save("wave","Anlauf und Auslaufen der vier Zellen",365,p)
+
+    p=[text(20,30,"Stationary bezeichnet den lokal bleibenden Wert, nicht das ganze Netz")]
+    p += marked_box(110,110,270,110,["C bleibt lokal","Output-Stationary"])
+    p += marked_box(620,110,270,110,["W bleibt lokal","Weight-Stationary"])
+    for x,label in [(245,"A und B bewegen sich"),(755,"x und Teilsummen bewegen sich")]:
+        p += [line(x,65,x,100,arrow=True),line(x,230,x,270,arrow=True),text(x,312,label,22,anchor="middle")]
+    p += [text(500,375,"Vorladen und Tilewechsel bleiben nötig · verschiedene Ablaufmodelle",24,anchor="middle")]
+    save("stationary","Zwei unterschiedliche lokal gehaltene Datenarten",405,p)
+
+    p=[text(20,30,"Ein isoliertes 2 × 2-Tile · vier interne Takte · keine weitere Arbeit")]
+    for x,n,label in [(90,2,"2 × 2-Array"),(550,4,"4 × 4-Array")]:
+        p += [text(x+130,78,label,25,anchor="middle")]
+        step=260/n
+        for i in range(n):
+            for j in range(n):p += [rect(x+j*step,100+i*step,step-5,step-5,BG,RED if i<2 and j<2 else LIGHT)]
+    p += [text(220,395,"8 / 16 Zell-Takte = 50 %",23,anchor="middle"),
+          text(680,395,"8 / 64 Zell-Takte = 12,5 %",23,anchor="middle"),
+          text(680,430,"Räumlich belegt: 4 / 16 = 25 %",23,anchor="middle")]
+    save("util","Zeitliche Auslastung und räumliche Belegung",458,p)
+
+    p=[text(20,30,"TPU v1 · dokumentierter Rechenpeak · 2 Ops je Int8-MAC")]
+    for x,labels in [(20,["256 × 256","65 536 MACs"]),(355,["700 MHz","45,8752 TMAC/s"]),(700,["× 2 Ops/MAC","91,7504 TOPS"])]:
+        p += box(x,110,280,100,labels)
+    p += [line(300,160,350,160,arrow=True),line(635,160,695,160,RED,3,arrow=True),
+          text(500,280,"Gerundet 92 TOPS · keine Inferenzen/s · keine Wattangabe",24,anchor="middle")]
+    save("tops","Von Einheiten und Taktfrequenz zum gezählten Peak",310,p)
+
+    p=[text(20,30,"Serielle Lehrzeiten in ms · gleiche Eingabe und gleiche Ausgabe")]
+    phases=[([2,10,3,1],["Vor","Dense","Rest","Nach"]),([2,1,1,3,1],["Vor","Kopie","Dense","Rest","Nach"])]
+    for r,(lengths,labels) in enumerate(phases):
+        y=110+r*135;x=180
+        p += [text(20,y+40,"CPU" if r==0 else "NPU",24)]
+        for v,label in zip(lengths,labels):
+            w=v*47
+            p += [rect(x,y,w-3,58,BG,RED if label=="Dense" else LIGHT),
+                  text(x+w/2,y+38,str(v),25,anchor="middle"),
+                  text(x+w/2,y+(119 if r==1 and label=="Dense" else 91),label,21,anchor="middle")]
+            x+=w
+        p += [text(x+8,y+38,"= 16" if r==0 else "= 8",24)]
+    p += [text(500,420,"Dense: Faktor 10 · gesamte Anwendung: Faktor 2",24,anchor="middle")]
+    save("speed","Teilbeschleunigung und vollständiges Zeitbudget",450,p)
+
+    p=[text(20,30,"Modellvorbereitung und Firmwareausführung sind getrennte Phasen")]
+    for x,labels in [(20,["Training","Parameter"]),(355,["Konvertierung",".tflite-Daten"]),(700,["Firmware","Daten + Kernel"])]:p += box(x,95,280,95,labels)
+    p += [line(300,143,350,143,arrow=True),line(635,143,695,143,arrow=True)]
+    for x,labels in [(20,["Sensorfenster","vorbereiten"]),(355,["Operatoren","ausführen"]),(700,["Ausgabe","interpretieren"])]:p += box(x,270,280,95,labels)
+    p += [line(300,317,350,317,arrow=True),line(635,317,695,317,RED,3,arrow=True),line(840,198,840,260,arrow=True)]
+    save("flow","Vom Modell zu wiederholter Inferenz",395,p)
+
+    p=[text(20,30,"Int8-Lehrregel · Skala s = 0,1 · Nullpunkt z = 0")]
+    for y,labels in [(100,["r = 1,24","r/s = 12,4","q = 12","Rückwert 1,2"]),
+                     (240,["r = 20","r/s = 200","q = 127","Rückwert 12,7"])]:
+        for i,label in enumerate(labels):
+            p += box(20+i*245,y,225,60,[label])
+            if i<3:p += [line(245+i*245,y+30,260+i*245,y+30,RED if y==240 and i==1 else INK,2,arrow=True)]
+        p += [text(500,y+103,"Rundungsfehler 0,04" if y==100 else "Begrenzungsfehler 7,3",24,anchor="middle")]
+    save("quant","Rundung und Sättigung sind verschiedene Fehlerarten",382,p)
+
+    p=[text(20,30,"Fiktive Speicherbudgets · KiB = 1024 Byte · Eingabetensor bereits in Arena")]
+    for y,total,vals,labels in [(110,128,[40,24,64],["Firmware 40","Modell 24","frei 64"]),
+                               (285,32,[12,1.5,6,4,8.5],["Arena 12","Quelle 1,5","Stack 6","übrig 4","frei 8,5"])]:
+        p += [text(20,y-25,"Flash 128 KiB" if total==128 else "SRAM 32 KiB",25)]
+        x=20
+        for i,(v,label) in enumerate(zip(vals,labels)):
+            w=960*v/total
+            p += [rect(x,y,w-3,65,BG,RED if (total==128 and i==1) or (total==32 and i==0) else LIGHT),
+                  text(x+w/2,y+41,str(v).replace('.',','),24,anchor="middle")]
+            x+=w
+        # Labels below the short SRAM segments are placed on separate lines.
+        p += [text(20,y+105," · ".join(labels),23)]
+    save("arena","Getrennte Flash- und SRAM-Bilanz",430,p)
+
+    p=[text(20,30,"Konzeptioneller TFLM-Ablauf · alle Objekte und Puffer bleiben gültig")]
+    for x,labels in [(20,["Modell prüfen","Operatoren"]),(355,["Arena planen","Status prüfen"]),(700,["Tensorvertrag","bereit"])]:p += box(x,85,280,90,labels)
+    p += [line(300,130,350,130,arrow=True),line(635,130,695,130,arrow=True)]
+    for x,labels in [(20,["Eingabe","schreiben"]),(355,["Invoke","Status prüfen"]),(700,["bei Erfolg","Ausgabe lesen"])]:p += box(x,245,280,90,labels)
+    p += [line(300,290,350,290,arrow=True),line(635,290,695,290,arrow=True),
+          line(840,182,840,208,arrow=True),line(840,208,160,208),line(160,208,160,238,arrow=True),
+          line(495,343,495,375,RED,3,arrow=True),text(495,410,"Fehler: keine neue Entscheidung aus alten Ausgangsbytes",23,anchor="middle")]
+    save("runtime","Initialisierung und wiederholter Inferenzzyklus mit Fehlerpfad",440,p)
+
+    p=[text(20,30,"Fiktiver Tensorvertrag: 128 Zeitpunkte · je drei Achsen · geordnete Elemente")]
+    x0=100
+    for i in range(4):
+        p += [text(x0+i*210+80,83,f"Zeit {i}" if i<3 else "… 127",24,anchor="middle")]
+        for j,label in enumerate(["x","y","z"]):p += [rect(x0+i*210+j*52,110,48,60),text(x0+i*210+j*52+24,149,label,24,anchor="middle")]
+    p += [text(500,225,"128 × 3 = 384 Elemente",26,anchor="middle"),
+          text(500,277,"Float32-Quelle: 1536 Byte · Int8-Ziel: 384 Byte",24,anchor="middle"),
+          text(500,335,"Datentyp + Reihenfolge + Skala + Ausgabebedeutung vereinbaren",23,anchor="middle")]
+    save("sensor","Elementzahl, Bytezahl und Sensorreihenfolge",365,p)
 
 
-def fig_h():
-    p = svg(1200, 460)
-    p.append(T(16, 18, "Output-Stationary. A nach rechts, B nach unten, C bleibt. Takt = ein gueltiger MAC.", 14))
-    p.append(T(16, 40, "C00=19, C01=22, C10=43, C11=50. Fertig in den Takten 2, 3, 3 und 4.", 16, ACC))
-    steps = systolic()
-    for t, step in enumerate(steps, start=1):
-        y = 58 + (t - 1) * 70
-        p.append(T(16, y + 22, f"T{t}", 14, MEM))
-        for n, (i, j, k, prod, acc) in enumerate(step):
-            p.append(R(70 + n * 280, y, 260, 52, W if acc in (19, 22, 43, 50) else ACT))
-            p.append(T(80 + n * 280, y + 22, f"C{i}{j} k={k} +{prod}", 13))
-            p.append(T(80 + n * 280, y + 42, f"Summe {acc}", 14, ACC))
-    p.append(T(16, 360, "Nicht: ab Takt 3 ein fertiger Output je Takt. C11 endet erst in Takt 4.", 15, ERR))
-    p.append(T(16, 388, "Staffelung: gleiche k treffen sich, weil Zeile und Spalte verzoegert eingespeist werden.", 14))
-    p.append(T(16, 416, "Fill Takt 1, Compute bis Takt 4, Readout der lokalen C danach. Drain ist kein Automatismus.", 14, MUTED, "400"))
-    p.append(T(16, 444, "Leere Zellen in einem Takt sind ungueltige Begegnungen, keine extra MACs.", 13, MUTED, "400"))
-    save("array.svg", p)
-
-
-def fig_i():
-    p = svg(1200, 340)
-    p.append(T(16, 22, "Zwei Dataflows. Der Rand-Speicherzugriff gilt fuer dieses vereinfachte Array.", 15))
-    p.append(R(16, 50, 560, 150, ACT))
-    p.append(T(28, 76, "Output-Stationary", 16, ACT))
-    p.append(T(28, 104, "C bleibt. A horizontal, B vertikal.", 14))
-    p.append(T(28, 130, "Teilsumme lokal. Readout am Ende.", 14))
-    p.append(T(28, 156, "Gewichte fliessen, sie stehen nicht fest.", 14, ERR))
-    p.append(R(620, 50, 540, 150, W))
-    p.append(T(632, 76, "Weight-Stationary", 16, W))
-    p.append(T(632, 104, "Gewicht steht. Aktivierung fliesst.", 14))
-    p.append(T(632, 130, "Teilsumme kann weiterwandern.", 14))
-    p.append(T(632, 156, "Weights brauchen trotzdem Load und Wechsel.", 14, ERR))
-    p.append(T(16, 230, "Nicht jede NPU ist systolisch und nicht jede rechnet nur Matrizen.", 15))
-    p.append(T(16, 258, "Vergleich CPU/GPU/NPU braucht Datentyp, Batch, Auslastung und Transfer.", 15))
-    p.append(T(16, 292, "TPU v1: 256*256*2*700e6 = 91,75e12 Ops/s, oft 92 TOPS genannt. Datacenter, kein mW-Edge.", 14, MUTED, "400"))
-    p.append(T(16, 320, "Peak ist nicht die End-to-End-Inferenzleistung.", 14, MUTED, "400"))
-    save("stationary.svg", p)
-
-
-def fig_j():
-    p = svg(1200, 360)
-    p.append(T(16, 22, "Peak-Rechnung und illustrative Auslastung. Keine gemessenen TOPS/W.", 16))
-    p.append(T(16, 52, "65536 MACs * 700 MHz = 45,8752 TMAC/s. Mal 2 Ops = 91,7504 TOPS.", 15, W))
-    p.append(T(16, 88, "2x2-Rechnung auf einem gedachten 4x4-Array: 4 von 16 Zellen aktiv = 25 Prozent.", 15, ACT))
-    for r in range(4):
-        for c in range(4):
-            on = r < 2 and c < 2
-            p.append(R(16 + c * 36, 110 + r * 36, 32, 32, ACC if on else MUTED, "#E8F5E9" if on else "#f5f5f5"))
-    p.append(T(200, 150, "Gruen = aktive Zelle des 2x2-Beispiels.", 14, ACC))
-    p.append(T(16, 280, "Pruefliste: Praezision, Ops je MAC, Sparse oder Dense, Batch, Messgrenze, End-to-End-Latenz.", 14))
-    p.append(T(16, 308, "Nullen in einer Dense-Matrix sparen keine Zeit, solange der Kernel sie rechnet.", 15, ERR))
-    p.append(T(16, 338, "Tile, Fill, Drain und nicht beschleunigte Operatoren senken die Auslastung.", 14, MUTED, "400"))
-    save("tops.svg", p)
-
-
-def fig_k():
-    p = svg(1200, 400)
-    p.append(T(16, 20, "real = scale * (q - zero_point). scale=0,1 zero_point=0. Rundung zur naechsten Zahl.", 14))
-    p.append(T(16, 50, "1,24 -> q=12 -> zurueck 1,2. Fehler 0,04.", 16, ACT))
-    p.append(T(16, 78, "20,0 -> Rohwert 200 -> Clamp 127 -> zurueck 12,7.", 16, ERR))
-    p.append(T(16, 114, "Int8-Gewichte: 4 Byte auf 1 Byte, 75 Prozent weniger reine Gewichtsbytes.", 15))
-    p.append(T(16, 142, "Bias, Metadaten, Aktivierungen, Scratch und Arena bleiben extra.", 15, W))
-    p.append(R(16, 170, 340, 80, MEM))
-    p.append(T(28, 196, "Flash: Gewichte", 14, MEM))
-    p.append(T(28, 220, "nur der konstante Block", 13))
-    p.append(R(400, 170, 740, 80, ACT))
-    p.append(T(412, 196, "SRAM: Input, Output, Aktivierungen, Scratch", 14, ACT))
-    p.append(T(412, 220, "Arena ist dieser Puffer, kein zweiter Heap", 13))
-    p.append(T(16, 280, "Int32-Akkumulator fuer geeignete Int8-MACs. Per-Tensor und Per-Channel sind verschiedene Scales.", 14))
-    p.append(T(16, 308, "Integer ist nicht auf jeder CPU schneller. Accuracy gehoert auf Testdaten gemessen.", 15, ERR))
-    p.append(T(16, 340, "Pruning aendert die Darstellung. Weniger MACs nur, wenn der Kernel Sparse versteht.", 14))
-    p.append(T(16, 372, "Kein 10-KiB- oder 20-KB-Wert ohne Messung.", 14, MUTED, "400"))
-    save("quant.svg", p)
-
-
-def fig_l():
-    p = svg(1200, 360)
-    p.append(T(16, 20, "Workflow. Das Byte-Array ist Modelldaten, kein ausfuehrbarer Maschinencode.", 15))
-    steps = ["Trainieren", "Quantisieren", "Operator pruefen", "C-Array", "Vorverarbeitung", "Invoke", "Pruefen"]
-    for i, name in enumerate(steps):
-        p.append(R(16 + (i % 4) * 290, 48 + (i // 4) * 70, 270, 52, ACT if i < 4 else ACC))
-        p.append(T(28 + (i % 4) * 290, 80 + (i // 4) * 70, name, 14))
-    p.append(T(16, 210, "CPU-Kernel ist der Default. Eine NPU braucht Backend, Operator und Toolchain.", 15, ERR))
-    p.append(T(16, 240, "AllocateTensors und Invoke haben Rueckgaben. Arena-Groesse wird gemessen, nicht geraten.", 15))
-    p.append(T(16, 270, "Int8-Input folgt scale und zero_point der Trainingsvorverarbeitung.", 15))
-    p.append(T(16, 300, "Ein Logit ist keine kalibrierte Wahrscheinlichkeit. 0,8 ist keine allgemeine Schwelle.", 15, W))
-    p.append(T(16, 334, "Renode-Funktion ist kein Beweis fuer Memory Wall, CPI oder NPU-Beschleunigung.", 14, MUTED, "400"))
-    save("flow.svg", p)
+def rasterize(chromium):
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        browser=p.chromium.launch(executable_path=chromium,headless=True,args=["--no-sandbox"])
+        page=browser.new_page(viewport={"width":W,"height":600},device_scale_factor=2)
+        for source in sorted(OUT.glob("*.svg")):
+            page.set_content('<html><body style="margin:0;background:white">'+source.read_text(encoding="utf-8")+'</body></html>')
+            page.locator("svg").screenshot(path=str(source.with_suffix(".png")))
+        browser.close()
 
 
 if __name__ == "__main__":
-    assert A[0][0] * B[0][0] + A[0][1] * B[1][0] == 19
-    assert A[0][0] * B[0][1] + A[0][1] * B[1][1] == 22
-    assert A[1][0] * B[0][0] + A[1][1] * B[1][0] == 43
-    assert A[1][0] * B[0][1] + A[1][1] * B[1][1] == 50
-    y0 = 1 * 2 + 2 * 1 + 3 * 3 + 1
-    y1 = 0 * 2 + (-1) * 1 + 4 * 3 + (-2)
-    assert (y0, y1) == (14, 9)
-    macs = 65536 * 700_000_000
-    assert macs == 45_875_200_000_000
-    assert macs * 2 == 91_750_400_000_000
-    assert 31 * 32 + 8 == 1000
-    q = max(-128, min(127, int(round(1.24 / 0.1))))
-    assert q == 12
-    q2 = max(-128, min(127, int(round(20.0 / 0.1))))
-    assert q2 == 127
-    for fn in (fig_a, fig_b, fig_c, fig_d, fig_e, fig_f, fig_g, fig_h, fig_i, fig_j, fig_k, fig_l):
-        fn()
-    # systolic final
-    acc = [[0, 0], [0, 0]]
-    done = {}
-    for t, step in enumerate(systolic(), start=1):
-        for i, j, k, prod, total in step:
-            acc[i][j] = total
-            if (i, j) == (0, 0) and total == 19:
-                done.setdefault((i, j), t)
-            if total in (22, 43, 50) and (i, j) not in done:
-                if (i, j) != (0, 0):
-                    done[(i, j)] = t
-    assert acc == C
-    assert done[(0, 0)] == 2 and done[(0, 1)] == 3 and done[(1, 0)] == 3 and done[(1, 1)] == 4
-    print("checks ok", done)
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--png",action="store_true")
+    parser.add_argument("--chromium",default="/usr/bin/chromium")
+    args=parser.parse_args()
+    figures()
+    if args.png:rasterize(args.chromium)
+    print("27 Lehrdiagramme geschrieben"+(" (SVG und PNG)." if args.png else " (SVG)."))
