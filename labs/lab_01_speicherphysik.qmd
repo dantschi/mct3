@@ -1,163 +1,395 @@
 ---
-title: "Übungsblatt 1: Speicherphysik und Speicher-Mapping"
-subtitle: "Mikrocomputertechnik 3 (MCT3)"
+title: "Übungsblatt 1: Speicherphysik & RAM-Typen"
+subtitle: "Mikrocomputertechnik 3 · Zellzustände, Ladung und Adressen auf Papier"
+highlight-style: ../assets/styles/dhbw-code.theme
+header-includes: |
+  \usepackage{needspace}
 ---
 
 ::: {.content-visible when-profile="solution"}
 > **Musterlösung**
 :::
 
-## Zielsetzung
+## Ziel und Arbeitsweise
 
-Sie vertiefen die Speicherphysik aus Vorlesung 1 (Von-Neumann/Harvard, SRAM/DRAM, Flash/XIP) und üben den Brückenschlag zur Embedded-C-Praxis (Linker-Sections, Pointer auf die Memory Map).
+Sechs Pflichtaufgaben sind vollständig auf Papier lösbar und üben
+Begründungen, Skizzen und Rechenwege wie in einer Klausur.
+Alle Zahlen und Adressbereiche sind ausdrücklich Lehrmodelle.
+Geben Sie Annahmen, Zwischenwerte und Einheiten an.
 
-**Bearbeitungszeit:** ca. 45–60 Min. | **Orientierungspunkte:** Aufgabe 1: 12 P, Aufgabe 2: 10 P (Gesamt: 22 P)
+**Bearbeitungszeit:** etwa 75–90 Minuten selbstständig.
+**Orientierungspunkte:** 32, keine neue Prüfungsregel.
+Im Unterricht: Aufgaben 1–2 (10 min), Aufgabe 3 (15 min),
+Aufgabe 4 (15 min), Aufgaben 5–6 (15 min).
+Die Vorlesungsphasen enthalten Lösungsbesprechungen.
 
-## Teil 1: Theorie — Speicherphysik
-
-### Aufgabe 1.1: Systemarchitekturen und Flaschenhälse
-
-Die Architektur eines Systems bestimmt maßgeblich seine Leistung.
-
-1. Erläutern Sie den fundamentalen Unterschied zwischen der Von-Neumann- und der Harvard-Architektur hinsichtlich ihrer Bus-Systeme.
-2. Was versteht man unter dem Begriff „Von-Neumann-Flaschenhals“, und warum tritt er auf?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-*(Notieren Sie Ihre Lösung hier.)*
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 1.1**
-
-1. Die **Von-Neumann-Architektur** nutzt einen gemeinsamen Speicher und einen gemeinsamen Bus für Befehle (Code) und Daten. Die **Harvard-Architektur** trennt diese Speicherräume und verwendet getrennte Busse zur CPU (Instruction- und Data-Pfad).
-2. Der **Von-Neumann-Flaschenhals** entsteht, weil Fetch (Befehl laden) und Datenzugriff denselben Bus teilen und daher nicht gleichzeitig stattfinden können. Das führt zu Verzögerungen (Stalls) in der Pipeline.
-:::
-
-### Aufgabe 1.2: Volatiler Arbeitsspeicher (SRAM vs. DRAM)
-
-Arbeitsspeicher (RAM) wird primär in SRAM und DRAM unterteilt.
-
-1. Vergleichen Sie den physikalischen Aufbau (Anzahl und Art der Bauteile) einer SRAM-Zelle mit einer DRAM-Zelle.
-2. Warum muss DRAM periodisch aufgefrischt werden (Refresh), während SRAM seinen Zustand ohne Auffrischen hält?
-3. Wo werden diese beiden Speichertypen innerhalb der Speicherhierarchie eines System-on-Chip (SoC) typischerweise eingesetzt — und warum?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-*(Notieren Sie Ihre Lösung hier.)*
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 1.2**
-
-1. Eine klassische **SRAM-Zelle** besteht aus sechs Transistoren (6T: zwei kreuzgekoppelte Inverter plus zwei Zugriffstransistoren). Eine **DRAM-Zelle** ist auf ein Minimum reduziert: ein Transistor und ein Kondensator (1T1C).
-2. DRAM speichert die Information als Ladung im Kondensator. Die Isolation ist nicht perfekt — die Ladung leckt ab und muss periodisch (z. B. alle $64\,\mathrm{ms}$) aufgefrischt werden. SRAM hält den Zustand durch das Gleichgewicht der Inverter, solange die Versorgungsspannung anliegt.
-3. **SRAM** ist schnell, aber flächenintensiv/teuer → typisch CPU-nah (Register, L1/L2/L3-Caches, On-Chip-SRAM). **DRAM** ist dichter und kostengünstiger, aber langsamer → typisch Hauptspeicher (Main Memory).
-:::
-
-### Aufgabe 1.3: Non-Volatile Memory (Flash)
-
-Für Firmware in Embedded Systems wird häufig Flash-Speicher verwendet.
-
-1. Erklären Sie das Prinzip von Execute-In-Place (XIP) in Verbindung mit NOR-Flash.
-2. Warum ist NAND-Flash trotz höherer Speicherdichte typischerweise nicht direkt für XIP durch die CPU geeignet?
-3. Was versteht man unter Wear Leveling bei Flash-Speichern, und warum ist diese Technik notwendig?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-*(Notieren Sie Ihre Lösung hier.)*
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 1.3**
-
-1. **XIP** bedeutet: Die Fetch-Stufe der CPU liest Instruktionen direkt über den Bus aus dem NOR-Flash und führt sie aus — ohne den Code vorher vollständig in den Arbeitsspeicher kopieren zu müssen. NOR-Flash erlaubt dafür wahlfreien Lesezugriff auf Wortebene.
-2. **NAND-Flash** ist auf seiten-/blockweises Lesen und Schreiben ausgelegt (Pages, oft KiB-Größe). Es bietet keinen effizienten wahlfreien Wortzugriff für den Instruction Fetch. Deshalb ist NAND nicht direkt XIP-tauglich; Code wird typisch erst in RAM geladen oder über zusätzliche Controller/Caches bereitgestellt.
-3. Flash-Zellen verschleißen bei Schreib-/Löschzyklen (hohe Spannungen belasten die Oxidisolation des Floating Gates). **Wear Leveling** (oft im Flash Translation Layer) verteilt Schreibzugriffe möglichst gleichmäßig über physische Blöcke, damit einzelne Sektoren nicht vorzeitig ausfallen.
-:::
-
-## Teil 2: Praxis — Speicher-Mapping und C-Pointer
+SRAM = Static Random-Access Memory, statischer wahlfreier Speicher.
+DRAM = Dynamic Random-Access Memory, dynamischer wahlfreier Speicher.
+6T = sechs Zelltransistoren, 1T1C = ein Transistor und ein Kondensator.
+WL = Word Line, Wortleitung. BL / BLB = komplementäre Bit Lines, Bitleitungen.
+KiB $=2^{10}$ Byte, MiB $=2^{20}$ Byte, ein Byte enthält acht Bit.
+Die professionelle Speicherentscheidung unterscheidet Zelle, Zugriff und Software.
 
 {{< pagebreak >}}
 
-### Aufgabe 2.1: Memory Map und Linker-Skript
+## Aufgabe 1: Kapazität und gemeinsame Wege (5 Punkte)
 
-In einem Embedded System müssen Software und Hardware über das Speicher-Mapping verbunden werden.
-
-1. Erklären Sie die Aufgabe eines Linker-Skripts (`.ld`-Datei) im Kontext eines Mikrocontrollers.
-2. In welche physikalischen Speicherbereiche mappt der Linker typischerweise die Sections `.text` und `.data`?
+1. Ein Speicher enthält $1$ MiB Nutzdaten.
+   Berechnen Sie Byte- und Bitzahl. Wie unterscheiden sich MiB und MB? (1 P)
+2. Zählen Sie dafür die Zelltransistoren bei klassischem 6T-SRAM und
+   die Transistoren und Kondensatoren bei 1T1C-DRAM.
+   Warum folgt daraus noch keine genaue Chipfläche? (2 P)
+3. Ein ausdrücklich angenommener gemeinsamer Port bedient entweder
+   Befehlsholen oder einen Datenzugriff im betrachteten Takt.
+   Beide werden gleichzeitig angefordert. Was ist der Konflikt?
+   Beweist ein gemeinsamer Adressraum allein denselben Konflikt? (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+\Needspace{10\baselineskip}
 
-*(Notieren Sie Ihre Lösung hier.)*
+**Ihre Zählung und Erklärung:**
+
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 2.1**
+\Needspace{18\baselineskip}
 
-1. Das **Linker-Skript** beschreibt die Memory Map des SoCs für den Linker: Welche Software-Sections (`.text`, `.data`, `.bss`, …) liegen in welchen Speicherregionen (Flash, SRAM, …) und an welchen Adressen. Ohne diese Zuordnung wüsste die Toolchain nicht, wohin die Firmware platziert werden muss.
-2. **`.text`** (Maschinencode, oft auch `const`-Daten) → typisch **nichtflüchtiger Flash** (z. B. NOR, XIP). **`.data`** (initialisierte Variablen) → zur **Laufzeit im SRAM**; die Initialwerte liegen oft zusätzlich als Ladeadresse (LMA) im Flash und werden beim Start nach SRAM kopiert. **`.bss`** (uninitialisierte/nullgesetzte Variablen) → ebenfalls **SRAM**.
+**Musterlösung 1**
+
+1. $2^{20}=1\,048\,576$ Byte, mal acht $=8\,388\,608$ Bit.
+   Ein MB sind dagegen $10^6$ Byte. (1 P)
+2. SRAM: $6\cdot8\,388\,608=50\,331\,648$ Zelltransistoren.
+   DRAM: $8\,388\,608$ Transistoren und ebenso viele Kondensatoren. (1 P)
+   Peripherie fehlt; Bauteilgrößen und Kondensatorgeometrie unterscheiden sich.
+   Die Zählung bestimmt deshalb keine genaue Fläche. (1 P)
+3. Beide Anfragen benötigen dieselbe beschränkt verfügbare Ressource;
+   eine muss warten oder später bedient werden. (1 P)
+   Ein gemeinsamer Adressraum legt Portzahl, Caches und physische Wege
+   nicht allein fest. Der Konflikt folgt hier aus dem Ein-Port-Modell. (1 P)
 :::
 
-### Aufgabe 2.2: Pointer auf die Memory Map
+{{< pagebreak >}}
 
-Ein Mikrocontroller hat seinen NOR-Flash an der Basisadresse `0x08000000` gemappt.
+## Aufgabe 2: Flashänderung und Ausführungsweg (5 Punkte)
 
-1. Schreiben Sie ein kurzes C-Snippet, das einen Pointer auf diese Adresse definiert und den 32-Bit-Wert dort ausliest.
-2. Erklären Sie, warum ein Schreibversuch über einen einfachen Store (z. B. `*ptr = 42;`) auf diese Adresse typischerweise zu einem Hardware-Fehler führt.
+Logisches Flashmodell: gelöscht ist `FF`.
+Programmieren darf nur eins nach null ändern.
+Ein Löschen setzt alle Byte eines Modellblocks auf `FF`.
+Das ist keine Freigabe für beliebige Teilprogrammierung realer Bauteile.
+
+1. Schreiben Sie `A5`, `81` und `AF` binär.
+   Ist `A5` nach `81` ohne Löschen möglich? Und `A5` nach `AF`? (2 P)
+2. Im selben Löschblock liegt ein benötigtes Byte `3C`.
+   Beschreiben Sie ein korrektes Update des ersten Bytes von `A5` nach `AF`. (1 P)
+3. Sechs **physische Löschzyklen** werden entweder als $6,0,0$ oder $2,2,2$
+   auf drei gleichartige Blöcke verteilt. Was verbessert sich,
+   was wird dadurch nicht abgeschafft? (1 P)
+4. Bedeutet ein NOR-Flash automatisch, dass daraus Code ausführbar ist?
+   Nennen Sie die nötige Systembedingung für XIP, Execute-in-Place. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+\Needspace{10\baselineskip}
 
-*(Notieren Sie Ihre Lösung hier.)*
+**Ihre Bitprüfung und Updatefolge:**
+
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 2.2**
+\Needspace{20\baselineskip}
 
-```c
-#include <stdint.h>
+**Musterlösung 2**
 
-/* 1. Pointer auf die Basisadresse des NOR-Flash */
-const uint32_t *firmware_word =
-    (const uint32_t *)0x08000000u;
+1. `A5` = `10100101`, `81` = `10000001`, `AF` = `10101111`.
+   `A5` nach `81` setzt nur weitere Einsen auf null: im Modell erlaubt.
+   `A5` nach `AF` verlangt auch null nach eins: vorher löschen. (2 P)
+2. Alle weiterhin benötigten Blockinhalte sichern, den ganzen Block löschen,
+   `AF` und das gesicherte `3C` sowie weitere benötigte Inhalte wieder programmieren.
+   Nur das erste Byte wiederherzustellen würde `3C` verlieren. (1 P)
+3. Die Summe bleibt sechs, die maximale Belastung sinkt von sechs auf zwei.
+   Endliche Belastbarkeit bleibt; Zuordnung und Updateaufwand sind nötig.
+   Hostwrites sind nicht automatisch physische Löschzyklen. (1 P)
+4. Nein. Codeadressen müssen über einen speicherabbildbaren, ausführbaren Leseweg
+   mit passendem Controller und Zugriffsrechten erreichbar sein.
+   Die NOR-Zellverschaltung allein beweist diesen Weg nicht. (1 P)
+:::
 
-/* 2. 32-Bit-Wert lesen (wahlfreier Zugriff / XIP-Pfad) */
-uint32_t ver = *firmware_word;
+{{< pagebreak >}}
+
+## Aufgabe 3: SRAM-Zustände und Reihenfolge (6 Punkte)
+
+Die klassische 6T-Zelle besitzt zwei kreuzgekoppelte CMOS-Inverter
+und zwei nMOS-Zugriffstransistoren.
+CMOS = Complementary Metal-Oxide-Semiconductor.
+pMOS leitet im qualitativen Modell bei Gate null, nMOS bei Gate eins.
+Links steuert QB die Transistoren P_Q und N_Q,
+rechts Q die Transistoren P_QB und N_QB.
+
+1. Füllen Sie die Tabelle für die zwei stabilen Zustände aus.
+   Warum sind null/null und eins/eins keine stabilen digitalen Paare? (2 P)
+2. Beschreiben Sie für Q null die Lesefolge mit Vorladung, WL und Leseverstärker.
+   Welche Bitleitung sinkt? Muss Q vollständig unverändert in Volt bleiben? (2 P)
+3. Schreiben Sie Q von null nach eins.
+   Welche äußeren Bitleitungswerte werden benötigt?
+   Ordnen Sie Datenbereitstellung, WL-Anstieg, Umschalten,
+   WL-Abfall und Treiberfreigabe. (2 P)
+
+| Q | QB | P_Q | N_Q | P_QB | N_QB |
+|---|----|-----|-----|------|------|
+| 0 | 1 | | | | |
+| 1 | 0 | | | | |
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{9\baselineskip}
+
+**Ihre Lese- und Schreibzeitfolge:**
+
+\vspace*{3.5cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{23\baselineskip}
+
+**Musterlösung 3**
+
+| Q | QB | P_Q | N_Q | P_QB | N_QB |
+|---|----|-----|-----|------|------|
+| 0 | 1 | sperrt | leitet | leitet | sperrt |
+| 1 | 0 | leitet | sperrt | sperrt | leitet |
+
+1. Jeder Inverter muss den Gegenwert seines Eingangs liefern.
+   Gleiche digitale Knotenwerte erfüllen dies nicht gleichzeitig. (2 P)
+2. Beide Bitleitungen hoch vorladen, Vorladung ausschalten, WL anheben,
+   Differenz erkennen, WL absenken, danach erneut vorladen. (1 P)
+   BL am Nullknoten sinkt leicht. Q kann einen kleinen analogen Hub besitzen,
+   muss aber bei ausreichender Lesestabilität logisch null bleiben. (1 P)
+3. BL eins, BLB null vor WL-Anstieg bereitstellen.
+   Der Treiber zieht QB herunter, Rückkopplung lässt Q steigen.
+   WL erst nach ausreichendem Umschalten absenken,
+   Daten bis danach halten, anschließend Treiber freigeben. (2 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 4: DRAM-Ladung und Adressorganisation (6 Punkte)
+
+Idealmodell: $C_\mathrm{cell}=30$ fF, $C_\mathrm{BL}=300$ fF,
+Plattenspannung null Volt und Bitleitung vorab $0{,}6$ Volt.
+Die Vorsilbe f in fF bedeutet femto, $10^{-15}$.
+Die Zelle beginnt wahlweise bei $1{,}2$ oder $0$ Volt.
+Ohne Verstärker gilt nach Verbinden:
+
+$$V_\mathrm{share}=\frac{C_\mathrm{cell}V_\mathrm{cell}+C_\mathrm{BL}V_\mathrm{pre}}{C_\mathrm{cell}+C_\mathrm{BL}}.$$
+
+1. Berechnen Sie beide gemeinsamen Spannungen und die jeweilige Abweichung
+   vom Vorladepegel. Warum sind Verstärken und Wiederherstellen nötig? (3 P)
+2. Ordnen Sie Restore, WL-Absenken und Precharge.
+   Wird beim Lesen der Zellkondensator immer vollständig entladen? (1 P)
+3. Adressmodell: vier Banken, je $128$ Zeilen, je $64$ Spalten,
+   je zwei Byte pro Spaltenelement.
+   Bankbits $[15:14]$, Zeilenbits $[13:7]$, Spaltenbits $[6:1]$, Bytebit $[0]$.
+   Bestimmen Sie Kapazität und Adresse für Bank zwei, Zeile fünf,
+   Spalte neun, Byte eins. (2 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{9\baselineskip}
+
+**Ihre Ladungsrechnung und Bitfelder:**
+
+\vspace*{3.5cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{23\baselineskip}
+
+**Musterlösung 4**
+
+1. Hoher Anfangszustand:
+   $(30\cdot1{,}2+300\cdot0{,}6)/(30+300)=216/330\approx0{,}6545$ V.
+   Niedriger Anfangszustand: $180/330\approx0{,}5455$ V. (2 P)
+   Abweichungen etwa $\pm54{,}5$ mV. Der ursprüngliche Zellpegel
+   wird zum mittleren Pegel hin verändert; der Verstärker erkennt
+   die kleine Richtung und stellt einen deutlichen logischen Zustand wieder her. (1 P)
+2. Restore bei noch hoher WL, dann WL absenken, danach BL vorladen.
+   Nein: Die hohe Zelle verliert Ladung, die niedrige erhält im Modell Ladung.
+   Precharge ist nicht Restore. (1 P)
+3. $4\cdot128\cdot64\cdot2=65\,536$ Byte $=64$ KiB. (1 P)
+   $2\cdot2^{14}+5\cdot2^7+9\cdot2+1=33\,427=$ `0x8293`. (1 P)
+   Die Bitfeldreihenfolge ist vorgegeben, keine universelle Hardwarezuordnung.
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 5: Memory Map und Firmwareanfang (6 Punkte)
+
+Byteadressiertes Lehrmodell:
+Flash ab `0x00000000`, $256$ KiB;
+SRAM ab `0x10000000`, $64$ KiB.
+Für einen `uint32_t`-Zugriff sind vier Byte und Ausrichtung durch vier nötig.
+
+1. Geben Sie für beide Bereiche das exklusive Ende und das letzte Byte an. (1 P)
+2. Prüfen Sie Vier-Byte-Zugriffe ab `0x1000FFFC`, `0x1000FFFF`
+   und `0x10010000` getrennt auf Bereich und Ausrichtung. (1 P)
+3. Firmwaremodell ohne Padding und weitere Abschnitte:
+   `.text` $24$ KiB, `.rodata` $4$ KiB, `.data` $256$ Byte,
+   `.bss` $4$ KiB und Stack $2$ KiB.
+   `.data` hat Initialwerte im Flash und Laufzeitobjekte im RAM;
+   `.bss` enthält keine Nullbytes im Flash-Abbild.
+   Berechnen Sie Bedarf und freien Platz beider Speicher. (2 P)
+4. Wer kopiert `.data` und nullsetzt `.bss`?
+   Erzwingt C-`const` allein die Platzierung im Flash? (2 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{10\baselineskip}
+
+**Ihre Grenzen, Speicherbilanz und Zuständigkeiten:**
+
+\vspace*{4cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{22\baselineskip}
+
+**Musterlösung 5**
+
+1. Flash: Ende `0x00040000`, letztes Byte `0x0003FFFF`.
+   SRAM: Ende `0x10010000`, letztes Byte `0x1000FFFF`. (1 P)
+2. `0x1000FFFC`: vollständig enthalten und ausgerichtet.
+   `0x1000FFFF`: nicht vollständig enthalten und unausgerichtet.
+   `0x10010000`: ausgerichtet, aber bereits außerhalb. (1 P)
+3. Flashbedarf $24\cdot1024+4\cdot1024+256=28\,928$ Byte
+   $=28{,}25$ KiB; frei $227{,}75$ KiB. (1 P)
+   RAM-Bedarf $256+4096+2048=6400$ Byte $=6{,}25$ KiB;
+   frei $57{,}75$ KiB. `.data` zählt in beiden Speicherbilanzen. (1 P)
+4. Startcode führt Kopieren und Nullsetzen vor der Anwendung aus;
+   der Linker bestimmt die Anordnung und nötigen Adressinformationen. (1 P)
+   `const` beschränkt Änderungen im C-Programm.
+   Abschnittszuordnung, Linkerskript und Plattform bestimmen den Speicherort. (1 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 6: FIFO und Speicherwahl (4 Punkte)
+
+FIFO bedeutet First In First Out. Das Modell hat vier nutzbare Arrayplätze,
+Leseindex r, Schreibindex w und Belegungszahl count.
+Anfang: r = w = count = null.
+Bei Erfolg steigt die entsprechende Position modulo vier;
+bei voll oder leer bleibt ein abgewiesener Vorgang ohne Zustandsänderung.
+Alle Vorgänge erfolgen in einem Ausführungskontext.
+
+1. Füllen Sie die Zustandsfolge aus. Geben Sie am Ende die Entnahmereihenfolge an. (2 P)
+2. Ein weiteres Einlegen von F wird versucht. Ergebnis und Zustand?
+   Warum beweist r gleich w allein keine Leere? (1 P)
+3. Firmware soll Abschalten überstehen, häufig veränderte Zwischensummen nicht.
+   Nennen Sie passende Speicherprinzipien und erklären Sie,
+   warum „Code“ und „Daten“ keine Zellbauarten sind. (1 P)
+
+| Vorgang | ausgegeben | r | w | count |
+|---------|------------|---|---|-------|
+| Anfang | – | 0 | 0 | 0 |
+| A einlegen | – | | | |
+| B einlegen | – | | | |
+| C einlegen | – | | | |
+| entnehmen | | | | |
+| D einlegen | – | | | |
+| E einlegen | – | | | |
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
+
+**Ihre Erklärung und Speicherwahl:**
+
+\vspace*{3cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{22\baselineskip}
+
+**Musterlösung 6**
+
+| Vorgang | ausgegeben | r | w | count |
+|---------|------------|---|---|-------|
+| Anfang | – | 0 | 0 | 0 |
+| A einlegen | – | 0 | 1 | 1 |
+| B einlegen | – | 0 | 2 | 2 |
+| C einlegen | – | 0 | 3 | 3 |
+| entnehmen | A | 1 | 3 | 2 |
+| D einlegen | – | 1 | 0 | 3 |
+| E einlegen | – | 1 | 1 | 4 |
+
+1. Entnahmereihenfolge B, C, D, E. (2 P)
+2. Voll: F wird abgewiesen; r eins, w eins, count vier bleiben erhalten.
+   Die Anfangspositionen waren ebenfalls gleich, aber count null.
+   Die Belegungszahl unterscheidet beide Fälle. (1 P)
+3. Nichtflüchtiger Speicher etwa Flash für das dauerhaft vorhandene Programmbild,
+   SRAM für die häufig geänderten Zwischensummen.
+   Ausführung aus Flash verlangt zusätzlich einen geeigneten Leseweg.
+   Nutzungsart und Zellphysik sind verschiedene Eigenschaften. (1 P)
+:::
+
+{{< pagebreak >}}
+
+## Optional: logische Modelle mit Host-GCC prüfen
+
+Vom Repository-Hauptordner aus:
+
+```bash
+gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+    labs/src/lab01_memory.c -o /tmp/lab01_memory
+/tmp/lab01_memory
 ```
 
-Ein direkter Schreibversuch (z. B. nach Cast auf nicht-`const`) scheitert typischerweise an der **Flash-Hardware**: Zellen lassen sich nicht wie SRAM byteweise per Store beschreiben. Zuerst sind blockweise Löschzyklen (Erase) mit speziellen Programmiersequenzen nötig. Die Speicher-Hardware blockiert den normalen CPU-Store — je nach Architektur als Bus-/Access-Fault bzw. Hard Fault.
+Erwartete Ausgabe:
 
-Hinweis: Bereits `const` verhindert den Schreibversuch zur Compile-Zeit; der Hard-Fault-Aspekt betrifft den Fall eines erzwungenen Stores auf die Flash-Region.
-:::
+```text
+Flashmodell: A5 -> 81 erlaubt, A5 -> AF braucht Loeschen
+Adressmodell: letzter ausgerichteter Wortstart 1000FFFC
+Startupmodell: Initialwerte kopiert, BSS auf null
+FIFO-Modell: volle und leere Zustaende korrekt
+Alle Prueffaelle bestanden.
+```
 
-### Aufgabe 2.3: Adressraum und Endadresse
+Untersuchen Sie die Fehlerfälle: Ein abgewiesenes Programmieren oder Einlegen
+ändert den Speicherzustand nicht. Das Programm dereferenziert keine Geräteadressen
+und modelliert keine analogen Zellströme oder reale Flash-Controller.
+Es arbeitet ohne Nebenläufigkeit.
 
-Ein Mikrocontroller mappt $1\,\mathrm{MiB}$ NOR-Flash ab der Basisadresse `0x08000000`.
+Die typische Abschnittszuordnung der C-Folie können Sie unabhängig ansehen:
 
-1. Berechnen Sie die erste Adresse *nach* dem Flash-Bereich (Exclusive-Endadresse). Geben Sie den Rechenweg an.
-2. Liegt die Adresse `0x080FFFFF` noch im Flash? Begründen Sie kurz.
+```bash
+gcc -std=c11 -O0 -fno-pie -c labs/src/lab01_sections.c \
+    -o /tmp/lab01_sections.o
+readelf -SW /tmp/lab01_sections.o
+readelf -sW /tmp/lab01_sections.o
+```
 
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-*(Notieren Sie Ihre Lösung hier.)*
-:::
+Suchen Sie `.text`, `.rodata`, `.data` und `.bss` sowie die vier Symbole.
+Dies ist ein natives Host-Objekt, keine RISC-V-Firmware und kein Bootversuch.
+Die konkrete Toolchain kann die Abschnitte anders organisieren.
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung Aufgabe 2.3**
+**Hinweise zur optionalen Aufgabe**
 
-1. $1\,\mathrm{MiB} = 2^{20}\,\mathrm{Byte} = 1\,048\,576\,\mathrm{Byte} = \mathtt{0x100000}$ Byte.
+`flash_program` prüft im logischen Modell vor dem Schreiben,
+ob alle gewünschten Einsen bereits Einsen sind.
+Ein Löschen setzt den ganzen Modellblock auf `FF`;
+das Beispiel stellt anschließend das gesicherte Nachbarbyte `3C` wieder her.
+Reale Programmiergranularität, Stromausfallfestigkeit und Treiberbefehle sind nicht modelliert.
 
-$$
-\mathrm{Endadresse}_{\mathrm{exklusiv}} = \mathtt{0x08000000} + \mathtt{0x100000} = \mathtt{0x08100000}
-$$
+`word_start_valid` prüft numerische Grenzen, vier Byte Länge und Ausrichtung
+mit Subtraktion; es erzeugt keine ungültigen C-Zeiger.
+Das Startupmodell kopiert zwischen gültigen, getrennten Host-Arrays
+und nullsetzt einen weiteren Bereich. Es richtet keinen Zielprozessor ein.
 
-Gültiger Adressbereich: $\mathtt{0x08000000}$ … $\mathtt{0x080FFFFF}$ (inklusive).
+Der FIFO verwendet einen Belegungszähler und weist ungültige Operationen
+vor jeder Zustandsänderung ab. Ein r gleich w ist sowohl leer als auch voll möglich.
+Die Tests umfassen Umbruch, Ablehnung, erneutes Einlegen und komplette Entnahmereihenfolge.
+Ein anderer Kontext oder Takt bräuchte zusätzliche Synchronisation.
 
-2. Ja — `0x080FFFFF` ist die letzte gültige Byte-Adresse im Flash ($1\,\mathrm{MiB}-1$ Offset).
+Im unoptimierten Abschnittsbeispiel sind lookup, counter, buffer und read_snapshot
+in einer typischen GNU-Werkzeugkette den vier genannten Abschnitten zugeordnet.
+Die Symboltabelle verbindet Namen und Abschnittsnummern.
+Das endgültige Ladebild und die Laufzeitadressen entstehen erst beim Linken.
 :::
