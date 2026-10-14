@@ -1,382 +1,600 @@
 ---
 title: "Probeklausur: Mikrocomputertechnik 3"
-subtitle: "Wrap-Up & Prüfungsvorbereitung · MCT3"
+subtitle: "60 Minuten · Multiple Choice und Papieraufgaben"
+highlight-style: ../assets/styles/dhbw-code.theme
+header-includes: |
+  \usepackage{needspace}
 ---
+
+Beantworten Sie die nachfolgenden Fragen im Multiple-Choice-Format. Bei jeder Frage können eine, mehrere oder alle Antwortmöglichkeiten richtig sein. Jede Teilaufgabe wird mit einem Punkt bewertet – dieser wird nur bei vollständig korrekter Antwort vergeben.
+
+Dieser Bewertungsmodus gilt für die 20 Fragen in Teil A:
+Markieren Sie alle richtigen Antworten und lassen Sie die falschen unmarkiert.
+Eine fehlende oder zusätzliche Markierung ergibt für die betreffende Frage null Punkte.
+In Teil B werden nachvollziehbare Rechenwege und Begründungen mit Teilpunkten bewertet.
 
 ::: {.content-visible when-profile="solution"}
 > **Musterlösung**
 :::
 
-**Deckblatt**
+## Bearbeitung und Punkte
 
-| | |
-|--|--|
-| Name | \underline{\hspace{8cm}} |
-| Matrikelnummer | \underline{\hspace{8cm}} |
-| Kurs / Studiengruppe | \underline{\hspace{8cm}} |
+- Bearbeitungszeit: etwa 60 Minuten
+- Maximal erreichbare Punktzahl: 60 Punkte
+- Hilfsmittel: nicht programmierbarer Taschenrechner
+- Alle angegebenen Hardware- und Zahlenmodelle gelten nur für diese Aufgaben.
 
-**Hinweise zur Bearbeitung**
+| Teil | Umfang | Punkte | Zeitrichtwert |
+|------|--------|--------|---------------|
+| A | 20 Multiple-Choice-Fragen, je vier Antworten | 20 | 20 min |
+| B1 | Cacheadresse und mittlere Zugriffszeit | 8 | 8 min |
+| B2 | PWM, UART und Watchdog | 8 | 8 min |
+| B3 | Sensorprotokoll und DMA-Puffer | 8 | 8 min |
+| B4 | Registerabhängigkeiten und Sprungvorhersage | 8 | 8 min |
+| B5 | Edge-Rechnung und gemeinsame Daten | 8 | 8 min |
+| Gesamt | | 60 | 60 min |
 
-- **Dauer:** 90 Minuten  
-- **Erlaubte Hilfsmittel:** Nicht-programmierbarer Taschenrechner (keine Skripte, kein Smartphone)  
-- **Maximal erreichbare Punktzahl:** 100 Punkte  
+Die Zeitaufteilung ist ein Richtwert für eine geübte Bearbeitung.
+Teil A umfasst die Themen aller neun Vorlesungen.
+In Teil B sind Annahmen, Einheiten und Zwischenschritte anzugeben.
+KiB bedeutet $2^{10}$ Byte, MB $10^6$ Byte; ein Byte enthält acht Bit.
 
-**Punkteübersicht**
+{{< pagebreak >}}
 
-| Aufgabe | Thema | Punkte |
-|---------|-------|--------|
-| 1 | Speicherphysik, Hierarchie und Caches | 20 |
-| 2 | Interrupts, Timer, PWM | 25 |
-| 3 | DMA, CPU-Architekturen, Branch Prediction | 30 |
-| 4 | Multicore, Busse und Edge AI | 25 |
-| | **Summe** | **100** |
+## Teil A: Multiple Choice (20 Punkte)
 
----
+\Needspace{10\baselineskip}
 
-## Aufgabe 1: Speicherphysik, Hierarchie und Caches (20 Punkte)
+### A1: SRAM und DRAM (1 Punkt)
 
-### 1.1 SRAM vs. DRAM (5 Punkte)
+Betrachten Sie die klassischen 6T-SRAM- und 1T1C-DRAM-Zellen. Welche Aussagen zu Halten und Lesen treffen zu?
 
-Nennen Sie je zwei charakteristische Unterschiede zwischen SRAM und DRAM (Zellaufbau, Refresh, Dichte/Flüchtigkeit).
+- $\square$ A. Zwei kreuzgekoppelte Inverter halten den SRAM-Zustand bei vorhandener Versorgung.
+- $\square$ B. Die SRAM-Zelle braucht bei vorhandener Versorgung regelmäßiges Auffrischen der Ladung.
+- $\square$ C. DRAM-Lesen verändert zunächst den Zellpegel und benötigt dessen Wiederherstellung.
+- $\square$ D. DRAM-Lesen entlädt den Zellkondensator bei jedem Anfangszustand vollständig.
 
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+\Needspace{10\baselineskip}
 
-\vspace{2.5cm}
-:::
+### A2: Flash und Codezugriff (1 Punkt)
+
+Ein System speichert Programmcode in NOR-Flash. Welche Aussagen über Änderung, Platzierung und Ausführung sind richtig?
+
+- $\square$ A. Ein gewöhnlicher CPU-Store erlaubt beliebige Bitänderungen ohne Flash-Löschverfahren.
+- $\square$ B. Das C-Schlüsselwort const garantiert unabhängig vom Linkerskript einen physischen Flashort.
+- $\square$ C. Parallele NOR-Zellpfade verlangen unabhängig vom Controller einen parallelen Außenbus.
+- $\square$ D. Execute-in-Place benötigt einen speicherabbildbaren und ausführbaren Leseweg im System.
+
+\Needspace{10\baselineskip}
+
+### A3: Cacheorganisation (1 Punkt)
+
+Ein direkt abgebildeter Cache enthält 1 KiB Nutzdaten mit 64 Byte je Zeile. Die Adressen bezeichnen einzelne Byte. Welche Aussagen gelten?
+
+- $\square$ A. Der Cache bietet sechzehn Plätze für die gespeicherten Datenzeilen.
+- $\square$ B. Sechs Adressbits wählen das Byte innerhalb einer Datenzeile aus.
+- $\square$ C. Sechs weitere Adressbits wählen den Cacheplatz für eine Datenzeile.
+- $\square$ D. Unterschiedliche Tags am selben Index können sich gegenseitig verdrängen.
+
+\Needspace{10\baselineskip}
+
+### A4: Cache-Schreibstrategie (1 Punkt)
+
+Eine Write-Back-Datenzeile ist gültig und dirty. Welche Aussagen folgen daraus?
+
+- $\square$ A. Der untere Speicher enthält nach jedem lokalen Store bereits denselben aktuellen Wert.
+- $\square$ B. Beim Verdrängen muss der geänderte Inhalt gemäß dem Speichervertrag erhalten werden.
+- $\square$ C. Die dirty Markierung zeigt noch nicht zurückgeschriebene lokale Schreibzugriffe an.
+- $\square$ D. Write-Back erzwingt bei Store-Misses auch Write-Allocate.
+
+{{< pagebreak >}}
+
+\Needspace{10\baselineskip}
+
+### A5: Timeranforderung (1 Punkt)
+
+Im Machine-Mode-Lehrmodell gilt mtime größer oder gleich mtimecmp, aber die globale Interruptfreigabe MIE ist null. Welche Aussagen sind richtig?
+
+- $\square$ A. Die Timeranforderung kann warten, obwohl aktuell kein Timer-Trap angenommen wird.
+- $\square$ B. Die fehlende globale Freigabe löscht gleichzeitig den Inhalt des Timervergleichs.
+- $\square$ C. Die Rückkehr mit mret quittiert die Anforderung durch Ändern des Timervergleichs.
+- $\square$ D. Ein Vergleichstermin hinter der aktuellen Zeit beseitigt die jetzige Vergleichsbedingung.
+
+\Needspace{10\baselineskip}
+
+### A6: Externe Interruptbehandlung (1 Punkt)
+
+Betrachten Sie den PLIC-Pfad und einen Machine-Mode-Trap. Welche Aussagen über Behandlung und Kontext treffen zu?
+
+- $\square$ A. Der mcause-Code allein unterscheidet sämtliche externen Geräte-IDs des PLIC.
+- $\square$ B. Bei einer Level-Quelle wird die Geräteursache vor dem PLIC-Complete bearbeitet.
+- $\square$ C. Eine höhere PLIC-Quellenpriorität aktiviert automatisch verschachtelte Interrupts.
+- $\square$ D. Der Trap-Eintritt sichert alle allgemeinen Register automatisch in einem Stackrahmen.
+
+\Needspace{10\baselineskip}
+
+### A7: PWM-Zählmodell (1 Punkt)
+
+Ein Timer erhält 100 MHz, teilt durch PSC plus eins und zählt inklusiv von null bis ARR. PSC ist 99, ARR 999. HIGH gilt für CNT kleiner als CCR, CCR ist 250. Welche Aussagen gelten?
+
+- $\square$ A. Die Zählfrequenz hinter dem Vorteiler beträgt ein Megahertz.
+- $\square$ B. Eine vollständige PWM-Periode enthält genau tausend Zählintervalle.
+- $\square$ C. Der HIGH-Anteil umfasst fünfundzwanzig Prozent der vollständigen Periode.
+- $\square$ D. Eine HIGH-Phase dauert unter diesen Annahmen zweihundertfünfzig Mikrosekunden.
+
+\Needspace{10\baselineskip}
+
+### A8: Watchdog und Fortschritt (1 Punkt)
+
+Das Hauptprogramm hängt, während Timer und Versorgung weiterlaufen. Welche Aussagen über Hardware-PWM und Watchdog sind begründet?
+
+- $\square$ A. Eine weiterlaufende Interruptbehandlung beweist Fortschritt aller wichtigen Anwendungsteile.
+- $\square$ B. Der Timer kann das zuletzt konfigurierte PWM-Muster weiterhin am Ausgang erzeugen.
+- $\square$ C. Ein Watchdog-Reset garantiert bei jedem Baustein sofort einen niedrigen Aktorpegel.
+- $\square$ D. Ein Feed sollte an die nötigen Fortschrittsnachweise der überwachten Teile gebunden sein.
+
+{{< pagebreak >}}
+
+\Needspace{10\baselineskip}
+
+### A9: UART-Rahmen (1 Punkt)
+
+Zehn Byte werden ohne Pausen als UART 8N1 übertragen. Die Datenbits jedes Bytes werden LSB-first gesendet. Welche Aussagen sind richtig?
+
+- $\square$ A. Die zehn Rahmen benötigen zusammen hundert Bitzeiten auf der Leitung.
+- $\square$ B. Die Abtastzeitpunkte werden aus der vereinbarten Baudrate und lokalen Takten abgeleitet.
+- $\square$ C. Start- und Stoppbit gehören zum Rahmen und sind keine zusätzlichen Nutzdatenbits.
+- $\square$ D. LSB-first legt zugleich die Reihenfolge der Bytes eines mehrbyteigen Zahlenwerts fest.
+
+\Needspace{10\baselineskip}
+
+### A10: SPI-Datenwege (1 Punkt)
+
+Controller und Target tauschen Daten per SPI aus. Welche Aussagen über Vollduplex, Flanken und Lesen sind richtig?
+
+- $\square$ A. Vollduplex verdoppelt bei gleichem SCK die Bitrate einer einzelnen Übertragungsrichtung.
+- $\square$ B. CPOL legt fest, welches Byte eines mehrbyteigen CPU-Zahlenwerts zuerst gespeichert wird.
+- $\square$ C. Controller und Target müssen die vereinbarten Abtast- und Änderungsflanken einhalten.
+- $\square$ D. Ein Leseauftrag kann Dummy-Sendedaten benötigen, damit der Controller Takt erzeugt.
+
+\Needspace{10\baselineskip}
+
+### A11: I²C-Signal und Protokoll (1 Punkt)
+
+Betrachten Sie I²C mit korrekt ausgelegten Open-Drain-Anschlüssen. Welche Aussagen über Leitung und Leseabschluss treffen zu?
+
+- $\square$ A. Ein LOW-Treiber setzt sich gegen einen freigegebenen HIGH-Wunsch auf derselben Leitung durch.
+- $\square$ B. Ein freigebender Teilnehmer erzeugt den HIGH-Pegel durch seinen aktiven Push-Pull-Treiber.
+- $\square$ C. Das Richtungsbit zur Geräteadresse ist nicht der spätere Registerindex des Geräts.
+- $\square$ D. Ein Master-NACK nach dem letzten Lesebyte kann den vorgesehenen Leseabschluss anzeigen.
+
+\Needspace{10\baselineskip}
+
+### A12: DMA und Grenzen (1 Punkt)
+
+Ein DMA-Controller übernimmt Datenkopien zu einer seriellen Peripherie. Welche Aussage über den Gesamtsystemweg ist richtig?
+
+- $\square$ A. Nach dem DMA-Start fällt unabhängig vom Treiber keinerlei weitere CPU-Arbeit an.
+- $\square$ B. DMA beseitigt nicht die durch die serielle Leitung begrenzte Übertragungsrate.
+- $\square$ C. Der DMA-Zählwert bezeichnet bei jeder möglichen Transferbreite dieselbe Bytezahl.
+- $\square$ D. Die interne DMA-Kanalpriorität legt zugleich die gesamte Buspriorität gegenüber der CPU fest.
+
+{{< pagebreak >}}
+
+\Needspace{10\baselineskip}
+
+### A13: DMA-Puffer und Cache (1 Punkt)
+
+Ein nicht kohärenter DMA liest einen von der CPU geänderten Write-Back-Puffer. Welche Aussagen über Übergabe und Besitz sind richtig?
+
+- $\square$ A. Dirty-Daten müssen vor Geräteübernahme über einen passenden Veröffentlichungsweg sichtbar werden.
+- $\square$ B. Bloßes Invalidieren veröffentlicht alle dirty Nutzdaten automatisch im unteren Speicher.
+- $\square$ C. Die DMA-Abschlussmeldung beweist unabhängig von der Peripherie das Ende des letzten Leitungsbits.
+- $\square$ D. Ein Software-Timeout gibt einen noch vom DMA genutzten Puffer nicht automatisch an die CPU zurück.
+
+\Needspace{10\baselineskip}
+
+### A14: Registerversionen (1 Punkt)
+
+Ein Out-of-Order-Kern benennt Architekturregister in physische Versionen um. Welche Aussagen über die Wirkung sind richtig?
+
+- $\square$ A. Eine WAR-Namensabhängigkeit kann durch getrennte Registerversionen beseitigt werden.
+- $\square$ B. Eine WAW-Namensabhängigkeit kann durch getrennte Schreibziele beseitigt werden.
+- $\square$ C. Eine RAW-Datenabhängigkeit bleibt auf die passende erzeugte Wertversion angewiesen.
+- $\square$ D. Renaming erlaubt architektonische Bestätigung beliebig vor älteren fehlgeschlagenen Befehlen.
+
+\Needspace{10\baselineskip}
+
+### A15: Vorhersage und Update (1 Punkt)
+
+Ein saturierender 2-Bit-Zähler startet in 10. Vorhersage ist T bei 10/11, sonst NT. T erhöht, NT senkt um eins. Der tatsächliche Sprung ist NT. Welche Aussage ist richtig?
+
+- $\square$ A. Die Vorhersage lautet NT, und das Ergebnis senkt den Zähler auf 00.
+- $\square$ B. Die Vorhersage lautet T, und der Zähler bleibt nach dem Ergebnis auf 10.
+- $\square$ C. Die Vorhersage lautet NT, und das Ergebnis setzt den Zähler auf 10.
+- $\square$ D. Die Vorhersage lautet T, und das tatsächliche Ergebnis senkt den Zähler auf 01.
+
+\Needspace{10\baselineskip}
+
+### A16: Vektorkapazität (1 Punkt)
+
+Für RVV gilt VLEN 128 Bit, SEW 32 Bit, LMUL eins. Welche Aussagen über Kapazität und aktive Länge VL sind richtig?
+
+- $\square$ A. VLMAX beträgt in diesem Modell vier Elemente in einer Registergruppe.
+- $\square$ B. Vier aktive Elemente verlangen zwingend vier physische Rechen-Lanes.
+- $\square$ C. Die Schleife verarbeitet pro Iteration die vom Vektorlängenbefehl gelieferte VL.
+- $\square$ D. Bei angeforderten fünf Elementen ist VL zwei als erster Schritt zulässig.
+
+{{< pagebreak >}}
+
+\Needspace{10\baselineskip}
+
+### A17: Dense-Schicht (1 Punkt)
+
+Eine Dense-Schicht hat drei Eingänge, zwei Ausgänge, eine 2×3-Gewichtsmatrix und je einen Bias pro Ausgang. Eine Aktivierungsfunktion ist ausgeblendet. Welche Aussagen sind richtig?
+
+- $\square$ A. Eine vollständige Auswertung verwendet sechs produktbezogene MACs.
+- $\square$ B. Gewichte und Bias ergeben zusammen acht gespeicherte Parameter.
+- $\square$ C. Die beiden Ausgabesummen können als unabhängige Rechnungen organisiert werden.
+- $\square$ D. Jeder Bias geht genau einmal in die zugehörige Ausgabesumme ein.
+
+\Needspace{10\baselineskip}
+
+### A18: Quantisierungswert (1 Punkt)
+
+Im Lehrmodell gilt der reale Wert gleich Skala mal (Code minus Nullpunkt). Skala ist 0,1, Nullpunkt −3, Code 12. Welcher reale Wert ist richtig?
+
+- $\square$ A. 1,2
+- $\square$ B. 1,5
+- $\square$ C. −1,5
+- $\square$ D. 15
+
+\Needspace{10\baselineskip}
+
+### A19: Kohärenz und False Sharing (1 Punkt)
+
+Zwei Kerne schreiben jeweils ihre eigene Variable. Beide Variablen liegen in derselben kohärenten Write-Back-Cachezeile. Welche Aussagen sind richtig?
+
+- $\square$ A. Kohärenz hält den unteren Speicherstand nach jedem lokalen Store zwingend aktuell.
+- $\square$ B. Besitzerwechsel können trotz unterschiedlicher Variablen durch False Sharing entstehen.
+- $\square$ C. Schreiben auf eine geteilte Zeile benötigt die passende abgeschlossene Übernahme des Schreibrechts.
+- $\square$ D. Kohärenz macht jede aus mehreren Zugriffen bestehende Updategruppe automatisch atomar.
+
+\Needspace{10\baselineskip}
+
+### A20: Atomizität und Datenfreigabe (1 Punkt)
+
+Betrachten Sie C11-Atomics und RISC-V-LR/SC unter ihren jeweiligen Speicherverträgen. Welche Aussagen treffen zu?
+
+- $\square$ A. Acquire auf den passenden Release-Wert kann zuvor geschriebene Nutzdaten veröffentlichen.
+- $\square$ B. Ein relaxed Flag veröffentlicht gewöhnliche konfliktierende Nutzdaten ohne weitere Synchronisation.
+- $\square$ C. Getrennte atomare Zähler-Loads und -Stores können dennoch ein logisches Update verlieren.
+- $\square$ D. Ein fehlgeschlagener SC schreibt nicht und liefert einen Status ungleich null.
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung 1.1**
 
-- **Zellaufbau:** SRAM typisch 6T-Flip-Flop; DRAM 1T1C (Transistor + Kondensator).  
-- **Refresh:** DRAM braucht periodischen Refresh (Ladung sickert ab); SRAM hält den Zustand, solange Versorgungsspannung anliegt.  
-- **Dichte/Kosten:** DRAM dichter/günstiger pro Bit; SRAM schneller, aber flächenintensiver. Beide volatil.
-:::
+{{< pagebreak >}}
 
-### 1.2 AMAT-Berechnung (6 Punkte)
+## Musterlösung Teil A
 
-Ein SoC verfügt über einen L1-Cache und langsamen DRAM.
+Je Frage ein Punkt ausschließlich für die vollständige richtige Auswahl.
+Keine Teilpunkte für einzelne Markierungen.
 
-- Hit Time L1: $2$ Taktzyklen  
-- Miss Penalty (DRAM): $150$ Taktzyklen  
-- Hit Rate: $96\,\%$  
+| Frage | Richtige Antworten | Begründung |
+|------|----------------|------------------------------------------------------------------------------|
+| A1 | A, C | SRAM hält durch Rückkopplung ohne periodischen Refresh. DRAM-Ladungsteilung verändert den Zellpegel, der danach restauriert wird, aber nicht stets vollständig entladen ist. |
+| A2 | D | XIP ist eine Fähigkeit des System-Lesewegs. Programmierregeln, C-Änderbarkeit, Zellverschaltung und äußere Schnittstelle sind getrennte Eigenschaften. |
+| A3 | A, B, D | 1024/64 ergibt sechzehn Plätze: sechs Offsetbits und vier Indexbits. Verschiedene Speicherblöcke können auf denselben Platz abgebildet sein. |
+| A4 | B, C | Dirty bezeichnet geänderte Daten, die vor Verlust der Kopie erhalten werden müssen. Write-Allocate ist eine gesonderte Entscheidung, kein Synonym für Write-Back. |
+| A5 | A, D | Anforderung und Freigabe sind getrennt. mret verändert mtimecmp nicht, ein neuer Zukunftstermin beseitigt dagegen zunächst mtime größer oder gleich mtimecmp. |
+| A6 | B | Claim liefert die Geräte-ID, mcause zunächst die externe Kategorie. Geräteursache, Complete, Software-Kontextsicherung und Verschachtelungsfreigabe sind eigene Schritte. |
+| A7 | A, B, C, D | Teiler hundert ergibt 1 MHz. Tausend Intervalle je Periode und zweihundertfünfzig HIGH-Intervalle ergeben 25 Prozent und 250 Mikrosekunden. |
+| A8 | B, D | Weiterlaufende Flanken oder Interrupts beweisen keinen Anwendungsfortschritt. Der Aktorzustand während und nach Reset verlangt eine konkrete Plattformvereinbarung. |
+| A9 | A, B, C | 8N1 enthält ein Startbit, acht Datenbits und ein Stoppbit. Die Bitfolge innerhalb eines Bytes bestimmt nicht die Bytefolge eines mehrbyteigen Werts. |
+| A10 | C, D | Vollduplex erlaubt gleichzeitige Richtungen, keine verdoppelte Einzelrichtungsrate. CPOL betrifft den Taktruhepegel, und Lesen benötigt ebenfalls passende Taktflanken. |
+| A11 | A, C, D | HIGH entsteht über den Pull-up, LOW wird aktiv gezogen. Geräteadressierung und Registerauswahl sind getrennt, und ein abschließendes Lese-NACK ist kein pauschaler Übertragungsfehler. |
+| A12 | B | DMA verändert den Kopier- und Bedienungsweg, nicht die Leitungskapazität. Transferbreite, CPU-Aufwand und verschiedene Arbitrierungsebenen bleiben gesondert zu prüfen. |
+| A13 | A, D | Bei diesem Sendepfad sind passende Cachebereinigung und Ordnung nötig, bloßes Verwerfen genügt nicht. Geräteabschluss, Leitungsende und Rückgabe nach Abbruch sind verschiedene Bedingungen. |
+| A14 | A, B, C | Renaming trennt Namen, nicht die Erzeugung eines benötigten Werts. Geordnete architektonische Bestätigung bleibt für präzise Fehlerzustände erforderlich. |
+| A15 | D | Vorhersage wird aus dem alten Zustand gebildet. Erst danach aktualisiert das tatsächliche NT den Zähler von 10 auf 01. |
+| A16 | A, C | VLMAX ist 128/32 gleich vier, keine physische Lanezahl. Bei AVL fünf liegt die erste zulässige Länge zwischen drei und vier, und die Schleife nutzt die tatsächlich gelieferte VL. |
+| A17 | A, B, C, D | Zwei Ausgänge mit je drei Produkten ergeben sechs MACs. Sechs Gewichte und zwei Biaswerte sind acht Parameter, die Ausgänge sind unabhängig. |
+| A18 | B | Nach Nullpunktkorrektur sind es 12 minus (−3), also fünfzehn. Skalierung mit 0,1 ergibt 1,5. |
+| A19 | B, C | Kohärenz betrifft Zeilen und Einzelzugriffe. False Sharing kann verschiedene Objekte betreffen, während atomare Updategruppen zusätzliche Mechanismen benötigen. |
+| A20 | A, C, D | Acquire und Release benötigen die passende Übergabebeziehung. Atomare Einzelzugriffe sind keine atomare Updategruppe, und ein SC-Fehler führt keinen Store aus. |
 
-Berechnen Sie die Average Memory Access Time (AMAT) in Taktzyklen. Formel und Rechenweg angeben.
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-\vspace{2.5cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung 1.2**
-
-$$
-\mathrm{AMAT} = \text{Hit Time} + (\text{Miss Rate} \times \text{Miss Penalty})
-$$
-
-$\text{Miss Rate} = 1 - 0{,}96 = 0{,}04$
-
-$$
-\mathrm{AMAT} = 2 + (0{,}04 \times 150) = 2 + 6 = 8\ \mathrm{Taktzyklen}
-$$
-:::
-
-### 1.3 Cache-Mapping (4 Punkte)
-
-Erklären Sie *Thrashing* bei einem Direct-Mapped-Cache. Wie löst ein 4-Way Set-Associative Cache das Problem hardwareseitig?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-\vspace{2.5cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung 1.3**
-
-**Thrashing:** Beim Direct Mapped hat jeder RAM-Block genau einen festen Cache-Platz (Index). Wechseln zwei Adressen mit demselben Index ab, verdrängen sie sich ständig → Miss Rate nahe $100\,\%$, obwohl der Rest des Caches leer sein kann.
-
-**4-Way:** Derselbe Index führt auf ein *Set* mit 4 Ways. Beide Blöcke können im Set nebeneinander liegen, ohne sich zu verdrängen.
-:::
-
-### 1.4 Hardwarenahes C und Lokalität (5 Punkte)
-
-```c
-for (int col = 0; col < 1000; col++) {
-    for (int row = 0; row < 1000; row++) {
-        bild[row][col] = 255 - bild[row][col];
-    }
-}
-```
-
-Warum ist die Performance mit Caches schlecht? Wie muss der Code umgeschrieben werden?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-\vspace{2.5cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung 1.4**
-
-C speichert 2D-Arrays *Row-Major*. Der Code läuft *Column-Major* → große Sprünge, Cache-Lines werden ungenutzt verdrängt (viele Misses).
-
-Lösung: Schleifen tauschen — äußere `row`, innere `col` (sequenzieller Zugriff, hohe räumliche Lokalität).
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 2: Interrupts, Timer und Aktorik (25 Punkte)
+## Teil B: Aufgaben auf Papier (40 Punkte)
 
-### 2.1 Interrupt-Controller (8 Punkte)
+### B1: Cacheadresse und mittlere Zugriffszeit (8 Punkte)
 
-Nennen Sie für CLINT und PLIC je ein typisches Einsatzbeispiel und begründen Sie kurz die hardwareseitige Trennung.
+Lehrmodell: direkt abgebildeter Cache, $1$ KiB Nutzdaten,
+$64$ Byte pro Zeile, $32$-Bit-Byteadressen.
+Die Metadaten zählen nicht zur Nutzdatenkapazität.
+Alle betrachteten Zugriffe sind Reads, der Cache ist zunächst leer.
+
+1. Bestimmen Sie die Zahl der Cacheplätze sowie Offset-, Index- und Tagbits. (2 P)
+2. Zerlegen Sie `0x00001234` in Tag, Index und Offset.
+   Geben Sie die zugehörige vollständige Zeilenbasis an. (2 P)
+3. Zugriffsfolge: `0x00001234`, `0x00001634`, `0x00001234`, `0x00001634`.
+   Geben Sie für jeden Read Hit oder Miss an.
+   Können beide Blöcke in einem zunächst leeren 2-Way-Cache gleicher Nutzdatenkapazität
+   nebeneinander bleiben, wenn es keine weiteren Zugriffe gibt? Begründen Sie. (2 P)
+4. Separater langfristiger Fall: Hitzeit zwei Takte, Hitrate $75\,\%$,
+   **zusätzliche** Misspenalty zwanzig Takte, Prozessorfrequenz $100$ MHz.
+   Berechnen Sie die mittlere Zugriffszeit AMAT in Takten und Nanosekunden. (2 P)
+
+AMAT bedeutet Average Memory Access Time.
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+\Needspace{11\baselineskip}
 
-\vspace{2.5cm}
+**Ihre Bitfelder, Zugriffsfolge und Rechnungen:**
+
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung 2.1**
+\Needspace{18\baselineskip}
 
-- **CLINT:** lokaler Timer (`mtime`/`mtimecmp`), Software-/IPI — kernnah, geringe Latenz für OS-kritische Events.  
-- **PLIC:** externe Peripherie (UART, I2C, GPIO, …) — bündelt, priorisiert und routet viele Quellen.
+**Musterlösung B1**
 
-Trennung: kritische lokale Events ohne Warteschlange hinter hunderten Peripherie-IRQs.
-:::
-
-### 2.2 Hardware-Timer und PWM (10 Punkte)
-
-Systemtakt $50\,\mathrm{MHz}$, `PSC = 49`, `ARR = 10000`.
-
-1. Berechnen Sie die PWM-Frequenz in Hz (vereinfachtes Modell $f_{\mathrm{pwm}} = f_{\mathrm{cnt}}/\mathrm{ARR}$).  
-2. Welchen `CCR`-Wert brauchen Sie für $60\,\%$ Duty Cycle?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-\vspace{2.5cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung 2.2**
-
-1. $$
-f_{\mathrm{cnt}} = \frac{50\,\mathrm{MHz}}{\mathrm{PSC}+1} = \frac{50\times 10^{6}}{50} = 1\,\mathrm{MHz}
-$$
-$$
-f_{\mathrm{pwm}} = \frac{f_{\mathrm{cnt}}}{\mathrm{ARR}} = \frac{10^{6}}{10000} = 100\,\mathrm{Hz}
-$$
-
-2. $\mathrm{CCR} = 10000 \times 0{,}60 = 6000$
-:::
-
-### 2.3 Nested Interrupts (7 Punkte)
-
-Was ist das *Clobbering* von `mepc`, wenn in einer ISR (nach erneut gesetztem `MIE=1`) ein weiterer Interrupt eintrifft? Welche Maßnahme ist nötig, bevor `MIE` in der ISR wieder auf 1 gesetzt wird?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-\vspace{2.5cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung 2.3**
-
-Trifft nach `MIE=1` ein weiterer Interrupt in der ISR ein, überschreibt die Hardware `mepc` mit dem PC *innerhalb* der äußeren ISR — die ursprüngliche Rücksprungadresse zum Main-Programm geht verloren (*Clobbering*).
-
-Vor erneutem `MIE=1` müssen `mepc` (und typisch `mstatus`) auf dem Stack gesichert werden.
+1. $1024/64=16$ Plätze. Offset $\log_2(64)=6$ Bit,
+   Index $\log_2(16)=4$ Bit, Tag $32-6-4=22$ Bit. (2 P)
+2. Tag `0x4`, Index $8$, Offset $52$ beziehungsweise `0x34`.
+   Basis `0x00001200`. (2 P)
+3. Miss, Miss, Miss, Miss: beide Blöcke benutzen im direkt abgebildeten Cache
+   Index acht, aber verschiedene Tags, und verdrängen sich. (1 P)
+   Der 2-Way-Cache hat acht Sets mit je zwei Plätzen.
+   Beide Blöcke fallen dort in Set null und passen in die beiden Ways. (1 P)
+4. $\mathrm{AMAT}=2+(1-0{,}75)\cdot20=7$ Takte.
+   Ein Takt bei hundert MHz dauert zehn ns, also $70$ ns. (2 P)
+   Die vorgegebene langfristige Hitrate ist nicht die Quote der kurzen Folge in Teil 3.
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 3: DMA, CPU-Architekturen und Branch Prediction (30 Punkte)
+### B2: PWM, UART und Watchdog (8 Punkte)
 
-### 3.1 Direct Memory Access (8 Punkte)
+Timer-Lehrmodell: Eingang $48$ MHz, Teiler $PSC+1$,
+Zählbereich inklusiv null bis $ARR$, Active-High-Ausgang mit HIGH genau für $CNT<CCR$.
+Gegeben: $PSC=47$, $ARR=999$, $CCR=300$.
+PSC ist der Vorteilerwert, ARR die obere Zählgrenze, CNT der aktuelle Zählerstand,
+CCR die Vergleichsschwelle; PWM bedeutet Pulsweitenmodulation.
 
-DMA überträgt $10000$ Bytes aus einem SRAM-Array an UART-TX.
+1. Berechnen Sie Zählfrequenz, Intervalle pro Periode und PWM-Frequenz. (2 P)
+2. Berechnen Sie HIGH-Dauer und Tastverhältnis. (2 P)
+3. Separater UART-Fall: hundert Nutzdatenbyte als 8N1 bei $115\,200$ Baud,
+   keine Pausen. Jedes Bit belegt eine Bitzeit.
+   Wie viele Leitungsbits und welche Mindestdauer werden benötigt? (2 P)
+4. Watchdogmodell: Ein Feed ist zeitlich nur $40$ bis einschließlich $100$ ms
+   nach dem letzten Feed zulässig. Letzter Feed bei $1000$ ms, jetzt $1075$ ms.
+   Eine überwachte Sensorverarbeitung meldet für die aktuelle Überwachungsrunde
+   keinen neuen Fortschritt. Alle überwachten Teile müssen Fortschritt nachweisen.
+   Ist der Zeitpunkt zulässig? Soll die Anwendung trotzdem feeden? Begründen Sie. (2 P)
 
-1. Inkrement-Modi für `SRC_ADDR` und `DST_ADDR` (An/Aus)? Begründung.  
-2. Hauptvorteil gegenüber interrupt-basiertem Senden (Interrupt Storm)?
+UART 8N1 bezeichnet acht Datenbits, keine Parität und ein Stoppbit,
+zusätzlich ein Startbit. Ein Feed ist das Bedienen des Watchdogs.
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+\Needspace{11\baselineskip}
 
-\vspace{2.5cm}
+**Ihre Periodenrechnung, Leitungslänge und Feed-Entscheidung:**
+
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung 3.1**
+\Needspace{18\baselineskip}
 
-1. **SRC:** Inkrement an (Array durchlaufen). **DST:** Inkrement aus (immer dasselbe TX-Register; sonst Bus Fault / falsche Adressen).  
-2. Kein ISR-Overhead pro Byte — DMA als Bus-Master kopiert SRAM → UART, CPU-Last nahe $0\,\%$.
+**Musterlösung B2**
+
+1. $f_\mathrm{cnt}=48\cdot10^6/(47+1)=10^6$ Hz.
+   $N=ARR+1=1000$ Intervalle, $f_\mathrm{PWM}=10^6/1000=1000$ Hz. (2 P)
+2. Ein Zählintervall dauert eine Mikrosekunde.
+   $t_\mathrm{HIGH}=300$ µs, $D=300/1000=30\,\%$. (2 P)
+3. Hundert Rahmen mit je zehn Bit ergeben tausend Leitungsbits.
+   $T=1000/115200\,\mathrm{s}\approx8{,}681$ ms. (2 P)
+4. Seit dem letzten Feed vergingen $1075-1000=75$ ms;
+   der Zeitpunkt liegt im erlaubten Fenster. (1 P)
+   Trotzdem nicht feeden: Der verlangte Fortschrittsnachweis fehlt.
+   Eine zeitliche Erlaubnis beweist keine erfolgreiche Verarbeitung. (1 P)
 :::
 
-### 3.2 Cache-Kohärenz bei DMA (5 Punkte)
+{{< pagebreak >}}
 
-L1-D-Cache mit Write-Back: Warum kann DMA *Stale Data* senden? Software-Abhilfe?
+### B3: Sensorprotokoll und DMA-Puffer (8 Punkte)
+
+I²C-Gerätevertrag: 7-Bit-Adresse `0x2A`, Registerindex `0x10`.
+Nach Registerauswahl per Write folgt ein Repeated START und ein Read von zwei Byte.
+Das erste Byte ist das höherwertige Byte eines $16$-Bit-Zweierkomplementwerts.
+Die Skalierung ist $0{,}01$ g pro Zählschritt.
+Erfolgreich empfangen wurden `FF`, dann `80`.
+
+1. Geben Sie die gesendeten Adressbyte für Write und Read an.
+   Wie quittiert der Master das erste und das letzte Lesebyte? (2 P)
+2. Rekonstruieren Sie den vorzeichenbehafteten Rohwert und den Wert in g. (2 P)
+3. Ein DMA liest pro Transfer ein Byte aus demselben Empfangsregister
+   und schreibt in die nächsten Byte eines RAM-Arrays.
+   Welche Adresse bleibt fest, welche wächst, wie viele Transfers braucht der Auftrag?
+   Beweist dessen Abschluss bereits ein erfolgreiches vollständiges Sensorprotokoll? (2 P)
+4. Nicht kohärentes Cachemodell: Zeilengröße $64$ Byte,
+   Pufferstart `0x20001018`, Länge zwei Byte.
+   Bestimmen Sie das auf ganze Cachezeilen erweiterte Intervall mit exklusivem Ende.
+   Ein unabhängiges dirty CPU-Objekt liegt bei `0x20001020`.
+   Warum darf die betreffende Zeile nicht einfach verworfen werden? (2 P)
+
+I²C bedeutet Inter-Integrated Circuit, DMA Direct Memory Access,
+CPU Central Processing Unit, RAM Random-Access Memory.
+ACK ist Quittierung, NACK Nichtquittierung; g steht hier für die Normfallbeschleunigung als Bezugseinheit.
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+\Needspace{11\baselineskip}
 
-\vspace{2.0cm}
+**Ihre Adressbyte, Dekodierung und Puffergrenzen:**
+
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung 3.2**
+\Needspace{20\baselineskip}
 
-CPU schreibt nur in den Cache; RAM bleibt veraltet. DMA liest den RAM und sendet alte Bytes.
+**Musterlösung B3**
 
-Abhilfe: vor DMA-Start *Cache Clean/Flush* des Puffers — oder Puffer in *uncached* Region (MPU/PMP/Linker).
+1. Write: $(\mathtt{0x2A}\ll1)|0=$ `0x54`,
+   Read: $(\mathtt{0x2A}\ll1)|1=$ `0x55`. (1 P)
+   Master-ACK nach dem ersten Byte, Master-NACK nach dem letzten Byte,
+   anschließend STOP. Das letzte NACK ist der vorgesehene Abschluss. (1 P)
+2. Zusammenfügung `0xFF80` $=65\,408$ vorzeichenlos.
+   Wegen des gesetzten Vorzeichenbits $65\,408-65\,536=-128$.
+   Skalierung $-128\cdot0{,}01=-1{,}28$ g. (2 P)
+3. Quelle fest, Ziel inkrementierend, zwei Ein-Byte-Transfers. (1 P)
+   Nein. Auch Controllerstatus, Quittierungen und vollständiger Abschluss
+   des I²C-Gerätevertrags müssen passen. (1 P)
+4. Pufferende `0x2000101A`; erweiterter Bereich
+   $[\mathtt{0x20001000},\mathtt{0x20001040})$. (1 P)
+   Das dirty Objekt liegt in derselben Zeile. Blindes Invalidieren könnte
+   seine noch nicht veröffentlichten Änderungen verlieren.
+   Benötigt wird ein geeigneter zeilenbezogener Besitz- und Übergabevertrag,
+   beispielsweise getrennte exklusiv genutzte Zeilen. (1 P)
 :::
 
-### 3.3 Moderne CPU-Architekturen (7 Punkte)
+{{< pagebreak >}}
+
+### B4: Registerabhängigkeiten und Sprungvorhersage (8 Punkte)
+
+Betrachten Sie diese vier RISC-V-Befehle in Programmreihenfolge:
 
 ```riscv
-1: add t0, t1, t2
-2: sub t0, t4, t5
+add t0, t1, t2    # I1
+sub t0, t3, t4    # I2
+add t5, t0, t6    # I3
+add t6, t7, t8    # I4
 ```
 
-RAW oder WAR/WAW? Wie löst Register Renaming das Problem?
+1. Klassifizieren Sie die Registerbeziehungen I1–I2, I2–I3 und I3–I4
+   als RAW, WAR oder WAW. Welche Beziehung transportiert einen benötigten Wert? (2 P)
+2. Welche dieser Beziehungen kann Register-Renaming beseitigen?
+   Garantiert das allein einen gleichzeitigen Start aller vier Befehle? Begründen Sie. (2 P)
+3. Separater Vorhersagefall: 2-Bit-Zähler, anfangs `10`.
+   Vorhersage T bei `10`/`11`, NT bei `00`/`01`.
+   Tatsächliches T erhöht, NT senkt den Zähler um eins, saturierend zwischen null und drei.
+   Ergänzen Sie die Tabelle, jeweils Vorhersage vor Update. (3 P)
+4. Geben Sie Zahl und Anteil der richtigen Vorhersagen an. (1 P)
+
+RAW = Read After Write, WAR = Write After Read, WAW = Write After Write.
+T bedeutet Sprung genommen, NT nicht genommen. Renaming vergibt physische Registerversionen.
+
+| Schritt | Zustand vorher | Vorhersage | Tatsächlich | Zustand danach |
+|---------|----------------|------------|-------------|----------------|
+| 1 | `10` | | T | |
+| 2 | | | NT | |
+| 3 | | | NT | |
+| 4 | | | NT | |
+| 5 | | | T | |
+| 6 | | | T | |
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+\Needspace{8\baselineskip}
 
-\vspace{2.5cm}
+**Ihre Abhängigkeiten, Begründungen und Trefferquote:**
+
+\vspace*{2.5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung 3.3**
+\Needspace{18\baselineskip}
 
-**WAW** (beide schreiben `t0`; Befehl 2 braucht das Ergebnis von 1 nicht).
+**Musterlösung B4**
 
-Renaming: Schreibziel von 1 → physisches Register z. B. `P10`, von 2 → `P11`. Ziele getrennt → beide parallel ausführbar.
-:::
+1. I1–I2: WAW auf `t0`; I2–I3: RAW auf `t0`;
+   I3–I4: WAR auf `t6` (je 0,5 P).
+   RAW verlangt den von I2 erzeugten Wert für I3 (0,5 P).
+2. Renaming kann WAR und WAW auflösen, RAW bleibt. (1 P)
+   Ressourcen, Bereitheit und die echte Datenabhängigkeit begrenzen weiterhin den Start;
+   keine Garantie, dass alle vier gleichzeitig starten. (1 P)
 
-### 3.4 2-Bit-Branch-Predictor (10 Punkte)
+| Schritt | Zustand vorher | Vorhersage | Tatsächlich | Zustand danach |
+|---------|----------------|------------|-------------|----------------|
+| 1 | `10` | T | T | `11` |
+| 2 | `11` | T | NT | `10` |
+| 3 | `10` | T | NT | `01` |
+| 4 | `01` | NT | NT | `00` |
+| 5 | `00` | NT | T | `01` |
+| 6 | `01` | NT | T | `10` |
 
-Ein 2-Bit saturierender Zähler startet in `11` (*Strongly Taken*). Kodierung: `00` Strongly NT, `01` Weakly NT, `10` Weakly T, `11` Strongly T. Vorhersage: `1x` → Taken, `0x` → Not Taken.
-
-Sequenz der tatsächlichen Sprünge: **T, T, NT, NT, T**.
-
-1. Geben Sie für jeden Schritt Startzustand, Vorhersage, Ist-Ergebnis und Folgezustand an.  
-2. Wie viele Treffer?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-\vspace{3.5cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung 3.4**
-
-| Schritt | Start | Vorhersage | Ist | Folge |
-|--------:|:-----:|:----------:|:---:|:-----:|
-| 1 | `11` | T | T | `11` |
-| 2 | `11` | T | T | `11` |
-| 3 | `11` | T | NT | `10` |
-| 4 | `10` | T | NT | `01` |
-| 5 | `01` | NT | T | `10` |
-
-**Treffer:** 2 von 5 (Schritte 1 und 2).
+3. Je vollständig richtiger Ablaufzeile 0,5 P, zusammen 3 P.
+4. Zwei Treffer, in Schritt eins und vier; $2/6\approx33{,}3\,\%$. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 4: Multicore, Busse und Edge AI (25 Punkte)
+### B5: Edge-Rechnung und gemeinsame Daten (8 Punkte)
 
-### 4.1 MESI-Protokoll (6 Punkte)
+Die folgenden Teilaufgaben sind unabhängige Lehrmodelle.
 
-Beide Kerne haben Variable `x` in **S**. Core 1 führt `x = 42;` aus. Welche Bus-Nachricht? Zustände danach in Core 0 und Core 1?
+1. Dense-Schicht ohne Aktivierungsfunktion:
+   $$W=\begin{bmatrix}1&2&-1\\0&-1&2\end{bmatrix},\quad
+   x=\begin{bmatrix}2\\1\\3\end{bmatrix},\quad
+   b=\begin{bmatrix}1\\-2\end{bmatrix}.$$
+   Bestimmen Sie $y=Wx+b$ und die Zahl produktbezogener MACs. (2 P)
+2. Ein Modell enthält $120\,000$ reine Gewichte.
+   Float32 benötigt vier Byte, Int8 ein Byte pro Gewicht.
+   Berechnen Sie beide Bytezahlen und die prozentuale Ersparnis der Gewichtbytes.
+   Beweist das zugleich passende Tensor-Arena und unveränderte Modellgüte? (2 P)
+3. MESI-Modell mit Write-Back: Beide Kerne halten S:5, der untere Speicher enthält fünf.
+   Kern 0 schreibt sieben. Danach liest Kern 1.
+   Ein Fremdread auf M schreibt hier zunächst den aktuellen Wert in den unteren Speicher;
+   beide Kopien werden S. Füllen Sie die Tabelle aus. (2 P)
+4. Feste Arbeit, serieller Anteil $s=0{,}25$, zwei gleiche Kerne,
+   perfekte Verteilung des restlichen Anteils, kein Zusatzaufwand.
+   Berechnen Sie den Speedup mit $S(N)=1/(s+(1-s)/N)$. (1 P)
+5. Separater Hardwareablauf: Zwei Ausführungsinstanzen lesen denselben Zählerstand null,
+   erhöhen jeweils ihren Registerwert und schreiben beide eins zurück.
+   Warum liegt kein korrektes zweifaches Inkrement vor?
+   Welche Art Operation oder Schutz wird benötigt? (1 P)
+
+MAC = Multiply-Accumulate, Produkt zur laufenden Summe addieren.
+MESI = Modified, Exclusive, Shared, Invalid.
+S ist eine saubere geteilte, M eine geänderte exklusive, I eine ungültige Kopie.
+Eine Tensor-Arena ist ein Arbeitsbereich für die Modellverarbeitung.
+
+| Abgeschlossener Schritt | Kern 0 | Kern 1 | Unterer Speicher |
+|------------------------|--------|--------|------------------|
+| Anfang | S:5 | S:5 | 5 |
+| Kern 0 schreibt 7 | | | |
+| Kern 1 liest | | | |
 
 ::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
+\Needspace{10\baselineskip}
 
-\vspace{2.0cm}
+**Ihre Ergebnisse, Speicherbilanz und Update-Begründung:**
+
+\vspace*{3.5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-**Musterlösung 4.1**
+\Needspace{20\baselineskip}
 
-Core 1 sendet **Invalidate**-Broadcast. Core 0 → **I**, Core 1 nach dem Write → **M**.
-:::
+**Musterlösung B5**
 
-### 4.2 Hardware-Atomics (5 Punkte)
-
-Warum führt `while(lock == 1); lock = 1;` zu einer Race Condition? Welche zwei RISC-V-A-Extension-Befehle lösen das?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-\vspace{2.0cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung 4.2**
-
-Lesen und Schreiben sind getrennte Befehle: beide Kerne können „frei“ sehen und den Lock setzen → kritischer Bereich doppelt betreten.
-
-Lösung: `lr.w` (Load-Reserved) und `sc.w` (Store-Conditional).
-:::
-
-### 4.3 Serielle Busse (4 Punkte)
-
-Warum ist I2C gegen Kurzschlüsse resilienter als SPI Push-Pull, wenn zwei Geräte gleichzeitig treiben — und welcher Geschwindigkeitsnachteil folgt daraus?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-\vspace{2.0cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung 4.3**
-
-I2C: Open-Drain — nur aktiv LOW oder hochohmig; HIGH über Pull-ups. Konflikt LOW/„HIGH“ → Strom über Pull-up nach GND, kein Push-Pull-Kurzschluss.
-
-Nachteil: langsame Rising Edges → typisch deutlich niedriger als SPI (z. B. $100$–$400\,\mathrm{kHz}$ vs. MHz).
-:::
-
-### 4.4 KI-Hardware / Systolic Array (5 Punkte)
-
-Warum ist ein Systolic Array (NPU) für neuronale Netze energieeffizienter als eine hochgetaktete General-Purpose-CPU?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-\vspace{2.0cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung 4.4**
-
-Milliarden identischer MACs. Die CPU leidet unter Memory Wall und Instruction-Decode-Overhead. Systolic Arrays reichen Daten in Hardware von Zelle zu Zelle weiter (Wiederverwendung) → weniger RAM-Zugriffe und weniger Front-End-Energie → höhere Effizienz (TOPS/Watt).
-:::
-
-### 4.5 Quantisierung und Memory Wall (5 Punkte)
-
-Ein Modell habe $250\,000$ Gewichte.
-
-1. Vergleichen Sie den Speicherbedarf in Float32 vs. Int8.  
-2. Warum mildert Int8-Quantisierung die *Memory Wall* auf MCUs?
-
-::: {.content-hidden when-profile="solution"}
-### Ihre Lösung {.unnumbered}
-
-\vspace{2.5cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-**Musterlösung 4.5**
-
-1. Float32: $250\,000 \times 4\,\mathrm{B} = 1\,\mathrm{MB}$. Int8: $250\,000 \times 1\,\mathrm{B} = 250\,\mathrm{KB}$ (Faktor $4$ kleiner).
-
-2. Weniger Bytes → weniger DRAM-/Flash-Bandbreite und kürzere Ladezeiten; Integer-MACs oft günstiger als Float ohne FPU. Die ALU wartet weniger auf Speicher → Memory Wall wird entschärft.
+1. $y_0=1+1\cdot2+2\cdot1-1\cdot3=2$,
+   $y_1=-2+0\cdot2-1\cdot1+2\cdot3=3$.
+   Also $y=[2,3]^T$ (1 P); sechs produktbezogene MACs (1 P).
+2. Float32: $120\,000\cdot4=480\,000$ Byte;
+   Int8: $120\,000$ Byte, Ersparnis $75\,\%$. (1 P)
+   Nein. Arbeitsbereich, Operatorunterstützung und Modellgüte mit repräsentativen
+   Daten sind eigene Prüfungen; nur reine Gewichtbytes sind gezählt. (1 P)
+3. Nach Write: Kern 0 M:7, Kern 1 I, unterer Stand fünf.
+   Nach Read: beide S:7, unterer Stand sieben.
+   Je Schritt 0,5 P für Kernzustände/Werte und 0,5 P für den unteren Stand. (2 P)
+4. $S(2)=1/(0{,}25+0{,}75/2)=1/0{,}625=1{,}6$. (1 P)
+5. Endwert eins statt zwei: Einzelzugriffe ergeben keine atomare Updategruppe.
+   Eine atomare Read-Modify-Write-Operation oder eine geeignete Sperre
+   muss das gesamte Inkrement schützen. (1 P)
+   Kohärenz allein genügt nicht. Gewöhnliches konkurrierendes ungeschütztes C
+   wäre bei einem Data Race undefiniert; der vorgegebene Ablauf ist ein Hardwaremodell.
 :::
