@@ -1,389 +1,235 @@
 ---
 title: "Übungsblatt 2: Speicherhierarchie und Caches"
-subtitle: "Mikrocomputertechnik 3 · Papieraufgaben und optionaler Simulatorvergleich"
+subtitle: "Mikrocomputertechnik 3 · 32 Orientierungspunkte · ca. 60–75 Minuten"
 header-includes: |
   \usepackage{needspace}
+highlight-style: ../assets/styles/dhbw-code.theme
 ---
 
 ::: {.content-visible when-profile="solution"}
 > **Musterlösung**
 :::
 
-## Ziel und Arbeitsweise
+## Aufgabe 1: Lokalität an einer Blockgrenze (4 Punkte)
 
-Sie erklären Lokalität, rechnen die mittlere Speicherzugriffszeit aus und verfolgen
-Cache-Zustände. Alle Pflichtaufgaben sind ohne Rechner und ohne Simulator lösbar.
+Zwei unabhängige Lesefolgen, jeweils kalter Cache, 32-Byte-Lines,
+keine Verdrängung:
 
-**Bearbeitungszeit:** etwa 60–75 Minuten. **Orientierungspunkte:** 32 Punkte.
-Für die vier Schulstunden sind insgesamt 55 Minuten angeleitete Arbeitsphasen
-vorgesehen: Aufgabe 1 (10 Minuten), Aufgaben 2–3 (15 Minuten), Aufgaben 4–5
-(15 Minuten) und Aufgabe 6 (15 Minuten). Gemeinsame Besprechungen erfolgen in
-den Vorlesungsphasen; die längere Zeitangabe gilt für selbstständiges Bearbeiten.
-Begründen Sie Ihre Antworten; zu Rechnungen gehören Formel, Rechenweg und Einheit.
-Hexadezimale Adressen tragen das Präfix `0x`. Eine Adresse bezeichnet ein Byte.
+- A: `0x207C, 0x207C, 0x207C, 0x207C`
+- B: `0x2078, 0x207C, 0x2080, 0x2084`
 
-Wir verwenden ausdrücklich vereinfachte Lehrmodelle: ein Prozessor, normaler
-cachefähiger Speicher, abgeschlossene Anfragen, kein Vorabladen und keine
-zusätzlichen Zugriffe. „Kalt“ bedeutet, dass alle Valid-Bits zunächst null sind.
-Valid ist das Gültigkeitsbit, Dirty das Änderungsbit einer Write-Back-Line.
-Zähler und Zeiten der Modelle sind keine Messungen eines übersetzten C-Programms.
-
-## Aufgabe 1: Lokalität begründen (4 Punkte)
-
-Die beiden Folgen beginnen jeweils unabhängig mit einem kalten Cache und
-$64$-Byte-Lines. Es findet keine Verdrängung statt.
-
-- A: `0x1000, 0x1000, 0x1000`
-- B: `0x1000, 0x1004, 0x1008`
-
-1. Ordnen Sie zeitliche und räumliche Lokalität zu. Begründen Sie die Zuordnung. (2 P)
-2. Bestimmen Sie für jede Folge Hits und Misses. Erklären Sie, warum eine
-   verstreute verkettete Liste mit demselben Elementumfang schlechtere räumliche
-   Lokalität haben kann, aber nicht muss. (2 P)
+1. Welche Lokalität nutzt jede Folge? (2 P)
+2. Geben Sie Hit/Miss je Zugriff und die vollständigen berührten Linebereiche an.
+   Warum garantiert räumliche Lokalität nicht nur einen Miss? (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-**Ihr Rechenweg und Ihre Begründung:**
+\Needspace{8\baselineskip}
 
+**Ihre Lösung:**
 
-\vspace{2cm}
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
 **Musterlösung 1**
 
-A zeigt zeitliche Lokalität: Dieselbe Adresse wird erneut gelesen. B zeigt räumliche
-Lokalität: Benachbarte Wörter werden gelesen. Alle Adressen gehören zur Line
-`0x1000` bis `0x103F`. In beiden unabhängigen Folgen entsteht daher zuerst ein
-Miss, danach zwei Hits. Das gilt unter der Annahme, dass die gültige Line erhalten
-bleibt.
-
-Ein Array speichert seine Elemente zusammenhängend. Bei einer verstreuten Liste
-kann der Zeiger auf einen Knoten in einer anderen Line führen; die mitgeladenen
-Nachbarn helfen dann wenig. Zusammenhängend abgelegte Listenknoten können dagegen
-ebenfalls gute räumliche Lokalität haben. Der Datentyp allein legt die Quote nicht
-fest. Bewertung: je 1 P für die zwei Zuordnungen, 1 P für die Bilanzen,
-1 P für die begründete Layout-Aussage.
+A: zeitlich; Miss, Hit, Hit, Hit. B: räumlich; Miss, Hit, Miss, Hit.
+Linebereiche `0x2060` bis `0x207F` und `0x2080` bis `0x209F`.
+B überschreitet die Blockgrenze. Je 1 P für die beiden Lokalitäten,
+1 P für Folgen und 1 P für Grenzen/Begründung.
 :::
 
-## Aufgabe 2: AMAT auf zwei Wegen (5 Punkte)
+{{< pagebreak >}}
 
-Hit Time $t_H=1$ Takt, **zusätzliche** Miss Penalty $p=100$ Takte.
-AMAT bedeutet Average Memory Access Time, mittlere Speicherzugriffszeit.
+## Aufgabe 2: AMAT aus einer Messspur im Modell (5 Punkte)
 
-1. Eine Folge mit $100$ Anfragen hat $95$ Hits und $5$ Misses. Berechnen Sie
-   die Miss Rate und AMAT. Kontrollieren Sie das Ergebnis durch Aufsummieren
-   aller Einzelzeiten. (3 P)
-2. Berechnen Sie AMAT bei $80\,\%$ Hit Rate. (1 P)
-3. Ist das Verhältnis der beiden AMAT-Werte bereits der Beschleunigungsfaktor
-   eines ganzen Programms? Begründen Sie. (1 P)
+Hitzeit zwei Takte, zusätzliche Misspenalty sechzig Takte.
+AMAT ist die mittlere Speicherzugriffszeit; alle Anfragen sind abgeschlossen.
+
+1. 120 Anfragen ergeben 108 Hits und zwölf Misses. Bestimmen Sie Missrate und
+   AMAT. Kontrollieren Sie durch Summieren der Einzelzeiten. (3 P)
+2. Berechnen Sie AMAT bei 75 Prozent Hitrate. (1 P)
+3. Ist das Verhältnis beider Werte bereits ein Programmspeedup? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-**Ihr Rechenweg:**
+\Needspace{8\baselineskip}
 
+**Ihre Lösung:**
 
-\vspace{3cm}
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
 **Musterlösung 2**
 
-Die Miss Rate $m$ ist der Anteil der Misses:
-
-$$
-m=\frac{5}{100}=0{,}05,\qquad
-\mathrm{AMAT}=t_H+mp=1+0{,}05\cdot100=6\ \text{Takte}.
-$$
-
-Jeder Miss kostet insgesamt $1+100=101$ Takte. Kontrolle:
-
-$$
-\frac{95\cdot1+5\cdot101}{100}
-=\frac{600}{100}=6\ \text{Takte}.
-$$
-
-Bei $80\,\%$ Hit Rate ist $m=1-0{,}80=0{,}20$ und
-$\mathrm{AMAT}=1+0{,}20\cdot100=21$ Takte. Die Prüfung kostet auch beim Miss
-einen Takt; daher sind $5$ beziehungsweise $20$ Takte keine korrekten Ergebnisse.
-
-Das Verhältnis $21/6=3{,}5$ vergleicht die mittleren Zugriffszeiten des Modells.
-Für eine Programmlaufzeit fehlen unter anderem Anfrageanzahl, übrige
-Rechenarbeit und Überlappung. Bewertung: Miss Rate 1 P, Formel und Ergebnis 1 P,
-Kontrollrechnung 1 P, zweite AMAT 1 P, begründete Abgrenzung 1 P.
+1. $m=12/120=0{,}1$, AMAT $=2+0{,}1\cdot60=8$ Takte.
+   Kontrolle: $(108\cdot2+12\cdot62)/120=960/120=8$. (3 P)
+2. $2+0{,}25\cdot60=17$ Takte. (1 P)
+3. $17/8=2{,}125$ vergleicht Zugriffszeiten; übrige Arbeit und Überlappung fehlen. (1 P)
 :::
 
-## Aufgabe 3: Adressfelder und Blockgrenzen (6 Punkte)
+{{< pagebreak >}}
 
-Referenzmodell aus der Vorlesung: $32$-Bit-Byteadressen, $C=32$ KiB
-Datenkapazität, $B=64$ Byte je Line. Ein KiB hat $1024$ Byte.
-Tags und Zustandsbits zählen nicht zu $C$.
+## Aufgabe 3: Andere Cachegeometrie (6 Punkte)
 
-1. Bestimmen Sie Anzahl der Sets sowie Bitbreiten von Tag, Index und Offset
-   für Direct Mapped und für $4$-Way. Erklären Sie, warum der Offset gleich bleibt. (3 P)
-2. Zerlegen Sie `0x12345678` für Direct Mapped. Geben Sie Index und Offset
-   dezimal, das Tag hexadezimal an. Kontrollieren Sie durch Rückrechnung. (2 P)
-3. Eine andere Anfrage hat die **Dezimaladresse** $1000$. Geben Sie bei
-   $64$-Byte-Lines Blockbeginn, Blockende und Offset an. (1 P)
+32-Bit-Byteadressen, 16 KiB Datenkapazität, 32 Byte je Line;
+Tags und Zustandsbits sind nicht in der Kapazität enthalten.
+
+1. Bestimmen Sie Sets, Tag-, Index- und Offsetbits für Direct Mapped und 2-Way. (3 P)
+2. Zerlegen Sie `0x3A5C91E6` für Direct Mapped und kontrollieren Sie durch Rückrechnung. (2 P)
+3. Bestimmen Sie für die Dezimaladresse 1510 Blockbeginn, letztes Blockbyte und Offset. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-**Ihre Rechnung:**
+\Needspace{8\baselineskip}
 
+**Ihre Lösung:**
 
-\vspace{3cm}
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
 **Musterlösung 3**
 
-Mit $W$ Ways, also Plätzen je Set, gilt
+| Organisation | Sets | Tagbits | Indexbits | Offsetbits |
+|--------------|------|---------|-----------|------------|
+| Direct Mapped | 512 | 18 | 9 | 5 |
+| 2-Way | 256 | 19 | 8 | 5 |
 
-$$
-S=\frac{C}{BW},\quad b=\log_2 B,\quad s=\log_2 S,\quad \tau=32-b-s.
-$$
-
-| Organisation | Sets $S$ | Tagbits $\tau$ | Indexbits $s$ | Offsetbits $b$ |
-|--------------|----------|----------------|---------------|----------------|
-| Direct Mapped | $512$ | $17$ | $9$ | $6$ |
-| $4$-Way | $128$ | $19$ | $7$ | $6$ |
-
-Die Blockgröße bleibt $64$ Byte; der Offset adressiert weiterhin dieselben
-Bytepositionen. Vier Ways verteilen dieselben $512$ Plätze auf weniger Sets.
-
-Für `0x12345678` ist $o=56$, $q=\lfloor a/64\rfloor=\texttt{0x48D159}$,
-$i=q\bmod512=345$ und $t=\lfloor q/512\rfloor=\texttt{0x2468}=9320$.
-Die Rückrechnung lautet
-
-$$
-a=t\cdot32768+i\cdot64+o
-=9320\cdot32768+345\cdot64+56=305419896=\texttt{0x12345678}.
-$$
-
-Für Dezimaladresse $1000$ ist die Blocknummer $15$.
-Blockbeginn $15\cdot64=960$, Blockende $960+63=1023$, Offset $1000-960=40$.
-Bewertung: je 1 P pro Tabellenzeile, 1 P für unveränderten Offset,
-1 P für Adressfelder, 1 P für Rückrechnung, 1 P für Blockgrenzen und Offset.
+Je 1 P pro Zeile, 1 P: gleicher Offset wegen gleicher Linegröße.
+Adresse: Offset sechs, Index 143, Tag `0xE972`.
+Rückrechnung $59762\cdot16384+143\cdot32+6=979145190=$ `0x3A5C91E6`. (2 P)
+Für 1510: Block 47, Beginn 1504, letztes Byte 1535, Offset sechs. (1 P)
 :::
 
-## Aufgabe 4: Zugriffstabelle und Ersetzung (6 Punkte)
+{{< pagebreak >}}
 
-### 4a: Ein Platz oder vier Plätze? (4 Punkte)
+## Aufgabe 4: Konflikte und Ersatzreihenfolge (6 Punkte)
 
-Verwenden Sie das Referenzmodell aus Aufgabe 3. Beide Caches beginnen kalt.
-Alle Anfragen sind Daten-Loads; vier Ways verwenden zunächst freie Plätze.
+Cachegeometrie wie Aufgabe 3, beide Caches anfangs leer.
+Nur diese sieben Reads zählen:
+`0x3000, 0x7000, 0x3004, 0x7004, 0x3000, 0x7000, 0x3008`.
 
-\Needspace{12\baselineskip}
-
-| Schritt | Adresse | DM: Index | DM: Tag | DM: Hit/Miss | 4-Way: Hit/Miss |
-|---------|---------|-----------|---------|--------------|-----------------|
-| 1 | `0x1000` | | | | |
-| 2 | `0x1004` | | | | |
-| 3 | `0x9000` | | | | |
-| 4 | `0x1000` | | | | |
-| 5 | `0x9000` | | | | |
-| 6 | `0x1004` | | | | |
-
-DM steht für Direct Mapped. Füllen Sie die Tabelle aus. Nennen Sie für jeden Cache
-Hits, Misses und Hit Rate. Begründen Sie, warum die zusätzlichen DM-Misses
-Konflikt-Misses und keine Kapazitäts-Misses sind.
-
-### 4b: FIFO oder LRU? (2 Punkte)
-
-Ein getrenntes, zunächst leeres $4$-Way-Set erhält die Blockfolge
-`A, B, C, D, A, E`. Alle Blöcke haben denselben Set-Index.
-
-Geben Sie für FIFO (First In, First Out) und LRU (Least Recently Used) die
-Reihenfolge „alt nach neu“ nach dem zweiten A sowie den durch E verdrängten
-Block an. Erklären Sie die Wirkung eines Hits auf beide Regeln.
+1. Erstellen Sie eine Tabelle mit DM-Index, DM-Tag und Hit/Miss für Direct Mapped
+   sowie Hit/Miss für 2-Way. Bestimmen Sie beide Quoten und die Ursache zusätzlicher Misses. (4 P)
+2. Separates leeres 3-Way-Set, Blockfolge J, K, L, J, M.
+   Geben Sie die Ordnung nach dem zweiten J und das Opfer bei M an:
+   FIFO nach Ladealter, LRU nach letzter Nutzung. (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-**Ihre Zählung und Begründung:**
+\Needspace{8\baselineskip}
 
+**Ihre Lösung:**
 
-\vspace{2cm}
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
 **Musterlösung 4**
 
-\Needspace{12\baselineskip}
+| Schritt | DM-Index | DM-Tag | DM | 2-Way |
+|---------|----------|--------|----|-------|
+| 1 | 384 | 0 | Miss | Miss |
+| 2 | 384 | 1 | Miss | Miss |
+| 3 | 384 | 0 | Miss | Hit |
+| 4 | 384 | 1 | Miss | Hit |
+| 5 | 384 | 0 | Miss | Hit |
+| 6 | 384 | 1 | Miss | Hit |
+| 7 | 384 | 0 | Miss | Hit |
 
-| Schritt | Adresse | DM: Index | DM: Tag | DM | 4-Way |
-|---------|---------|-----------|---------|----|--------|
-| 1 | `0x1000` | $64$ | $0$ | Miss | Miss |
-| 2 | `0x1004` | $64$ | $0$ | Hit | Hit |
-| 3 | `0x9000` | $64$ | $1$ | Miss | Miss |
-| 4 | `0x1000` | $64$ | $0$ | Miss | Hit |
-| 5 | `0x9000` | $64$ | $1$ | Miss | Hit |
-| 6 | `0x1004` | $64$ | $0$ | Miss | Hit |
-
-`0x1004` gehört zur selben Line wie `0x1000`. Direct Mapped hat
-$1$ Hit, $5$ Misses und Hit Rate $1/6\approx16{,}67\,\%$. Zwei Misses sind
-erste Blockanforderungen, drei weitere entstehen durch gegenseitige Verdrängung.
-
-Der $4$-Way-Cache hat $4$ Hits, $2$ Misses und Hit Rate $4/6\approx66{,}67\,\%$.
-Beide Blöcke treffen dort ebenfalls Set $64$, mit Tags $0$ und $4$.
-Sie belegen verschiedene Ways. Schon zwei Plätze würden für diese Folge genügen.
-Die zusätzlichen DM-Misses entstehen trotz ausreichend großer Gesamtkapazität:
-Ein vollassoziativer Cache gleicher Kapazität könnte beide Blöcke halten.
-Bewertung 4a: Index/Tag 1 P, Trefferfolgen 1 P, Bilanzen und Quoten 1 P,
-Konfliktbegründung 1 P.
-
-FIFO behält nach dem Hit auf A die Ladereihenfolge A, B, C, D und verdrängt A.
-LRU aktualisiert die letzte Nutzung zu B, C, D, A und verdrängt B.
-Ein Hit verjüngt einen Block nur in der LRU-Nutzungsordnung.
-Bewertung 4b: je 1 P für vollständige Reihenfolge, Opfer und Begründung pro Regel.
+DM: null Hits, sieben Misses. 2-Way: fünf Hits, zwei Misses, $5/7\approx71{,}43\,\%$.
+Dort Set 128, Tags eins und drei. Die zusätzlichen DM-Misses sind Konflikte:
+Zwei Blöcke passen in die Gesamtkapazität. (4 P)
+FIFO: J, K, L; Opfer J. LRU: K, L, J; Opfer K.
+Nur LRU verändert beim Hit die Nutzungsordnung. (2 P)
 :::
 
-## Aufgabe 5: Schreiben und alte Blockadresse (5 Punkte)
+{{< pagebreak >}}
+
+## Aufgabe 5: Writeback tritt vor dem letzten Zugriff auf (5 Punkte)
 
 Direct Mapped wie Aufgabe 3, Write-Back und Write-Allocate, keine Puffer.
-Zunächst ist die Line `0x1000` gültig und sauber (Dirty $=0$).
-Das betrachtete Wort hat im Cache und in der nächsten Ebene den Wert $0$.
-`0x9000` ist nicht im Cache; dort enthält die nächste Ebene den Wert $9$.
+Anfangs ist Block `0x3000` gültig und sauber; sein betrachtetes Wort ist zwei,
+auch in der unteren Ebene. Block `0x7000` fehlt im Cache und enthält unten acht.
 
-Verfolgen Sie: `Store 5 nach 0x1000; Load 0x1000; Store 7 nach 0x1000;
-Load 0x9000`. Nur diese vier Anfragen werden gezählt.
+Folge: Store sechs nach `0x3000`; Load `0x7000`; Load `0x3000`; Store elf nach `0x3000`.
 
-1. Füllen Sie Zustand und eventuelles Writeback nach jedem Schritt aus. (3 P)
-
-\Needspace{12\baselineskip}
-
-| Schritt | Cache-Blockbasis | Wortwert | Dirty | Wert unten bei `0x1000` | Writeback-Adresse |
-|---------|-----------------|----------|-------|-------------------------|-------------------|
-| Store 5 | | | | | |
-| Load | | | | | |
-| Store 7 | | | | | |
-| Load `0x9000` | | | | | |
-
-2. Warum muss der letzte Schritt gegebenenfalls an die alte Blockadresse
-   zurückschreiben? (1 P)
-3. Was wäre bei einem Store-Miss mit No-Write-Allocate anders?
-   Ist diese Regel durch Write-Back schon festgelegt? (1 P)
+1. Notieren Sie nach jedem Schritt Blockbasis, Wortwert, Dirty,
+   unteren Wert bei `0x3000` und eine mögliche Writeback-Adresse. (3 P)
+2. Aus welchen alten Informationen entsteht die Writeback-Adresse? (1 P)
+3. Wie wirkt No-Write-Allocate bei einem Store-Miss? Folgt die Regel aus Write-Back? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-**Ihre Erläuterung:**
+\Needspace{8\baselineskip}
 
+**Ihre Lösung:**
 
-\vspace{1.5cm}
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
 **Musterlösung 5**
 
-\Needspace{12\baselineskip}
+| Schritt | Blockbasis | Wert | Dirty | Unten bei 0x3000 | Writeback |
+|---------|------------|------|-------|-----------------|-----------|
+| Store 6 | `0x3000` | 6 | 1 | 2 | keiner |
+| Load 0x7000 | `0x7000` | 8 | 0 | 6 | `0x3000` |
+| Load 0x3000 | `0x3000` | 6 | 0 | 6 | keiner |
+| Store 11 | `0x3000` | 11 | 1 | 6 | keiner |
 
-| Schritt | Blockbasis | Wortwert | Dirty | Wert unten bei `0x1000` | Writeback |
-|---------|------------|----------|-------|-------------------------|-----------|
-| Store 5 | `0x1000` | $5$ | $1$ | $0$ | keiner |
-| Load | `0x1000` | $5$ | $1$ | $0$ | keiner |
-| Store 7 | `0x1000` | $7$ | $1$ | $0$ | keiner |
-| Load `0x9000` | `0x9000` | $9$ | $0$ | $7$ | nach `0x1000` |
-
-Die ersten drei Anfragen sind Hits. Lesen ändert Dirty nicht. Der vierte
-Zugriff ist ein Miss auf denselben Index $64$ und verdrängt die veränderte Line.
-Die alte Blockbasis ist aus altem Tag und Index zu bilden:
-
-$$
-a_\text{alt}=(t_\text{alt}\cdot S+i)B=(0\cdot512+64)\cdot64=\texttt{0x1000}.
-$$
-
-Das Zurückschreiben erhält den aktuellen Wert $7$ am richtigen Ort.
-Ein Writeback nach `0x9000` würde den fremden Block überschreiben.
-Danach wird der angefragte Block geladen und ist sauber.
-Die gültige Line bleibt bei allen dargestellten Zuständen Valid $=1$.
-
-No-Write-Allocate würde bei einem Store-Miss den Store weitergeben, ohne eine
-neue Cache-Line anzulegen. Weitergabe und Zuteilen sind getrennte Entscheidungen;
-Write-Back legt die Store-Miss-Regel nicht allein fest. Bewertung:
-Stores 1 P, Load-Hit 1 P, letzter Zustand 1 P, alte Adresse 1 P, Policy-Abgrenzung 1 P.
+Tabelle 3 P. Alte Basis $(0\cdot512+384)\cdot32=$ `0x3000` aus altem Tag und Index,
+nicht aus der neu angefragten Adresse. (1 P)
+No-Write-Allocate gibt den Store weiter, ohne eine neue Line zuzuteilen;
+diese Entscheidung ist von Write-Back getrennt. (1 P)
 :::
 
-## Aufgabe 6: C-Layout als Papieraufgabe (6 Punkte)
+{{< pagebreak >}}
 
-Es gilt `uint32_t a[16][16]`: $16$ Zeilen, $16$ Spalten, $4$ Byte pro
-Element, Basis `0x1000`. Die Elemente sind initialisiert.
-Betrachten Sie zwei **definierte Modellspuren**, je genau ein Daten-Load pro
-Element. Andere Zugriffe und Compileroptimierungen gehören nicht zur Zählung.
+## Aufgabe 6: Ein rechteckiges C-Array (6 Punkte)
 
-```c
-/* A: zeilenweise; sum ist ein uint64_t-Akkumulator mit Startwert 0. */
-for (unsigned r = 0; r < 16; ++r)
-    for (unsigned c = 0; c < 16; ++c)
-        sum += a[r][c];
+`uint32_t feld[12][8]`, vier Byte je Element, ausgerichtete Basis `0x3000`.
+Zwei unabhängige Modellspuren laden genau einmal jedes Element:
+A zeilenweise, B spaltenweise. Keine anderen Zugriffe oder Optimierungen.
 
-/* B: unabhängig davon spaltenweise, sum zuvor wieder 0. */
-for (unsigned c = 0; c < 16; ++c)
-    for (unsigned r = 0; r < 16; ++r)
-        sum += a[r][c];
-```
-
-`uint32_t` und `uint64_t` sind vorzeichenlose Ganzzahltypen mit $32$
-beziehungsweise $64$ Bit; `r` und `c` sind Zeilen- und Spaltenindex.
-
-1. Leiten Sie die Elementadresse her und geben Sie die ersten vier Adressen
-   beider Spuren an. (2 P)
-2. Kleines Modell: $512$ Byte Datenkapazität, Direct Mapped, $64$-Byte-Lines,
-   vor jeder Variante kalt. Leiten Sie den Set-Index der Zeile $r$ her und zählen
-   Sie Hits und Misses für beide vollständigen Spuren. (3 P)
-3. Ändern Sie nur die Datenkapazität auf $1024$ Byte. Was ändert sich an der
-   spaltenweisen Bilanz? Begründen Sie. (1 P)
+1. Geben Sie die Adressformel und die ersten vier Adressen beider Spuren an. (2 P)
+2. Direct Mapped, 128 Byte Datenkapazität, 32-Byte-Lines, vor jeder Spur kalt:
+   Bestimmen Sie Set-Index und vollständige Hit/Miss-Bilanzen. (3 P)
+3. Wie ändert sich B bei 512 Byte Kapazität und sonst gleichen Bedingungen? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-**Ihr Rechenweg:**
+\Needspace{8\baselineskip}
 
+**Ihre Lösung:**
 
-\vspace{3cm}
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
 **Musterlösung 6**
 
-C speichert zeilenweise. Vor Zeile $r$ liegen $16r$ Elemente, davor in der Zeile
-weitere $c$. Somit
-
-$$
-a_{r,c}=\texttt{0x1000}+4(16r+c).
-$$
-
-Spur A beginnt `0x1000, 0x1004, 0x1008, 0x100C`.
-Spur B beginnt `0x1000, 0x1040, 0x1080, 0x10C0`.
-
-Im kleinen Modell gibt es $512/64=8$ Sets. Eine Arrayzeile ist
-$16\cdot4=64$ Byte groß und beginnt auf einer Blockgrenze. Ihre Blocknummer
-ist $64+r$, also ihr Set-Index $(64+r)\bmod8=r\bmod8$.
-
-Zeilenweise folgen auf den ersten Load einer Zeile fünfzehn Hits:
-$16$ Misses und $240$ Hits, Hit Rate $93{,}75\,\%$.
-Spaltenweise ersetzen Zeilen $8$ bis $15$ die Zeilen $0$ bis $7$ in denselben Sets.
-In der nächsten Spalte fehlen die ersten acht Zeilen wieder; sie ersetzen
-die zweiten acht, die anschließend ebenfalls fehlen. Daher $256$ Misses und
-$0$ Hits. Die $16$ ersten Blockanforderungen sind Kaltstart-Misses.
-Die späteren Misses sind gegenüber einem vollassoziativen Acht-Plätze-Cache
-mit LRU ebenfalls nicht vermeidbar; die aktive Menge ist zu groß.
-
-Mit $1024$ Byte gibt es $16$ Sets. Jede Zeile hat einen eigenen Platz und bleibt
-bis zur Wiederverwendung erhalten. Spaltenweise lädt die erste Spalte alle
-$16$ Lines; die folgenden $15$ Spalten ergeben $240$ Hits. Beide Varianten haben
-nun $16$ Misses und $240$ Hits. Ein großer Adresssprung allein beweist somit
-keine bestimmte Miss Rate oder Programmlaufzeit.
-
-Bewertung: Adressformel 1 P, Anfangsspuren 1 P, Set-Index 1 P,
-je eine begründete Bilanz 1 P, größerer Cache 1 P.
+1. $a_{r,c}=\mathtt{0x3000}+4(8r+c)$.
+   A: `3000, 3004, 3008, 300C`; B: `3000, 3020, 3040, 3060`, jeweils hexadezimal. (2 P)
+2. Vier Sets, eine Arrayzeile je Line; Index $(384+r)\bmod4=r\bmod4$.
+   A: zwölf Misses, 84 Hits. B: 96 Misses, null Hits;
+   je Spalte verdrängen zwölf Zeilen einander in vier Sets. (3 P)
+3. Sechzehn Sets halten alle zwölf Zeilen: B hat zwölf Misses und 84 Hits. (1 P)
 :::
 
-## Optional: Simulatorvergleich (ohne Punkte)
+{{< pagebreak >}}
 
-Wenn Ripes, ein visueller RISC-V-Simulator, verfügbar ist, vergleichen Sie eine
-explizite Load-Spur mit der Papierlösung. Dokumentieren Sie Version, Cache-Größe,
-Blockgröße, Ways, Anfangszustand und welche Datenanfragen tatsächlich gezählt
-werden. Setzen Sie den Cache vor jedem Vergleich zurück.
+## Optional: am Rechner prüfen
 
-Behandeln Sie Trefferzahlen als Analyse der Spur. Das Cache-Modell von Ripes ist
-kein vollständiges Cache-Latenzmodell und belegt keinen allgemeinen
-Geschwindigkeitsfaktor. Zusätzliche Datenzugriffe eines Simulatorprogramms müssen
-gesondert berücksichtigt werden.
-
-::: {.content-visible when-profile="solution"}
-**Hinweis zur Auswertung:** Eine Abweichung zuerst auf zusätzliche Zugriffe,
-falsche Einstellungen oder einen nicht zurückgesetzten Cache prüfen.
-Keine bestimmte Simulatorzeit ist als Musterergebnis vorgegeben.
-:::
+Erzeugen Sie die beiden Adressspuren aus Aufgabe 6 in einem kurzen Programm.
+Vergleichen Sie sie mit einem verfügbaren Cache-Simulator bei 128 und 512 Byte.
+Zählen Sie ausschließlich diese Loads; dokumentieren Sie Anfangszustand und Einstellungen.

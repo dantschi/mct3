@@ -1,6 +1,6 @@
 ---
 title: "Übungsblatt 8: KI-Beschleuniger & Edge AI"
-subtitle: "Mikrocomputertechnik 3 · Datenfluss, Vektorlängen und Speicherplanung auf Papier"
+subtitle: "Mikrocomputertechnik 3 · 32 Orientierungspunkte · ca. 60–75 Minuten"
 highlight-style: ../assets/styles/dhbw-code.theme
 header-includes: |
   \usepackage{needspace}
@@ -10,404 +10,247 @@ header-includes: |
 > **Musterlösung**
 :::
 
-## Ziel und Arbeitsweise
+## Aufgabe 1: Drei Ausgänge aus zwei Eingängen (5 Punkte)
 
-Die sechs Pflichtaufgaben sind vollständig auf Papier lösbar.
-Geben Sie Rechenweg, Einheiten und Zählgrenze an.
-Alle Architekturzeiten und Speicherbudgets sind Lehrannahmen.
+Dense-Schicht $y=Wx+b$, keine Aktivierungsfunktion:
 
-**Bearbeitungszeit:** etwa 60–75 Minuten selbstständig.
-**Orientierungspunkte:** 32.
-Im Unterricht: Aufgaben 1–2 (10 min), Aufgabe 3 (15 min),
-Aufgabe 4 (15 min), Aufgaben 5–6 (15 min).
-Lösungsbesprechungen sind in die Vorlesungsphasen eingeplant.
+$$W=\begin{bmatrix}2&-1\\-3&4\\1&2\end{bmatrix},\quad
+x=\begin{bmatrix}3\\-2\end{bmatrix},\quad b=\begin{bmatrix}-1\\2\\0\end{bmatrix}.$$
 
-MAC heißt Multiply-Accumulate und zählt hier zwei Operationen.
-Int8: $1$ B, Int32/Float32: $4$ B je Element.
-KiB $=1024$ B, MB $=10^6$ B.
-
-## Aufgabe 1: Dense-Schicht und Datenbudget (5 Punkte)
-
-Eine Dense-Schicht, vollständig verbundene Schicht, berechnet $y=Wx+b$.
-Eine anschließende Aktivierungsfunktion ist ausgeblendet.
-
-$$W=\begin{bmatrix}1&2&3\\0&-1&4\end{bmatrix},\quad
-x=\begin{bmatrix}2\\1\\3\end{bmatrix},\quad
-b=\begin{bmatrix}1\\-2\end{bmatrix}$$
-
-1. Berechnen Sie beide Ausgänge einschließlich Zwischenrechnungen. (2 P)
-2. Zählen Sie trainierbare Parameter und produktbezogene MACs.
-   Warum sind diese Zahlen verschieden? (1 P)
-3. Gewichte und Eingaben liegen als Int8, Biaswerte als Int32 vor.
-   Wie viele gespeicherte Byte benötigen $W$, $b$ und $x$ zusammen?
-   Wie verändert sich diese Summe, wenn zwei Int8-Ausgänge hinzukommen?
-   Ist dies bereits die Größe der Modelldatei oder der Arena? (2 P)
-
-::: {.content-hidden when-profile="solution"}
-\Needspace{10\baselineskip}
-
-**Ihre Ausgänge, Zählung und Bytebilanz:**
-
-\vspace*{4cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-\Needspace{18\baselineskip}
-
-**Musterlösung 1**
-
-1. $y_0=1\cdot2+2\cdot1+3\cdot3+1=2+2+9+1=14$.
-   $y_1=0\cdot2+(-1)\cdot1+4\cdot3-2=0-1+12-2=9$.
-   Also $y=[14,9]^T$. (je 1 P)
-2. Sechs Gewichte plus zwei Biaswerte ergeben acht Parameter.
-   Die sechs Produkte ergeben sechs produktbezogene MACs.
-   Bias ist ein Parameter, wird aber nicht mit einem Eingang multipliziert. (1 P)
-3. $W$: $6$ B, $b$: $2\cdot4=8$ B, $x$: $3$ B.
-   Zusammen $17$ B, mit den zwei Ausgängen $19$ B. (1 P)
-   Diese Bilanz enthält keine Strukturmetadaten, Skalen, Ausrichtung,
-   temporären Kernelpuffer oder Laufzeitverwaltung.
-   Sie ist weder vollständige Modelldatei noch Arena. (1 P)
-
-Die Null im Gewichtsfeld zählt in dieser dichten Ausführung als gespeicherter
-Wert und als Produkt. Ein besonderer Sparse-Kernel wurde nicht angenommen.
-:::
-
-{{< pagebreak >}}
-
-## Aufgabe 2: Roofline und Wiederverwendung (5 Punkte)
-
-Lehrmodell R betrachtet zunächst nur Operandenverkehr vom externen Speicher
-zum lokalen Puffer. Jede MAC zählt zwei Operationen, jeder Operand vier Byte.
-Bias und Ausgabeschreiben sind zunächst ausgeschlossen.
-Rechenpeak $P_{\mathrm{peak}}=8$ Ops/Takt, Bandbreite $B=8$ Byte/Takt.
-Roofline ist das Modell $P\leq\min(P_{\mathrm{peak}},B I)$,
-$I$ die Intensität in Ops/Byte.
-
-1. Berechnen Sie die ideale Obergrenze für $I=0{,}25$ und $I=0{,}5$.
-   Wo liegt der Knick, und welche Grenze ist an beiden Punkten enger? (2 P)
-2. Ein $2\times2$-Produkt $C=AB$ benötigt acht MACs.
-   Naiv lädt jede MAC beide Operanden neu.
-   Mit lokalem Halten wird jeder der acht verschiedenen Eingangswerte einmal geladen.
-   Berechnen Sie beide Eingangsbytezahlen und Intensitäten.
-   Nun werden zusätzlich vier Ausgaben zu je vier Byte geschrieben,
-   ohne vorher ein altes $C$ zu lesen. Wie ändern sich Bytezahlen und Intensitäten? (2 P)
-3. Der Rechenpeak wird auf $16$ Ops/Takt erhöht, die Bandbreite bleibt $8$ Byte/Takt.
-   Wird bei der ursprünglichen Eingangsintensität $0{,}25$ die Grenze größer?
-   Begründen Sie. (1 P)
-
-::: {.content-hidden when-profile="solution"}
-\Needspace{10\baselineskip}
-
-**Ihre Obergrenzen und Transferbilanz:**
-
-\vspace*{4cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-\Needspace{20\baselineskip}
-
-**Musterlösung 2**
-
-1. $\min(8,8\cdot0{,}25)=2$ und $\min(8,8\cdot0{,}5)=4$ Ops/Takt.
-   Knick $I=8/8=1$ Op/Byte. Beide Punkte liegen darunter;
-   die Bandbreitengrenze ist enger. Dies sind Obergrenzen, keine Messwerte. (2 P)
-2. Acht MACs ergeben sechzehn Ops.
-   Naiv: $8\cdot2\cdot4=64$ B, $I=16/64=0{,}25$.
-   Lokal gehalten: $8\cdot4=32$ B, $I=16/32=0{,}5$. (1 P)
-   Zusätzlich $4\cdot4=16$ Ausgabebytes ergeben $80$ beziehungsweise $48$ B.
-   Intensitäten $16/80=0{,}2$ und $16/48=1/3\approx0{,}333$ Ops/Byte. (1 P)
-3. Nein: $\min(16,8\cdot0{,}25)=2$ Ops/Takt.
-   Zusätzliche Rechenkapazität ändert die unveränderte Versorgung nicht. (1 P)
-
-Die Intensitäten mit Ausgaben verwenden eine erweiterte Zählbasis.
-Die eingangsbezogene Roofline darf nicht ohne eine neue Bandbreitenannahme
-für beide Transferrichtungen als dieselbe Messgrenze ausgegeben werden.
-:::
-
-{{< pagebreak >}}
-
-## Aufgabe 3: Vektorlänge und Zeitmodell (6 Punkte)
-
-RVV bedeutet RISC-V Vector Extension.
-VLEN ist die Registerbreite in Bit, SEW die Elementbreite,
-LMUL die Registergruppengröße und VLMAX die Elementkapazität.
-AVL ist die angeforderte Restzahl, VL die aktive zurückgegebene Länge.
-
-Es gelten die RVV-1.0-Regeln für eine unterstützte Konfiguration:
-Bei $\mathrm{AVL}\leq\mathrm{VLMAX}$ ist VL exakt AVL,
-bei $\mathrm{AVL}\geq2\mathrm{VLMAX}$ exakt VLMAX,
-dazwischen ein Integer von $\lceil\mathrm{AVL}/2\rceil$ bis VLMAX.
-
-1. VLEN $=128$ Bit, SEW $=32$ Bit, LMUL $=1$.
-   Bestimmen Sie VLMAX. Folgt daraus dieselbe Zahl physischer Rechen-Lanes? (1 P)
-2. Separates Beispiel: VLMAX $=32$, AVL $=40$.
-   Prüfen Sie die Folgen $32+8$, $24+16$, $20+20$, $16+24$.
-   Geben Sie für $24+16$ beide Zeigerinkremente bei Vier-Byte-Elementen an. (2 P)
-3. Wie viele Iterationen verarbeitet ein Array mit $1000$ Elementen
-   bei dieser Kapazität? Begründen Sie auch die letzten Abschnitte. (1 P)
-4. Ein eigenes Chaining-Modell startet vier unabhängige Multiplikationen in
-   Takten eins bis vier. Latenz zwei, Ergebnis jeweils am Taktende.
-   Die zugehörigen unabhängigen Additionen haben Latenz eins und Startabstand eins.
-   Mit Weitergabe darf jede Addition im Takt nach ihrem Produkt beginnen;
-   ohne Weitergabe erst nach Fertigstellung aller vier Produkte.
-   Wann endet das letzte Ergebnis in beiden Fällen? Ist das eine RVV-Zeitgarantie? (2 P)
-
-::: {.content-hidden when-profile="solution"}
-\Needspace{10\baselineskip}
-
-**Ihre Längenfolgen und Zeitachse:**
-
-\vspace*{4cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-\Needspace{20\baselineskip}
-
-**Musterlösung 3**
-
-1. $\mathrm{VLMAX}=\mathrm{LMUL}\cdot\mathrm{VLEN}/\mathrm{SEW}
-   =1\cdot128/32=4$ Elemente.
-   Physische Rechen-Lanes und ihre Startabstände sind eine Implementierungsfrage. (1 P)
-2. Für AVL vierzig muss die erste VL zwischen zwanzig und zweiunddreißig liegen.
-   $32+8$, $24+16$ und $20+20$ sind erlaubt;
-   $16+24$ beginnt unzulässig unter zwanzig. (1 P)
-   Bei $24+16$ sind die Inkremente $24\cdot4=96$ und $16\cdot4=64$ Byte. (1 P)
-3. Dreißig erzwungene volle Iterationen bearbeiten $960$ Elemente.
-   Der Rest vierzig braucht zwei zulässige Abschnitte.
-   Insgesamt zweiunddreißig Iterationen. (1 P)
-4. Produkte enden in zwei bis fünf.
-   Mit Chaining, elementweiser Weitergabe, starten und enden Additionen in drei bis sechs.
-   Ohne Chaining in sechs bis neun. Letztes Ergebnis: Ende sechs beziehungsweise neun. (1 P)
-   Dies folgt aus dem gegebenen Modell, nicht aus der Befehlssatzspezifikation.
-   Es sind in beiden Fällen vier Multiplikationen und vier separate Additionen. (1 P)
-:::
-
-{{< pagebreak >}}
-
-## Aufgabe 4: Systolische Teilsummen (6 Punkte)
-
-$$A=\begin{bmatrix}1&2\\3&4\end{bmatrix},\quad
-B=\begin{bmatrix}5&6\\7&8\end{bmatrix},\quad C=AB$$
-
-Vier Zellen $C_{ij}$ halten ihre Ausgabesumme lokal (Output-Stationary).
-Anfangs sind alle Summen null. Eine gültige MAC wird im aktuellen Takt fertig.
-$A$ wandert je Takt eine Zelle rechts, $B$ eine unten.
-Indizes $i,j,k$ beginnen bei null.
-$A_{ik}$ wird links in Takt $1+k+i$ eingespeist,
-$B_{kj}$ oben in Takt $1+k+j$.
-Vorladen und Auslesen sind nicht Teil dieses Zeitfensters.
-
-1. Tragen Sie die vier Teilsummen nach jedem Takt ein.
-   Markieren Sie deren letzte gültige MAC. (3 P)
-2. Welche beiden Paare erreichen $C_{11}$ in welchen Takten?
-   Warum ist die Summe nicht schon in Takt zwei fertig? (1 P)
-3. Berechnen Sie die mittlere Auslastung über vier Takte im $2\times2$-Array.
-   Dasselbe Tile läuft nun isoliert in vier Zellen eines $4\times4$-Arrays,
-   alle anderen bleiben leer. Berechnen Sie zeitliche Auslastung und räumliche Belegung.
-   Ist interne Fertigstellung bereits Readout? (2 P)
-
-| Taktende | $C_{00}$ | $C_{01}$ | $C_{10}$ | $C_{11}$ |
-|----------|----------|----------|----------|----------|
-| 1 | | | | |
-| 2 | | | | |
-| 3 | | | | |
-| 4 | | | | |
+1. Berechnen Sie alle drei Ausgänge. (2 P)
+2. Zählen Sie Parameter und produktbezogene MACs. (1 P)
+3. Gewichte und Eingaben: Int8, Bias: Int32. Zählen Sie gespeicherte Bytes,
+   anschließend zusätzlich drei Int8-Ausgaben. Ist dies die gesamte Arena? (2 P)
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
 
-**Ihre Begründung und Auslastungsrechnung:**
+**Ihre Lösung:**
 
 \vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{21\baselineskip}
+\Needspace{4\baselineskip}
+
+**Musterlösung 1**
+
+1. $y_0=6+2-1=7$, $y_1=-9-8+2=-15$, $y_2=3-4=-1$. (2 P)
+2. Sechs Gewichte, drei Biaswerte: neun Parameter; sechs MACs. (1 P)
+3. $6+12+2=20$ Byte, mit Ausgaben 23 Byte.
+   Metadaten, Ausrichtung und temporäre Arbeitsbereiche fehlen. (2 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 2: Mehr innere Produkte, andere Roofline (5 Punkte)
+
+Eine MAC zählt zwei Operationen, Operanden vier Byte.
+Grenze: externer Speicher zum lokalen Puffer; zunächst nur Eingangstransfers.
+Peak zwölf Operationen/Takt, Bandbreite sechs Byte/Takt.
+$P\leq\min(P_\mathrm{peak},BI)$.
+
+1. Bestimmen Sie Obergrenzen bei Intensität 0,5 und zwei Operationen/Byte sowie den Knick. (2 P)
+2. Ein 2×3-mal-3×2-Matrixprodukt hat zwölf MACs.
+   Naiv werden beide Operanden je MAC neu geladen, mit Wiederverwendung jeder
+   der zwölf verschiedenen Eingangswerte einmal. Bestimmen Sie Bytezahlen und Intensitäten;
+   danach zusätzlich vier Ausgaben zu je vier Byte ohne altes C einzulesen. (2 P)
+3. Peak steigt auf 24, Bandbreite bleibt sechs: Ändert sich die Grenze bei Intensität 0,5? (1 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
+
+**Ihre Lösung:**
+
+\vspace*{3cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
+**Musterlösung 2**
+
+1. Drei und zwölf Operationen/Takt, Knick bei zwei Operationen/Byte. (2 P)
+2. 24 Operationen: naiv 96 Byte, Intensität 0,25;
+   wiederverwendet 48 Byte, Intensität 0,5.
+   Mit 16 Ausgabebytes: 112 beziehungsweise 64 Byte,
+   Intensitäten $3/14\approx0{,}2143$ und 0,375.
+   Diese letzten Werte verwenden eine erweiterte Transfergrenze. (2 P)
+3. Nein, $\min(24,6\cdot0{,}5)=3$. (1 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 3: Andere Vektorgruppen und längere Latenz (6 Punkte)
+
+RVV: VLEN Registerbits, SEW Elementbits, LMUL Gruppengröße;
+VLMAX $=\mathrm{LMUL}\cdot\mathrm{VLEN}/\mathrm{SEW}$.
+Für unterstützte Konfigurationen gilt: AVL bis VLMAX liefert genau AVL;
+AVL ab zweimal VLMAX liefert VLMAX; dazwischen liegt VL zwischen
+$\lceil AVL/2\rceil$ und VLMAX.
+
+1. VLEN 256, SEW 16, LMUL zwei: VLMAX? Folgt daraus die Lanezahl? (1 P)
+2. Separat VLMAX 16, AVL 26: Prüfen Sie $16+10$, $14+12$, $13+13$, $12+14$.
+   Welche Byteinkremente gelten bei $14+12$ für Zwei-Byte-Elemente? (2 P)
+3. Wie viele Iterationen benötigt ein Array mit 250 Elementen bei VLMAX 16? (1 P)
+4. Sechs unabhängige Produkte starten in Takten eins bis sechs, Latenz drei.
+   Zugehörige unabhängige Additionen: Latenz zwei, Startabstand eins.
+   Mit Chaining starten sie frühestens im Takt nach ihrem Produkt;
+   ohne erst nach allen Produkten. Wann endet das letzte Ergebnis jeweils?
+   Ist dies eine Befehlssatzgarantie? (2 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
+
+**Ihre Lösung:**
+
+\vspace*{3cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
+**Musterlösung 3**
+
+1. 32 Elemente, keine Aussage über physische Lanes. (1 P)
+2. Erste VL muss 13 bis 16 sein: die ersten drei Folgen sind zulässig,
+   die vierte nicht. Byteinkremente 28 und 24. (2 P)
+3. Vierzehn volle Iterationen verarbeiten 224 Elemente; Rest 26 braucht zwei,
+   zusammen sechzehn Iterationen. (1 P)
+4. Produkte enden drei bis acht. Chaining: Additionen starten vier bis neun,
+   enden fünf bis zehn. Ohne: Starts neun bis vierzehn, Enden zehn bis fünfzehn.
+   Letztes Ende zehn beziehungsweise fünfzehn, nur im gegebenen Modell. (2 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 4: Ein längeres Tile im systolischen Array (6 Punkte)
+
+$$A=\begin{bmatrix}2&1&-1\\3&0&2\end{bmatrix},\quad
+B=\begin{bmatrix}1&4\\-2&3\\5&-1\end{bmatrix},\quad C=AB.$$
+
+Vier Output-Stationary-Zellen, anfangs Summen null; eine gültige MAC je Zelle und Takt.
+A wandert rechts, B unten, je einen Nachbarn pro Takt.
+Einspeisung links in $1+k+i$, oben in $1+k+j$;
+$i,j\in\{0,1\}$, $k\in\{0,1,2\}$.
+Keine Vorlade- oder Auslesezeit im Fenster.
+
+1. Tragen Sie alle vier Teilsummen nach jedem der fünf Takte ein;
+   markieren Sie deren letzte gültige MAC. (3 P)
+2. Welche Paare erreichen C11 in welchen Takten? Zählt das Produkt mit null als gültige MAC? (1 P)
+3. Bestimmen Sie zeitliche Auslastung über fünf Takte.
+   Dasselbe Tile belegt allein vier Zellen eines 4×4-Arrays:
+   zeitliche Auslastung und räumliche Belegung? Sind die Ergebnisse bereits ausgelesen? (2 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
+
+**Ihre Lösung:**
+
+\vspace*{3cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
 
 **Musterlösung 4**
 
-| Taktende | $C_{00}$ | $C_{01}$ | $C_{10}$ | $C_{11}$ | gültige MACs |
-|----------|----------|----------|----------|----------|--------------|
-| 1 | $5$ | $0$ | $0$ | $0$ | 1 |
-| 2 | $19$ fertig | $6$ | $15$ | $0$ | 3 |
-| 3 | $19$ | $22$ fertig | $43$ fertig | $18$ | 3 |
-| 4 | $19$ | $22$ | $43$ | $50$ fertig | 1 |
+| Takt | C00 | C01 | C10 | C11 | gültige MACs |
+|------|-----|-----|-----|-----|--------------|
+| 1 | 2 | 0 | 0 | 0 | 1 |
+| 2 | 0 | 8 | 3 | 0 | 3 |
+| 3 | −5 fertig | 11 | 3 | 12 | 4 |
+| 4 | −5 | 12 fertig | 13 fertig | 12 | 3 |
+| 5 | −5 | 12 | 13 | 10 fertig | 1 |
 
-1. $C_{00}$: $1\cdot5=5$, dann $+2\cdot7=19$.
-   $C_{01}$: $1\cdot6=6$, dann $+2\cdot8=22$.
-   $C_{10}$: $3\cdot5=15$, dann $+4\cdot7=43$.
-   $C_{11}$: $3\cdot6=18$, dann $+4\cdot8=50$.
-   Letzte MACs in zwei, drei, drei und vier. (3 P)
-2. In Zelle $(i,j)$ treffen passende Operanden in $1+k+i+j$ ein.
-   $C_{11}$ erhält drei und sechs in Takt drei, vier und acht in vier.
-   Zeilen- und Spaltenversatz verhindern einen früheren Start. (1 P)
-3. Acht MACs bei sechzehn Zell-Takten ergeben $8/16=50\,\%$.
-   Im größeren Array: $8/(16\cdot4)=12{,}5\,\%$ zeitlich,
-   $4/16=25\,\%$ räumlich. (1 P)
-   Fertige lokale Summen benötigen weiterhin einen Ausleseweg;
-   dessen Zeit wurde nicht angenommen. (1 P)
+Tabelle 3 P. C11 erhält $(3,4)$ in drei, $(0,3)$ in vier,
+$(2,-1)$ in fünf. Numerische null ist kein ungültiger Platz. (1 P)
+Zwölf MACs: $12/(4\cdot5)=60\,\%$;
+im größeren Array 15 Prozent zeitlich, 25 Prozent räumlich.
+Readout benötigt weiterhin einen eigenen Weg. (2 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 5: Quantisierung und Zahlenformate (6 Punkte)
+## Aufgabe 5: Negative Werte quantisieren (6 Punkte)
 
-Int8 hat Bereich $[-128,127]$.
-Wir verwenden $q=\operatorname{clip}(\operatorname{round}(r/s)+z)$
-und $\hat r=s(q-z)$.
-$s>0$ ist die Skala, $z$ der ganzzahlige Nullpunkt.
-Rundung: nächster Integer, exakte Halbfälle weg von null.
+Int8-Bereich $[-128,127]$;
+$q=\operatorname{clip}(\operatorname{round}(r/s)+z)$,
+$\hat r=s(q-z)$; halbe Werte werden weg von null gerundet.
 
-1. Mit $s=0{,}1$, $z=0$: Bestimmen Sie Code, Rückwert und absoluten Fehler
-   für $r=1{,}24$ und $r=20$. Welche Fehlerart liegt jeweils vor? (2 P)
-2. Mit $z=-3$: Welcher Code repräsentiert reale Null? Begründen Sie. (1 P)
-3. Separates Skalarprodukt:
-   $q_x=[12,-4]$, $z_x=-3$, $s_x=0{,}1$,
-   $q_w=[2,3]$, $z_w=0$, $s_w=0{,}2$.
-   Biascode $q_b=5$ hat Skala $s_xs_w$ und Nullpunkt null.
-   Bestimmen Sie die korrigierte Integerakkumulation und den realen Rückwert.
-   Quantisieren Sie diesen mit $s_y=0{,}05$, $z_y=-2$ erneut. (2 P)
-4. $250\,000$ reine Gewichte wechseln von Float32 zu Int8.
-   Berechnen Sie beide Bytezahlen und die prozentuale Ersparnis.
-   Gilt sie auch für komplette Modelldatei und Arena? (1 P)
+1. Skala 0,2, Nullpunkt null: Code, Rückwert und absoluter Fehler für
+   $r=-1{,}37$ und $r=-30$? Welche Fehlerarten liegen vor? (2 P)
+2. Welcher Code repräsentiert reale null bei Nullpunkt fünf? (1 P)
+3. Separat $q_x=[7,-3],z_x=1,s_x=0{,}25$;
+   $q_w=[-2,3],z_w=0,s_w=0{,}1$; Biascode vier mit Skala $s_xs_w$.
+   Berechnen Sie Akkumulation und Realwert. Requantisieren Sie mit $s_y=0{,}08,z_y=3$. (2 P)
+4. Vergleichen Sie 180000 reine Gewichte in Float32 und Int8.
+   Gilt deren prozentuale Ersparnis für die ganze Modelldatei und Arena? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{10\baselineskip}
+\Needspace{8\baselineskip}
 
-**Ihre Codes, Fehler und breite Produktsumme:**
+**Ihre Lösung:**
 
-\vspace*{4cm}
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{22\baselineskip}
+\Needspace{4\baselineskip}
 
 **Musterlösung 5**
 
-1. $1{,}24/0{,}1=12{,}4\to12$, Rückwert $1{,}2$, Fehler $0{,}04$: Rundung.
-   $20/0{,}1=200\to127$, Rückwert $12{,}7$, Fehler $7{,}3$: Begrenzung.
-   Die halbe-Schritt-Fehlergrenze gilt im zweiten Fall nicht. (je 1 P)
-2. $q=z=-3$, denn $s((-3)-(-3))=0$. (1 P)
-3. Korrigierte Eingaben $15$ und $-1$.
-   $a=15\cdot2+(-1)\cdot3+5=30-3+5=32$.
-   $\hat r_y=(0{,}1\cdot0{,}2)\cdot32=0{,}64$. (1 P)
-   $q_y=\operatorname{round}(0{,}64/0{,}05)-2=13-2=11$.
-   Rückwert $0{,}05(11+2)=0{,}65$, Fehler $0{,}01$. (1 P)
-4. Float32: $1\,000\,000$ B, Int8: $250\,000$ B.
-   Ersparnis $1-1/4=75\,\%$ nur für Gewichtbytes.
-   Bias, Metadaten und Arbeitsspeicher folgen anderen Regeln. (1 P)
-
-Skalen und Nullpunkte sind Bestandteil des Tensorvertrags.
-Breite Akkumulation verhindert Informationsverlust durch zu schmale Zwischenergebnisse;
-sie ersetzt nicht die Prüfung auf einen möglichen Bereichsüberlauf.
+1. −1,37: Code −7, Rückwert −1,4, Fehler 0,03 durch Rundung.
+   −30: Code −128, Rückwert −25,6, Fehler 4,4 durch Sättigung. (2 P)
+2. Code fünf. (1 P)
+3. Korrigierte Eingaben sechs und −4.
+   $a=6(-2)+(-4)3+4=-20$, Realwert $-20\cdot0{,}025=-0{,}5$.
+   Ausgangscode $\operatorname{round}(-6{,}25)+3=-3$,
+   Rückwert −0,48, Fehler 0,02. (2 P)
+4. 720000 und 180000 Byte, 75 Prozent nur für Gewichtbytes. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 6: Firmware als Gesamtsystem (4 Punkte)
+## Aufgabe 6: Andere Plattform und anderes Sensorfenster (4 Punkte)
 
-CPU bedeutet Central Processing Unit, Prozessor.
-SRAM ist Static Random Access Memory, statischer Arbeitsspeicher.
-Flash ist nichtflüchtiger Speicher, die Arena ein Tensor-Arbeitsbereich.
-
-1. Fiktive Plattform: $128$ KiB Flash, $32$ KiB SRAM.
-   Firmware $40$ KiB, vollständige Modelldatei $24$ KiB liegen im Flash.
-   SRAM: Arena $12$ KiB, Float-Quellfenster $1{,}5$ KiB,
-   Stackreserve $6$ KiB, übrige Daten $4$ KiB.
-   Der Int8-Eingabetensor liegt schon in der Arena.
-   Bestimmen Sie beide freien Restbudgets. (1 P)
-2. Das Fenster enthält $128$ Zeitpunkte mit je drei Achsen.
-   Bestimmen Sie Elementzahl, Float32-Quellbytes und Int8-Zielbytes.
-   Warum liefert `sizeof` eines Zeigers nicht diese Quellgröße? (1 P)
-3. Eine Setup-Funktion erzeugt Arena und Interpreter als lokale Objekte
-   und kehrt zurück. Eine spätere Run-Funktion verwendet sie weiter.
-   Zusätzlich liest sie nach einem fehlgeschlagenen `Invoke()` den alten Ausgang
-   als neue Wahrscheinlichkeit.
-   Nennen Sie beide Fehler und die nötigen Korrekturen. (1 P)
-4. Serielle Lehrzeiten: CPU-Pfad Vorverarbeitung $2$ ms,
-   Dense-Rechnung $10$ ms, übrige Operatoren $3$ ms, Nachverarbeitung $1$ ms.
-   Beschleunigerpfad: zusätzlich Kopie $1$ ms, Dense nur $1$ ms,
-   alle übrigen Phasen unverändert.
-   Bestimmen Sie Gesamtzeiten, Teilfaktor und Gesamtfaktor. (1 P)
+1. 192 KiB Flash: Firmware 52 KiB, vollständiges Modell 36 KiB.
+   48 KiB SRAM: Arena 18 KiB, Quellfenster 1600 Byte, Stack sieben KiB,
+   andere Daten fünf KiB. Zieltensor bereits in der Arena.
+   Bestimmen Sie beide freien Budgets. (1 P)
+2. Fenster aus 200 Zeitpunkten mit zwei Kanälen: Float32-Quellgröße und
+   Int8-Zielgröße? Warum hilft sizeof eines Zeigers nicht? (1 P)
+3. Lokale Arena/Interpreter werden nach Setup-Rückkehr weiter benutzt;
+   nach einem Inferenzfehler wird der alte Ausgang als neue Entscheidung verwendet.
+   Benennen Sie beide Korrekturen. (1 P)
+4. Serielle Zeiten: Vorbereitung 1,5 ms, Dense zwölf ms, andere Operatoren 2,5 ms,
+   Nachbereitung 0,5 ms. Beschleunigt: zusätzlich 0,75 ms Kopie, Dense zwei ms.
+   Bestimmen Sie Gesamtzeiten, Dense- und Gesamtfaktor. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{10\baselineskip}
+\Needspace{8\baselineskip}
 
-**Ihre Budgets, Fehleranalyse und Zeitbilanz:**
+**Ihre Lösung:**
 
-\vspace*{4cm}
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{19\baselineskip}
+\Needspace{4\baselineskip}
 
 **Musterlösung 6**
 
-1. Flash: $128-40-24=64$ KiB frei.
-   SRAM: $32-12-1{,}5-6-4=8{,}5$ KiB frei.
-   Int8-Zieltensor nicht doppelt zählen. Arena ist ein separates Arbeitsbudget. (1 P)
-2. $128\cdot3=384$ Elemente,
-   Quelle $384\cdot4=1536$ B, Ziel $384$ B.
-   Ein Zeiger enthält eine Adresse; seine Größe zählt weder Elemente noch Pufferbytes. (1 P)
-3. Die lokalen Objekte leben nach dem Funktionsende nicht weiter.
-   Modell, Interpreter und Arena müssen über alle Nutzungsphasen gültig bleiben.
-   Nach einem Fehler darf keine neue Entscheidung aus alten Ausgangsbytes entstehen:
-   Status prüfen, Fehler behandeln, Ausgabe nur nach Erfolg gemäß Vertrag lesen.
-   Eine Wahrscheinlichkeit muss außerdem vom Modell als solche definiert sein. (1 P)
-4. CPU: $2+10+3+1=16$ ms.
-   Beschleuniger: $2+1+1+3+1=8$ ms.
-   Dense-Teilfaktor $10/1=10$, Gesamtfaktor $16/8=2$. (1 P)
-
-Ein funktionaler Renode-Lauf wäre ohne validiertes Zeitmodell
-kein Nachweis dieser Hardwarezeiten oder einer Energieersparnis.
+1. Flash 104 KiB frei. SRAM $48-18-1600/1024-7-5=16{,}4375$ KiB frei. (1 P)
+2. 400 Elemente, 1600 Byte Quelle, 400 Byte Ziel; Zeigergröße zählt keine Elemente. (1 P)
+3. Ausreichende Lebensdauer aller Objekte; Status prüfen und nur erfolgreiche aktuelle Ausgaben verwenden. (1 P)
+4. CPU 16,5 ms, Beschleuniger 7,25 ms; Densefaktor sechs,
+   Gesamtfaktor $66/29\approx2{,}276$. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Optional: Zahlenbeispiele auf dem Host prüfen
+## Optional: am Rechner prüfen
 
-Die Datei `src/lab08_dense.c` enthält ein vollständiges C-Programm.
-Sie prüft die Dense-Ausgänge, Matrixprodukte, Quantisierung und Fehlerfälle.
-Sie benötigt weder Modellblob noch TensorFlow Micro oder Renode.
-Vom Repository-Hauptordner aus:
-
-```bash
-gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
-    labs/src/lab08_dense.c -lm -o /tmp/lab08_dense
-/tmp/lab08_dense
-```
-
-Erwartete Ausgabe:
-
-```text
-Dense: 14 9
-Matrix: 19 22 43 50
-Quantisierung: 12 127 -128
-Alle Prueffaelle bestanden.
-```
-
-1. Lesen Sie zuerst die Verträge der beiden Hilfsfunktionen.
-   Warum wird vor dem schmalen Cast begrenzt beziehungsweise der Bereich geprüft?
-2. Vergleichen Sie die zurückgerechneten Werte mit Ihren Papierlösungen.
-3. Prüfen Sie optional mit `-fsanitize=address,undefined`, `-O1` und `-g`.
-   Welche Fehlerarten kann dieser Lauf prüfen, und welche Systemaussagen fehlen weiterhin?
-
-::: {.content-visible when-profile="solution"}
-**Hinweise zur optionalen Aufgabe**
-
-`dense_2x3` rechnet eine feste Zwei-mal-drei-Schicht mit Int8-Operanden,
-Int32-Bias und Nullpunkten null. Sie akkumuliert in Int64 und prüft vor
-Int32-Ausgabe, ob alle Ergebnisse passen. Ausgaben bleiben bei Fehler unverändert.
-Das ist kein vollständiger quantisierter Netzwerkoperator.
-
-`quantize_i8` verlangt endlichen realen Wert, endliche positive Skala,
-Int8-Nullpunkt und einen gültigen Ausgabepointer. Sie rundet nach der Lehrregel
-und begrenzt vor dem Integercast. Auch ein durch Division entstandener
-unendlicher Zwischenwert wird am Bereichsrand begrenzt.
-
-Ein Sanitizer prüft im durchlaufenen Programm unter anderem ungültige
-Speicherzugriffe und undefinierte Integeroperationen. Er beweist weder
-Modellgüte noch NPU-Geschwindigkeit oder RISC-V-Zykluszahlen.
-RISC-V GCC wäre eine eigene Zielübersetzung; Renode bräuchte passende
-Firmware, Plattform und für Zeitangaben ein validiertes Zeitmodell.
-:::
+Ergänzen Sie `src/lab08_dense.c` um eine eigene 3×2-Dense-Funktion für Aufgabe 1
+und einen 2×3-mal-3×2-Matrixtest für Aufgabe 4. Erwartete Ergebnisse stehen in den Papierlösungen.
+Prüfen Sie zusätzlich die neuen negativen Quantisierungsfälle; die vorhandenen Folien-Testwerte reichen nicht.

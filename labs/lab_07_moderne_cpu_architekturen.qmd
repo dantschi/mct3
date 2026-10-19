@@ -1,6 +1,6 @@
 ---
 title: "Übungsblatt 7: CPU-Architekturen"
-subtitle: "Mikrocomputertechnik 3 · Zeitpläne, Registerversionen und Vorhersage auf Papier"
+subtitle: "Mikrocomputertechnik 3 · 32 Orientierungspunkte · ca. 60–75 Minuten"
 highlight-style: ../assets/styles/dhbw-code.theme
 header-includes: |
   \usepackage{needspace}
@@ -10,452 +10,260 @@ header-includes: |
 > **Musterlösung**
 :::
 
-## Ziel und Arbeitsweise
+## Aufgabe 1: Eine sechsstufige Pipeline (6 Punkte)
 
-Die sechs Pflichtaufgaben sind auf Papier lösbar. Sie zählen Takte in
-festgelegten Modellen, verfolgen alte und neue Werte und unterscheiden
-Berechnung von endgültiger Bestätigung.
+Stufen F, D1, D2, EX, MEM, WB, jeweils ein Takt;
+maximal ein Start je Takt. Fenster: erster Start bis letztes WB.
 
-**Bearbeitungszeit:** etwa 60–75 Minuten selbstständig.
-**Orientierungspunkte:** 32.
-Im Unterricht: Aufgabe 1 (10 min), Aufgaben 2–3 (15 min),
-Aufgabe 4 (15 min), Aufgaben 5–6 (15 min).
-Besprechungen gehören zu den Vorlesungsphasen.
-
-CPU bedeutet Central Processing Unit, ISA Instruction Set Architecture,
-IPC Instructions Per Cycle und CPI Cycles Per Instruction.
-IPC und CPI zählen hier bestätigte ISA-Befehle und dieselben Kerntakte.
-Issue ist der Start, Retire oder Commit die endgültige Bestätigung.
-Geben Sie Rechenweg und Voraussetzungen an. Alle Zeiten sind Lehrannahmen.
-
-## Aufgabe 1: Pipeline und Laufzeitfenster (6 Punkte)
-
-M1 besitzt fünf Stufen zu je einem Takt und startet höchstens einen
-neuen Befehl pro Takt. Es gibt zunächst keine Abhängigkeit oder Wartezeit.
-Das Fenster beginnt beim ersten Start und endet am letzten WB,
-Write Back, Register-Rückschreiben.
-
-1. Fünf unabhängige Befehle werden ausgeführt.
-   Bestimmen Sie Fensterlänge, CPI und IPC.
-   Warum ist die mittlere Rate hier noch nicht ein Befehl je Takt? (2 P)
-2. Nun liest der zweite Befehl das Ergebnis des ersten.
-   Kein Forwarding, direkte Ergebnisweiterleitung, ist vorhanden.
-   Der Produzent rechnet in EX, Execute, Takt drei und schreibt in WB fünf.
-   Schreiben vor Registerlesen im selben Takt ist erlaubt.
-   Wann darf der Verbraucher EX beginnen?
-   Bestimmen Sie die neue Fensterlänge und das CPI bei sonst unverändertem M1. (2 P)
-3. Zwei Modellübersetzungen derselben Aufgabe benötigen
-   hundert Befehle bei CPI eins beziehungsweise hundertfünfzig bei CPI $0{,}8$.
-   Die Frequenz ist konstant $100$ MHz.
-   Bestimmen Sie beide Zeiten. Ist das höhere IPC automatisch besser? (2 P)
+1. Sieben unabhängige Befehle: Fensterlänge, CPI, IPC? Warum ist IPC nicht eins? (2 P)
+2. Der zweite Befehl liest das Ergebnis des ersten in D2.
+   Kein Forwarding, Ergebnis von I1 in WB sechs, Schreiben vor Lesen im selben Takt.
+   Ein wartender Leser hält alle jüngeren Befehle auf.
+   Wann beginnt I2 mit EX? Bestimmen Sie neues Fenster und CPI. (2 P)
+3. Zwei Übersetzungen derselben Aufgabe: 160 Befehle bei CPI 1,2 beziehungsweise
+   240 bei CPI 0,9, beide 160 MHz. Berechnen und vergleichen Sie Laufzeiten. (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{9\baselineskip}
+\Needspace{8\baselineskip}
 
-**Ihre Zeitachse und Rechnungen:**
-
-\vspace*{3.5cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-\Needspace{20\baselineskip}
-
-**Musterlösung 1**
-
-1. $C=N+k-1=5+5-1=9$ Takte.
-   CPI $=9/5=1{,}8$, IPC $=5/9\approx0{,}556$.
-   Das Fenster enthält Anlaufen und Leeren; ein stationärer Ausschnitt
-   ab dem ersten Ergebnis besitzt dagegen Abstand eins. (1 P Werte, 1 P Begründung)
-2. Der Verbraucher kann den Wert in fünf lesen und beginnt EX in sechs.
-   Gegenüber EX in vier fehlen zwei Startgelegenheiten.
-   Das ganze Fenster wächst auf elf Takte, CPI $=11/5=2{,}2$.
-   Die benötigte RAW-Wertabhängigkeit, Read After Write,
-   bleibt auch mit Forwarding bestehen. (je 1 P)
-3. $C_A=100\cdot1=100$, $C_B=150\cdot0{,}8=120$ Takte.
-   $T_A=100/10^8=1\,\mu$s, $T_B=120/10^8=1{,}2\,\mu$s.
-   B hat IPC $1/0{,}8=1{,}25$, braucht aber im betrachteten Fenster
-   länger, weil seine Befehlszahl höher ist. (1 P Zeiten, 1 P Deutung)
-:::
-
-{{< pagebreak >}}
-
-## Aufgabe 2: Wertfluss und physische Versionen (6 Punkte)
-
-Gegeben ist eine RV32I-Lehrfolge, RISC-V-Basis mit 32-Bit-Integerbefehlen.
-`s1` zeigt auf ein gültiges ausgerichtetes Wort mit Wert zehn.
-`t2 = 1`, `t3 = 7`, `t4 = 8` und `t5 = 3`.
-
-```asm
-lw  t0, 0(s1)     # A: Laden
-add t1, t0, t2    # B: Addition
-sub t0, t4, t5    # C: Subtraktion
-and t6, t0, t3    # D: bitweises Und
-```
-
-1. Nennen Sie alle RAW-Kanten, Read After Write, zwischen diesen Befehlen. (2 P)
-2. Wo liegen WAR, Write After Read, und WAW, Write After Write?
-   Warum sind das Namenskonflikte? (1 P)
-3. Anfangsabbildung: `t0` auf P7, `t2` auf P2, `t3` auf P3,
-   `t4` auf P4, `t5` auf P5 und `s1` auf P9.
-   Freie neue Ziele werden in Reihenfolge P10, P11, P12, P13 vergeben.
-   Erstellen Sie für A–D eine Tabelle mit physischen Quellen und Ziel.
-   Welche Quelle behält B nach der Vorbereitung von C? (2 P)
-4. Bestimmen Sie die endgültigen Werte `t0`, `t1` und `t6`.
-   Warum liest B keine fünf, auch wenn C intern früher fertig wird? (1 P)
-
-P mit Zahl bezeichnet einen physischen Registerplatz.
-Renaming liest passende Quellabbildungen zuerst und vergibt anschließend
-ein neues Ziel. Die Quellen werden für den Leser festgehalten.
-
-::: {.content-hidden when-profile="solution"}
-\Needspace{9\baselineskip}
-
-**Ihre Kanten und Versionstabelle:**
-
-\vspace*{4cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-\Needspace{23\baselineskip}
-
-**Musterlösung 2**
-
-1. A nach B auf der alten `t0`-Version; C nach D auf der neuen.
-   B braucht das Ladeergebnis, D das Subtraktionsergebnis. (je 1 P)
-2. WAR B nach C: B muss die alte Version lesen dürfen.
-   WAW A nach C: Der Endwert muss vom jüngeren Schreiber C stammen.
-   C benötigt das Ergebnis von A oder B nicht für seine Rechnung. (1 P)
-
-| Befehl | physische Quellen | neues Ziel |
-|--------|--------------------|------------|
-| A | P9 als Adressbasis | P10 für `t0` |
-| B | P10, P2 | P11 für `t1` |
-| C | P4, P5 | P12 für `t0` |
-| D | P12, P3 | P13 für `t6` |
-
-3. B behält P10. C aktualisiert nur die neueste Abbildung für `t0` auf P12;
-   es verändert nicht den schon gespeicherten Quelltag von B. (1 P Tabelle, 1 P Quelle)
-4. A liefert zehn, B berechnet elf, C berechnet fünf,
-   D $5\ \mathrm{AND}\ 7=5$.
-   Endzustand: `t0 = 5`, `t1 = 11`, `t6 = 5`.
-   Getrennte physische Plätze halten beide richtigen Versionen,
-   bis ihre Nutzung beziehungsweise Bestätigung abgeschlossen ist. (1 P)
-:::
-
-{{< pagebreak >}}
-
-## Aufgabe 3: Gleiche Ressourcen, andere Startreihenfolge (6 Punkte)
-
-M3 verwendet A–D aus Aufgabe 2. Alle vier sind vor Takt eins
-dekodiert und umbenannt. Das Fenster zählt ausschließlich
-vom ersten Issue bis zum letzten Retire.
-
-- Höchstens ein Start je Takt, eine ALU, Arithmetic Logic Unit,
-  und eine LSU, Load/Store Unit.
-- A startet in eins; sein Ergebnis ist erst Ende Takt vier bereit.
-- Die anderen Operationen sind Ende ihres Starttakts fertig.
-- Nutzer starten frühestens im Folgetakt ihres Produzenten.
-- Höchstens zwei Retires pro Takt, strikt in Programmordnung
-  und frühestens im Takt nach der jeweiligen Fertigstellung.
-
-In-Order wählt nur den nächsten Programmplatz.
-Out-of-Order darf einen jüngeren bereiten Kandidaten wählen.
-
-1. Zeichnen Sie den In-Order-Plan für Start, Fertigstellung und Retire. (2 P)
-2. Zeichnen Sie den Out-of-Order-Plan. Wie nutzt C den zweiten Takt,
-   und wann kann D beginnen? (2 P)
-3. Berechnen Sie Fensterlänge, IPC und CPI beider Pläne.
-   Bestimmen Sie Zeitreduktion und Beschleunigungsfaktor.
-   Hat Out-of-Order den Load-Miss beseitigt? (2 P)
-
-::: {.content-hidden when-profile="solution"}
-\Needspace{9\baselineskip}
-
-**Ihre beiden Taktpläne und Bilanz:**
-
-\vspace*{5cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-\Needspace{25\baselineskip}
-
-**Musterlösung 3**
-
-S steht für Start, F für Fertigstellung am Taktende, R für Retire.
-S/F bedeutet, dass beide in diesem Takt liegen.
-
-| In-Order | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
-|----------|---|---|---|---|---|---|---|---|
-| A | S | | | F | R | | | |
-| B | | | | | S/F | R | | |
-| C | | | | | | S/F | R | |
-| D | | | | | | | S/F | R |
-
-B blockiert die Auswahl in zwei bis vier; C und D dürfen nicht vorbeiziehen.
-Die zwei Retireplätze erzeugen keine zusätzlichen fertigen Vorgänger. (2 P)
-
-| Out-of-Order | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
-|--------------|---|---|---|---|---|---|---|
-| A | S | | | F | R | | |
-| B | | | | | S/F | R | |
-| C | | S/F | | | | R | |
-| D | | | S/F | | | | R |
-
-C liest unabhängige Quellen in zwei. D braucht C und startet in drei.
-Beide können vor B fertig werden, aber nicht vorher retiren.
-In sechs werden B und C bestätigt; D folgt wegen Breite zwei erst in sieben. (2 P)
-
-In-Order: acht Takte, IPC $=4/8=0{,}5$, CPI $=2$.
-Out-of-Order: sieben Takte, IPC $=4/7\approx0{,}571$, CPI $=1{,}75$.
-Zeitreduktion $1-7/8=12{,}5\,\%$,
-Beschleunigungsfaktor $8/7\approx1{,}143$ bei gleichem Takt.
-A wird in beiden erst Ende vier fertig.
-Es wurde andere Arbeit überlappt, nicht der Miss gelöscht. (1 P Werte, 1 P Grenzen)
-:::
-
-{{< pagebreak >}}
-
-## Aufgabe 4: Vorhersage vor dem Update (5 Punkte)
-
-Ein 2-Bit-Prädiktor startet in `11`.
-`00` und `01` sagen NT, Not Taken, nicht genommen, vorher,
-`10` und `11` T, Taken, genommen.
-Nach dem tatsächlichen T wird um eins bis maximal `11` erhöht,
-nach NT um eins bis minimal `00` vermindert.
-
-1. Verfolgen Sie T, T, NT, NT, T in einer Tabelle:
-   alter Zustand, Vorhersage, tatsächliches Ergebnis, Treffer/Miss, neuer Zustand.
-   Wie viele Treffer entstehen? (3 P)
-2. Ein separates additives Zeitmodell hat Basis-CPI eins.
-   $20\,\%$ der bestätigten Befehle sind Sprünge;
-   $10\,\%$ dieser Sprünge sind fehlvorhergesagt,
-   je Fehler fallen effektiv fünfzehn zusätzliche Takte an.
-   Bestimmen Sie CPI-Aufschlag, Gesamt-CPI, Zeitänderung
-   und Durchsatzänderung bei gleicher Arbeit und Frequenz.
-   Überlappende Strafen sind ausgeschlossen. (2 P)
-
-::: {.content-hidden when-profile="solution"}
-\Needspace{9\baselineskip}
-
-**Ihre Zustandstabelle und Prozentrechnung:**
-
-\vspace*{4cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-\Needspace{22\baselineskip}
-
-**Musterlösung 4**
-
-| Schritt | alt | Vorhersage | Ist | Treffer? | neu |
-|---------|-----|------------|-----|----------|-----|
-| 1 | `11` | T | T | ja | `11` |
-| 2 | `11` | T | T | ja | `11` |
-| 3 | `11` | T | NT | nein | `10` |
-| 4 | `10` | T | NT | nein | `01` |
-| 5 | `01` | NT | T | nein | `10` |
-
-Zwei Treffer, drei Misses. Bei Schritt fünf bleibt die Vorhersage NT,
-obwohl der **nachfolgende** Zustand bereits wieder Taken vorhersagt.
-Aus einem schwachen Zustand kann ein Widerspruch die Richtung wechseln. (2 P Tabelle, 1 P Deutung)
-
-$\Delta\mathrm{CPI}=0{,}20\cdot0{,}10\cdot15=0{,}30$;
-CPI gesamt $1{,}30$.
-Zeit wird um $30\,\%$ länger. Der Durchsatz ist der Kehrwert:
-$1/1{,}30\approx0{,}76923$ der alten Rate, also etwa $23{,}1\,\%$ weniger.
-Die zehn Prozent Fehler gelten nur innerhalb der zwanzig Prozent Sprünge. (je 1 P)
-:::
-
-{{< pagebreak >}}
-
-## Aufgabe 5: Bestätigung und bleibende Spuren (5 Punkte)
-
-Betrachten Sie zwei getrennte Varianten von M3.
-Vor A gelten `t0 = 42`, `t1 = 9`, `t6 = 12`.
-Ein Vorgänger hat `s0 = 13` bereits erfolgreich bestätigt.
-Ein ROB, Reorder Buffer, verwaltet Ordnung und Fertigstatus;
-Zahlenwerte liegen in der PRF, Physical Register File.
-
-1. In der Fehlervariante meldet A statt eines Ergebnisses einen
-   synchronen Load-Zugriffsfehler. C und D haben intern bereits fünf berechnet.
-   Welche der genannten Registerwerte bleiben architektonisch erhalten?
-   Welche Befehle dürfen keine normale Wirkung bestätigen? (2 P)
-2. In der Erfolgsvariante liefert A zehn.
-   Ein Interrupt wird an der ausdrücklich erlaubten Grenze nach A,
-   vor Bestätigung von B und C, angenommen.
-   Welche vier genannten Registerwerte sind dann gültig?
-   Ist der Interrupt ein fehlerhafter Load? (1 P)
-3. Ein davon unabhängiger Spectre-v1-Fall hat einen falsch vorhergesagten
-   Bereichspfad. Der Pfad wird verworfen.
-   Warum kann dennoch ein Cache-Seitenkanal entstehen?
-   Welche Kopplung braucht der geladene Wert, und was beweist
-   eine einzelne kurze Zugriffszeit? (2 P)
-
-::: {.content-hidden when-profile="solution"}
-\Needspace{9\baselineskip}
-
-**Ihre beiden Zustände und Seitenkanalbegründung:**
-
-\vspace*{4cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-\Needspace{22\baselineskip}
-
-**Musterlösung 5**
-
-1. `t0 = 42`, `t1 = 9` und `t6 = 12` bleiben erhalten,
-   ebenso der bereits bestätigte `s0 = 13`.
-   A bestätigt keine normale Loadwirkung; die jüngeren B, C und D
-   ebenfalls keine normalen Wirkungen.
-   Interne fertige Werte in P12/P13 ersetzen nicht diesen Zustand.
-   Der Ausnahmezustand gehört zur Fehlerstelle A. (je 1 P)
-2. Gültiger Programmanfang nach A:
-   `t0 = 10`, `t1 = 9`, `t6 = 12` und `s0 = 13`.
-   Der asynchrone Interrupt wird an der gegebenen gültigen Grenze angenommen;
-   A ist erfolgreich und kein fehlerhafter Load.
-   Noch unbestätigte spätere Werte gehören nicht zum Zustand. (1 P)
-3. Die normale Bereichsprüfung bleibt architektonisch wirksam,
-   der falsche Pfad wird nicht bestätigt.
-   Ein transient geladener Wert kann aber die Adresse eines nachfolgenden
-   Probezugriffs beeinflussen und eine bestimmte Cachezeile zurücklassen. (1 P)
-   Spätere Zeitbeobachtung kann daraus Information gewinnen.
-   Eine einzelne kurze Zeit ist wegen Störungen und anderer Cacheursachen
-   nur ein Indiz, kein eindeutiger Beweis.
-   Es wird kein Angriff ausgeführt und keine konkrete CPU-Verwundbarkeit nachgewiesen. (1 P)
-:::
-
-{{< pagebreak >}}
-
-## Aufgabe 6: Zwei Akkumulatoren und richtige Nachweise (4 Punkte)
-
-Der folgende vollständige C-Rechenhelfer liest vorzeichenlose 32-Bit-Werte
-und summiert in 64 Bit. `a` zeigt auf mindestens `n` gültige Elemente.
-`size_t` ist der vorzeichenlose Typ für Objektgrößen und Indizes.
-Die Integer-Typen stehen in `<stdint.h>`, `size_t` in `<stddef.h>`.
-
-```c
-#include <stddef.h>
-#include <stdint.h>
-
-uint64_t reduce_split(const uint32_t *a, size_t n) {
-    uint64_t sum0 = 0, sum1 = 0;
-    size_t pairs = n / 2;
-    for (size_t j = 0; j < pairs; ++j) {
-        sum0 += a[2 * j];
-        sum1 += a[2 * j + 1];
-    }
-    if (n % 2 != 0)
-        sum0 += a[n - 1];
-    return sum0 + sum1;
-}
-```
-
-1. Verfolgen Sie `a = {1,2,3,4,5}` und `n = 5`:
-   Paare, Teilwerte nach der Schleife, Restwert und Rückgabe. (1 P)
-2. Warum sind `2*j` und `2*j+1` im Schleifenkörper gültige Indizes?
-   Was geschieht bei `n = 0`, auch für `a = NULL`? (1 P)
-3. Warum kann diese Form mehr unabhängige Arbeit anbieten als eine
-   einzige Summenkette? Genügt bloßes Ausrollen derselben Kette dafür? (1 P)
-4. Was zeigt Ergebnisgleichheit am Host?
-   Was zeigt eine Assemblerausgabe, und was garantieren beide zusammen
-   noch nicht über die Laufzeit oder `-O3`? (1 P)
-
-::: {.content-hidden when-profile="solution"}
-\Needspace{9\baselineskip}
-
-**Ihre Teilwerte, Indexbegründung und Nachweisgrenzen:**
+**Ihre Lösung:**
 
 \vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{22\baselineskip}
+\Needspace{4\baselineskip}
 
-**Musterlösung 6**
+**Musterlösung 1**
 
-1. `pairs = 2`. Paare sind Indizes $(0,1)$ und $(2,3)$.
-   Nach der Schleife `sum0 = 1+3=4`, `sum1 = 2+4=6`.
-   Der Rest `a[4]=5` ergänzt `sum0` zu neun,
-   die Rückgabe ist $9+6=15$. (1 P)
-2. `j < n/2` begrenzt jedes vollständige Paar;
-   seine beiden Indizes liegen unter `n`.
-   Auch die Multiplikation für diese Indizes überschreitet unter dieser
-   Grenze den Typbereich nicht. Bei null ist die Schleife leer,
-   die Restbedingung falsch und die Rückgabe null.
-   `n-1` wird dann nicht ausgewertet; es gibt keinen Nullzeigerzugriff.
-   Bei positiver Länge ist ein entsprechend gültiges Array vorausgesetzt. (1 P)
-3. Jeder Teilakkumulator hat seine eigene RAW-Kette, Read After Write.
-   Zwischen den Teilketten sind Schritte unabhängig;
-   abschließend wird jedoch eine gemeinsame Summe benötigt.
-   Vier ausgeschriebene Additionen auf derselben Variable
-   behalten dagegen ihre ursprüngliche Kette. (1 P)
-4. Ein Hostlauf prüft die Funktion für die ausgeführten Eingaben.
-   Assembler zeigt eine bestimmte Übersetzung für Compiler, Version und Optionen.
-   Beides liefert keine festgelegten Out-of-Order-Takte oder einen garantierten
-   Laufzeitgewinn durch `-O3`.
-   Zusätzliche Teilketten können auch Register- und Verwaltungsaufwand erhöhen. (1 P)
-
-Vorzeichenlose 64-Bit-Addition ist modulo $2^{64}$ definiert.
-Beide Summenformen besitzen hier dieselbe Semantik auch bei einem Umlauf.
-Das ist keine allgemeine Zusage für beliebige Gleitkomma-Neuklammerung.
+1. $7+6-1=12$ Takte, CPI $12/7\approx1{,}714$,
+   IPC $7/12\approx0{,}583$; Anlauf und Leeren zählen mit. (2 P)
+2. D2 kann in sechs lesen, EX beginnt in sieben statt fünf.
+   Zwei zusätzliche Takte: Fenster 14, CPI zwei. (2 P)
+3. 192 beziehungsweise 216 Takte: $1{,}2$ und $1{,}35$ µs.
+   Höheres IPC der zweiten Übersetzung garantiert keine kürzere Zeit. (2 P)
 :::
 
 {{< pagebreak >}}
 
-## Optional: vorhandenes C-Programm übersetzen und beobachten
+## Aufgabe 2: Andere Register und Operationen (6 Punkte)
 
-Die Datei `labs/src/lab07_ilp.c` enthält beide vollständigen Funktionen
-und eine Prüfung mit bekannten Ergebnissen. Starten Sie vom Repository-Hauptordner:
+RV32I-Modell: s0 adressiert ein gültiges ausgerichtetes Wort mit Wert 18;
+t4 ist sechs, t5 vierzehn, t6 neun, a1 zwei.
 
-```bash
-gcc -std=c11 -O1 -Wall -Wextra -Werror \
-  labs/src/lab07_ilp.c -o /tmp/lab07_O1
-/tmp/lab07_O1
-
-gcc -std=c11 -O3 -Wall -Wextra -Werror \
-  labs/src/lab07_ilp.c -o /tmp/lab07_O3
-/tmp/lab07_O3
+```asm
+lw  t2, 0(s0)     # A
+add t3, t2, t4    # B
+xor t2, t5, t6    # C
+sub a0, t2, a1    # D
 ```
 
-Beide Läufe sollen ausgeben:
+1. Nennen Sie alle RAW-Kanten zwischen den vier Befehlen. (2 P)
+2. Nennen Sie WAR und WAW. Warum sind diese Namenskonflikte? (1 P)
+3. Anfangsabbildung: s0 P8, t2 P2, t4 P4, t5 P5, t6 P6, a1 P9.
+   Neue Ziele P20, P21, P22, P23 in Programmreihenfolge.
+   Erstellen Sie eine Tabelle physischer Quellen und Ziele. Welche t2-Version liest B? (2 P)
+4. Bestimmen Sie endgültig t2, t3 und a0. (1 P)
 
-```text
-n=8: Kette=36, geteilt=36
-n=5: Kette=15, geteilt=15
-Alle Prueffaelle bestanden.
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
+
+**Ihre Lösung:**
+
+\vspace*{3cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
+**Musterlösung 2**
+
+1. RAW A nach B und C nach D. (2 P)
+2. WAR B nach C, WAW A nach C, jeweils auf t2. C braucht keinen von A/B erzeugten Wert. (1 P)
+
+| Befehl | Quellen | Ziel |
+|--------|---------|------|
+| A | P8 | P20 |
+| B | P20, P4 | P21 |
+| C | P5, P6 | P22 |
+| D | P22, P9 | P23 |
+
+B behält P20 trotz späterer neuer t2-Abbildung. (2 P)
+Endwerte t2 sieben, t3 24, a0 fünf; vierzehn XOR neun ist sieben. (1 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 3: Ein längerer Load hält Bestätigung auf (6 Punkte)
+
+A–D aus Aufgabe 2 sind vor Takt eins dekodiert und umbenannt.
+Ein Issue je Takt, eine ALU und eine Load/Store-Einheit.
+A startet in eins und wird Ende sechs fertig; andere Befehle Ende ihres Starttakts.
+Nutzer starten frühestens im Folgetakt des Produzenten.
+Zwei Retires je Takt, strikt in Programmreihenfolge, frühestens nach Fertigstellung.
+In-Order wählt nur den nächsten Programmplatz;
+Out-of-Order wählt den ältesten bereiten Kandidaten.
+
+1. Bestimmen Sie Start, Fertigstellung und Retire für In-Order. (2 P)
+2. Bestimmen Sie diese Zeiten für Out-of-Order. (2 P)
+3. Vergleichen Sie Fensterlänge, IPC, CPI, Zeitreduktion und Speedup.
+   Ist der Load dadurch früher fertig? (2 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
+
+**Ihre Lösung:**
+
+\vspace*{3cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
+**Musterlösung 3**
+
+| Befehl | In-Order S/F/R | Out-of-Order S/F/R |
+|--------|----------------|-------------------|
+| A | 1 / 6 / 7 | 1 / 6 / 7 |
+| B | 7 / 7 / 8 | 7 / 7 / 8 |
+| C | 8 / 8 / 9 | 2 / 2 / 8 |
+| D | 9 / 9 / 10 | 3 / 3 / 9 |
+
+Je Plan 2 P. Fenster zehn beziehungsweise neun Takte.
+IPC 0,4 beziehungsweise $4/9\approx0{,}444$;
+CPI 2,5 beziehungsweise 2,25. Zeitreduktion zehn Prozent,
+Speedup $10/9\approx1{,}111$. A bleibt Ende sechs fertig. (2 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 4: Ein anfangs nicht genommener Sprung (5 Punkte)
+
+2-Bit-Zähler startet `01`; `00/01` sagen NT, `10/11` T vorher.
+T erhöht, NT senkt um eins, saturierend von null bis drei.
+
+1. Verfolgen Sie NT, T, T, T, NT, NT, NT, T:
+   alter Zustand, Vorhersage, Ist, neuer Zustand. Zählen Sie Treffer. (3 P)
+2. Separates additives Modell: Basis-CPI 0,9, Sprunganteil 15 Prozent,
+   Fehlerquote innerhalb der Sprünge zwölf Prozent, zehn Extratakte je Fehler.
+   Keine Strafüberlappung. Bestimmen Sie Gesamt-CPI, Zeit- und Durchsatzänderung
+   bei gleicher Arbeit und Frequenz. (2 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
+
+**Ihre Lösung:**
+
+\vspace*{3cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
+**Musterlösung 4**
+
+| Schritt | Alt | Vorhersage | Ist | Neu |
+|---------|-----|------------|-----|-----|
+| 1 | 01 | NT | NT | 00 |
+| 2 | 00 | NT | T | 01 |
+| 3 | 01 | NT | T | 10 |
+| 4 | 10 | T | T | 11 |
+| 5 | 11 | T | NT | 10 |
+| 6 | 10 | T | NT | 01 |
+| 7 | 01 | NT | NT | 00 |
+| 8 | 00 | NT | T | 01 |
+
+Drei Treffer, in eins, vier und sieben. Vorhersage stets vor Update. (3 P)
+$\Delta CPI=0{,}15\cdot0{,}12\cdot10=0{,}18$, gesamt 1,08.
+Zeitfaktor $1{,}08/0{,}9=1{,}2$: 20 Prozent länger;
+Durchsatzfaktor $0{,}9/1{,}08=5/6$: etwa 16,67 Prozent weniger. (2 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 5: Ein anderer bestätigter Ausgangszustand (5 Punkte)
+
+Vor A aus Aufgabe 2: t2 ist 31, t3 40, a0 55.
+Ein Vorgänger hat s1 bereits mit 27 bestätigt.
+
+1. A meldet einen synchronen Ladefehler; C und D sind intern schon fertig.
+   Welche genannten Architekturwerte bleiben erhalten? Was darf nicht bestätigt werden? (2 P)
+2. Separat liefert A erfolgreich 18. Ein Interrupt wird genau nach Bestätigung von A,
+   aber vor B angenommen. Welche vier Werte sieht der Handler? (1 P)
+3. Ein falsch vorhergesagter Bereichspfad wird verworfen.
+   Welche wertabhängige Kopplung wäre für einen Cache-Seitenkanal nötig?
+   Beweist eine einzelne kurze Zugriffszeit den geheimen Wert? (2 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
+
+**Ihre Lösung:**
+
+\vspace*{3cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
+**Musterlösung 5**
+
+1. t2 31, t3 40, a0 55, s1 27. A bestätigt keine normale Loadwirkung,
+   jüngere B, C, D ebenfalls keine normalen Wirkungen. (2 P)
+2. t2 18, t3 40, a0 55, s1 27. Erfolgreicher Programmanfang, kein Loadfehler. (1 P)
+3. Ein transient geladener Wert beeinflusst eine Probeadresse und damit eine Cachezeile.
+   Rollback muss diesen internen Zustand nicht entfernen.
+   Eine Einzelzeit ist wegen anderer Ursachen kein eindeutiger Beweis. (2 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 6: Drei statt zwei Summenketten (4 Punkte)
+
+Der gültige Puffer enthält $[9,1,8,2,7,3,6]$, n ist sieben.
+
+```c
+#include <stddef.h>
+#include <stdint.h>
+uint64_t sum3(const uint32_t *a, size_t n) {
+    uint64_t s0 = 0, s1 = 0, s2 = 0;
+    size_t groups = n / 3;
+    for (size_t j = 0; j < groups; ++j) {
+        s0 += a[3*j]; s1 += a[3*j+1]; s2 += a[3*j+2];
+    }
+    for (size_t i = 3*groups; i < n; ++i) s0 += a[i];
+    return s0 + s1 + s2;
+}
 ```
 
-GCC heißt GNU Compiler Collection. `-std=c11` wählt die C-Sprachfassung,
-`-O1` und `-O3` Optimierungsstufen, `-Wall` und `-Wextra` Warnungen,
-`-Werror` deren Behandlung als Fehler. `-o` benennt die ausführbare Datei.
-Die Shellfortsetzung `\` verbindet die beiden Kommandozeilen.
-Ein Compilerfehler muss behoben werden, bevor ein Lauf bewertet wird.
+1. Bestimmen Sie Teilsummen vor Restbehandlung und Rückgabe. (1 P)
+2. Begründen Sie die Indexgrenzen und das Verhalten bei n null mit Nullzeiger. (1 P)
+3. Welche Unabhängigkeit entsteht gegenüber einer einzigen Summenkette? (1 P)
+4. Beweist Ergebnisgleichheit oder eine O3-Übersetzung einen Laufzeitgewinn? (1 P)
 
-Die Datei prüft leere Eingaben, alle Präfixlängen null bis acht,
-gerade und ungerade Fälle sowie Werte bis `UINT32_MAX`.
-`reduce_chain` führt eine `uint64_t`-Summe fort;
-`reduce_split` führt zwei solche Summen und die Restbehandlung aus.
-`uint32_t` und `uint64_t` sind vorzeichenlose 32- und 64-Bit-Typen.
-`UINT32_MAX` ist der größte 32-Bit-Wert, `UINT64_C` erzeugt
-eine passend breite Konstante. `PRIu64` aus `<inttypes.h>`
-ist das passende Ausgabeformat, `%zu` das für `size_t`.
-`NULL` wird nur mit Länge null benutzt.
-Der Prozess meldet bei einem falschen Ergebnis einen Fehlerstatus;
-er misst keine Hardwarezyklen.
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
 
-Zusätzlich können Sie im [Compiler Explorer](https://godbolt.org/)
-dieselben Funktionen für einen verfügbaren RISC-V-GCC betrachten.
-RISC heißt Reduced Instruction Set Computer.
-Wählen und dokumentieren Sie Compilerfassung, Zielarchitektur,
-ABI, Application Binary Interface, und Optionen.
-Beispielsweise sind `-march=rv32i` und `-mabi=ilp32` nur für einen passenden
-RISC-V-Compiler gültig; sie gehören nicht an den Host-GCC-Aufruf oben.
-RV32I ist die 32-Bit-Integerbasis, ILP32 eine 32-Bit-Schnittstellenkonvention.
+**Ihre Lösung:**
 
-Vergleichen Sie die **tatsächlich** ausgegebenen Befehle und notieren Sie,
-ob Ausrollen oder getrennte Teilketten sichtbar sind.
-`-O3` garantiert keines von beidem.
-Eine Renode-Ausführung ohne passendes Mikroarchitekturmodell oder
-ein skalares Ripes-Modell belegt keine Desktop-Out-of-Order-Zeit.
-Kein zusätzlicher Simulator ist für die Pflichtaufgaben nötig.
+\vspace*{3cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
+**Musterlösung 6**
+
+1. Vor Rest $s0=11,s1=8,s2=11$; Rest sechs ergibt $s0=17$, Rückgabe 36. (1 P)
+2. Jede Dreiergruppe liegt unter n, danach nur Restindizes unter n.
+   Bei n null keine Zugriffe, Rückgabe null. (1 P)
+3. Drei eigene RAW-Ketten mit unabhängigen Zwischenschritten; abschließend gemeinsame Summe. (1 P)
+4. Nein. Funktionstest und konkrete Übersetzung beweisen kein bestimmtes Mikroarchitektur-Timing. (1 P)
+:::
+
+{{< pagebreak >}}
+
+## Optional: am Rechner prüfen
+
+Ergänzen Sie `src/lab07_ilp.c` um `sum3` aus Aufgabe 6 und neue Tests:
+$[9,1,8,2,7,3,6]$ ergibt 36; $[4,10]$ ergibt 14; leere Eingabe ergibt null.
+Vergleichen Sie Funktion und erzeugten Assembler bei O1 und O3 getrennt von Laufzeitmessungen.

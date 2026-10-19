@@ -1,7 +1,7 @@
 ---
 title: "Übungsblatt 6: Hardware-Beschleunigung"
 highlight-style: ../assets/styles/dhbw-code.theme
-subtitle: "Mikrocomputertechnik 3 · Datenbedarf, Pufferbesitz und Fristen auf Papier"
+subtitle: "Mikrocomputertechnik 3 · 32 Orientierungspunkte · ca. 60–75 Minuten"
 header-includes: |
   \usepackage{needspace}
 ---
@@ -10,437 +10,242 @@ header-includes: |
 > **Musterlösung**
 :::
 
-## Ziel und Arbeitsweise
+## Aufgabe 1: Ein kleineres Display mit höherer Bildrate (6 Punkte)
 
-Die sechs Pflichtaufgaben sind ohne Platine oder Simulator auf Papier lösbar.
-Sie berechnen Grenzen, verfolgen Speicheradressen und begründen sichere
-Pufferübergaben. DMA bedeutet Direct Memory Access, direkter Speicherzugriff;
-CPU Central Processing Unit, Prozessor.
+240×135 Pixel, RGB565 mit zwei Byte je Pixel, 45 vollständige Bilder/s.
+SPI überträgt ideal ein Bit je SCK, ohne Zusatzbytes oder Pausen.
 
-**Bearbeitungszeit:** etwa 60–75 Minuten selbstständig.
-**Orientierungspunkte:** 32.
-Im Unterricht sind 55 Minuten angeleitete Arbeitsphasen vorgesehen:
-Aufgabe 1 (10 min), Aufgaben 2–3 (15 min), Aufgabe 4 (15 min),
-Aufgaben 5–6 (15 min). Lösungsbesprechungen gehören zu den Vorlesungsphasen.
-
-Geben Sie Rechenweg, Einheiten und Modellgrenzen an.
-Ein Byte hat acht Bits, MB bedeutet $10^6$ Bytes, MiB $2^{20}$ Bytes.
-Hexadezimale Adressen beginnen mit `0x`. Geräteadressen, Zählergrenzen,
-Cachegrößen und Zeitwerte sind Lehrannahmen, keine zugesicherte Plattform.
-
-## Aufgabe 1: Leitung und CPU-Budget (6 Punkte)
-
-Ein vollständiges Bild besitzt $320\times240$ Pixel im Format RGB565:
-Red, Green, Blue mit fünf, sechs und fünf Bits, insgesamt zwei Bytes je Pixel.
-Ein SPI, Serial Peripheral Interface, überträgt ideal ein Bit je
-SCK, Serial Clock oder Takt, ohne Pausen und Kommandobytes.
-
-1. Berechnen Sie die Bildgröße und die Nutzdatenrate für
-   $60$ vollständige Bilder pro Sekunde. (2 P)
-2. Berechnen Sie die idealen maximalen Bildraten bei
-   $10$ MHz und $50$ MHz SCK. Kann DMA allein $60$ Bilder/s ermöglichen? (1 P)
-3. Die CPU hat $100$ MHz. Bei $10$ MHz SCK fallen modellhaft
-   $150$ CPU-Takte fester Interruptaufwand je Meldung an.
-   Berechnen Sie den Bedarf bei einer Meldung je Byte und je sechzehn Bytes.
-   Wie ist ein Bedarf über $100\,\%$ zu interpretieren? (2 P)
-4. Bestimmen Sie die ideale Leitungszeit für $1$ MiB bei $10$ MHz SCK.
-   Weshalb ergibt die Rechnung für $1$ MB eine andere Zeit? (1 P)
+1. Berechnen Sie Bildgröße und geforderte Nutzdatenrate. (2 P)
+2. Bestimmen Sie ideale Bildraten bei zwölf und 36 MHz.
+   Welche Leitung reicht rechnerisch? Verändert DMA diese Grenze? (1 P)
+3. CPU 120 MHz, 96 Takte fester Aufwand je Meldung, SCK zwölf MHz.
+   Berechnen Sie den Budgetbedarf bei einer Meldung je Byte und je 32 Byte. (2 P)
+4. Wie lange brauchen ein MiB und ein MB ideal bei zwölf MHz? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{9\baselineskip}
+\Needspace{8\baselineskip}
 
-**Ihre Rechnungen und Grenzbegründungen:**
+**Ihre Lösung:**
 
-\vspace*{3.5cm}
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{20\baselineskip}
+\Needspace{4\baselineskip}
 
 **Musterlösung 1**
 
-1. $B=320\cdot240\cdot2=153600$ Bytes.
-   $r=60\cdot153600=9216000$ Byte/s, also $9{,}216$ MB/s.
-   Die Leitung müsste mindestens $73{,}728$ Mbit/s Nutzdaten tragen. (je 1 P)
-2. $10^7/8=1250000$ Byte/s, damit $1250000/153600\approx8{,}14$ Bilder/s.
-   Bei $50$ MHz sind es $\approx40{,}69$ Bilder/s.
-   Beide Werte liegen unter $60$. DMA kann CPU-Kopierarbeit sparen,
-   erhöht diese Leitungsgrenze aber nicht. Reale Zusatzbytes senken die Werte. (1 P)
-3. Pro Byte: $1250000\cdot150=187500000$ Takte/s,
-   also $187{,}5\,\%$ des verfügbaren Budgets.
-   Das ist ein nicht erfüllbarer Bedarf, keine erreichbare CPU-Auslastung.
-   Pro sechzehn Bytes: $1250000/16=78125$ Meldungen/s,
-   damit $11718750$ Takte/s oder $11{,}71875\,\%$.
-   Datenkopieren und Anwendungsarbeit sind darin noch nicht enthalten. (1 P Zahlen, 1 P Deutung)
-4. $t=2^{20}\cdot8/10^7=0{,}8388608$ s.
-   $1$ MB enthält nur $1000000$ Bytes und benötigt $0{,}8$ s.
-   Binäres und dezimales Präfix bezeichnen unterschiedliche Mengen. (1 P)
+1. $240\cdot135\cdot2=64800$ Byte;
+   $45\cdot64800=2916000$ Byte/s beziehungsweise 23,328 Mbit/s. (2 P)
+2. Zwölf MHz: etwa 23,15 Bilder/s; 36 MHz: etwa 69,44 Bilder/s.
+   Nur 36 MHz reicht ideal für 45; DMA erhöht die Leitungsrate nicht. (1 P)
+3. Bei 1,5 Millionen Byte/s: 144 Millionen Takte/s, 120 Prozent Bedarf, nicht erfüllbar.
+   Bei 32 Byte je Meldung: 4,5 Millionen Takte/s, 3,75 Prozent. (2 P)
+4. MiB: etwa 0,699051 s; MB: etwa 0,666667 s. (1 P)
 :::
 
-\Needspace{24\baselineskip}
+{{< pagebreak >}}
 
-## Aufgabe 2: Adressen, Elemente und Blöcke (6 Punkte)
+## Aufgabe 2: Andere Transferbreiten und Grenzen (6 Punkte)
 
-Es gelten bereits DMA-sichtbare 32-Bit-Modelladressen und gleiche
-Quell- und Zielbreite. COUNT ist die Anzahl der **Elemente**, nicht generell
-die Bytezahl. Inkrement bedeutet Erhöhen um die Elementbreite.
+DMA-sichtbare Modelladressen, gleiche Quell-/Zielbreite;
+COUNT zählt Elemente. Inkrement entspricht der Elementbreite.
 
-1. Beim Senden von vier Bytes beginnt die Quelle bei `0x20001000`,
-   das UART-TX-Register liegt bei `0x40010004`.
-   Schreiben Sie die vier Paare aus Quell- und Zieladresse auf.
-   UART heißt Universal Asynchronous Receiver-Transmitter, TX Transmit. (1 P)
-2. Beim Empfang liegt ADC_DATA fest bei `0x40011000`.
-   Acht 16-Bit-Messwerte sollen ab `0x20002000` gespeichert werden.
-   Nennen Sie die ersten vier Adresspaare, die Gesamtbytezahl und
-   die Zieladresse des letzten Elements.
-   ADC heißt Analog-to-Digital Converter, Analog-Digital-Wandler. (2 P)
-3. Ein Byte-Transfer ist auf $65535$ Elemente je Auftrag begrenzt.
-   Zerlegen Sie $1000000$ Bytes in möglichst wenige Aufträge.
-   Wie viele volle Blöcke und welche Restlänge entstehen? (1 P)
-4. Ermitteln Sie die Rückgabe der folgenden C-Funktion für
-   `(70000, 65535)`, `(20, 65535)` und `(0, 65535)`.
-   Welche Gefahr bleibt bei `limit = 0` für eine Schleife,
-   die erst nach einem positiven Block fortschreitet? (1 P)
-
-   ```c
-   uint16_t next_block(uint32_t remaining, uint16_t limit) {
-       if (remaining < limit)
-           return (uint16_t)remaining;
-       return limit;
-   }
-   ```
-
-5. Ein 32-Bit-Zugriff verlangt hier eine durch vier teilbare Geräteadresse.
-   Prüfen Sie `0x20001002` und `0x20001004`.
-   Erzeugt ein C-Cast eines CPU-Zeigers automatisch eine gültige
-   DMA-Geräteadresse? Begründen Sie kurz. (1 P)
-
-`remaining` ist die verbleibende Elementzahl, `limit` die positive
-Auftragsgrenze. `uint16_t` und `uint32_t` sind vorzeichenlose
-16- beziehungsweise 32-Bit-Typen aus `<stdint.h>`.
-Eine Rückgabe null erlaubt **keinen** Hardwarestart; dessen Zählersemantik
-müsste gesondert dokumentiert sein.
+1. Vier Sendebyte ab `0x21003000` nach festem TX-Register `0x41000008`:
+   Notieren Sie alle Adresspaare. (1 P)
+2. Zehn 32-Bit-Messwerte aus festem Register `0x41001000` ab `0x21004000`:
+   erste vier Paare, Gesamtbytes und Startadresse des letzten Elements? (2 P)
+3. Höchstens 4095 Byte pro Auftrag: Zerlegen Sie 25000 Byte in möglichst wenige Blöcke. (1 P)
+4. Eine Hilfsfunktion liefert das Minimum aus Rest und Limit.
+   Ergebnisse für $(9000,4095)$, $(57,4095)$ und $(0,4095)$?
+   Warum ist Limit null für eine fortschreitende Schleife ungeeignet? (1 P)
+5. 32-Bit-Zugriffe müssen durch vier ausgerichtet sein:
+   Prüfen Sie `0x21003006` und `0x21003008`. Genügt ein Zeigercast als Geräteabbildung? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{9\baselineskip}
+\Needspace{8\baselineskip}
 
-**Ihre Adresstabelle und Blockrechnung:**
+**Ihre Lösung:**
 
 \vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{20\baselineskip}
+\Needspace{4\baselineskip}
 
 **Musterlösung 2**
 
-1. Quellen `0x20001000`, `0x20001001`, `0x20001002`, `0x20001003`;
-   Ziel jeweils `0x40010004`. Die Quelle wächst um ein Byte,
-   das einzelne Senderegister bleibt fest. (1 P)
-2. Quelle jeweils `0x40011000`; erste Ziele `0x20002000`,
-   `0x20002002`, `0x20002004`, `0x20002006`.
-   Acht Elemente zu zwei Bytes sind sechzehn Bytes.
-   Letztes Element beginnt bei `0x2000200E` und belegt auch `...200F`. (je 1 P)
-3. $15\cdot65535=983025$ Bytes in fünfzehn vollen Blöcken;
-   Rest $16975$ Bytes. Insgesamt sechzehn Aufträge. (1 P)
-4. Rückgaben $65535$, $20$ und $0$.
-   Ein Limit null liefert auch bei Restdaten null; die verbleibende
-   Menge nimmt dann nicht ab. Der Aufrufer muss ein positives Limit
-   sicherstellen und bei Rest null aufhören.
-   Der Cast im kleineren Zweig ist sicher, weil dort
-   `remaining < limit <= 65535` gilt. (1 P)
-5. `...1002` ist nicht durch vier teilbar, `...1004` ist es.
-   Ein Cast verändert nur die C-Darstellung. Er bildet keinen Speicher
-   für das Gerät ab und prüft weder Erreichbarkeit noch Plattformübersetzung. (1 P)
+1. Quellen `...3000` bis `...3003`, Ziel immer `0x41000008`. (1 P)
+2. Quelle immer `0x41001000`; Ziele `0x21004000`, `...4004`, `...4008`, `...400C`.
+   40 Byte insgesamt, letztes Element ab `0x21004024`. (2 P)
+3. Sechs volle Blöcke zu 4095 plus 430 Byte, sieben Aufträge. (1 P)
+4. 4095, 57, null. Limit null verhindert den Abbau positiver Restmengen;
+   null Elemente erlauben keinen undokumentierten Hardwarestart. (1 P)
+5. `...3006` unausgerichtet, `...3008` ausgerichtet.
+   Ein Cast konfiguriert weder Erreichbarkeit noch Adressübersetzung. (1 P)
 :::
 
-\Needspace{24\baselineskip}
+{{< pagebreak >}}
 
-## Aufgabe 3: Wann gehört der Puffer wieder der CPU? (5 Punkte)
+## Aufgabe 3: Abschlussmeldungen auf einer Zeitachse (5 Punkte)
 
-Für einen endlichen normalen Sendeauftrag dokumentiert der Treiber:
-DMA-TC, Transfer Complete, bestätigt die erfolgreiche letzte
-Speicherbewegung und das Ende weiterer Zugriffe auf den Quellpuffer.
-Ein Peripherie-FIFO, First In, First Out, und ein Schieberegister
-können anschließend noch Daten an die Leitung abgeben.
+Ein endlicher SPI-Sendeauftrag meldet DMA-Erfolg bei zehn µs.
+Der Vertrag garantiert danach keine weiteren Zugriffe auf den Quellpuffer.
+FIFO und Schieberegister beenden das letzte Leitungsbit erst bei 34 µs.
+CS muss bis zum Leitungsende aktiv bleiben.
 
-1. Die CPU verändert den Quellpuffer, während DMA daraus liest.
-   Warum ist das trotz gültiger Speicheradresse ein Fehler? (1 P)
-2. Ein SPI-Gerät verlangt aktives CS, Chip Select, bis das letzte
-   Taktbit übertragen wurde. Darf CS unmittelbar bei DMA-TC
-   deaktiviert werden? Welche zweite Bedingung ist nötig? (1 P)
-3. Ist der Quellpuffer unter der obigen normalen Abschlussgarantie
-   bei DMA-TC wieder nutzbar? Wie unterscheidet sich das
-   von TC im Circular Mode, dem fortlaufenden Umlaufbetrieb? (1 P)
-4. Ein Timeout läuft ab, bevor der Auftrag erfolgreich abgeschlossen ist.
-   Formulieren Sie den Abbruchweg einschließlich einer zweiten,
-   begrenzten Wartefrist. Was passiert mit dem Puffer,
-   wenn ruhender DMA nicht bestätigt werden kann? (2 P)
+1. Darf die CPU den Quellpuffer bei fünf µs verändern? Warum? (1 P)
+2. Darf sie CS bei zwölf µs deaktivieren? Nennen Sie die nötige Bedingung. (1 P)
+3. Darf sie den Puffer bei 15 µs neu befüllen?
+   Würde dieselbe Aussage bei einer Circular-Mode-Umlaufmeldung gelten? (1 P)
+4. Separater Fall: Timeout vor Abschluss, Stop angefordert, Stillstand innerhalb
+   einer zweiten begrenzten Frist nicht bestätigt. Wie geht die Software
+   mit Puffer und weiteren Aufträgen um? (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{9\baselineskip}
+\Needspace{8\baselineskip}
 
-**Ihre Zustandsfolge und Begründungen:**
+**Ihre Lösung:**
 
 \vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{22\baselineskip}
+\Needspace{4\baselineskip}
 
 **Musterlösung 3**
 
-1. DMA kann eine Mischung aus altem und verändertem Inhalt lesen.
-   Die Adresse ist erreichbar, aber der vereinbarte Pufferbesitz verletzt.
-   Die CPU hält die veröffentlichte Quelle bis zum Ende aller Zugriffe unverändert. (1 P)
-2. Nein. Erst das dokumentierte Leitungsende der SPI-Peripherie,
-   einschließlich des letzten Taktbits, erlaubt die geforderte CS-Freigabe.
-   DMA-TC bestätigt nur die letzte Speicherbewegung. (1 P)
-3. Unter der ausdrücklich gegebenen normalen Erfolgsgarantie ja:
-   Die nachlaufende Peripherie hält bereits eigene Daten.
-   Im Circular Mode kann TC dagegen nur einen Umlauf markieren;
-   DMA setzt wieder am Anfang an. Der ganze Puffer ist dann nicht frei. (1 P)
-4. Neue Aufträge verhindern, Stopp über den Plattformweg anfordern,
-   innerhalb einer begrenzten Frist bestätigen, dass keine Zugriffe mehr erfolgen,
-   anschließend Status und Peripherie geordnet behandeln.
-   Erst bestätigter Stillstand erlaubt die Puffer-Rückgabe.
-   Ein unbestätigt weiter aktiver Kanal behält einen gesperrten Puffer;
-   bloßes Verlassen der Wartefunktion erlaubt keine Wiederverwendung.
-   Unbestätigte Empfangsteile gelten nicht als neuer vollständiger Datensatz. (je 1 P)
+1. Nein, DMA könnte einen gemischten Datensatz lesen. (1 P)
+2. Nein, erst bestätigtes Leitungsende bei 34 µs erfüllt den CS-Vertrag. (1 P)
+3. Beim endlichen Auftrag ja. Circular Mode kann wieder auf den Puffer zugreifen;
+   die Umlaufmeldung gibt ihn nicht insgesamt frei. (1 P)
+4. Neue Aufträge sperren, Abbruch und Fehlerstatus nach Plattformvertrag behandeln.
+   Ohne bestätigten Stillstand bleibt der Puffer gesperrt;
+   Timeout allein überträgt den Besitz nicht zurück. (2 P)
 :::
 
-\Needspace{36\baselineskip}
+{{< pagebreak >}}
 
-## Aufgabe 4: Sichtbarkeit und ganze Cachezeilen (6 Punkte)
+## Aufgabe 4: Vier 64-Byte-Cachezeilen (6 Punkte)
 
-Es gilt ein **nicht kohärenter Write-Back-Daten-Cache**:
-Neue CPU-Werte können zunächst nur in einer lokalen Kopie liegen;
-DMA greift auf den Speicher dahinter zu. Die Cachezeile hat $32$ Bytes.
-Clean schreibt Dirty-Daten zurück; Invalidate verwirft die Cachekopie.
-Dirty heißt geändert und noch nicht zurückgeschrieben.
+Nicht kohärenter Write-Back-Cache mit 64-Byte-Zeilen.
+Clean schreibt dirty Daten zurück, Invalidate verwirft eine Cachekopie.
 
-1. Beim Senden enthält der Speicher das Hexbyte `11`,
-   die CPU hat im Cache `22` geschrieben, die Zeile ist Dirty.
-   Was liest DMA ohne Wartung? Beschreiben Sie eine sichere Übergabe. (1 P)
-2. Beim Empfang bleibt eine alte Dirty-Kopie `AA` im Cache,
-   DMA schreibt `55` in den Speicher.
-   Was könnte ein CPU-Cache-Hit liefern, und was bewirkt späteres Write-Back?
-   Warum genügt blindes Clean nach dem Empfang nicht? (2 P)
-3. Ein Puffer beginnt bei `0x20001003` und umfasst $100$ Bytes.
-   Bestimmen Sie das exklusive Ende, die letzte enthaltene Byteadresse,
-   den vollständigen Cache-Wartungsbereich und dessen Länge.
-   Wie viele Bytes außerhalb des Puffers werden dabei mitbetroffen? (2 P)
-4. Die Randbytes enthalten fremde Dirty-Variablen.
-   Nennen Sie eine sichere Layoutregel. Ersetzt ein RISC-V-`fence`
-   automatisch die Cache-Wartung? Reicht ein Linkerbereich namens
-   `RAM_UNCACHED` als Beweis für einen geeigneten DMA-Puffer? (1 P)
-
-Ein exklusives Ende bezeichnet die erste **nicht** enthaltene Adresse.
-RISC-V ist die Prozessor-Befehlssatzarchitektur. `fence` ordnet
-Speicherzugriffe gemäß seiner Plattformverwendung;
-`RAM_UNCACHED` ist zunächst nur ein gewählter Bereichsname.
+1. TX: Speicherbyte `37`, neue dirty CPU-Kopie `9B`.
+   Was liest DMA ohne Wartung, wie wird sicher übergeben? (1 P)
+2. RX: alte dirty Cachekopie `CC`, neu durch DMA im Speicher `66`.
+   Was liefern Cache-Hit und späteres Writeback? Warum ist spätes blindes Clean falsch? (2 P)
+3. Puffer ab `0x21003035`, Länge 150 Byte:
+   exklusives Ende, letztes Byte, Wartungsintervall, Länge und mitbetroffene Randbytes? (2 P)
+4. Fremde dirty Daten liegen an den Rändern.
+   Nennen Sie eine Layoutregel. Ersetzt fence Cachewartung?
+   Konfiguriert ein Linkername `DEVICE_RAM` bereits die Hardwareattribute? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{9\baselineskip}
+\Needspace{8\baselineskip}
 
-**Ihre Wertfolge und Skizze der Cachezeilen:**
+**Ihre Lösung:**
 
-\vspace*{3.5cm}
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{25\baselineskip}
+\Needspace{4\baselineskip}
 
 **Musterlösung 4**
 
-1. DMA liest `11`. Vor Übergabe die neuen `22` gemäß Plattformregel
-   in die DMA-sichtbare Ebene veröffentlichen, nötige Reihenfolge sichern
-   und die Quelle während DMA-Zugriffen unverändert halten. (1 P)
-2. Ein Cache-Hit liefert noch `AA`; späteres Write-Back kann die
-   neu empfangenen `55` mit `AA` überschreiben.
-   Ein spätes Clean würde genau diese alten Daten veröffentlichen.
-   Empfangsbereiche werden vor Übergabe nach Plattformregel vorbereitet
-   und nach bestätigtem Empfang zur CPU-Sicht synchronisiert.
-   Das konkrete API, Application Programming Interface, muss festlegen,
-   welche Wartung wann nötig und erlaubt ist. (1 P Fehlerfolge, 1 P Übergabe)
-3. Exklusives Ende `0x20001067`, letzte Byteadresse `0x20001066`.
-   Nach unten beziehungsweise oben auf Zeilengrenzen:
-   `0x20001000` bis ausschließlich `0x20001080`.
-   Das sind $128$ Bytes, vier Cachezeilen.
-   Drei Bytes davor und fünfundzwanzig danach sind mitbetroffen. (je 1 P)
-4. Ganze ausgerichtete Cachezeilen exklusiv reservieren, einschließlich
-   des aufgerundeten Endes; keine fremden Dirty-Daten in diesen Zeilen.
-   `fence` schreibt nicht automatisch einen Write-Back-Cache zurück.
-   Der Linkername konfiguriert keine Cachebarkeit. Plattformattribute,
-   DMA-Erreichbarkeit und eindeutiger Pufferbesitz sind separat zu prüfen. (1 P)
+1. DMA liest `37`. Neue Daten plattformgerecht veröffentlichen, Reihenfolge sichern,
+   Quelle bis Rückgabe unverändert lassen. (1 P)
+2. Cache-Hit kann `CC` liefern; Writeback überschreibt `66` mit `CC`.
+   Spätes Clean veröffentlicht gerade den veralteten Stand.
+   Vorbereitung und Übernahme müssen dem RX-Vertrag folgen. (2 P)
+3. Ende `0x210030CB`, letztes Byte `0x210030CA`.
+   Wartungsintervall:
+
+   $$[\mathtt{0x21003000},\mathtt{0x21003100})$$
+
+   Länge 256 Byte.
+   Je 53 Randbyte, insgesamt 106 außerhalb des Puffers. (2 P)
+4. Ganze ausgerichtete Zeilen exklusiv reservieren.
+   fence ordnet, ersetzt kein automatisches Clean; Linkernamen konfigurieren keine Cachebarkeit. (1 P)
 :::
 
-\Needspace{24\baselineskip}
+{{< pagebreak >}}
 
-## Aufgabe 5: Ping-Pong-Frist und Ringrückstand (5 Punkte)
+## Aufgabe 5: Stereo-Ping-Pong und zwei verlorene Samples (5 Punkte)
 
-Ein Mono-Audiostrom enthält $44100$ Samples pro Sekunde mit
-$16$ Bit je Sample. Ein Ping-Pong-Sendepuffer besitzt zwei Hälften
-zu je $2048$ Bytes. DMA liest erst A, dann B, dann wieder A.
-Die CPU darf die jeweils verlassene Hälfte nachfüllen.
+48000 Stereo-Frames/s; je Kanal wird ein 24-Bit-Sample in vier Byte gespeichert.
+Zwei DMA-Sendehälften zu je 3072 Byte werden A, B, A, B gelesen.
 
-1. Berechnen Sie Datenrate und Halbzeit $T_H$.
-   Ein Nachfüllen benötigt höchstens $3$ ms Reaktionslatenz,
-   $18$ ms Arbeit und $1$ ms Veröffentlichung.
-   Passt das Fenster? Reichen $30$ ms Arbeit allein? (2 P)
-2. HT, Half Transfer, wird beim ersten Wechsel A nach B gesetzt.
-   Die CPU bearbeitet dieses Flag erst bei $2T_H+1$ ms.
-   Welche Hälfte liest DMA dann? Erlaubt das alte HT-Flag
-   einen Schreibzugriff auf A? (1 P)
-3. Ein unabhängiger Empfangsring hat $N=8$ Plätze.
-   Konsistent bekannte Gesamtzähler melden $P=14$ geschriebene
-   und $C=5$ verarbeitete Samples; die Samples sind ab null nummeriert.
-   Berechnen Sie Rückstand, beide Ringpositionen und deren Differenz
-   modulo acht. Welches unverarbeitete Sample ist bereits überschrieben? (2 P)
-
-`P` und `C` sind hier **gegebene Gesamtzähler**, keine automatisch aus
-einem einzelnen Flag ableitbaren Werte. Ein gesetztes Statusbit kann
-mehrere Ereignisse zusammenfassen.
+1. Datenrate und Halbzeit? Passen 0,5 ms Reaktion, sechs ms Arbeit
+   und 0,4 ms Veröffentlichung? Passen neun ms Arbeit allein? (2 P)
+2. Ein altes Half-Transfer-Flag wird erst bei zweimal Halbzeit plus 0,5 ms bearbeitet.
+   Welche Hälfte wird dann gelesen, darf A beschrieben werden? (1 P)
+3. Unabhängiger RX-Ring mit 16 Plätzen, Gesamtzähler P 39 und C 21.
+   Samples sind ab null nummeriert. Bestimmen Sie Rückstand, Positionen,
+   Moduloabstand und die bereits verlorenen unverarbeiteten Samples. (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{9\baselineskip}
+\Needspace{8\baselineskip}
 
-**Ihre Zeitachse und Ringbelegung:**
+**Ihre Lösung:**
 
 \vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{20\baselineskip}
+\Needspace{4\baselineskip}
 
 **Musterlösung 5**
 
-1. $r=44100\cdot2=88200$ Byte/s.
-   $T_H=2048/88200\approx23{,}21995$ ms.
-   $3+18+1=22$ ms passen unter den angenommenen Höchstwerten:
-   Reserve $\approx1{,}21995$ ms. Dreißig Millisekunden Arbeit
-   allein überschreiten das Fenster. Die Frist muss für jeden
-   Umlauf gelten, nicht nur im Mittel. (je 1 P)
-2. Nach $2T_H\approx46{,}43991$ ms liest DMA erneut A.
-   Bei $\approx47{,}43991$ ms ist A deshalb belegt.
-   Das verspätete Flag berichtet einen früheren Übergang,
-   keine aktuelle Schreibfreigabe. (1 P)
-3. $P-C=9>8$: Der Ring reicht nicht aus.
-   Schreibposition $14\bmod8=6$, Leseposition $5\bmod8=5$;
-   Positionsdifferenz $(6-5)\bmod8=1$ verschleiert den Rückstand neun.
-   Sample $13$ hat im Platz fünf das noch unverarbeitete Sample $5$
-   überschrieben. Plätze null bis sieben enthalten jetzt
-   $8,9,10,11,12,13,6,7$. Gesamtfortschritt ist nötig,
-   wenn Überläufe sicher erkannt werden sollen. (je 1 P)
+1. $48000\cdot2\cdot4=384000$ Byte/s;
+   Halbzeit acht ms. 6,9 ms passen mit 1,1 ms Reserve; neun ms nicht. (2 P)
+2. Bei 16,5 ms liest DMA wieder A. Das alte Flag ist keine aktuelle Schreibfreigabe. (1 P)
+3. Rückstand 18, Schreibposition sieben, Leseposition fünf, Moduloabstand zwei.
+   Nur Samples 23 bis 38 sind noch vorhanden; 21 und 22 wurden durch 37 und 38 überschrieben. (2 P)
 :::
 
-\Needspace{28\baselineskip}
+{{< pagebreak >}}
 
-## Aufgabe 6: Rechtecktransfer und begründete Auswahl (4 Punkte)
+## Aufgabe 6: Ein vierzeiliges Bildrechteck (4 Punkte)
 
-Ein RGB565-Bild mit zwei Bytes je Pixel hat $320$ Pixel je Zeile
-und beginnt bei `0x20001000`. Die Koordinaten starten bei null.
-Ein Rechteck ab $x=10$, $y=20$ mit vier Pixeln Breite und drei Zeilen Höhe
-soll ab `0x20008000` dicht gepackt werden.
-Pitch ist der Byteabstand zwischen zwei Zeilenanfängen.
+RGB565, Bildbreite 240 Pixel, Basis `0x21003000`.
+Rechteck ab $x=7,y=11$, fünf Pixel breit, vier Zeilen hoch;
+Ziel ab `0x21009000` dicht gepackt.
 
-1. Bestimmen Sie Quell-Pitch, kopierte Bytes je Zeile,
-   Abstand vom Ende einer kopierten Zeile zum nächsten Quellanfang
-   und Gesamtbytezahl des Rechtecks. (1 P)
-2. Berechnen Sie die drei Quell- und Zielanfangsadressen.
-   Warum genügt ein einziger linearer 24-Byte-Auftrag aus der Quelle nicht?
-   Nennen Sie eine passende Zerlegung. (2 P)
-3. Ein anderer Sensor liefert nur sechs Bytes je $10$ ms.
-   Muss dafür DMA gewählt werden?
-   Begründen Sie die Auswahl mit CPU-Aufwand, Frist und Komplexität. (1 P)
+1. Bestimmen Sie Quell-Pitch, Bytes je kopierter Zeile, Quelllücke und Gesamtbytes. (1 P)
+2. Berechnen Sie alle vier Quell- und Zielzeilenanfänge.
+   Welche lineare Zerlegung ist nötig? (2 P)
+3. Ein anderer Sensor liefert 40 Byte je fünf ms. Verlangt das zwingend DMA?
+   Begründen Sie anhand Aufwand und Reaktionsfrist. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{9\baselineskip}
+\Needspace{8\baselineskip}
 
-**Ihre Zeilenadressen und Entscheidung:**
+**Ihre Lösung:**
 
 \vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{20\baselineskip}
+\Needspace{4\baselineskip}
 
 **Musterlösung 6**
 
-1. Quell-Pitch $320\cdot2=640$ Bytes, kopierte Zeile $4\cdot2=8$ Bytes,
-   Lücke nach diesen acht Bytes $640-8=632$ Bytes.
-   Drei kopierte Zeilen ergeben $24$ Bytes. Pitch und Lücke sind verschieden. (1 P)
-2. Startoffset $20\cdot640+10\cdot2=12820=\texttt{0x3214}$.
-   Quellen `0x20004214`, `0x20004494`, `0x20004714`.
-   Ziele `0x20008000`, `0x20008008`, `0x20008010`.
-   Die nächsten Quellzeilen liegen $640$ Bytes auseinander;
-   ein linearer Auftrag kopierte überwiegend Nachbarpixel derselben Zeile.
-   Drei lineare Aufträge zu acht Bytes passen. Alternativ sind
-   dokumentierte Deskriptorketten oder ein geeigneter zweidimensionaler
-   DMA-Modus möglich. Deren Verfügbarkeit muss geprüft werden. (je 1 P)
-3. Nein, $600$ Byte/s allein verlangen keinen DMA.
-   Ein kurzer blockierender Aufruf oder Interruptbedienung kann
-   bei eingehaltenen Reaktionsfristen einfacher sein.
-   DMA kann sich dennoch wegen anderer CPU-Arbeit oder Energiezielen lohnen.
-   Entscheidend sind geprüfter Aufwand und Fristen, nicht nur die Existenz eines Kanals. (1 P)
+1. Pitch 480 Byte, Kopierzeile zehn Byte, Lücke 470 Byte, gesamt 40 Byte. (1 P)
+2. Startoffset $11\cdot480+7\cdot2=5294=$ `0x14AE`.
+   Quellen `0x210044AE`, `0x2100468E`, `0x2100486E`, `0x21004A4E`.
+   Ziele `0x21009000`, `0x2100900A`, `0x21009014`, `0x2100901E`.
+   Vier lineare Zehn-Byte-Aufträge statt eines durchgehenden Quellblocks. (2 P)
+3. Nein, 8000 Byte/s allein entscheiden nicht. Einfache Bedienung ist bei eingehaltenen
+   Fristen möglich; DMA-Aufwand und übrige CPU-Arbeit mitbewerten. (1 P)
 :::
 
-\Needspace{35\baselineskip}
+{{< pagebreak >}}
 
-## Optional: zwei reine C-Rechenfunktionen am Host prüfen
+## Optional: am Rechner prüfen
 
-Diese Vertiefung benötigt einen C-Compiler am normalen Rechner.
-Sie prüft **keinen** Hardwaretreiber und führt keine Gerätezugriffe aus.
-Speichern Sie die folgende Datei als `dma_rechnen.c`.
-
-```c
-#include <stdint.h>
-#include <inttypes.h>
-#include <stdio.h>
-
-static uint16_t next_block(uint32_t remaining, uint16_t limit) {
-    if (remaining < limit)
-        return (uint16_t)remaining;
-    return limit;
-}
-
-static uint64_t covered_end(uint32_t start, uint32_t bytes) {
-    uint64_t end = (uint64_t)start + bytes;
-    return (end + 31u) & ~UINT64_C(31);
-}
-
-int main(void) {
-    printf("Block: %" PRIu16 "\n", next_block(1000000u, 65535u));
-    printf("Ende: 0x%08" PRIX64 "\n",
-           covered_end(UINT32_C(0x20001003), 100u));
-    return 0;
-}
-```
-
-Bauen und starten Sie beispielsweise mit:
-
-```bash
-gcc -std=c11 -Wall -Wextra -Werror dma_rechnen.c -o dma_rechnen
-./dma_rechnen
-```
-
-Erwartet werden `Block: 65535` und `Ende: 0x20001080`.
-Ändern Sie die Eingaben auf `remaining = 0`, `limit = 0` sowie
-`start = 0x20001000`, `bytes = 32`. Erklären Sie die Ergebnisse.
-
-`covered_end` berechnet ausschließlich die Geometrie eines positiven
-Bytebereichs mit $32$ Bytes je Cachezeile.
-`start` ist dessen Anfang, `bytes` seine Länge und `end` das exklusive Ende.
-`uint64_t` ist ein vorzeichenloser 64-Bit-Typ.
-Der Cast erfolgt **vor** der Addition; `UINT64_C(31)` erzeugt die Maske
-in derselben Breite. `~` invertiert Bits, `&` verknüpft sie bitweise.
-Die Druckmakros `PRIu16` und `PRIX64` aus `<inttypes.h>` passen
-das Ausgabeformat an die Typen an.
-
-Der Aufrufer prüft vorher positive Länge und gültigen Gerätebereich.
-Null Bytes bedeuten keinen Wartungsauftrag.
-Die Rückgabe ist kein Beweis für Erreichbarkeit, exklusive Cachezeilen
-oder eine ausgeführte Cache-Wartung.
-Ein passender Hardwaretreiber benötigt zusätzlich dokumentierte
-Request-Zuordnung, Registersemantik, Adressabbildung, Synchronisation,
-Fehlerbehandlung und ein bestätigtes Ende aller Zugriffe.
+Implementieren Sie Blockzerlegung aus Aufgabe 2 und Cachebereichsrundung aus Aufgabe 4.
+Prüfen Sie zusätzlich Pufferstart `0x2100313F` mit zwei Byte:
+Wartungsbereich `0x21003100` bis exklusiv `0x21003180`.
+Verwenden Sie ausreichend breite Zwischenwerte vor der Addition.

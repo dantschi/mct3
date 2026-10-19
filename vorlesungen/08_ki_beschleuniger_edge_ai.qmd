@@ -256,11 +256,11 @@ OoO bedeutet Out of Order, interne Ausführung außerhalb der Programmreihenfolg
 - Tile: Wiederverwendung erklären und Ausgaben gesondert zählen
 
 ::: notes
-Dense ist eine vollständig verbundene Schicht; MAC heißt Multiply-Accumulate, Produkt zur Summe addieren. Roofline ist das Modell einer durch Rechenpeak und Bandbreite begrenzten Rate. Ein Tile ist ein lokal bearbeiteter Matrixausschnitt. Diese Arbeitsphase verbindet die drei Begriffe, ohne einen Compiler oder ein Framework vorauszusetzen.
+Dense heißt vollständig verbunden; MAC bedeutet Multiply-Accumulate, Produkt zur Summe addieren. Die neue Schicht hat drei Ausgänge und zwei Eingänge. Die Zeilenrechnungen ergeben $6+2-1=7$, $-9-8+2=-15$ und $3-4=-1$. Sechs Gewichte und drei Biaswerte ergeben neun Parameter, aber nur sechs produktbezogene MACs. Int8 und Int32 sind Ganzzahlen mit acht beziehungsweise zweiunddreißig Bit. Gewichte, Biaswerte und Eingaben brauchen $6+12+2=20$ Byte; drei Int8-Ausgaben erhöhen dies auf $23$ Byte. Metadaten, Ausrichtung und temporäre Arbeitsbereiche fehlen noch.
 
-Aufgabe 1 führt zu den Ausgängen vierzehn und neun, acht Parametern und sechs produktbezogenen MACs. Bei sechs Int8-Gewichten, zwei Int32-Biaswerten und drei Int8-Eingaben ergeben sich sechs plus acht plus drei, also siebzehn gespeicherte Byte vor den Ausgaben. Int8 und Int32 sind vorzeichenbehaftete Ganzzahlen mit acht beziehungsweise zweiunddreißig Bit. Das ist ein Datenbudget, noch keine vollständige Datei- oder Laufzeitgröße.
+Roofline begrenzt die Rate durch Rechenpeak und über die festgelegte Grenze übertragene Bytes. Mit Peak zwölf Operationen je Takt und sechs Byte je Takt Bandbreite liegen die Grenzen bei Intensität $0{,}5$ und zwei bei drei beziehungsweise zwölf Operationen je Takt. Der Knick liegt bei zwei Operationen je Byte. Eine Verdopplung des Peaks allein ändert die Grenze drei bei Intensität $0{,}5$ nicht.
 
-Aufgabe 2 benutzt die Eingangsgrenze von Lehrmodell R: Peak acht Operationen je Takt, Bandbreite acht Byte je Takt, Grenzen zwei und vier bei Intensität $0{,}25$ und $0{,}5$. Beide liegen unter dem Knick eins. Mit Ausgaben entstehen beim Tile andere Intensitäten. Besprechen Sie besonders, warum mehr Rechenwerke im unveränderten Eingangsmodell den engeren Transfergrenzwert nicht verschieben. Vollständige Lösungen stehen im Lösungsprofil des Übungsblatts.
+Ein Tile ist ein lokal bearbeiteter Matrixausschnitt. Das neue 2×3-mal-3×2-Produkt enthält zwölf MACs, also vierundzwanzig Operationen. Naive Eingangsladungen brauchen $96$ Byte, Wiederverwendung nur $48$ Byte: Intensitäten $0{,}25$ und $0{,}5$. Werden zusätzlich vier Vier-Byte-Ausgaben mitgezählt, ergeben sich $112$ und $64$ Byte sowie Intensitäten $3/14$ und $0{,}375$. Die geänderte Transfergrenze muss neben dem Ergebnis genannt werden. Vollständige Rechenwege stehen im Lösungsprofil des Übungsblatts.
 :::
 
 ## ILP und DLP können gleichzeitig auftreten
@@ -465,11 +465,11 @@ Ohne Chaining verlangt dieses Vergleichsmodell, dass erst alle vier Produkte fer
 - Kapazität und physische Rechenbreite auseinanderhalten
 
 ::: notes
-VLMAX ist die maximale aktive Elementzahl einer Registergruppe. VLEN, Vector Register Length, ist deren Registerbreite in Bit, SEW, Selected Element Width, die Bitzahl je Element und LMUL, Vector Register Group Multiplier, die Gruppengröße. VL ist die aktive Länge; AVL, Application Vector Length, die angeforderte Restzahl.
+VLMAX bezeichnet die maximale aktive Elementzahl einer Registergruppe. VLEN, Vector Register Length, ist die Registerbreite in Bit, SEW, Selected Element Width, die Bitzahl je Element und LMUL, Vector Register Group Multiplier, die Gruppengröße. VL ist die aktive Länge; AVL, Application Vector Length, die angeforderte Restzahl. Die neue Konfiguration liefert $2\cdot256/16=32$ Elemente. Daraus folgt keine physische Lanezahl, also keine Anzahl gleichzeitig rechnender Pfade.
 
-Bei VLEN hundertachtundzwanzig, SEW zweiunddreißig und LMUL eins folgt VLMAX vier. Das ist keine Angabe von vier physischen Rechenpfaden. Im zweiten Teil der Aufgabe gilt separat VLMAX zweiunddreißig. Für AVL vierzig sind erste Längen zwanzig bis zweiunddreißig zulässig. Mit VL vierundzwanzig bleiben sechzehn; die Zeiger bewegen sich um sechsundneunzig, anschließend vierundsechzig Byte. Die Anfangswahl sechzehn ist dagegen unzulässig.
+Im separaten Restfall gelten VLMAX sechzehn und AVL sechsundzwanzig. Die erste Länge muss zwischen dreizehn und sechzehn liegen. Daher sind $16+10$, $14+12$ und $13+13$ zulässig, $12+14$ nicht. Bei Zwei-Byte-Elementen verschiebt $14+12$ die Zeiger um achtundzwanzig und vierundzwanzig Byte. Für zweihundertfünfzig Elemente erzwingen zunächst vierzehn volle Iterationen zweihundertvierundzwanzig Elemente; der Rest sechsundzwanzig benötigt zwei weitere Iterationen.
 
-Für eintausend Elemente entstehen dreißig volle und zwei Restiterationen. Besprechen Sie abschließend die Chaining-Zeitpunkte sechs und neun unter den gegebenen Modellbedingungen. Chaining bedeutet direkte elementweise Weiterleitung und ist keine garantierte Vektorbefehlseigenschaft. Die Aufgabe prüft damit sowohl die Befehlssatzregeln als auch die Grenze zwischen diesen Regeln und einem angenommenen Zeitmodell.
+Im Zeitmodell enden die sechs Produkte in Takten drei bis acht. Chaining bedeutet elementweise Weiterleitung: Die zugehörigen Additionen starten vier bis neun und enden fünf bis zehn. Ohne Chaining beginnen sie erst neun bis vierzehn und enden zehn bis fünfzehn. Die Endzeiten zehn und fünfzehn hängen von den gegebenen Latenzen und Startabständen ab; sie sind keine Befehlssatzgarantie.
 :::
 
 ## CPU, GPU und NPU: gleiche Rechnung
@@ -635,11 +635,11 @@ Die Teilrechnung wird um Faktor zehn schneller, die Gesamtaufgabe nur um Faktor 
 - Peak und Gesamtlatenz getrennt bewerten
 
 ::: notes
-Ein systolisches Array gibt Operanden getaktet an Nachbarzellen weiter. Im verwendeten Output-Stationary-Modell bleiben Ausgabesummen in ihren Zellen. MAC heißt Multiply-Accumulate, ein Produkt zur laufenden Summe addieren. Diese Papieraufgabe verlangt das Nachvollziehen des Datenflusses und nicht nur das Erinnern der Endmatrix.
+Ein systolisches Array reicht Operanden getaktet an Nachbarzellen weiter. Im Output-Stationary-Modell bleiben die Ausgabesummen in ihren Zellen. MAC heißt Multiply-Accumulate, Produkt zur laufenden Summe addieren. Die neue Aufgabe verwendet eine innere Dimension von drei, deshalb dauert ihre versetzte Welle fünf Takte. Die Einspeisezeit legt fest, welche beiden Werte sich tatsächlich begegnen.
 
-Die Musterlösung ergibt acht MACs, verteilt als eins, drei, drei und eins auf vier Takte. Die Teilsummen lauten nach eins $[[5,0],[0,0]]$, nach zwei $[[19,6],[15,0]]$, nach drei $[[19,22],[43,18]]$ und nach vier $[[19,22],[43,50]]$. Für $C_{11}$ treffen die Paare drei und sechs in drei sowie vier und acht in vier zusammen. Die Summe fünfzig ist erst am Ende von vier intern fertig.
+Die vier Teilsummen lauten nach Takt eins $[[2,0],[0,0]]$, nach zwei $[[0,8],[3,0]]$, nach drei $[[-5,11],[3,12]]$, nach vier $[[-5,12],[13,12]]$ und nach fünf $[[-5,12],[13,10]]$. Die letzten gültigen MACs liegen für $C_{00}$ in drei, $C_{01}$ und $C_{10}$ in vier sowie $C_{11}$ in fünf. In $C_{11}$ treffen die Paare $(3,4)$, $(0,3)$ und $(2,-1)$ in drei, vier und fünf ein. Ein numerisches Nullprodukt bleibt eine gültige MAC.
 
-Vier Zellen mal vier Takte ergeben sechzehn Zell-Takte; acht gültige MACs bedeuten fünfzig Prozent. Ein größeres isoliertes Array kann schlechter ausgelastet sein. Beim Besprechen sollte außerdem ausdrücklich die Frage gestellt werden, ob fertige interne Summen schon nach außen übertragen sind. Die Antwort ist nein: Dafür fehlt im Lehrmodell ein angenommener Ausleseweg. Die nachfolgenden Software- und Speicherfragen setzen genau an dieser Systemgrenze an.
+Die gültigen MAC-Zahlen je Takt sind eins, drei, vier, drei und eins. Zwölf MACs auf vier Zellen in fünf Takten ergeben $12/20=60\,\%$ zeitliche Auslastung. Auf einem ansonsten ungenutzten 4×4-Array sinkt sie für dasselbe Fenster auf $12/80=15\,\%$; räumlich belegt das Tile vier von sechzehn Zellen, also $25\,\%$. Fertige interne Summen sind ohne einen festgelegten Ausleseweg noch keine nach außen übertragenen Ergebnisse.
 :::
 
 ## Vom trainierten Modell zur Firmware
@@ -772,11 +772,11 @@ Aufgaben 5–6: 15 Minuten · anschließend Quiz: 15 Minuten
 - Rückblick: Datenmuster → Versorgung → Hardware → Gesamtsystem
 
 ::: notes
-Die letzte Papierphase führt zunächst die Quantisierungsrechnung vollständig aus. Bei Skala null Komma eins und Nullpunkt null ergibt eins Komma vierundzwanzig Code zwölf, Rückwert eins Komma zwei und absoluten Fehler null Komma null vier. Zwanzig wird auf hundert siebenundzwanzig begrenzt. Ein negativer Nullpunkt verschiebt den Code der realen Null, nicht die Rechenbedeutung der Null.
+Die neue Quantisierungsaufgabe verwendet Int8, Ganzzahlen von minus hundertachtundzwanzig bis hundertsiebenundzwanzig. Bei Skala $0{,}2$ und Nullpunkt null wird $-1{,}37$ zu Code minus sieben, Rückwert $-1{,}4$ und Fehler $0{,}03$. Der Wert minus dreißig sättigt auf Code minus hundertachtundzwanzig, Rückwert $-25{,}6$ und Fehler $4{,}4$. Bei Nullpunkt fünf repräsentiert Code fünf die reale Null. Im separaten Skalarprodukt ergibt Nullpunktkorrektur die Eingaben sechs und minus vier; $6(-2)+(-4)3+4=-20$. Mit Skala $0{,}025$ sind das $-0{,}5$. Requantisierung mit Ausgangsskala $0{,}08$ und Nullpunkt drei liefert Code minus drei, Rückwert $-0{,}48$.
 
-Im Speicherbudget werden Flash, nichtflüchtiger Programmspeicher, und SRAM, Static Random Access Memory, getrennt bilanziert. Die Tensor Arena ist der geplante Arbeitsbereich; ihr bereits enthaltener Eingabetensor darf nicht doppelt gerechnet werden. Das Übungsblatt verbindet diese Bilanz mit der Lebensdauer eines Interpreters und der Bedeutung eines Fehlerstatus. Vollständige Musterlösungen sind im Lösungsprofil enthalten.
+Flash, nichtflüchtiger Programmspeicher, und SRAM, Static Random-Access Memory, werden getrennt bilanziert. Frei bleiben $192-52-36=104$ KiB Flash und $48-18-1600/1024-7-5=16{,}4375$ KiB SRAM; KiB sind Kibibyte. Das Quellfenster enthält vierhundert Elemente: $1600$ Byte Float32 oder vierhundert Byte Int8. Der Zieltensor ist bereits in der Tensor Arena, dem geplanten Arbeitsbereich, enthalten. Arena und Interpreter müssen während der Nutzung leben; ein Fehlerstatus darf keinen alten Ausgang als neue Entscheidung freigeben.
 
-Das Quiz prüft anschließend zehn Unterscheidungen aus derselben Vorlesung: Parameter gegen MACs, Multiply-Accumulate, Bandbreitengrenze gegen Peak, Vektorkapazität gegen aktive Länge, interne Fertigstellung gegen Gesamtsystem und Gewichtbytes gegen Arbeitsspeicher. Geben Sie nach einer Antwort jeweils eine kurze Begründung. Die gemeinsame Erkenntnis ist, dass gleichartige Rechenarbeit erst mit passenden Datenwegen, Zahlenformaten und einer korrekten Firmwareintegration zur nutzbaren Anwendung wird.
+Die seriellen CPU-Zeiten, Central Processing Unit oder Prozessor, ergeben $16{,}5$ Millisekunden. Mit Beschleuniger einschließlich Kopie sind es $7{,}25$ Millisekunden. Die Dense-Schicht allein ist Faktor sechs schneller, die Anwendung nur $66/29\approx2{,}276$. Ebenso gilt die Gewichtbyte-Ersparnis von $75\,\%$ nicht automatisch für Modelldatei oder Arena. Das Quiz prüft diese Systemgrenzen sowie Parameter, MACs, Bandbreite, Vektorlänge und Datenfluss.
 :::
 
 ## Quellen und sinnvoller nächster Versuch

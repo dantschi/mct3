@@ -1,57 +1,32 @@
 ---
 title: "Übungsblatt 4: Aktorik & Sicherheit"
-subtitle: "Mikrocomputertechnik 3 · Zeitdiagramme, PWM-Rechnungen und überwachte Abläufe"
+subtitle: "Mikrocomputertechnik 3 · 32 Orientierungspunkte · ca. 60–75 Minuten"
 header-includes: |
   \usepackage{needspace}
+highlight-style: ../assets/styles/dhbw-code.theme
 ---
 
 ::: {.content-visible when-profile="solution"}
 > **Musterlösung**
 :::
 
-## Ziel und Arbeitsweise
+## Aufgabe 1: Ein anderer PWM-Timer (6 Punkte)
 
-Sie berechnen Hardware-PWM, lesen Zeitdiagramme und beurteilen, ob ein
-Watchdog fehlenden Anwendungsfortschritt erkennen kann. Alle sechs
-Pflichtaufgaben sind als Papieraufgaben ohne Platine oder Simulator lösbar.
+Modell: 48 MHz Timereingang, Teiler PSC plus eins, Zähler inklusiv null bis ARR.
+HIGH genau für CNT kleiner CCR; jeder Zählerstand dauert einen Tick.
 
-**Bearbeitungszeit:** etwa 60–75 Minuten selbstständig.
-**Orientierungspunkte:** 32.
-Im Unterricht sind 55 Minuten angeleitete Arbeitsphasen vorgesehen:
-Aufgabe 1 (10 min), Aufgaben 2–3 (15 min), Aufgabe 4 (15 min),
-Aufgaben 5–6 (15 min). Besprechungen gehören zu den Vorlesungsphasen.
-
-**Gemeinsames Modell:** Der PWM-Timer erhält $f_\text{tim}=100$ MHz.
-PSC, Prescaler oder Vorteiler, teilt durch $\mathrm{PSC}+1$.
-CNT, Counter oder Zählwert, zählt aufwärts $0,\ldots,\mathrm{ARR}$;
-ARR ist das Auto-Reload Register. Jeder Zustand dauert einen ganzen Tick.
-Eine Periode hat $N=\mathrm{ARR}+1$ Intervalle.
-Beim Active-High-Ausgang gilt HIGH genau für $\mathrm{CNT}<\mathrm{CCR}$;
-CCR ist das Capture/Compare Register.
-Der Pin hat ideal die Pegel $0$ V und $3{,}3$ V.
-Andere Zählmodi und Polaritäten werden ausdrücklich angegeben.
-PWM bedeutet Pulsweitenmodulation, WDT Watchdog Timer.
-
-Geben Sie Rechenweg, Einheit und die Bedeutung des Ergebnisses an.
-Alle Werte sind Modellannahmen, keine Messungen oder universellen Registervorgaben.
-
-## Aufgabe 1: Takt, Intervalle und Endpunkte (6 Punkte)
-
-1. Für `PSC = 99`, `ARR = 999`, `CCR = 250`:
-   Berechnen Sie Zählfrequenz, PWM-Frequenz, HIGH-Zeit und aktiven
-   Anteil. Markieren Sie HIGH und LOW in einer Periode mit Zeitachse. (2 P)
-2. Jemand ersetzt ARR durch `1000`, lässt PSC und CCR jedoch unverändert.
-   Bleiben Frequenz und Tastverhältnis genau gleich? Geben Sie die neuen
-   Werte und die Ursache der Abweichung an. (2 P)
-3. Ein separates Auf/ab-Modell mit `ARR = 4` durchläuft
-   $0,1,2,3,4,3,2,1$ und danach wieder $0$.
-   Vergleichen Sie seine Periodendauer bei $1$ MHz Zähltakt mit dem
-   Aufwärtszählen $0,1,2,3,4$. Darf hier überall $N=\mathrm{ARR}+1$ stehen? (2 P)
+1. PSC 23, ARR 1199, CCR 480: Bestimmen Sie Zähltakt, PWM-Frequenz,
+   HIGH-Zeit und Tastverhältnis; zeichnen Sie eine Periode. (2 P)
+2. Nur ARR wird auf 1200 erhöht. Welche Frequenz und welcher HIGH-Anteil entstehen? (2 P)
+3. Separates Auf/ab-Modell: $0,1,2,3,4,5,6,5,4,3,2,1$, dann wieder null.
+   Vergleichen Sie bei zwei MHz die Periode mit dem Aufwärtszählen null bis sechs. (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-**Ihre Rechnung und Ihr Zeitdiagramm:**
+\Needspace{8\baselineskip}
 
-\vspace{3cm}
+**Ihre Lösung:**
+
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -59,43 +34,33 @@ Alle Werte sind Modellannahmen, keine Messungen oder universellen Registervorgab
 
 **Musterlösung 1**
 
-1. $f_\text{cnt}=100\,\mathrm{MHz}/100=1\,\mathrm{MHz}$, ein Tick $1\,\mu$s.
-   $N=1000$, $f_\text{PWM}=1\,\mathrm{MHz}/1000=1$ kHz.
-   HIGH dauert $250\,\mu$s, LOW $750\,\mu$s:
-   $D=250/1000=25\,\%$. Auf der Zeitachse liegt HIGH in
-   $[0,250\,\mu\mathrm{s})$, LOW in $[250,1000\,\mu\mathrm{s})$,
-   danach beginnt die nächste Periode. (1 P für Takt/Frequenz, 1 P für Zeiten/Diagramm)
-2. ARR $1000$ bedeutet $1001$ ganze Intervalle:
-   $f_\text{PWM}=10^6/1001\approx999{,}001$ Hz,
-   $D=250/1001\approx24{,}975\,\%$. HIGH bleibt $250\,\mu$s,
-   die Periode wird $1001\,\mu$s lang. Der Endzustand zählt mit. (je 1 P)
-3. Auf/ab hat acht Intervalle, $T=8\,\mu$s und $f=125$ kHz.
-   Aufwärts hat fünf, $T=5\,\mu$s und $f=200$ kHz.
-   Die Formel $N=\mathrm{ARR}+1$ ist hier nur für das Aufwärtsmodell gültig;
-   das Auf/ab-Modell verwendet $N=2\,\mathrm{ARR}$ bei ARR größer null.
-   Die beiden Perioden stehen hier im Verhältnis $8:5$, nicht $2:1$. (je 1 P)
+1. Zwei MHz, Tick $0{,}5$ µs. $N=1200$, $f=1666{,}67$ Hz,
+   HIGH 240 µs, LOW 360 µs, $D=40\,\%$. (2 P)
+2. $N=1201$, $f=2000000/1201\approx1665{,}28$ Hz,
+   $D=480/1201\approx39{,}967\,\%$; HIGH bleibt 240 µs. (2 P)
+3. Auf/ab zwölf Intervalle, sechs µs; aufwärts sieben Intervalle, $3{,}5$ µs.
+   ARR plus eins gilt nur für das vorgegebene Aufwärtsmodell. (2 P)
 :::
 
-\Needspace{8\baselineskip}
+{{< pagebreak >}}
 
-## Aufgabe 2: Mittelwert, Effektivwert und Polarität (6 Punkte)
+## Aufgabe 2: Eine gepulste Widerstandslast (6 Punkte)
 
-Eine ideale Spannungsquelle liefert das ungefilterte PWM-Rechteck
-$0/3{,}3$ V mit HIGH-Anteil $D_H=25\,\%$.
+Ideale ungefilterte PWM von null bis fünf Volt, HIGH-Anteil 36 Prozent,
+rein ohmsche Last mit zwei kΩ.
 
-1. Bestimmen Sie den zeitlichen Mittelwert $\overline V$ und den
-   Effektivwert $V_\text{RMS}$. RMS bedeutet Root Mean Square. (2 P)
-2. Berechnen Sie die mittlere Leistung an $R=1$ k$\Omega$.
-   Welche Leistung hätte eine tatsächlich konstante Spannung
-   $\overline V$ an demselben Widerstand? Erklären Sie den Unterschied. (2 P)
-3. Nun sei der Ausgang Active-Low bei unverändertem aktiven Anteil von
-   $25\,\%$. Bestimmen Sie HIGH-Anteil und Spannungsmittelwert.
-   Begründen Sie, weshalb aktive Lastzeit und HIGH-Anteil getrennt werden müssen. (2 P)
+1. Berechnen Sie Mittelwert und Effektivwert der Spannung. (2 P)
+2. Berechnen Sie mittlere Lastleistung und vergleichen Sie mit einer konstanten Spannung
+   in Höhe des Mittelwerts. (2 P)
+3. Bei Active-Low bleibt der aktive Anteil 36 Prozent. Wie ändern sich
+   HIGH-Anteil und Spannungsmittelwert? (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-**Ihre Rechnung und Interpretation:**
+\Needspace{8\baselineskip}
 
-\vspace{3cm}
+**Ihre Lösung:**
+
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -103,44 +68,32 @@ $0/3{,}3$ V mit HIGH-Anteil $D_H=25\,\%$.
 
 **Musterlösung 2**
 
-1. $\overline V=D_HV_H=0{,}825$ V.
-   $V_\text{RMS}=V_H\sqrt{D_H}=1{,}65$ V. (je 1 P)
-2. $P=V_\text{RMS}^2/R=2{,}7225$ mW.
-   Konstante $0{,}825$ V ergäben $0{,}825^2/1000=0{,}680625$ mW.
-   Der ungefilterte Pin besitzt weiterhin zwei Pegel.
-   Für die ohmsche Leistung wird das mittlere Quadrat gebraucht,
-   nicht das Quadrat des Mittelwerts. (1 P je richtigem Leistungsvergleich mit Begründung)
-3. Die aktive Zeit liegt bei Active-Low auf LOW.
-   Daher ist $D_H=75\,\%$ und $\overline V=2{,}475$ V.
-   Derselbe aktive Anteil beschreibt bei anderer Polarität einen anderen
-   Spannungsmittelwert. Daraus folgt keine universelle Aussage über
-   Motorleistung oder wahrgenommene LED-Helligkeit. (1 P Werte, 1 P Begründung)
-
-Diese Leistungsrechnung setzt eine ideale Quelle und einen ohmschen Widerstand
-voraus; sie ist keine Belastbarkeitsempfehlung für einen GPIO-Pin.
+1. $\overline V=0{,}36\cdot5=1{,}8$ V;
+   $V_\mathrm{RMS}=5\sqrt{0{,}36}=3$ V. (2 P)
+2. PWM: $9/2000=4{,}5$ mW. Konstant: $1{,}8^2/2000=1{,}62$ mW.
+   Mittleres Quadrat und Quadrat des Mittelwerts sind verschieden. (2 P)
+3. HIGH-Anteil 64 Prozent, Mittelwert $3{,}2$ V; aktive Zeit liegt jetzt auf LOW. (2 P)
 :::
 
-\Needspace{8\baselineskip}
+{{< pagebreak >}}
 
-## Aufgabe 3: Flanken und gepufferte Compare-Werte (5 Punkte)
+## Aufgabe 3: Verspätete und zusätzliche Flanken (5 Punkte)
 
-1. Software-PWM plant $50\,\mu$s HIGH, danach $50\,\mu$s LOW.
-   Die fallende Flanke verspätet sich um $20\,\mu$s.
-   Die anschließende LOW-Wartezeit bleibt $50\,\mu$s.
-   Berechnen Sie neue Periode, Frequenz und HIGH-Anteil. (2 P)
-2. Bei einem einzelnen Puls verschieben sich beide Flanken gleich um
-   $5\,\mu$s. Ändert sich seine Breite? Was ändert sich trotzdem? (1 P)
-3. Im Timer aus Aufgabe 1, Teil 1 wird CCR bei CNT $500$ von $250$ auf $750$
-   geändert. Der ungepufferte Vergleich prüft kontinuierlich
-   $\mathrm{CNT}<\mathrm{CCR}$.
-   Zeichnen Sie die HIGH-Abschnitte der betroffenen Periode und berechnen
-   Sie ihren gesamten HIGH-Anteil. Vergleichen Sie mit einer
-   gepufferten Übernahme erst beim nächsten Periodenanfang. (2 P)
+1. Software-PWM plant 30 µs HIGH und danach 70 µs LOW.
+   Die fallende Flanke kommt 15 µs zu spät; die LOW-Wartezeit bleibt 70 µs.
+   Bestimmen Sie Periode, Frequenz und HIGH-Anteil. (2 P)
+2. Beide Flanken eines einzelnen Pulses verschieben sich um acht µs.
+   Was geschieht mit Breite und Lage? (1 P)
+3. Timer wie Aufgabe 1.1: CCR wechselt bei CNT 720 von 480 auf 960.
+   Vergleichen Sie sofortigen kontinuierlichen Vergleich mit gepufferter Übernahme
+   am nächsten Periodenanfang. Geben Sie HIGH-Intervalle und Anteile an. (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-**Ihre Zeitdiagramme und Begründung:**
+\Needspace{8\baselineskip}
 
-\vspace{3cm}
+**Ihre Lösung:**
+
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -148,65 +101,44 @@ voraus; sie ist keine Belastbarkeitsempfehlung für einen GPIO-Pin.
 
 **Musterlösung 3**
 
-1. $t_H=70\,\mu$s, $t_L=50\,\mu$s, $T'=120\,\mu$s.
-   $f'=1/T'\approx8{,}333$ kHz,
-   $D'_H=70/120\approx58{,}33\,\%$.
-   Dies folgt aus dem angegebenen Wartezeitmodell, nicht aus jeder
-   beliebigen Interruptverzögerung. (1 P Zeiten, 1 P Frequenz/Anteil)
-2. $t_\text{Ende}-t_\text{Anfang}$ bleibt gleich, da beide Zeiten um
-   denselben Betrag wachsen. Die Lage des Pulses verschiebt sich. (1 P)
-3. Sofort wirksam: HIGH in $[0,250)$ und $[500,750)$, jeweils in
-   Mikrosekunden; insgesamt $500$ von $1000$ Ticks, also $50\,\%$.
-   Der schon inaktive Ausgang wird bei CNT $500$ wieder aktiv.
-   Gepuffert: in dieser Periode nur $[0,250)$, also $25\,\%$;
-   in der nächsten $750$ Ticks, also $75\,\%$.
-   Das kontinuierliche Vergleichsmodell ist vorgegeben; reale Timer
-   verlangen die Prüfung ihrer Update- und Preload-Regeln. (je 1 P)
+1. HIGH 45 µs, LOW 70 µs, Periode 115 µs,
+   $f\approx8{,}696$ kHz und $D=45/115\approx39{,}13\,\%$. (2 P)
+2. Breite unverändert, Lage acht µs später. (1 P)
+3. Sofort: Zählintervalle $[0,480)$ und $[720,960)$,
+   insgesamt 720 von 1200 Ticks, 60 Prozent.
+   Gepuffert: zunächst 40 Prozent, nächste Periode 80 Prozent. (2 P)
 :::
 
-\Needspace{30\baselineskip}
+{{< pagebreak >}}
 
-## Aufgabe 4: Servoformat und C-Rechenmodelle (5 Punkte)
+## Aufgabe 4: Pulsformat und Hüllkurve (5 Punkte)
 
-Ein gewähltes Servoformat wiederholt Pulse alle $20$ ms;
-$1{,}5$ ms ist ein mögliches Kommando. Der Timer zählt mit $1$ MHz.
+Ein gewähltes Stellgliedformat verlangt alle 25 ms einen 1,8-ms-Puls.
+Der Timer zählt mit zwei MHz, ansonsten Modell aus Aufgabe 1.
 
-1. Bestimmen Sie ARR, CCR und aktiven Anteil für diesen Puls.
-   Wie lang wäre ein Puls mit demselben Anteil bei $1$ kHz PWM? (2 P)
-2. Die folgende reine Rechenfunktion rundet auf den nächsten Tick,
-   bei genau halbem Tick nach oben. Welchen Wert liefert
-   `percent_to_ccr(1, 49)`, und welchen tatsächlichen Anteil bedeutet er?
-   Was liefert `percent_to_ccr(255, 999)`? (1 P)
-
-```c
-uint32_t percent_to_ccr(uint32_t percent, uint16_t arr) {
-    if (percent > 100u) percent = 100u;
-    uint32_t n = (uint32_t)arr + 1u;
-    return (percent * n + 50u) / 100u;
-}
-```
-
-3. Eine Fading-Folge verwendet einen neuen Schritt alle $10$ ms:
+1. Bestimmen Sie ARR, CCR und aktiven Anteil. Wie breit wäre derselbe Anteil
+   bei zwei kHz Trägerfrequenz? (2 P)
+2. Prozentwerte werden auf 100 begrenzt und auf ganze Ticks gerundet, halbe Ticks nach oben.
+   Welcher CCR entsteht bei einem Prozent und ARR 79? Welcher reale Anteil?
+   Was entsteht bei Eingabe 240 Prozent und ARR 1199? (1 P)
+3. Die folgende Hüllkurve wird alle 15 ms ausgewertet.
+   Bestimmen Sie den Wert bei Schritt 117 und die Zyklusdauer.
+   Wie wird nach verspäteter Auswertung der aktuelle Schritt bestimmt? (2 P)
 
 ```c
-uint8_t fade_percent(uint64_t step) {
-    uint32_t phase = (uint32_t)(step % 200u);
-    return (uint8_t)(phase <= 100u ? phase : 200u - phase);
+#include <stdint.h>
+uint8_t level80(uint64_t step) {
+    uint32_t p = (uint32_t)(step % 160u);
+    return (uint8_t)(p <= 80u ? p : 160u - p);
 }
 ```
-
-   Welcher Wert entsteht bei `step = 125`? Wie lang ist ein voller Zyklus?
-   Wie sollte eine verspätete Hauptschleife den aktuellen Schritt bestimmen,
-   wenn alte Zwischenwerte übersprungen werden dürfen? Ändert eine verspätete
-   Sollwertaktualisierung zwangsläufig die Hardware-PWM-Periode? (2 P)
-
-Die Typen stammen aus `<stdint.h>`; `u` kennzeichnet unsigned-Konstanten.
-Beide Funktionen berechnen Werte ohne Gerätezugriff oder Wartefunktion.
 
 ::: {.content-hidden when-profile="solution"}
-**Ihre Rechnung und Codeanalyse:**
+\Needspace{8\baselineskip}
 
-\vspace{2.5cm}
+**Ihre Lösung:**
+
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -214,50 +146,35 @@ Beide Funktionen berechnen Werte ohne Gerätezugriff oder Wartefunktion.
 
 **Musterlösung 4**
 
-1. $N=20000$, ARR $19999$, CCR $1500$,
-   $D=1500/20000=7{,}5\,\%$.
-   Bei einer Millisekunde Periode wären $7{,}5\,\%$ nur $75\,\mu$s.
-   Gleicher Anteil ist daher nicht dasselbe Servo-Kommando.
-   Pulsformat und zulässige Wiederholrate sind gerätespezifisch. (je 1 P)
-2. $(1\cdot50+50)/100=1$ in Integerarithmetik:
-   ein von fünfzig Ticks, also $2\,\%$ statt gewünschtem $1\,\%$.
-   `255` wird auf `100` begrenzt; das Ergebnis ist `1000`.
-   Hundert Prozent erfordern CCR $N$ und eine passende Registerbreite;
-   bei ARR $65535$ wäre $N=65536$ für einen 16-Bit-CCR nicht darstellbar.
-   Die Rückgabe ist deshalb 32 Bit breit. (1 P für beide Fälle samt Quantisierung)
-3. Phase $125$ ergibt $200-125=75\,\%$.
-   $200\cdot10$ ms ergeben zwei Sekunden.
-   Der aktuelle Schritt folgt aus verstrichener Systemzeit seit einem
-   Startpunkt geteilt durch die Schrittzeit, bei geeignetem Zeitbereich.
-   Bei einem Systemtimer mit $10$ MHz sind $10$ ms genau $100000$ Ticks.
-   Die Folge enthält keine Busy-Wait-Schleife. Die PWM-Trägerperiode
-   bleibt bei laufendem Hardware-Timer und unverändertem ARR gleich;
-   der Sollwert kann länger auf seinem alten Wert bleiben. (1 P Wert/Zyklus, 1 P Ablauf)
+1. $N=50000$, ARR 49999, CCR 3600, $D=7{,}2\,\%$.
+   Bei zwei kHz wäre der Puls nur 36 µs breit. (2 P)
+2. $(1\cdot80+50)/100=1$ Tick, also $1{,}25\,\%$.
+   240 wird begrenzt: CCR 1200. (1 P)
+3. $160-117=43$, Zyklus $160\cdot15=2400$ ms.
+   Schritt aus verstrichener Zeit seit Start geteilt durch 15 ms bestimmen;
+   überholte Zwischenwerte dürfen hier entfallen. (2 P)
 :::
 
-\Needspace{26\baselineskip}
+{{< pagebreak >}}
 
-## Aufgabe 5: Watchdogfristen und Zeitfenster (5 Punkte)
+## Aufgabe 5: Ein knapper Watchdogabstand (5 Punkte)
 
-1. Ein idealer Watchdog hat zwei Sekunden Timeout.
-   Feeds erfolgen bei $0$, $0{,}5$ und $1$ s; danach fehlen sie.
-   Das Hauptprogramm hängt ab $1{,}2$ s.
-   Wann ist der Reset, und wie lang kann das letzte PWM-Muster bis
-   dahin noch weiterlaufen, falls Timer und Takt aktiv bleiben? (2 P)
-2. Für denselben fest eingestellten Zähler sei das nominale Timeout
-   zwei Sekunden, der Watchdogtakt aber um bis zu $20\,\%$ schneller
-   oder langsamer. Berechnen Sie frühestes und spätestes Timeout.
-   Passt ein größter vorgesehener Feedabstand von $1{,}4$ s mit
-   $0{,}2$ s zusätzlicher Verzögerung vor das früheste Timeout? (2 P)
-3. Ein separates Fenster-Modell erlaubt Feeds nur für
-   $0{,}5\,\mathrm{s}<a<2\,\mathrm{s}$; $a$ ist das Alter seit dem letzten Feed.
-   Beurteilen Sie $a=0{,}2$ s, $1$ s und $2{,}1$ s.
-   Ist bei $a=1$ s ein Feed ohne frischen Anwendungsfortschritt sinnvoll? (1 P)
+1. Idealer Watchdog mit drei Sekunden Timeout: Feeds bei null, 0,7 und 1,4 s;
+   danach keine mehr. Hauptprogramm hängt ab 1,9 s.
+   Wann erfolgt Reset, wie lange kann die alte Hardware-PWM weiterlaufen? (2 P)
+2. Bei gleichem Zähler ist der Watchdogtakt bis zu 15 Prozent schneller oder langsamer.
+   Bestimmen Sie frühestes und spätestes Timeout. Reichen 2,2 s Feedabstand
+   plus 0,5 s Verzögerung vor dem frühesten Timeout? (2 P)
+3. Separates Fenster: $0{,}4<a<1{,}6$ s seit letztem Feed.
+   Beurteilen Sie $a=0{,}3$, $0{,}8$ und $1{,}6$ s.
+   Darf ein zeitlich passender Feed fehlenden Fortschritt ersetzen? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-**Ihre Zeitachse und Auslegung:**
+\Needspace{8\baselineskip}
 
-\vspace{2.5cm}
+**Ihre Lösung:**
+
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -265,54 +182,40 @@ Beide Funktionen berechnen Werte ohne Gerätezugriff oder Wartefunktion.
 
 **Musterlösung 5**
 
-1. Der letzte Feed startet die Frist neu: Reset bei $1+2=3$ s.
-   Vom Hänger bis dahin sind $3-1{,}2=1{,}8$ s.
-   Ein Hänger setzt den Watchdog nicht selbst zurück. (je 1 P)
-2. Bei schnellerem Takt $T_\text{min}=2/1{,}2\approx1{,}667$ s,
-   bei langsamerem $T_\text{max}=2/0{,}8=2{,}5$ s.
-   $1{,}4+0{,}2=1{,}6$ s liegt rechnerisch vor $T_\text{min}$,
-   mit etwa $0{,}067$ s verbleibendem Abstand. Dies gilt für die
-   vorgegebenen Grenzen, nicht als allgemeine Sicherheitsreserve. (je 1 P)
-3. $0{,}2$ s ist zu früh, $1$ s zeitlich gültig,
-   $2{,}1$ s liegt nach dem abgelaufenen Timeout.
-   Ohne frischen kritischen Fortschritt soll auch bei $1$ s kein
-   Feed erfolgen. Die strikten Fenstergrenzen gehören zu diesem Modell;
-   echte Randbedingungen sind im Datenblatt zu prüfen. (1 P)
+1. Reset $1{,}4+3=4{,}4$ s; mögliche Weiterlaufzeit ab Hänger $2{,}5$ s. (2 P)
+2. $T_{\min}=3/1{,}15\approx2{,}609$ s,
+   $T_{\max}=3/0{,}85\approx3{,}529$ s.
+   2,7 s reichen nicht: etwa 91 ms später als das früheste Timeout. (2 P)
+3. Zu früh, zeitlich zulässig, an der ausgeschlossenen oberen Grenze unzulässig.
+   Ohne frischen erforderlichen Fortschritt kein Feed. (1 P)
 :::
 
-\Needspace{24\baselineskip}
+{{< pagebreak >}}
 
-## Aufgabe 6: Fortschritt, Reset und Aktorzustand (5 Punkte)
+## Aufgabe 6: Fortschrittszähler einer Heizungsregelung (5 Punkte)
 
-Eine Überwachungsrunde verlangt **neuen** Fortschritt bei Sensorerfassung,
-Regelberechnung und Ausgabe. Nach jedem erfolgreichen Feed werden die
-Nachweise für die nächste Runde zurückgesetzt.
-Die hier betrachteten Feedzeiten liegen im gültigen Fenster.
+Eine Überwachungsrunde verlangt neue Erfassung, Regelrechnung und Ausgabe.
+Alle Feedzeiten liegen im gültigen Fenster; Zähler laufen hier nicht über.
+Die Tabellenzeilen sind unabhängige Fälle mit Ausgangswerten $(40,60,80)$.
 
-1. Ergänzen Sie für jede Runde „Feed ja/nein“ und begründen Sie.
-   Ein altes gesetztes Flag zählt nicht als neue Aktivität. (2 P)
+| Fall | Erfassungszähler | Rechenzähler | Ausgabezähler | Feed? |
+|------|-----------------|--------------|---------------|-------|
+| D | 41 | 61 | 81 | |
+| E | 41 | 60 | 81 | |
+| F | 40 | 60 | 80 | |
 
-| Runde | Neuer Sensorwert | Neue Berechnung | Neue Ausgabe | Feed? |
-|:--|:--:|:--:|:--:|:--:|
-| A | ja | ja | ja | |
-| B | ja | nein | ja | |
-| C | altes Flag | altes Flag | altes Flag | |
-
-2. Eine Timer-ISR läuft weiter, während die Regelberechnung hängt.
-   Weshalb würde blindes Füttern in dieser ISR den Fehler verdecken?
-   Genügt allein das Verschieben des Feeds in die Hauptschleife? (1 P)
-3. Beim Timeout startet die CPU neu. Nennen Sie zwei zu prüfende
-   Randbedingungen, bevor daraus ein sicherer Motorzustand gefolgert
-   werden darf. Erklären Sie außerdem, warum nach dem Neustart die
-   Resetursache ausgewertet werden sollte. (2 P)
-
-ISR bedeutet Interrupt Service Routine, CPU Central Processing Unit.
-Für die Resetdomänen des konkreten Geräts ist hier kein Verhalten vorgegeben.
+1. Entscheiden Sie über den Feed und die neuen Vergleichswerte nach erfolgreichem Feed. (2 P)
+2. Warum genügt ein weiterlaufender Timerinterrupt nicht als Fortschrittsnachweis?
+   Behebt allein ein Feed aus der Hauptschleife das Problem? (1 P)
+3. Nennen Sie zwei nötige Prüfungen zum Zustand der Heizleistung bei Reset.
+   Warum sollte die Resetursache gespeichert oder ausgewertet werden? (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-**Ihre Entscheidungen und Begründungen:**
+\Needspace{8\baselineskip}
 
-\vspace{3cm}
+**Ihre Lösung:**
+
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -320,43 +223,19 @@ Für die Resetdomänen des konkreten Geräts ist hier kein Verhalten vorgegeben.
 
 **Musterlösung 6**
 
-1. A: Feed ja, alle kritischen Schritte haben in der aktuellen Runde
-   Fortschritt gemacht. B: nein, neue Regelberechnung fehlt.
-   C: nein, frühere Nachweise gelten nicht für eine neue Runde.
-   Nach A müssen sie gelöscht oder eindeutig einer neuen Runde
-   zugeordnet werden. (1 P Entscheidungen, 1 P Umgang mit alten Nachweisen)
-2. Laufende ISR-Aufrufe beweisen keine neue Regelberechnung.
-   Ihr Feed verschiebt trotzdem das Timeout.
-   Auch die Hauptschleife kann an einer fehlerhaften Stelle weiterlaufen:
-   Entscheidend sind frische kritische Fortschrittsnachweise. (1 P)
-3. Zu prüfen sind beispielsweise Resetdomäne und Resetpegel des
-   Timer-/GPIO-Ausgangs sowie der Pegel des Treiber-Enable-Eingangs.
-   Außerdem kann die externe Motorversorgung weiter anliegen.
-   Abschalten, Bremsen und Halten sind verschiedene Zustände.
-   Die Resetursache hilft, einen Watchdogneustart von anderen
-   Resetgründen zu unterscheiden und wiederkehrende Fehler zu erkennen;
-   derselbe Programmfehler kann nach dem Neustart erneut auftreten.
-   Eine reine Feedüberwachung beweist auch keine richtige Berechnung.
-   (1 P für zwei begründete Randbedingungen, 1 P Diagnose)
+1. D ja, neue Vergleichswerte $(41,61,81)$; E und F nein.
+   Jeder erforderliche Zähler muss gegenüber dem letzten erfolgreichen Nachweis fortgeschritten sein. (2 P)
+2. Interrupt oder Hauptschleife können trotz ausgefallener Regelrechnung weiterlaufen.
+   Maßgeblich sind die verlangten frischen Nachweise. (1 P)
+3. Beispielsweise Resetpegel des Ausgangs und Zustand des Treiber-Enable;
+   auch externe Versorgung und Resetdomäne prüfen.
+   Die Ursache erlaubt Diagnose wiederholter Watchdogneustarts. (2 P)
 :::
 
-\Needspace{20\baselineskip}
+{{< pagebreak >}}
 
-## Optional: Rechenfunktionen am Host prüfen
+## Optional: am Rechner prüfen
 
-Übernehmen Sie die beiden Funktionen aus Aufgabe 4 und die Funktion
-`may_feed` aus Vorlesung 4 in ein gewöhnliches C-Programm. Für `may_feed`
-benötigen Sie zusätzlich `<stdbool.h>`. Prüfen Sie beispielsweise:
-
-- Prozentumsetzung: `0`, `25`, `100` und `255` bei ARR $999$;
-  außerdem `1` bei ARR $49$ und `100` bei ARR $65535$.
-- Fading: Schritte $0$, $100$, $125$, $199$, $200$;
-  alle Ergebnisse sollen zwischen $0$ und $100$ liegen.
-- Feedentscheidung: Alter $500$, $501$, $1999$, $2000$ ms,
-  jeweils mit und ohne frischen Fortschritt.
-
-Übersetzen Sie etwa mit `gcc -std=c11 -Wall -Wextra -Werror`.
-Die Hostausführung prüft Integerrechnung und Bedingungen, keine Pinflanken,
-Preload-Übernahme oder Resetdomänen. Ein Geräteversuch benötigt zuerst einen
-passenden dokumentierten Timer-/Watchdogtreiber sowie beobachtbare Ein- und
-Ausgänge; aus den Funktionsnamen entstehen keine Registeradressen.
+Übernehmen Sie `level80` aus Aufgabe 4 in ein Hostprogramm und prüfen Sie
+Schritte 79, 80, 81, 117 und 160: erwartet 79, 80, 79, 43 und null.
+Ergänzen Sie die Rundungs- und Fensterfälle dieses Blatts als Tests.

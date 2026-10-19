@@ -55,7 +55,7 @@ Vier Schulstunden entsprechen hundertachtzig Minuten ohne zusätzliche Pausen. D
 
 MESI steht für Modified, Exclusive, Shared, Invalid, die vier stabilen Cachezeilenzustände unseres Modells. LR/SC bedeutet Load-Reserved/Store-Conditional, reservierend lesen und bedingt schreiben. Beide werden vollständig eingeführt. Das Übungsblatt enthält sechs Pflichtaufgaben mit zweiunddreißig Orientierungspunkten und nennt einen längeren Zeitrichtwert für die vollständige selbstständige Bearbeitung.
 
-In der ersten Phase zählen Sie Zustand und Datenwert getrennt. Danach verfolgen Sie ein Update und eine Sperrübernahme. Die dritte Phase verbindet Datenordnung mit einem Interruptkontext. Am Ende rechnen Sie Beschleunigung und wiederholen Speicher- und Timergrößen. Musterlösungen gehören zum Lösungsprofil. Das optionale Hostexperiment ergänzt diese Papierarbeit; es ersetzt weder ein Hardware-Kohärenzmodell noch eine Zeitmessung eines RISC-V-Systems.
+In der ersten Phase zählen Sie Zustand und Datenwert getrennt. Danach verfolgen Sie ein verlorenes Update und seine atomare LR/SC-Wiederholung. Die dritte Phase verbindet Datenordnung mit einem Interruptkontext. Am Ende rechnen Sie Beschleunigung und wiederholen Speicher- und Timergrößen. Musterlösungen gehören zum Lösungsprofil. Das optionale Hostexperiment ergänzt diese Papierarbeit; es ersetzt weder ein Hardware-Kohärenzmodell noch eine Zeitmessung eines RISC-V-Systems.
 :::
 
 ## Thread, Hart und Kern auseinanderhalten
@@ -310,11 +310,11 @@ False Sharing, logisch unabhängige Objekte in einer gemeinsamen Zeile, lässt s
 - False Sharing aus Adresse, Größe und Abstand begründen
 
 ::: notes
-MESI steht für Modified, Exclusive, Shared, Invalid. Eine Invariante ist eine Bedingung, die jeder stabile Zustand erfüllen muss. Hier darf eine M- oder E-Kopie keine zweite gültige Kopie neben sich haben. Gemeinsame S-Kopien sind sauber und gleich. I liefert keinen Cachetreffer. $L$ ist die vereinfachte untere Speicherebene des Lehrmodells K.
+MESI steht für Modified, Exclusive, Shared, Invalid. Eine Invariante ist eine Bedingung jedes stabilen Zustands. Eine M- oder E-Kopie darf keine zweite gültige Kopie neben sich haben. Gemeinsame S-Kopien sind sauber und gleich. I liefert keinen Treffer. L bezeichnet die vereinfachte untere Speicherebene. Im neuen Fall lesen und schreiben drei Kerne statt zwei.
 
-Die Musterfolge von Aufgabe 1 beginnt I, I, $L=0$. Nach Read von Kern null gilt E:0, I, 0; nach Read von Kern eins S:0, S:0, 0; nach Write fünf von Kern null M:5, I, 0; nach erneutem Read von Kern eins S:5, S:5, 5. Read und Write bedeuten Lesen und Schreiben. Beim Schreiben auf S müssen fremde Gültigkeit und nötige Bestätigungen berücksichtigt werden, nicht nur eine abgesendete Nachricht.
+Anfangs sind alle Kopien I und L enthält vier. Read von Kern zwei ergibt E:4; sein Write macht daraus M:9, während L noch vier enthält. Der folgende Read von Kern null liefert neun und erzeugt S:9 in null und zwei sowie L neun. Nach Read von Kern eins besitzen alle S:9. Write von Kern null macht dessen Kopie M:13 und die beiden anderen I, L bleibt neun. Sein Auswurf schreibt dreizehn zurück. Danach erhält der allein lesende Kern eins E:13. Read und Write bedeuten Lesen und Schreiben. Ein sauberer Fremdauswurf erzwingt bei einer verbleibenden S-Kopie keinen automatischen E-Wechsel.
 
-Aufgabe 2 setzt eine vierundsechzig Byte große Zeile voraus. Die Adressen `0x20001000` und `0x20001004` liegen im selben Block, `0x20001040` im nächsten. Padding, eingefügter Abstand, kann unabhängig beschriebene Objekte trennen, macht aber ein Update derselben Variable nicht atomar. Besprechen Sie nach der Papierphase ausdrücklich, weshalb ein korrektes MESI-Ergebnis noch keine Zusage über das folgende Zählerprogramm enthält.
+Die neue Zeile reicht bei $128$ Byte von `0x30004000` bis `0x3000407F`. Die Acht-Byte-Objekte bei `0x30004008` und `0x30004018` teilen sie. Die Schreibfolge verursacht vier Besitzerwechsel. Versetzen von b nach `0x30004080` trennt die Zeilen; Basisausrichtung allein reicht dafür nicht. Padding, eingefügter Abstand, beseitigt diese Konkurrenz unabhängiger Objekte, aber keine verlorenen Updates auf demselben Zähler.
 :::
 
 ## Ein Inkrement kann drei Schritte enthalten
@@ -459,14 +459,14 @@ Die rote Zeile markiert den ersten SC-Erfolg; die folgenden Statusfelder zeigen 
 
 - Load, lokale Änderung und Store zeitlich verschachteln
 - Hardwaremodell von undefiniertem C-Data-Race unterscheiden
-- LR-Wert, SC-Status und neuen Schlosswert getrennt eintragen
+- LR-Wert, SC-Status und neuen Zählerwert getrennt eintragen
 
 ::: notes
-Load und Store sind Speicherlesen und -schreiben. RMW heißt Read-Modify-Write, Lesen, Ändern und Zurückschreiben. Die Papieraufgabe beginnt bei einem gewöhnlichen Zählerwert null. Zwei Leser übernehmen null in ihre Register, rechnen je eins und speichern eins. Das Hardwaremodell endet bei eins, obwohl zwei Inkremente beabsichtigt waren. MESI, Modified, Exclusive, Shared, Invalid, ordnet einzelne Kopien und Änderungen, nicht die lokale Rechengruppe.
+Load und Store sind Speicherlesen und -schreiben. RMW heißt Read-Modify-Write, Lesen, Ändern und Zurückschreiben. Im neuen Hardwaremodell lesen beide Harts den Zähler zehn, addieren lokal zwei und speichern zwölf. Endwert zwölf verliert eine der beabsichtigten Erhöhungen; korrekt wären vierzehn. Ein Hart ist eine Hardware-Ausführungsinstanz. MESI, Modified, Exclusive, Shared, Invalid, ordnet einzelne Kopien und Änderungen, nicht automatisch diese Rechengruppe.
 
-C11 bezeichnet den Sprachstandard von 2011. Ein konkurrierend ungeschütztes gewöhnliches C-Objekt hat bei den beschriebenen Konflikten einen Data Race und undefiniertes Verhalten. Der Wert eins ist deshalb keine zugesicherte C-Ergebnisliste. Das begleitende Hostprogramm bildet die Verschachtelung mit atomaren Einzelzugriffen nach.
+C11 bezeichnet den Sprachstandard von 2011. Ein gewöhnliches konkurrierend ungeschütztes C-Objekt hat bei den beschriebenen Konflikten einen Data Race und undefiniertes Verhalten. Zwölf ist deshalb keine zugesicherte Ergebnisliste dieses C-Programms. Atomare Einzel-Loads und -Stores können zwar das Sprachproblem vermeiden, verlieren aber weiterhin die logische Gruppenwirkung.
 
-LR/SC bedeutet Load-Reserved/Store-Conditional. Im Lockteil lesen beide zuerst null. Der erste erfolgreiche SC schreibt eins und liefert Status null. Der zweite schreibt bei Fehlerstatus ungleich null nichts. Nach einem erneuten LR mit Wert eins darf er nicht eintreten. Erst nach Freigabe null und einer neuen erfolgreichen Übernahme ist der Eintritt erlaubt. Die Musterlösung hält Schlosswert und Status getrennt. Anschließend beantworten wir, wie der nächste Besitzer außerdem die vom vorherigen geschriebenen Nutzdaten erhält.
+LR/SC bedeutet Load-Reserved/Store-Conditional. Beide LR lesen zehn. Der erfolgreiche SC von Hart eins schreibt zwölf und liefert Status null. Der scheiternde SC von Hart null schreibt nichts und liefert einen Status ungleich null. Beim Wiederholen liest Hart null zwölf neu, berechnet vierzehn und schreibt dies mit erfolgreichem Status null. Er darf den alten Zwölferwert nicht einfach wiederverwenden. Ein SC kann auch ohne fremden Store scheitern; Fehlstatus allein beweist dessen Ursache nicht. Anschließend geht es darum, welche weiteren Daten nach einer atomaren Übergabe sichtbar werden.
 :::
 
 ## Acquire und Release ordnen die Nutzdaten
@@ -634,11 +634,11 @@ Ein geeignetes Konzept kann kurze gemeinsame Abschnitte gegen die betreffende lo
 - ISR-Selbstdeadlock von fehlender Atomizität unterscheiden
 
 ::: notes
-Acquire ist Übernahmeordnung, Release Freigabe- oder Publikationsordnung. Für die einmalige Datenübergabe wird zuerst die Payload, der Nutzdatenwert, geschrieben und danach das Bereitschaftsflag mit Release gesetzt. Ein Konsument, der diesen Wert mit Acquire liest, darf den vorher geschriebenen Wert nutzen. Atomar-relaxed Zugriffe ordnen dagegen nur das betreffende Objekt; beliebige andere Daten werden dadurch nicht veröffentlicht.
+Acquire ist Übernahmeordnung, Release Freigabe- oder Publikationsordnung. Für die einmalige Datenübergabe wird zuerst die gewöhnliche Payload, der Nutzdatenwert dreiundsiebzig, geschrieben und danach das atomare Bereitschaftsflag auf sieben gesetzt. Liest der Konsument genau diesen Release-Wert mit Acquire und erfolgen keine späteren Überschreibungen, erhält er anschließend Payload dreiundsiebzig. Bei ausschließlich atomar-relaxed Zugriffen ist dagegen Flag sieben mit altem Datenwert minus eins erlaubt. Eine gewöhnliche konfliktierende ungeschützte Payload hätte einen C-Data-Race, also undefiniertes Verhalten.
 
-Die Musterlösung der Papieraufgabe liefert für die korrekte Einmalpublikation zweiundvierzig nach beobachteter passender Freigabe. Für den Lockkreis A/B nennen Sie die fehlende einheitliche Reihenfolge. Deadlock ist ausbleibender Fortschritt durch eine Wartebeziehung, nicht zwingend durch eine kaputte atomare Operation.
+Der neue Wartekreis ist $A\to Y\to B\to Z\to C\to X\to A$: Jeder Kontext hält eine Sperre, die ein anderer benötigt. Eine überall eingehaltene Erwerbsreihenfolge X vor Y vor Z verhindert diesen Kreis. Ein Timeout erlaubt nicht, eine fremde noch genutzte Sperre zu löschen. Deadlock bedeutet ausbleibenden Fortschritt durch eine Wartebeziehung und setzt keine kaputte atomare Operation voraus.
 
-ISR heißt Interrupt Service Routine. Wartet diese auf die Sperre des unterbrochenen Kontexts desselben Harts, kann der Halter bis zur Rückkehr nicht freigeben. Ein Hart ist eine Hardware-Ausführungsinstanz. Mehr Atomizität löst diesen Fehler nicht. Eine lokale Unterbrechungssperre hält wiederum andere Harts nicht fern. Besprechen Sie zuerst den tatsächlich benötigten Fortschritt des Besitzers und erst dann eine passende Schutzdisziplin. Anschließend untersuchen wir die andere Seite der Parallelität: Auch korrekte Arbeit mit mehreren Kernen beschleunigt nicht jede Phase.
+ISR heißt Interrupt Service Routine. Wartet diese auf die Sperre des unterbrochenen Kontexts desselben Harts, kann der Halter bis zur Rückkehr nicht freigeben. Ein Hart ist eine Hardware-Ausführungsinstanz. Atomizität löst diesen Selbstdeadlock nicht. Eine lokale Interruptsperre hält wiederum andere Harts nicht fern. Die Schutzdisziplin muss den tatsächlich benötigten Fortschritt des Besitzers ermöglichen. Auch bei korrekter Synchronisation bleibt zu untersuchen, wie viel der Anwendung überhaupt parallel läuft.
 :::
 
 ## Amdahl: feste Arbeit enthält serielle Zeit
@@ -774,11 +774,11 @@ Aufgaben 5–6: 15 Minuten · anschließend Quiz: 15 Minuten
 - Zusammenführen: gültige Kopie, unteilbares Update, geordnete Übergabe
 
 ::: notes
-Speedup ist die Beschleunigung gegenüber der festgehaltenen Ein-Kern-Aufgabe. Effizienz ist dieser Faktor geteilt durch die Kernzahl. Mit zwanzig Prozent serieller Zeit ergeben vier Kerne ideal Faktor zwei Komma fünf und zweiundsechzig Komma fünf Prozent Effizienz. Fünf zusätzliche Zeiteinheiten auf die Referenz hundert senken den Faktor auf etwa zwei Komma zwei zwei zwei. Das Übungsblatt enthält die vollständigen Rechenwege.
+Speedup ist die Beschleunigung gegenüber derselben Ein-Kern-Aufgabe. Effizienz ist dieser Faktor geteilt durch die Kernzahl. Die neue Referenz dauert hundertfünfzig Einheiten, davon fünfundvierzig seriell und hundertfünf parallel. Drei Kerne ergeben ideal $45+105/3=80$, Speedup $1{,}875$ und $62{,}5\,\%$ Effizienz. Sechzig Kerne ergeben $46{,}75$ Einheiten, Faktor $3{,}20856$ und etwa $5{,}3476\,\%$ Effizienz; die ideale Grenze ist $1/0{,}3$. Sechs Zusatzeinheiten bei drei Kernen erhöhen die Zeit auf sechsundachtzig, Faktor $1{,}74419$, normierter Zusatz $6/150=0{,}04$. Ungleiche Pakete fünfzehn, fünfundzwanzig und fünfundsechzig dauern parallel fünfundsechzig, insgesamt hundertzehn, Faktor $1{,}36364$.
 
-AMAT bedeutet Average Memory Access Time, mittlere Zugriffszeit. PWM steht für Pulse Width Modulation, Pulsweitenmodulation. Beide Rechnungen beginnen mit Zählbasis und Einheiten: zusätzliche Misspenalty statt Gesamtdauer, Anzahl Zählerwerte statt unklarer Endregisterwert. Die Papierphase wiederholt damit das methodische Vorgehen der bisherigen Vorlesungen.
+AMAT bedeutet Average Memory Access Time, mittlere Zugriffszeit. Im neuen Cachemodell gibt es vierundsechzig Sets sowie sieben Offset-, sechs Index- und neunzehn Tagbits. Die Adresse `0x30004298` hat Offset vierundzwanzig, Index fünf, Tag `0x18002` und Basis `0x30004280`. $3+0{,}08\cdot50=7$ Takte dauern bei hundertfünfundzwanzig MHz sechsundfünfzig Nanosekunden; MHz bedeutet Millionen Takte pro Sekunde. PWM, Pulse Width Modulation oder Pulsweitenmodulation, hat nach Teiler acht $250000$ Zählticks je Sekunde. $1250$ Intervalle ergeben zweihundert Hertz, fünf Millisekunden Periode und bei fünfhundert HIGH-Ticks zwei Millisekunden, also vierzig Prozent. Geräte-Kohärenz, Pufferbesitz, Sichtbarkeit, Ordnung und vollständiger Abschluss müssen zusätzlich zur Kohärenz der Prozessorkopien feststehen.
 
-Das Quiz prüft zehn Unterscheidungen derselben Vorlesung. Eine richtige Antwort sollte durch Zustandsfolge, Sprachregel oder Rechnung begründet werden können. Der fachliche Abschluss verbindet drei Fragen: Welche Cachekopie gilt? Welches Update ist unteilbar? Welche weiteren Daten dürfen nach einer passenden Übergabe verwendet werden? Kleine Rechnungen und kurze Codeanalysen sind sinnvolle Vorbereitung. Diese Materialien legen keine neuen Prüfungsformalien wie Dauer, Hilfsmittel oder einen verbindlichen Themenausschluss fest.
+Das Quiz prüft zehn Unterscheidungen derselben Vorlesung. Begründen Sie die Antworten mit Zustandsfolge, Sprachregel oder Rechnung. Der Abschluss verbindet gültige Cachekopien, unteilbare Updates und geordnete Datenübergaben. Die neuen Übungsfälle verlangen den Transfer der Folienmethoden. Diese Materialien legen keine zusätzlichen Prüfungsformalien fest.
 :::
 
 ## Quellen und Schlussfolgerung

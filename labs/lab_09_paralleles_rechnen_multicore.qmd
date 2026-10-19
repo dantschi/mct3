@@ -1,6 +1,6 @@
 ---
 title: "Übungsblatt 9: Multicore & Finale"
-subtitle: "Mikrocomputertechnik 3 · Zustände, Atomics und Systemrechnungen auf Papier"
+subtitle: "Mikrocomputertechnik 3 · 32 Orientierungspunkte · ca. 75–90 Minuten"
 highlight-style: ../assets/styles/dhbw-code.theme
 header-includes: |
   \usepackage{needspace}
@@ -10,393 +10,247 @@ header-includes: |
 > **Musterlösung**
 :::
 
-## Ziel und Arbeitsweise
+## Aufgabe 1: MESI mit drei Kernen (6 Punkte)
 
-Sechs Pflichtaufgaben, vollständig auf Papier lösbar.
-Geben Sie Modellannahmen, Zwischenwerte und Einheiten an.
-Es sind keine Hardwaremessungen oder neue Prüfungsformalien enthalten.
+Drei Write-Back-Caches, anfangs alle I, unterer Speicher L enthält vier.
+Reads ohne weitere Kopie ergeben E. Fremdread auf M schreibt hier nach L zurück,
+alle beteiligten Kopien werden S. Vor M-Auswurf wird zurückgeschrieben.
 
-**Bearbeitungszeit:** etwa 75–90 Minuten selbstständig.
-**Orientierungspunkte:** 32.
-Im Unterricht: Aufgaben 1–2 (10 min), Aufgabe 3 (15 min),
-Aufgabe 4 (15 min), Aufgaben 5–6 (15 min).
-Die Vorlesungsphasen enthalten Lösungsbesprechungen.
+1. Ergänzen Sie Zustände samt Werten und L nach jeder Aktion. (3 P)
+2. Welchen unteren Wert darf es nach dem ersten Write geben?
+   Welchen Wert muss der folgende fremde Read liefern? (1 P)
+3. Welche fremden Kopien muss Kern 0 bei seinem späteren Write ungültig machen? (1 P)
+4. Zwei S-Kopien bleiben übrig, eine wird sauber ausgeworfen.
+   Muss die verbleibende automatisch E werden? (1 P)
 
-MESI bedeutet Modified, Exclusive, Shared, Invalid.
-Hart ist eine Hardware-Ausführungsinstanz, Thread ein Softwareablauf.
-RMW heißt Read-Modify-Write, Lesen, Ändern und Schreiben.
-LR/SC steht für Load-Reserved/Store-Conditional.
-KiB $=1024$ Byte, MHz $=10^6$ Takte je Sekunde.
-
-{{< pagebreak >}}
-
-## Aufgabe 1: MESI mit Datenwerten (6 Punkte)
-
-Lehrmodell K: zwei Datencaches, Write-Back, Write-Allocate,
-stabile MESI-Zustände. Jede Zeile umfasst $64$ Byte.
-$L$ ist die untere kohärente Speicherebene; anfangs $x=0$, beide Caches I.
-Beim Fremdread auf M werden die aktuellen Daten im Modell nach $L$ übertragen
-und beide Kopien S. Geänderte Daten werden vor M-Auswurf zurückgeschrieben.
-
-1. Ergänzen Sie Zustände mit Werten und den unteren Stand
-   nach jedem abgeschlossenen Schritt. (3 P)
-2. Warum darf $L$ nach dem ersten Write noch null sein?
-   Darf Kern 1 beim folgenden Read trotzdem null liefern? (1 P)
-3. Welche Aktionen müssen beim Write auf S vor dem stabilen Abschluss erfolgen? (1 P)
-4. Separater Fall: Beide Caches halten S:5, dann wirft Kern 0 seine saubere Kopie aus.
-   Muss Kern 1 automatisch E werden? Begründen Sie. (1 P)
-
-| Aktion | Kern 0 | Kern 1 | $L$ |
-|--------|--------|--------|-----|
-| Start | I | I | $0$ |
-| Kern 0 liest $x$ | | | |
-| Kern 1 liest $x$ | | | |
-| Kern 0 schreibt $x=5$ | | | |
-| Kern 1 liest $x$ | | | |
-| Kern 1 schreibt $x=7$ | | | |
-| Kern 1 wirft seine Zeile aus | | | |
-| Kern 0 liest $x$ | | | |
+| Aktion | Kern 0 | Kern 1 | Kern 2 | L |
+|--------|--------|--------|--------|---|
+| Kern 2 liest | | | | |
+| Kern 2 schreibt 9 | | | | |
+| Kern 0 liest | | | | |
+| Kern 1 liest | | | | |
+| Kern 0 schreibt 13 | | | | |
+| Kern 0 wirft aus | | | | |
+| Kern 1 liest | | | | |
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
 
-**Ihre Begründungen:**
+**Ihre Lösung:**
 
 \vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{23\baselineskip}
+\Needspace{4\baselineskip}
 
 **Musterlösung 1**
 
-| Aktion | Kern 0 | Kern 1 | $L$ |
-|--------|--------|--------|-----|
-| Start | I | I | $0$ |
-| Read Kern 0 | E:0 | I | $0$ |
-| Read Kern 1 | S:0 | S:0 | $0$ |
-| Write Kern 0: 5 | M:5 | I | $0$ |
-| Read Kern 1 | S:5 | S:5 | $5$ |
-| Write Kern 1: 7 | I | M:7 | $5$ |
-| Auswurf Kern 1 | I | I | $7$ |
-| Read Kern 0 | E:7 | I | $7$ |
+| Aktion | Kern 0 | Kern 1 | Kern 2 | L |
+|--------|--------|--------|--------|---|
+| Read 2 | I | I | E:4 | 4 |
+| Write 2 | I | I | M:9 | 4 |
+| Read 0 | S:9 | I | S:9 | 9 |
+| Read 1 | S:9 | S:9 | S:9 | 9 |
+| Write 0 | M:13 | I | I | 9 |
+| Auswurf 0 | I | I | I | 13 |
+| Read 1 | I | E:13 | I | 13 |
 
-1. Nur M enthält einen gegenüber $L$ geänderten Wert.
-   Exklusive M-/E-Kopien schließen andere gültige Kopien aus,
-   gemeinsame S-Werte stimmen überein. (3 P)
-2. Write-Back hält die Änderung zunächst im privaten Besitzer.
-   Der abgeschlossene fremde Read muss fünf über einen aktuellen Pfad erhalten,
-   nicht die alte Null von $L$ oder einer I-Kopie. (1 P)
-3. Schreibrecht übernehmen, fremde Gültigkeit entziehen und die nötigen
-   Bestätigungen abwarten. Die abgesendete Anfrage allein genügt nicht. (1 P)
-4. Nein. Eine verbleibende S-Kopie kann S bleiben, weil der Controller nicht
-   automatisch die vollständige Abwesenheit weiterer Kopien weiß. (1 P)
+Tabelle 3 P. L darf zunächst vier bleiben, der fremde Read muss neun erhalten. (1 P)
+Vor abgeschlossenem Write 0 werden die S-Kopien von Kern eins und zwei ungültig. (1 P)
+S darf nach sauberem Fremdauswurf S bleiben; ein automatischer E-Wechsel folgt nicht. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 2: False Sharing und Besitzerwechsel (4 Punkte)
+## Aufgabe 2: Acht-Byte-Objekte in einer großen Zeile (4 Punkte)
 
-Cachezeile $64$ Byte, Objektgröße je $4$ Byte,
-ausgerichtete Basis `0x20001000`.
-Kern 0 schreibt nur Objekt $a$ bei Offset $0$,
-Kern 1 nur Objekt $b$ bei Offset $4$.
-Die Objekte sind softwareseitig getrennt zugeteilt.
+128-Byte-Cachezeilen, Basis `0x30004000`.
+Kern 0 schreibt nur a bei Offset acht, Kern 1 nur b bei Offset 24;
+beide Objekte sind acht Byte groß und getrennt zugeteilt.
+Anfangs besitzt Kern 1 die Zeile M.
 
-1. Geben Sie beide Adressen und den vollständigen gemeinsamen Zeilenbereich an. (1 P)
-2. Anfangs besitzt Kern 0 die Zeile bereits M.
-   Schreibfolge: Kern 0, Kern 0, Kern 1, Kern 1, Kern 0.
-   Wie oft wechselt die exklusive Zuständigkeit zwischen Kernen?
-   Warum nicht bei jedem Write? (1 P)
-3. $b$ wird nun bei Offset $64$ abgelegt.
-   Bestimmen Sie die neue Adresse und erklären Sie,
-   weshalb bloße Basisausrichtung bei Offset $4$ nicht genügt. (1 P)
-4. Würde solcher Abstand ein verlorenes Update zweier Schreiber
-   auf denselben ungeschützten Zähler reparieren? (1 P)
-
-::: {.content-hidden when-profile="solution"}
-\Needspace{10\baselineskip}
-
-**Ihre Zeilenskizze und Besitzerfolge:**
-
-\vspace*{4cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-\Needspace{18\baselineskip}
-
-**Musterlösung 2**
-
-1. $a$: `0x20001000`, $b$: `0x20001004`.
-   Gemeinsame Zeile `0x20001000` bis einschließlich `0x2000103F`. (1 P)
-2. Besitzerfolge $0,0,1,1,0$ mit anfangs Besitzer null:
-   zwei Wechsel, beim ersten Write von eins und danach beim Write von null.
-   Weitere lokale Writes auf eigener M-Zeile benötigen keinen erneuten Wechsel. (1 P)
-3. Offset vierundsechzig ergibt `0x20001040`, nächste Zeile.
-   Basis und Stride, Elementabstand, müssen zusammen zur Zeilengröße passen. (1 P)
-4. Nein. False Sharing betrifft verschiedene Objekte derselben Zeile.
-   Das Update derselben Variable benötigt weiterhin atomare RMW oder geeignete Sperre.
-   Padding kostet zudem Speicher und kann Lokalität verschlechtern. (1 P)
-:::
-
-{{< pagebreak >}}
-
-## Aufgabe 3: Lost Update und LR/SC (6 Punkte)
-
-1. Im Hardwaremodell lesen beide Harts Zähler null,
-   erhöhen ihren lokalen Registerwert und schreiben zurück.
-   Notieren Sie eine vollständige Schrittfolge, den Endwert und
-   warum MESI ihn nicht korrigiert. (2 P)
-2. Was bedeutet derselbe Konflikt bei einem gewöhnlichen ungeschützten C-`int`?
-   Darf man die Endwerte eins oder zwei als garantierte C11-Liste angeben?
-   Würden getrennte atomare Loads und Stores die Gruppenwirkung schon liefern? (1 P)
-3. Binäres Schloss: frei null, belegt eins.
-   Beide LR lesen null. SC von Hart 0 versucht eins und gewinnt.
-   Danach versucht SC von Hart 1 ebenfalls eins und scheitert.
-   Füllen Sie den Ablauf einschließlich Rückgabestatus aus. (2 P)
-4. Darf Hart 1 nach einem neuen LR mit Wert eins den kritischen Abschnitt betreten?
-   Muss jeder SC-Fehler einen fremden Store beweisen? (1 P)
-
-| Ereignis | gelesener Wert / Status | Schloss danach |
-|----------|------------------------|----------------|
-| LR Hart 0 | | |
-| LR Hart 1 | | |
-| SC Hart 0 mit eins, Erfolg | | |
-| SC Hart 1 mit eins, Fehler | | |
-| Neuer LR Hart 1 | | |
-| Hart 0 gibt frei | | |
+1. Geben Sie Objektadressen und gemeinsamen vollständigen Zeilenbereich an. (1 P)
+2. Schreibfolge 1, 0, 0, 1, 0, 1: Wie oft wechselt der Besitzer? (1 P)
+3. b wird bei Offset 128 platziert. Neue Adresse? Warum reichte Basisausrichtung allein nicht? (1 P)
+4. Repariert das auch verlorene Updates auf einem gemeinsam ungeschützten Zähler? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
 
-**Ihre Registerfolge und Interpretation:**
+**Ihre Lösung:**
 
 \vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{23\baselineskip}
+\Needspace{4\baselineskip}
+
+**Musterlösung 2**
+
+1. a `0x30004008`, b `0x30004018`, Zeile `0x30004000` bis `0x3000407F`. (1 P)
+2. Vier Wechsel; wiederholte Writes des aktuellen Besitzers brauchen keinen Wechsel. (1 P)
+3. b `0x30004080`. Auch der Objektabstand muss die Zeilentrennung herstellen. (1 P)
+4. Nein. Derselbe Zähler braucht weiterhin atomare RMW oder passende Sperre. (1 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 3: LR/SC erhöht einen Wert um zwei (6 Punkte)
+
+1. Hardwaremodell: Zwei Harts lesen jeweils Zähler zehn, addieren lokal zwei
+   und schreiben beide zurück. Notieren Sie eine Folge und den Endwert statt des erwarteten 14. (2 P)
+2. Wie unterscheidet sich ein gewöhnlicher ungeschützter C-Zähler von diesem
+   vorgegebenen Hardwareablauf? Genügen getrennte atomare Loads und Stores? (1 P)
+3. LR/SC soll dieselbe Addition atomar ausführen. Beide LR lesen anfangs zehn.
+   SC von Hart 1 mit zwölf gelingt, SC von Hart 0 mit zwölf scheitert.
+   Hart 0 wiederholt LR, berechnet neu und sein nächster SC gelingt.
+   Geben Sie gelesene Werte, geschriebene Werte, SC-Status und Endwert an. (2 P)
+4. Warum darf Hart 0 nicht einfach den alten Wert zwölf erneut speichern?
+   Beweist jeder SC-Fehler einen fremden Store? (1 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
+
+**Ihre Lösung:**
+
+\vspace*{3cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
 
 **Musterlösung 3**
 
-1. Load Hart 0: null, Load Hart 1: null,
-   Add Hart 0: eins, Add Hart 1: eins,
-   Store Hart 0: eins, Store Hart 1: eins.
-   Endwert eins. Kohärenz ordnet einzelne Zugriffe, nicht die getrennte RMW-Gruppe. (2 P)
-2. Gewöhnliche konfliktierende C-Zugriffe ohne Synchronisation haben einen Data Race
-   und undefiniertes Verhalten. Es gibt keine garantierte Liste dieser Endwerte.
-   Atomare Einzel-Loads und -Stores können ebenfalls ein logisches Update verlieren. (1 P)
-
-| Ereignis | gelesener Wert / Status | Schloss danach |
-|----------|------------------------|----------------|
-| LR Hart 0 | Wert $0$ | $0$ |
-| LR Hart 1 | Wert $0$ | $0$ |
-| SC Hart 0 mit eins, Erfolg | Status $0$ | $1$ |
-| SC Hart 1 mit eins, Fehler | Status ungleich $0$ | $1$ |
-| Neuer LR Hart 1 | Wert $1$ | $1$ |
-| Hart 0 gibt frei | Store $0$ | $0$ |
-
-3. Die erfolgreiche Übernahme schreibt eins, der fehlgeschlagene SC schreibt nicht.
-   Rückgabestatus und gelesener Wert sind unterschiedliche Größen. (2 P)
-4. Nein, der belegt gelesene Wert verlangt Warten, keinen SC mit zwei.
-   SC kann auch ohne fremden Store scheitern; jeder SC beendet seine Reservation. (1 P)
+1. Load 0 zehn, Load 1 zehn, beide Register auf zwölf erhöhen,
+   Store 1 zwölf, Store 0 zwölf: Endwert zwölf statt vierzehn. (2 P)
+2. Ungeschützter konfliktierender C-Zugriff: Data Race, undefiniertes Verhalten.
+   Atomare Einzelzugriffe können weiterhin die logische Gruppenwirkung verlieren. (1 P)
+3. Beide LR liefern zehn. SC 1 schreibt zwölf, Status null;
+   SC 0 schreibt nichts, Status ungleich null.
+   Neuer LR 0 liefert zwölf; Addition ergibt vierzehn;
+   erfolgreicher SC schreibt vierzehn mit Status null. (2 P)
+4. Wiederholung muss vom neu gelesenen Wert ausgehen. SC kann auch ohne fremden Store scheitern. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 4: Ordnung und Fortschritt (6 Punkte)
+## Aufgabe 4: Übergabe und ein dreiteiliger Wartekreis (6 Punkte)
 
-1. Ein Produzent schreibt einmalig gewöhnliche Nutzdaten `data = 42`
-   und danach atomar `ready = 1` mit Release.
-   Ein Konsument liest genau diese Eins mit Acquire und danach `data`.
-   Nennen Sie Ergebnis und nötige Voraussetzungen. (2 P)
-2. Separates wohldefiniertes Gegenmodell: Sowohl `data` als auch `ready`
-   sind atomare Objekte, alle Zugriffe relaxed.
-   Darf der Konsument bei ready eins noch data null beobachten?
-   Warum wäre gewöhnliche ungeschützte Payload ein anderer Fall? (1 P)
-3. Kern 0 hält Lock A und wartet auf B, Kern 1 hält B und wartet auf A.
-   Skizzieren Sie den Wartekreis und eine gemeinsame Reihenfolge,
-   die genau diesen Kreis verhindert. Dürfte ein Timeout ein fremdes Lock löschen? (2 P)
-4. Auf demselben Hart hält ein Kontext L und wird unterbrochen.
-   Die ISR spinnt auf L. Warum hilft eine weitere atomare Übernahmeoperation nicht?
-   Hält eine lokale IRQ-Sperre andere Harts fern? (1 P)
-
-ISR bedeutet Interrupt Service Routine, IRQ Interrupt Request.
-Acquire und Release sind Übernahme- und Freigabeordnung.
+1. Produzent schreibt einmalig gewöhnliche data 73 und danach atomar ready sieben mit Release.
+   Konsument liest genau diese sieben mit Acquire und danach data;
+   keine späteren Überschreibungen. Ergebnis und Synchronisationsvoraussetzung? (2 P)
+2. Separat sind beide Objekte atomar und alle Zugriffe relaxed;
+   data beginnt bei −1. Ist ready sieben mit data −1 erlaubt?
+   Was wäre bei gewöhnlicher ungeschützter Payload anders? (1 P)
+3. A hält X und wartet auf Y, B hält Y und wartet auf Z,
+   C hält Z und wartet auf X. Zeichnen Sie den Kreis und nennen Sie eine
+   globale Erwerbsreihenfolge. Darf ein Timeout fremde Sperren löschen? (2 P)
+4. Ein Treiber hält P und wird unterbrochen; seine ISR wartet auf P.
+   Warum genügt eine atomare Lockoperation nicht?
+   Hält lokale Interruptsperre andere Harts fern? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{10\baselineskip}
+\Needspace{8\baselineskip}
 
-**Ihre Übergabebeziehung und Wartegraphen:**
+**Ihre Lösung:**
 
-\vspace*{4cm}
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{20\baselineskip}
+\Needspace{4\baselineskip}
 
 **Musterlösung 4**
 
-1. Der spätere Datenread liefert zweiundvierzig.
-   Erforderlich sind die passenden Zugriffe auf dasselbe Bereitschaftsflag:
-   Acquire liest den zugehörigen Release-Wert, die Nutzdaten werden vorher geschrieben
-   und später nicht ohne neue Disziplin überschrieben. (2 P)
-2. Ja, die atomaren Einzelobjekte haben noch keine objektübergreifende Synchronisation.
-   Mit gewöhnlicher konfliktierender Payload wäre der Zugriff dagegen ein
-   C-Data-Race und undefiniert, keine solche erlaubte Ergebnisbehauptung. (1 P)
-3. $0\to B\to1\to A\to0$ als Wartebeziehung.
-   Alle übernehmen A vor B; damit kann kein B-Halter A erst nachträglich verlangen. (1 P)
-   Ein Timeout darf eine vom Besitzer noch genutzte Sperre nicht einfach löschen.
-   Dafür wäre eine gesonderte Abbruch- und Konsistenzdisziplin nötig. (1 P)
-4. Der Besitzer kann erst nach ISR-Rückkehr freigeben, die ISR wartet gerade darauf.
-   Mehr Atomizität beendet diesen Selbstdeadlock nicht.
-   Lokale IRQ-Sperre betrifft nur den betreffenden Hart, keine anderen Harts. (1 P)
+1. Data 73; passendes Acquire muss den Release-Wert desselben Flags lesen,
+   Payload davor schreiben und während dieser Übergabe unverändert lassen. (2 P)
+2. Ja, ohne übergreifende Synchronisation. Gewöhnliche konfliktierende Payload
+   hätte dagegen einen C-Data-Race mit undefiniertem Verhalten. (1 P)
+3. $A\to Y\to B\to Z\to C\to X\to A$.
+   Alle erwerben X vor Y vor Z, auch bei nur zwei benötigten Locks.
+   Timeout berechtigt nicht zum Löschen fremder noch genutzter Sperren. (2 P)
+4. Der unterbrochene Besitzer kann vor ISR-Rückkehr nicht freigeben.
+   Atomizität löst den Selbstdeadlock nicht; lokale Sperre betrifft keine anderen Harts. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 5: Speedup, Effizienz und Verteilung (4 Punkte)
+## Aufgabe 5: Drei Kerne und ungleiche Teilpakete (4 Punkte)
 
-Feste Aufgabe: Ein-Kern-Zeit $100$ Zeiteinheiten,
-serieller Anteil $s=0{,}2$, paralleler Anteil $0{,}8$.
-Zunächst perfekte Verteilung auf gleiche Kerne, kein Zusatzaufwand.
-$S(N)=1/(s+(1-s)/N)$, $E(N)=S(N)/N$.
+Ein-Kern-Zeit 150 Einheiten, serieller Anteil 0,3, paralleler Anteil 0,7.
+Zunächst perfekte Verteilung ohne Zusatzaufwand.
+$S(N)=1/(s+(1-s)/N)$, Effizienz $E=S/N$.
 
-1. Berechnen Sie Zeit, Speedup und Effizienz bei vier Kernen. (1 P)
-2. Berechnen Sie Speedup und Effizienz bei hundert Kernen sowie den Grenzfaktor.
-   Wieso kann der Speedup nahe am Grenzwert und die Effizienz klein sein? (1 P)
-3. Bei vier Kernen fallen nun fünf zusätzliche Zeiteinheiten an.
-   Berechnen Sie neue Zeit und Speedup.
-   Welchen normierten Wert hat $h(4)$ in der erweiterten Formel? (1 P)
-4. Separat ohne diesen Zusatzaufwand:
-   Die achtzig parallelen Einheiten sind als $10,10,10,50$ verteilt.
-   Bestimmen Sie parallele Abschlusszeit, Gesamtzeit und Speedup. (1 P)
+1. Zeit, Speedup und Effizienz bei drei Kernen? (1 P)
+2. Zeit, Speedup, Effizienz bei sechzig Kernen und theoretische Speedupgrenze? (1 P)
+3. Bei drei Kernen kommen sechs Zeiteinheiten hinzu. Neue Zeit, Speedup und normierter Zusatz $h(3)$? (1 P)
+4. Ohne diesen Zusatz: Die 105 parallelen Einheiten sind als 15, 25, 65 verteilt.
+   Parallele Abschlusszeit, Gesamtzeit und Speedup? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{10\baselineskip}
+\Needspace{8\baselineskip}
 
-**Ihre Zeitbalken und Rechnungen:**
+**Ihre Lösung:**
 
-\vspace*{4cm}
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{18\baselineskip}
+\Needspace{4\baselineskip}
 
 **Musterlösung 5**
 
-1. $T(4)=20+80/4=40$,
-   $S(4)=100/40=2{,}5$, $E(4)=2{,}5/4=62{,}5\,\%$. (1 P)
-2. $T(100)=20{,}8$, $S(100)=100/20{,}8\approx4{,}8077$,
-   $E(100)\approx4{,}8077\,\%$.
-   Grenze $1/s=5$. Weitere Kerne verkürzen nur den verbleibenden parallelen Anteil. (1 P)
-3. $T=20+20+5=45$, $S=100/45\approx2{,}2222$.
-   $h(4)=5/100=0{,}05$, also relativ zur ursprünglichen Ein-Kern-Zeit. (1 P)
-4. Paralleler Abschluss nach $\max(10,10,10,50)=50$,
-   Gesamtzeit $20+50=70$, Speedup $100/70\approx1{,}4286$.
-   Dieselbe Gesamtarbeit ist nicht automatisch gleich verteilt. (1 P)
+1. $45+105/3=80$, Speedup 1,875, Effizienz 62,5 Prozent. (1 P)
+2. $T=46{,}75$, $S\approx3{,}20856$, $E\approx5{,}3476\,\%$,
+   Grenzfaktor $1/0{,}3\approx3{,}333$. (1 P)
+3. Zeit 86, Speedup $150/86\approx1{,}74419$, $h(3)=6/150=0{,}04$. (1 P)
+4. Paralleler Abschluss 65, gesamt 110, Speedup $150/110\approx1{,}36364$. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 6: Systemrechnungen zum Abschluss (6 Punkte)
+## Aufgabe 6: Neue Systemparameter zusammenführen (6 Punkte)
 
-1. Direkt abgebildeter Cache: $4$ KiB Nutzdaten, $64$ Byte je Zeile,
-   $32$-Bit-Byteadresse.
-   Bestimmen Sie Satzanzahl, Offset-, Index- und Tagbits.
-   Zerlegen Sie `0x20001084` und geben Sie die Zeilenbasis an. (2 P)
-2. Hitzeit zwei Takte, Hitrate $0{,}9$, zusätzliche Misspenalty vierzig Takte.
-   Bestimmen Sie AMAT und die Zeit bei $100$ MHz. (1 P)
-3. Lehrtimer: Eingang $1$ MHz, Teiler zehn,
-   Zähler null bis neunhundertneunundneunzig.
-   High bei null bis zweihundertneunundvierzig.
-   Bestimmen Sie PWM-Frequenz, Periodendauer, aktive Takte und Duty Cycle.
-   Warum darf ein Endregisterwert nicht ungeprüft als Periodenlänge verwendet werden? (2 P)
-4. Ein DMA-Gerät schreibt ein Sensorfenster in einen Puffer.
-   CPU-Caches sind untereinander kohärent; der Gerätevertrag ist noch offen.
-   Darf die CPU daraus automatisch DMA-Kohärenz und ein fertiges Fenster folgern?
-   Nennen Sie die gesondert nötigen Prüfungen. (1 P)
-
-AMAT heißt Average Memory Access Time, PWM Pulse Width Modulation,
-DMA Direct Memory Access, CPU Central Processing Unit.
+1. Direct-Mapped-Cache: acht KiB Nutzdaten, 128 Byte je Line,
+   32-Bit-Byteadresse. Bestimmen Sie Sets und Bitfelder;
+   zerlegen Sie `0x30004298` und geben Sie die Linebasis an. (2 P)
+2. Hitzeit drei Takte, Hitrate 92 Prozent, zusätzliche Misspenalty fünfzig Takte.
+   AMAT und Zeit bei 125 MHz? (1 P)
+3. Timer: Eingang zwei MHz, Teiler acht, Zähler inklusiv null bis 1249;
+   HIGH für null bis 499. Frequenz, Periodendauer, HIGH-Zeit und Tastverhältnis?
+   Warum muss die Zählkonvention genannt werden? (2 P)
+4. Ein neuronaler Beschleuniger schreibt über einen Gerätepfad in RAM.
+   Nur die CPU-Caches untereinander sind als kohärent dokumentiert.
+   Was muss vor Nutzung des Ergebnisses gesondert feststehen? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{10\baselineskip}
+\Needspace{8\baselineskip}
 
-**Ihre Adresszerlegung, Zeitrechnung und Übergabebedingungen:**
+**Ihre Lösung:**
 
-\vspace*{4cm}
+\vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{22\baselineskip}
+\Needspace{4\baselineskip}
 
 **Musterlösung 6**
 
-1. $4096/64=64$ Sätze, Offset sechs Bit, Index sechs Bit,
-   Tag $32-6-6=20$ Bit. (1 P)
-   Adresse: Offset vier, Index zwei, Tag `0x20001`, Basis `0x20001080`. (1 P)
-2. $\mathrm{AMAT}=2+(1-0{,}9)\cdot40=6$ Takte.
-   Bei hundert MHz ist ein Takt zehn ns, also sechzig ns. (1 P)
-3. Tausend Zählerwerte je Periode.
-   $f=10^6/(10\cdot1000)=100$ Hz,
-   $T=1/f=10$ ms, $250$ aktive Takte, $D=250/1000=25\,\%$. (1 P)
-   Der inklusive Bereich null bis neunhundertneunundneunzig hat tausend Werte.
-   Teilerkodierung, inklusives Ende und Vergleichsbedingung sind plattformspezifisch. (1 P)
-4. Nein. Teilnehmerdomäne, Pufferzuständigkeit, Zugriffsbreite,
-   Abschlussmeldung und Ordnung müssen festgelegt sein.
-   Bei nichtkohärentem Gerätetransfer kommt passende Cachemaintenance hinzu. (1 P)
+1. 64 Sets, Offset sieben Bit, Index sechs Bit, Tag neunzehn Bit.
+   Adresse: Offset 24, Index fünf, Tag `0x18002`, Basis `0x30004280`. (2 P)
+2. $3+0{,}08\cdot50=7$ Takte; acht ns je Takt, also 56 ns. (1 P)
+3. 250000 Zählticks/s, 1250 Intervalle: 200 Hz, fünf ms,
+   HIGH zwei ms, Anteil 40 Prozent. Das inklusive Ende zählt mit. (2 P)
+4. Geräte-Kohärenzdomäne, Pufferbesitz, passende Sichtbarkeit/Ordnung und
+   erfolgreicher vollständiger Abschluss; CPU-Kohärenz allein beweist dies nicht. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Optional: korrekte Hostbeispiele ausführen
+## Optional: am Rechner prüfen
 
-Die Datei `src/lab09_atomics.c` nutzt C11-Atomics und POSIX Threads.
-Vom Repository-Hauptordner aus:
-
-```bash
-gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -pthread \
-    labs/src/lab09_atomics.c -o /tmp/lab09_atomics
-/tmp/lab09_atomics
-```
-
-Erwartete Ausgabe:
-
-```text
-Teilsummen: 10 26, gesamt 36
-Getrennte atomare Zugriffe: Endwert 1
-Atomare RMW: 40000
-Geschuetzter Zaehler: 40000
-Veroeffentlichte Daten: 42
-Alle Prueffaelle bestanden.
-```
-
-1. Finden Sie die getrennt zugeteilten Ergebnisplätze und den Abschluss durch `pthread_join`.
-2. Warum ist die serielle Lost-Update-Nachbildung wohldefiniert,
-   ein ausgeführtes gewöhnliches racy C-`int`-Experiment aber kein Beweis?
-3. Begründen Sie, warum relaxed für den reinen Zähler genügt,
-   die Datenveröffentlichung dagegen Release/Acquire verwendet.
-4. Optional: mit `-O1 -g -fsanitize=address,undefined` prüfen.
-   Ein solcher Lauf beweist weder Fairness noch MESI-Geschwindigkeit.
-
-::: {.content-visible when-profile="solution"}
-**Hinweise zur optionalen Aufgabe**
-
-Die Teilsummen werden in unterschiedliche Ergebnisobjekte geschrieben;
-erst nach beiden Joins liest der Hauptthread sie.
-Die verlorene Änderung wird mit zwei atomaren Loads auf null und
-anschließend zwei atomaren Stores von eins seriell vorgegeben.
-Dies prüft die Updatezerlegung ohne undefiniertes konkurrierendes C-Verhalten.
-
-Je zwei tatsächlich gestartete Worker führen zwanzigtausend Inkremente aus.
-Die explizite atomare Additionsoperation erzeugt eine RMW;
-der Locklauf schützt eine gewöhnliche Variable über `atomic_flag`.
-Die einmalige Publikation schreibt Payload vor dem Release-Flag,
-der Konsument liest es mit Acquire und danach die Nutzdaten.
-Es gibt kein nachträgliches Überschreiben derselben Payload.
-
-Die erzeugten Threads werden auch bei fehlgeschlagener zweiter Erzeugung
-abgewartet. Das Programm liest bei einem Threadfehler keine ungeklärten Ergebnisse.
-Es ist ein funktionaler Hostversuch, kein RISC-V-, ISR- oder Kohärenz-Zeitmodell.
-:::
+Erweitern Sie `src/lab09_atomics.c` um drei Worker mit je 7000 atomaren Additionen:
+Der Zähler beginnt bei null und muss nach allen Joins 21000 enthalten.
+Prüfen Sie außerdem die einmalige Veröffentlichung von Payload 73.
+Führen Sie kein gewöhnliches ungeschütztes C-Race als Zahlenbeweis aus.

@@ -273,11 +273,11 @@ Die Kapazität, Controllerunterstützung, Datenrate und Lebensdauer einer Anwend
 - Flashänderung und vollständigen Löschbereich prüfen
 
 ::: notes
-Ein MiB, Mebibyte, sind $2^{20}$ Byte und damit $8\,388\,608$ Bit. Die sechs Transistoren der klassischen 6T-SRAM-Zelle ergeben dafür $50\,331\,648$ Zelltransistoren. SRAM bedeutet Static Random-Access Memory. Diese reine Zellzählung enthält keine Peripherie und liefert noch keine Chipfläche. Im einfachen Ein-Port-Modell konkurrieren Fetch, Befehl holen, und Datenzugriff um denselben Port; ein gemeinsamer Adressraum allein erzwingt das nicht.
+Die Papieraufgaben übertragen die Folienmethoden auf einen Messwertpuffer und einen neuen Konfigurationsblock. Ein KiB, Kibibyte, enthält $1024$ Byte. Damit ergeben $768\cdot1024=786432$ Byte insgesamt $6291456$ Bit. Klassisches 6T-SRAM, Static Random-Access Memory mit sechs Zelltransistoren je Bit, benötigt $37748736$ Zelltransistoren. Beim 1T1C-DRAM, Dynamic Random-Access Memory mit einem Transistor und einem Kondensator je Bit, sind es jeweils $6291456$. Peripherie und Bauteilgeometrie fehlen; die Zählung ist keine genaue Flächenrechnung. Ein gemeinsamer Port kann die beiden gleichzeitigen Anfragen nicht zugleich bedienen.
 
-Im Flash-Lehrmodell ist FF gelöscht. A5 zu 81 setzt nur weitere Bits auf null; A5 zu AF benötigt mindestens eine Null-nach-eins-Änderung und damit vorheriges Löschen. Befindet sich im selben Modellblock ein weiterhin benötigtes Byte 3C, muss es nach dem Löschvorgang wiederhergestellt werden. Ein bloßes Wiederprogrammieren nur des Zielbytes würde das andere verlieren.
+Im logischen Flashmodell ist FF gelöscht. C6 entspricht binär 11000110, 84 ist 10000100 und CE ist 11001110. C6 nach 84 braucht nur Eins-nach-null-Änderungen; C6 nach CE erfordert Löschen. Das weiterhin benötigte Nachbarbyte 5A muss gesichert und wieder programmiert werden. Zwölf physische Löschzyklen bleiben insgesamt zwölf; Verteilung auf vier Blöcke senkt die größte Belastung von zwölf auf drei.
 
-XIP, Execute-in-Place, benötigt einen tatsächlich ausführbaren speicherabbildbaren Leseweg und wird nicht durch NOR, NOT-OR als Name der Zellverschaltung, allein bewiesen. Die Aufgaben sind Modellrechnungen, keine Controlleraufrufe. Besprechen Sie vor allem diese Zähl- und Gültigkeitsgrenzen. Die Musterlösungen stehen im Lösungsprofil. Als Nächstes wird erklärt, wie SRAM häufige Änderungen ohne Flash-Löschblock organisiert.
+XIP, Execute-in-Place, benötigt einen ausführbaren speicherabbildbaren Leseweg mit passendem Controller und Zugriffsrechten. NOR, NOT-OR als Name der Zellverschaltung, allein garantiert diesen Weg nicht. Die Rechnungen modellieren keine realen Controllerbefehle oder Stromausfallfestigkeit. Die folgende Zellbetrachtung erklärt häufige Änderungen ohne Flash-Löschblock.
 :::
 
 ## Ein Inverter macht aus null eins
@@ -487,11 +487,11 @@ Ein Cache ist ein Zwischenspeicher für Kopien häufig benötigter Inhalte; sein
 - Vorladung, Wortleitung und Schreibdaten zeitlich ordnen
 
 ::: notes
-6T-SRAM bezeichnet Static Random-Access Memory mit sechs Zelltransistoren. Die beiden stabilen inneren Paare sind Q null, QB eins und Q eins, QB null. Bei null/eins leiten N_Q und P_QB, bei eins/null P_Q und N_QB. N und P benennen n- beziehungsweise p-Kanal-Metal-Oxide-Semiconductor-Transistoren; die Zugriffstransistoren werden durch WL, Word Line oder Wortleitung, gesteuert.
+6T-SRAM bedeutet Static Random-Access Memory mit sechs Zelltransistoren. Q und QB sind die komplementären inneren Knoten. Bei dem hier vorgegebenen Anfangszustand Q eins, QB null leiten P_Q und N_QB; N_Q und P_QB sperren. N und P bezeichnen n- beziehungsweise p-Kanal-Metal-Oxide-Semiconductor-Transistoren. Beim Halten ist WL, Word Line oder Wortleitung, niedrig.
 
-Für Halten ist WL niedrig. Beim Lesen werden BL und BLB, Bit Lines oder Bitleitungen, zunächst hoch vorgeladen. Nach Ausschalten der Vorladung steigt WL. Für Q null sinkt BL leicht, und der Leseverstärker erkennt die Differenz zu BLB. Die logische null bleibt bei ausreichender Lesestabilität erhalten. WL fällt vor erneuter Vorladung.
+Zum Lesen werden BL und BLB, Bit Lines oder Bitleitungen, zunächst hoch vorgeladen. Nach Ausschalten der Vorladung wird WL angehoben. BLB am Nullknoten sinkt leicht, der Leseverstärker wertet die Differenz aus. Bei ausreichender Lesestabilität bleibt der logische Zellinhalt erhalten. Danach fällt WL, erst anschließend beginnt die erneute Vorladung.
 
-Beim Schreiben von Q null nach eins müssen externe Treiber BL eins und BLB null vor dem WL-Anstieg bereitstellen. QB sinkt, die Rückkopplung kippt zu Q eins, QB null. WL fällt, bevor die Schreibtreiber freigegeben werden. Ein typischer Fehler ist die Annahme, hohe WL bedeute automatisch Schreiben: Die angeschlossene Peripherie und ihre Phase entscheiden über die Wirkung. Die Aufgabe fordert qualitative Zustände und Reihenfolgen, keine nicht eingeführten Halbleitergleichungen oder Transistordimensionierungen.
+Zum Umschreiben von Q eins nach null treiben die externen Schreiber BL null und BLB eins. Diese Daten müssen vor dem WL-Anstieg bereitstehen und bis nach dem WL-Abfall gehalten werden. Die Rückkopplung kippt zum neuen stabilen Zustand. Hohe WL allein bedeutet deshalb noch kein Schreiben: Die angeschlossene Peripherie und die zeitliche Reihenfolge bestimmen die Wirkung. Beide stabilen Zustände erfüllen dieselbe komplementäre Haltebedingung; beim umgekehrten Zustand vertauschen sich die leitenden Invertertransistoren.
 :::
 
 ## DRAM: ein Transistor, ein Kondensator
@@ -643,11 +643,11 @@ Das ist eine Spitzenrate unter lückenloser Nutzung der Datentransfers, ohne Ref
 - Im vorgegebenen Modell Bank, Zeile, Spalte und Byte bilden
 
 ::: notes
-DRAM bedeutet Dynamic Random-Access Memory. Im Lehrmodell sind Zellkapazität dreißig Femtofarad, Bitleitungskapazität dreihundert Femtofarad und Vorladung 0,6 Volt. Femto bedeutet $10^{-15}$. Bei Zellspannung 1,2 Volt ist die Anfangsladung insgesamt zweihundertsechzehn Femtocoulomb, bei null Volt hundertachtzig Femtocoulomb. Teilen durch dreihundertdreißig Femtofarad liefert 0,6545 beziehungsweise 0,5455 Volt, also ungefähr plus oder minus 54,5 Millivolt gegenüber dem Referenzpegel.
+DRAM bedeutet Dynamic Random-Access Memory. Das neue Lehrmodell verwendet $24$ Femtofarad Zellkapazität, $240$ Femtofarad Bitleitungskapazität und $0{,}5$ Volt Vorladung. Femto bedeutet $10^{-15}$. Bei anfangs einem Volt in der Zelle beträgt die Gesamtladung $144$ Femtocoulomb, bei null Volt $120$ Femtocoulomb. Teilen durch $264$ Femtofarad liefert $0{,}54545$ beziehungsweise $0{,}45455$ Volt. Der Abstand zum Referenzpegel beträgt etwa plus oder minus $45{,}45$ Millivolt.
 
-Restore stellt den Zellwert bei noch aktiver WL, Word Line oder Wortleitung, wieder her. Danach wird WL abgesenkt; Precharge bringt BL, Bit Line oder Bitleitung, zum mittleren Referenzpegel. Der Kondensator wird beim Lesen nicht immer vollständig geleert. Diese Aussage wäre schon mit dem niedrigen Anfangszustand unvereinbar, dessen Spannung durch Ladungsteilung steigt.
+Restore stellt den Zellwert bei noch aktiver WL, Word Line oder Wortleitung, wieder her. Danach wird WL abgesenkt; Precharge bringt BL, Bit Line oder Bitleitung, zurück zum mittleren Referenzpegel. Der Kondensator wird beim Lesen nicht immer geleert: Die niedrige Zellspannung steigt gerade durch die Ladungsteilung.
 
-Das Adressmodell nutzt Bankbits fünfzehn bis vierzehn, Zeilenbits dreizehn bis sieben, Spaltenbits sechs bis eins und Bytebit null. Bank zwei, Zeile fünf, Spalte neun und Byte eins ergibt `0x8293`. Die Aufgaben bewerten die Modellannahmen und nachvollziehbare Rechnung. Keine reale Bankabbildung und keine universellen Refreshzeiten müssen geraten werden. Im letzten Teil wechseln wir von einzelnen Zugriffen zur Organisation kleiner Puffer und der Firmware-Speicherbereiche.
+Das neue Adressmodell hat $8\cdot64\cdot32\cdot4=65536$ Byte, also $64$ KiB, Kibibyte. Bank, Zeile, Spalte und Byte benötigen von hoch nach niedrig drei, sechs, fünf und zwei Bit. Bank fünf, Zeile elf, Spalte neunzehn und Byte zwei ergeben $5\cdot8192+11\cdot128+19\cdot4+2=42446$, hexadezimal `0xA5CE`. Die Feldaufteilung ist ausdrücklich ein Lehrmodell und keine universelle reale Bankabbildung. Anschließend geht es um die Organisation gültiger Firmwareobjekte und Puffer.
 :::
 
 ## Dual-Port bezeichnet Zugriffsmöglichkeiten
@@ -815,11 +815,11 @@ Aufgaben 5–6: 15 Minuten · Quiz: 15 Minuten
 - FIFO-Zustände erklären; anschließend Antworten begründen
 
 ::: notes
-Für Aufgabe fünf gilt die frei gewählte Memory Map mit zweihundertsechsundfünfzig KiB Flash und vierundsechzig KiB SRAM; KiB sind Kibibyte, $2^{10}$ Byte. SRAM heißt Static Random-Access Memory. Ein Vier-Byte-Zugriff ab `0x1000FFFC` passt genau in RAM, Random-Access Memory; ab `0x1000FFFF` passt er nicht. Bei vierundzwanzig KiB `.text`, vier KiB `.rodata`, zweihundertsechsundfünfzig Byte `.data`, vier KiB `.bss` und zwei KiB Stack braucht das Lehrmodell 28,25 KiB Flash und 6,25 KiB RAM. `.text` enthält den Code, `.rodata` schreibgeschützte Daten, `.data` initialisierte veränderbare Objekte und `.bss`, historisch Block Started by Symbol, die zu null initialisierten Objekte. `.data` zählt an beiden Stellen, `.bss` hier nur im RAM. Der Stack reserviert Platz für Aufrufverwaltung und automatische Objekte.
+KiB bedeutet Kibibyte, $1024$ Byte. Im Datenlogger-Modell endet Flash exklusiv bei `0x00240000`, SRAM, Static Random-Access Memory, bei `0x21018000`. Die letzten Bytes liegen jeweils eins davor. Der Vier-Byte-Zugriff ab `0x21017FFC` passt und ist ausgerichtet. Ab `0x21017FFF` fehlen Platz und Ausrichtung; `0x21018000` ist bereits außerhalb. Code, Konstanten und die zusätzlichen Initialwerte benötigen $36+6+0{,}5=42{,}5$ KiB Flash. Veränderbare Initialdaten, Nullbereich und Stack brauchen $0{,}5+8+3=11{,}5$ KiB SRAM. Frei bleiben $213{,}5$ beziehungsweise $84{,}5$ KiB. Der Linker legt Bereiche fest, Startcode kopiert Initialwerte und setzt Nullbereiche. C-const allein erzwingt keinen physischen Flashort.
 
-FIFO bedeutet First In First Out. Nach der vorgegebenen Folge mit vier Plätzen gilt r gleich w gleich eins, count vier: voll. Die Gleichheit der Positionen allein beweist keine Leere. Ein abgewiesenes Einlegen darf den Zustand nicht verändern. Ein einzelner Ausführungskontext genügt für diese Aufgabe; zusätzliche Synchronisation ist nicht Teil des Modells.
+FIFO bedeutet First In First Out. Mit fünf Plätzen entstehen die Zustände $(r,w,count)$: $(0,1,1)$, $(0,2,2)$, $(0,3,3)$, $(0,4,4)$, nach Entnahme von K $(1,4,3)$, danach $(1,0,4)$ und $(1,1,5)$. Übrig bleiben L, M, N, P, Q in dieser Reihenfolge. R wird ohne Zustandsänderung abgewiesen. Gleiche Lese- und Schreibindizes können leer oder voll bedeuten; die Belegungszahl unterscheidet beides. Das Programmbild verlangt dauerhafte Speicherung, die häufig geänderten Zwischensummen passen zu SRAM.
 
-Das Quiz enthält zehn Transferfragen mit genau einer richtigen Antwort. Begründen Sie Ihre Wahl anhand der Annahmen, statt eine Antwort wegen ihrer Länge auszuwählen. Bei Fehlern wird der betreffende Unterschied besprochen: etwa Restore gegenüber Precharge oder `const` gegenüber physischer Flashplatzierung. Die vollständigen Lösungen erlauben später selbstständige Wiederholung.
+Das Quiz enthält zehn Transferfragen mit genau einer richtigen Antwort. Begründen Sie die Wahl anhand der Annahmen, etwa Restore gegenüber Precharge oder const gegenüber physischer Platzierung. Die vollständigen Übungslösungen stehen im Lösungsprofil; die Aufgabenwerte unterscheiden sich bewusst von den vorgeführten Folienrechnungen.
 :::
 
 ## Was Sie jetzt erklären können
