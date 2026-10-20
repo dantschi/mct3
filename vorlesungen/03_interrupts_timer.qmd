@@ -442,7 +442,8 @@ Die C-Lehrfunktion setzt Typdefinitionen aus `stdint.h` voraus. `uint32_t` und `
 C-Lehrfunktion für Little Endian und stark geordnete Gerätezugriffe:
 
 ```c
-void write_compare32(volatile uint32_t *cmp, uint64_t value) {
+void write_compare32(volatile uint32_t *cmp,
+                     uint64_t value) {
     cmp[0] = UINT32_MAX;
     cmp[1] = (uint32_t)(value >> 32);
     cmp[0] = (uint32_t)value;
@@ -514,7 +515,8 @@ Nur einmal auf elf Millisekunden zu erhöhen ließe den Vergleich weiterhin fäl
 C-Lehrmodell: positive Periode, kein Umlauf oder Überlauf im Zeitraum.
 
 ```c
-uint64_t next_future(uint64_t d, uint64_t now, uint64_t period) {
+uint64_t next_future(uint64_t d, uint64_t now,
+                     uint64_t period) {
     if (now < d)
         return d;
     uint64_t k = (now - d) / period + 1u;

@@ -673,7 +673,8 @@ Ein Schritt entspricht $10$ ms; Berechnung eines linearen Duty-Sollwerts:
 ```c
 uint8_t fade_percent(uint64_t step) {
     uint32_t phase = (uint32_t)(step % 200u);
-    return (uint8_t)(phase <= 100u ? phase : 200u - phase);
+    return (uint8_t)(phase <= 100u
+                     ? phase : 200u - phase);
 }
 ```
 
@@ -701,7 +702,7 @@ PWM ist Pulse Width Modulation, Pulsweitenmodulation. Die Hardware kann das zule
 
 ISR bedeutet Interrupt Service Routine, Unterbrechungsbehandlung. Bei wirksamen Freigaben kann eine kurze Timer-ISR weiterhin laufen, obwohl das Hauptprogramm seine Aufgaben nicht mehr erledigt. Dies entspricht der Trennung von Pending, Freigabe und tatsächlicher Softwarearbeit aus Vorlesung 3.
 
-Nicht jede `while(1)`-Schleife ist ein Fehler: Eine normale Hauptschleife ist häufig absichtlich endlos. Der Unterschied ist, ob sie die vereinbarten Verarbeitungsschritte weiter ausführt. Ein künstlicher Hänger ohne Rückkehr ist außerdem nicht automatisch ein Deadlock, der eine gegenseitige Warteabhängigkeit bezeichnet. Der Watchdog muss daher ein passendes Lebenszeichen überwachen, statt bloß irgendeine weiterlaufende Aktivität zu zählen.
+Nicht jede `while(1)`-Schleife ist ein Fehler: Eine normale Hauptschleife ist häufig absichtlich endlos. Der Unterschied ist, ob sie die vereinbarten Verarbeitungsschritte weiter ausführt. Ein künstlicher Hänger ohne Rückkehr ist außerdem nicht automatisch ein Deadlock, also eine dauerhaft blockierende Warteabhängigkeit. Dazu kann auch das spätere Beispiel einer ISR gehören, die auf eine vom unterbrochenen Kontext gehaltene Sperre wartet; ISR bedeutet Interrupt Service Routine. Der Watchdog muss daher ein passendes Lebenszeichen überwachen, statt bloß irgendeine weiterlaufende Aktivität zu zählen.
 
 Ein Beispiel ist eine Ausgabe, die vor dem Hänger auf fünfundsiebzig Prozent stand. Ein autonomer Timer kann dieses Muster weiter erzeugen, obwohl ein neuer Sensorwert nie mehr berechnet wird. Sichtbare Ausgangsaktivität beweist daher nicht automatisch die Aktualität ihrer zugrunde liegenden Entscheidung.
 :::

@@ -377,7 +377,8 @@ static atomic_bool lock = false;
 bool broken_try_lock(void) {
     if (atomic_load_explicit(&lock, memory_order_relaxed))
         return false;
-    atomic_store_explicit(&lock, true, memory_order_relaxed);
+    atomic_store_explicit(
+        &lock, true, memory_order_relaxed);
     return true;
 }
 ```
@@ -509,7 +510,8 @@ Ein Spinlock wartet durch wiederholtes Prüfen. Er braucht einen fortschrittsfä
 ## Freigeben: Daten vor dem freien Schloss
 
 ```asm
-# Nach dem geschuetzten Abschnitt; a0 ist dieselbe Lockadresse
+# Nach dem geschuetzten Abschnitt;
+# a0 ist dieselbe Lockadresse
 fence rw, w
 sw    zero, 0(a0)
 ```
@@ -569,7 +571,8 @@ void take_lock(void) {
                &lock, memory_order_acquire)) { }
 }
 void drop_lock(void) {
-    atomic_flag_clear_explicit(&lock, memory_order_release);
+    atomic_flag_clear_explicit(
+        &lock, memory_order_release);
 }
 ```
 

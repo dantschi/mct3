@@ -559,8 +559,9 @@ $t$ ist die Zeit seit dem idealisierten Loslassen bei null Volt, $V(t)$ die mome
 
 ## Zwei Grenzen für den Widerstand
 
-Lehrvorgaben: $V_{\mathrm{IO}}=3{,}3$ V, $V_{\mathrm{OL,max}}=0{,}4$ V,
-zulässiger Sinkstrom $I_{\mathrm{OL}}=3$ mA und $t_{r,\max}=300$ ns.
+Lehrvorgaben: $V_{\mathrm{IO}}=3{,}3$ V; der Ausgang garantiert
+$V_{\mathrm{OL}}\leq0{,}4$ V bei $I_{\mathrm{OL}}=3$ mA.
+Außerdem gilt $t_{r,\max}=300$ ns.
 
 $$
 R_{\min}=\frac{3{,}3-0{,}4}{0{,}003}\approx967\ \Omega
@@ -574,7 +575,7 @@ $$
 $2{,}2$ k$\Omega$ passt; $4{,}7$ k$\Omega$ ist im Modell zu langsam.
 
 ::: notes
-$V_{\mathrm{IO}}$ ist die Versorgung des Pull-ups, $V_{\mathrm{OL,max}}$ die vorgegebene obere LOW-Spannung und $I_{\mathrm{OL}}$ der hier erlaubte Sinkstrom. Sinken bedeutet Strom aus der Leitung aufnehmen und nach Masse führen. Die minimale Widerstandsgröße begrenzt diesen Strom: $(3{,}3-0{,}4)/3$ Milliampere ergibt ungefähr $966{,}7$ Ohm.
+$V_{\mathrm{IO}}$ ist die Versorgung des Pull-ups, $V_{\mathrm{OL,max}}$ die garantierte obere LOW-Spannung beim spezifizierten Sinkstrom $I_{\mathrm{OL}}$. Sinken bedeutet Strom aus der Leitung aufnehmen und nach Masse führen. Die Untergrenze folgt aus dieser Treiberfähigkeit: Am Grenzpegel darf der Pull-up nicht mehr als den spezifizierten Strom verlangen. $(3{,}3-0{,}4)/0{,}003$ ergibt ungefähr $966{,}7$ Ohm. Die drei Milliampere sind hier ein Referenzpunkt der garantierten LOW-Kennlinie, kein absoluter Maximalstrom des Pins. Soll zusätzlich eine harte Stromgrenze auch bei null Volt am Ausgang eingehalten werden, wäre separat $R_P\geq V_{\mathrm{IO}}/I_{\mathrm{abs,max}}$ zu prüfen; $I_{\mathrm{abs,max}}$ bezeichnet diese gesonderte Grenze.
 
 Die maximale Größe folgt aus der vorgegebenen Anstiegsgrenze $t_{r,\max}$ und Buskapazität $C_B$. Mit dreihundert Nanosekunden und hundert Pikofarad ergeben sich etwa $3540{,}7$ Ohm. Der betrachtete Bereich ist somit ungefähr $967$ Ohm bis $3{,}54$ Kiloohm. Diese Lehrvorgaben orientieren sich am I²C-Fast-Mode; I²C heißt Inter-Integrated Circuit. Sie sind keine vollständige Auslegung für beliebige Teilnehmer.
 
@@ -767,7 +768,8 @@ bool decode_accel_xyz(const uint8_t bytes[6],
                       bool transfer_ok, int32_t out[3]) {
     if (!transfer_ok) return false;
     for (unsigned i = 0; i < 3u; ++i)
-        out[i] = decode_s16_be(bytes[2u*i], bytes[2u*i+1u]);
+        out[i] = decode_s16_be(
+            bytes[2u*i], bytes[2u*i+1u]);
     return true;
 }
 ```

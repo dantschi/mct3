@@ -35,7 +35,7 @@ Pro Einheit: Folien (Reveal.js), Handout-PDF sowie Übungsblatt (Studierende / M
 
 | Dokument | Studierende | Musterlösung |
 |----------|:-----------:|:------------:|
-| Probeklausur (90 Min., 100 Punkte) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur.pdf) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur-musterloesung.pdf) |
+| Probeklausur (60 Min., 60 Punkte) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur.pdf) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur-musterloesung.pdf) |
 
 ## Literatur
 
