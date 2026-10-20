@@ -967,11 +967,12 @@ t=\frac{n}{f_T},\qquad
 <section id="mtimecmp-auf-rv32-schreiben" class="slide level2">
 <h2><code>mtimecmp</code> auf RV32 schreiben</h2>
 <p>C-Lehrfunktion für Little Endian und stark geordnete Gerätezugriffe:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb3-1"><a aria-label="1"></a><span class="dt">void</span> write_compare32<span class="op">(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*</span>cmp<span class="op">,</span> <span class="dt">uint64_t</span> value<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb3-2"><a aria-label="2"></a>    cmp<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">=</span> UINT32_MAX<span class="op">;</span></span>
-<span id="cb3-3"><a aria-label="3"></a>    cmp<span class="op">[</span><span class="dv">1</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)(</span>value <span class="op">&gt;&gt;</span> <span class="dv">32</span><span class="op">);</span></span>
-<span id="cb3-4"><a aria-label="4"></a>    cmp<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)</span>value<span class="op">;</span></span>
-<span id="cb3-5"><a aria-label="5"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb3-1"><a aria-label="1"></a><span class="dt">void</span> write_compare32<span class="op">(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*</span>cmp<span class="op">,</span></span>
+<span id="cb3-2"><a aria-label="2"></a>                     <span class="dt">uint64_t</span> value<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb3-3"><a aria-label="3"></a>    cmp<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">=</span> UINT32_MAX<span class="op">;</span></span>
+<span id="cb3-4"><a aria-label="4"></a>    cmp<span class="op">[</span><span class="dv">1</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)(</span>value <span class="op">&gt;&gt;</span> <span class="dv">32</span><span class="op">);</span></span>
+<span id="cb3-5"><a aria-label="5"></a>    cmp<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)</span>value<span class="op">;</span></span>
+<span id="cb3-6"><a aria-label="6"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Ein einzelner <code>uint64_t</code>-Store garantiert auf RV32 keine atomare Aktualisierung.</p>
 <aside class="notes">
 <p><code>mtimecmp</code> ist Machine Time Compare, der vierundsechzig Bit breite Timervergleich. RV32 hat zweiunddreißig Bit breite Integerregister. Zwei normale Halbschreibungen könnten kurzfristig einen Vergleichswert erzeugen, der kleiner als alter und neuer Gesamtwert ist. Die Funktion verwendet daher die in der Spezifikation beschriebene Dreischrittfolge.</p>
@@ -1064,12 +1065,13 @@ d'=d+k\Delta=16\ \mathrm{ms}
 <section id="eine-überprüfbare-planungsfunktion" class="slide level2">
 <h2>Eine überprüfbare Planungsfunktion</h2>
 <p>C-Lehrmodell: positive Periode, kein Umlauf oder Überlauf im Zeitraum.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb4-1"><a aria-label="1"></a><span class="dt">uint64_t</span> next_future<span class="op">(</span><span class="dt">uint64_t</span> d<span class="op">,</span> <span class="dt">uint64_t</span> now<span class="op">,</span> <span class="dt">uint64_t</span> period<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb4-2"><a aria-label="2"></a>    <span class="cf">if</span> <span class="op">(</span>now <span class="op">&lt;</span> d<span class="op">)</span></span>
-<span id="cb4-3"><a aria-label="3"></a>        <span class="cf">return</span> d<span class="op">;</span></span>
-<span id="cb4-4"><a aria-label="4"></a>    <span class="dt">uint64_t</span> k <span class="op">=</span> <span class="op">(</span>now <span class="op">-</span> d<span class="op">)</span> <span class="op">/</span> period <span class="op">+</span> <span class="dv">1</span><span class="bu">u</span><span class="op">;</span></span>
-<span id="cb4-5"><a aria-label="5"></a>    <span class="cf">return</span> d <span class="op">+</span> k <span class="op">*</span> period<span class="op">;</span></span>
-<span id="cb4-6"><a aria-label="6"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb4-1"><a aria-label="1"></a><span class="dt">uint64_t</span> next_future<span class="op">(</span><span class="dt">uint64_t</span> d<span class="op">,</span> <span class="dt">uint64_t</span> now<span class="op">,</span></span>
+<span id="cb4-2"><a aria-label="2"></a>                     <span class="dt">uint64_t</span> period<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-3"><a aria-label="3"></a>    <span class="cf">if</span> <span class="op">(</span>now <span class="op">&lt;</span> d<span class="op">)</span></span>
+<span id="cb4-4"><a aria-label="4"></a>        <span class="cf">return</span> d<span class="op">;</span></span>
+<span id="cb4-5"><a aria-label="5"></a>    <span class="dt">uint64_t</span> k <span class="op">=</span> <span class="op">(</span>now <span class="op">-</span> d<span class="op">)</span> <span class="op">/</span> period <span class="op">+</span> <span class="dv">1</span><span class="bu">u</span><span class="op">;</span></span>
+<span id="cb4-6"><a aria-label="6"></a>    <span class="cf">return</span> d <span class="op">+</span> k <span class="op">*</span> period<span class="op">;</span></span>
+<span id="cb4-7"><a aria-label="7"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Die ISR nutzt das Ergebnis für den Vergleich; vergangene Zeit stammt aus <code>mtime</code>.</p>
 <aside class="notes">
 <p>Die C-Funktion isoliert die Terminrechnung vom Gerätezugriff. <code>uint64_t</code> aus <code>stdint.h</code> bezeichnet einen vorzeichenlosen Vierundsechzig-Bit-Typ. <code>d</code> ist der nächste Solltermin, <code>now</code> die aktuelle Zeit und <code>period</code> das positive Intervall, alle in Timer-Ticks. <code>k</code> zählt fällige Termine. Ganzzahlige Division positiver Werte entspricht der Abrundung aus der vorherigen Formel.</p>

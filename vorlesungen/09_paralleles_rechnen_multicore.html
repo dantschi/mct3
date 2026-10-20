@@ -808,9 +808,10 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 <span id="cb2-4"><a aria-label="4"></a><span class="dt">bool</span> broken_try_lock<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
 <span id="cb2-5"><a aria-label="5"></a>    <span class="cf">if</span> <span class="op">(</span>atomic_load_explicit<span class="op">(&amp;</span>lock<span class="op">,</span> memory_order_relaxed<span class="op">))</span></span>
 <span id="cb2-6"><a aria-label="6"></a>        <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
-<span id="cb2-7"><a aria-label="7"></a>    atomic_store_explicit<span class="op">(&amp;</span>lock<span class="op">,</span> <span class="kw">true</span><span class="op">,</span> memory_order_relaxed<span class="op">);</span></span>
-<span id="cb2-8"><a aria-label="8"></a>    <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
-<span id="cb2-9"><a aria-label="9"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-7"><a aria-label="7"></a>    atomic_store_explicit<span class="op">(</span></span>
+<span id="cb2-8"><a aria-label="8"></a>        <span class="op">&amp;</span>lock<span class="op">,</span> <span class="kw">true</span><span class="op">,</span> memory_order_relaxed<span class="op">);</span></span>
+<span id="cb2-9"><a aria-label="9"></a>    <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb2-10"><a aria-label="10"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Absichtlich falsche Übernahme: Zwei Aufrufer können beide Erfolg melden.</p>
 <aside class="notes">
 <p>Das C11-Beispiel verwendet <code>atomic_bool</code>, einen atomaren Wahrheitswert, und die Header <code>stdbool.h</code> für <code>bool</code>, <code>true</code>, <code>false</code> sowie <code>stdatomic.h</code> für atomare Operationen. <code>lock</code> ist vor konkurrierender Nutzung falsch, also frei. <code>broken_try_lock</code> soll bei erfolgreicher Übernahme wahr zurückgeben. Sie ist absichtlich kein korrektes Sperrprimitiv und wird nicht als Lock ausgeführt.</p>
@@ -1006,9 +1007,10 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 </section>
 <section id="freigeben-daten-vor-dem-freien-schloss" class="slide level2">
 <h2>Freigeben: Daten vor dem freien Schloss</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb4-1"><a aria-label="1"></a># Nach dem geschuetzten Abschnitt<span class="co">; a0 ist dieselbe Lockadresse</span></span>
-<span id="cb4-2"><a aria-label="2"></a>fence <span class="dt">rw</span><span class="op">,</span> w</span>
-<span id="cb4-3"><a aria-label="3"></a>sw    zero<span class="op">,</span> <span class="dv">0</span><span class="op">(</span>a0<span class="op">)</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb4-1"><a aria-label="1"></a># Nach dem geschuetzten Abschnitt<span class="co">;</span></span>
+<span id="cb4-2"><a aria-label="2"></a># a0 ist dieselbe Lockadresse</span>
+<span id="cb4-3"><a aria-label="3"></a>fence <span class="dt">rw</span><span class="op">,</span> w</span>
+<span id="cb4-4"><a aria-label="4"></a>sw    zero<span class="op">,</span> <span class="dv">0</span><span class="op">(</span>a0<span class="op">)</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <p><img data-src="../assets/figures/09_paralleles_rechnen_multicore/lock.png" alt="Übernahme mit Acquire, geschützte Datenzugriffe und Freigabeordnung bilden drei Phasen. Fence rw,w steht vor dem Store0, nicht dahinter."></p>
 <aside class="notes">
 <p><code>fence</code> ist eine RISC-V-Ordnungsanweisung. <code>r</code> bezeichnet gewöhnliche Speicherreads, <code>w</code> Speicherwrites. <code>fence rw,w</code> ordnet vorherige Reads und Writes vor folgenden Writes, insbesondere dem anschließenden Freigabestore. <code>sw</code>, Store Word, schreibt vier Byte; <code>zero</code> ist der Registername für die konstante Null. <code>a0</code> ist dieselbe gültige ausgerichtete Schlossadresse wie bei der Übernahme.</p>
@@ -1080,8 +1082,9 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 <span id="cb6-5"><a aria-label="5"></a>               <span class="op">&amp;</span>lock<span class="op">,</span> memory_order_acquire<span class="op">))</span> <span class="op">{</span> <span class="op">}</span></span>
 <span id="cb6-6"><a aria-label="6"></a><span class="op">}</span></span>
 <span id="cb6-7"><a aria-label="7"></a><span class="dt">void</span> drop_lock<span class="op">(</span><span class="dt">void</span><span class="op">)</span> <span class="op">{</span></span>
-<span id="cb6-8"><a aria-label="8"></a>    atomic_flag_clear_explicit<span class="op">(&amp;</span>lock<span class="op">,</span> memory_order_release<span class="op">);</span></span>
-<span id="cb6-9"><a aria-label="9"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-8"><a aria-label="8"></a>    atomic_flag_clear_explicit<span class="op">(</span></span>
+<span id="cb6-9"><a aria-label="9"></a>        <span class="op">&amp;</span>lock<span class="op">,</span> memory_order_release<span class="op">);</span></span>
+<span id="cb6-10"><a aria-label="10"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Alle Zugreifer müssen denselben Lock für dieselben geschützten Daten nutzen.</p>
 <aside class="notes">
 <p>Der C11-Header <code>stdatomic.h</code> beschreibt die Sprachsemantik atomarer Operationen. <code>atomic_flag</code> ist ein atomarer gesetzter oder freier Zustand; <code>ATOMIC_FLAG_INIT</code> initialisiert ihn vor konkurrierender Nutzung frei. Der Standard verlangt für diesen Typ lock-free Operationen, also ohne intern blockierende Sperre. Das macht einen damit geschriebenen Spinlock nicht selbst wait-free oder automatisch interruptgeeignet.</p>
