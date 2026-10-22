@@ -1,6 +1,6 @@
 ---
 title: "Übungsblatt 2: Speicherhierarchie und Caches"
-subtitle: "Mikrocomputertechnik 3 · 32 Orientierungspunkte · ca. 60–75 Minuten"
+subtitle: "Mikrocomputertechnik 3 · 40 Orientierungspunkte · ca. 75–90 Minuten"
 header-includes: |
   \usepackage{needspace}
 highlight-style: ../assets/styles/dhbw-code.theme
@@ -224,6 +224,118 @@ A zeilenweise, B spaltenweise. Keine anderen Zugriffe oder Optimierungen.
    A: zwölf Misses, 84 Hits. B: 96 Misses, null Hits;
    je Spalte verdrängen zwölf Zeilen einander in vier Sets. (3 P)
 3. Sechzehn Sets halten alle zwölf Zeilen: B hat zwölf Misses und 84 Hits. (1 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 7: Ein Cache-Controller auf Papier (8 Punkte)
+
+16-Bit-Byteadressen, 32-Bit-Wörter. 2-Way-Cache mit vier Sets und 16 Byte je Line,
+Write-Back, Write-Allocate, LRU. Ein ungültiger Weg wird vor einem gültigen belegt.
+Bei einem Miss schreibt der Controller ein schmutziges Opfer zuerst zurück, lädt dann
+den ganzen Block und führt erst danach Load oder Store aus.
+Datenwerte sind dezimal, Adressen und Tags hexadezimal.
+
+**Cache, Ausschnitt Set 1 und 2.** In Set 1 ist Weg 0 am längsten unbenutzt.
+
+| Set | Weg | V | D | Tag | Wort 0 | Wort 1 | Wort 2 | Wort 3 |
+|-----|-----|---|---|-----|--------|--------|--------|--------|
+| 1 | 0 | 1 | 0 | `0x048` | 10 | 11 | 12 | 13 |
+| 1 | 1 | 1 | 1 | `0x091` | 40 | 41 | 99 | 43 |
+| 2 | 0 | 1 | 0 | `0x0E9` | 70 | 71 | 72 | 73 |
+| 2 | 1 | 0 | 0 | `0x07D` | 5 | 6 | 7 | 8 |
+
+**DRAM, Ausschnitt.** Jede Zeile ist ein ausgerichteter 16-Byte-Block.
+
+| Blockadresse | `+0x0` | `+0x4` | `+0x8` | `+0xC` |
+|--------------|--------|--------|--------|--------|
+| `0x0D10` | 30 | 31 | 32 | 33 |
+| `0x1210` | 10 | 11 | 12 | 13 |
+| `0x1F60` | 60 | 61 | 62 | 63 |
+| `0x2450` | 40 | 41 | 42 | 43 |
+| `0x3210` | 50 | 51 | 52 | 53 |
+| `0x3A60` | 70 | 71 | 72 | 73 |
+
+1. Bestimmen Sie Offset-, Index- und Tagbits. Zerlegen Sie `0x2458`, `0x1F64`,
+   `0x0D1C` und `0x3214` in Tag, Index, Offset und Wortnummer.
+   Berechnen Sie aus Tag und Index die Blockadressen der gültigen Cache-Lines. (2 P)
+2. Führen Sie den Controller für die Zugriffe in Programmreihenfolge aus.
+   LRU danach ist der Weg, den das betroffene Set als nächsten verdrängt. (4 P)
+3. Geben Sie den Endzustand von Set 1 und 2 sowie alle geänderten DRAM-Wörter an.
+   Welches DRAM-Wort ist am Ende veraltet? Warum ist das bei Write-Back zulässig? (2 P)
+
+```{=latex}
+\renewcommand{\arraystretch}{1.8}
+```
+
+| Nr. | Zugriff | Hit/Miss | Weg | Writeback | Nachgeladen | Wert | LRU danach |
+|----|--------------------------|----------|-----|------------|----------------|----------|----------|
+| 1 | Load `0x2458` | | | | | | |
+| 2 | Load `0x1F64` | | | | | | |
+| 3 | Store 77 nach `0x0D1C` | | | | | | |
+| 4 | Load `0x3214` | | | | | | |
+| 5 | Load `0x0D1C` | | | | | | |
+| 6 | Load `0x2458` | | | | | | |
+
+```{=latex}
+\renewcommand{\arraystretch}{1}
+```
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
+
+**Ihre Lösung:**
+
+\vspace*{4cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
+**Musterlösung 7**
+
+Teil 1: Offset 4 Bit, Index 2 Bit, Tag $16-6=10$ Bit; Tag $=$ Adresse $\gg 6$. (1 P)
+
+| Adresse | Tag, Index, Offset binär | Tag | Index | Offset (Wort) |
+|---------|--------------------------|-----|-------|---------------|
+| `0x2458` | `0010010001 01 1000` | `0x091` | 1 | 8 (2) |
+| `0x1F64` | `0001111101 10 0100` | `0x07D` | 2 | 4 (1) |
+| `0x0D1C` | `0000110100 01 1100` | `0x034` | 1 | 12 (3) |
+| `0x3214` | `0011001000 01 0100` | `0x0C8` | 1 | 4 (1) |
+
+Blockadresse $=\text{Tag}\cdot64+\text{Index}\cdot16$: Set 1 `0x1210` und `0x2450`,
+Set 2 Weg 0 `0x3A60`. Set 2 Weg 1 ist ungültig. (1 P)
+
+Teil 2:
+
+| Nr. | Zugriff | Hit/Miss | Weg | Writeback | Nachgeladen | Wert | LRU danach |
+|----|--------------------------|----------|-----|------------|----------------|----------|----------|
+| 1 | Load `0x2458` | Hit | 1 | – | – | 99 | 0 |
+| 2 | Load `0x1F64` | Miss | 1 | – | `0x1F60` | 61 | 0 |
+| 3 | Store 77 nach `0x0D1C` | Miss | 0 | – | `0x0D10` | 77 | 1 |
+| 4 | Load `0x3214` | Miss | 1 | `0x2450` | `0x3210` | 51 | 0 |
+| 5 | Load `0x0D1C` | Hit | 0 | – | – | 77 | 1 |
+| 6 | Load `0x2458` | Miss | 1 | – | `0x2450` | 99 | 0 |
+
+Zwei Hits, vier Misses, ein Writeback. Tabelle 3 P. Zugriff 1 liefert 99 aus der
+schmutzigen Line, nicht 42 aus dem DRAM. Zugriff 2 trifft den passenden Tag bei
+V = 0: Miss, die Werte 5 bis 8 sind bedeutungslos. Zugriff 3 lädt den sauberen
+LRU-Weg 0 neu, schreibt 77 in Wort 3 und setzt D = 1. Zugriff 4 verdrängt den
+schmutzigen Weg 1; `0x2450` folgt aus altem Tag `0x091` und Index 1.
+Zugriff 6 lädt den zurückgeschriebenen Block und erhält wieder 99. (1 P)
+
+Teil 3:
+
+| Set | Weg | V | D | Tag | Wort 0 | Wort 1 | Wort 2 | Wort 3 |
+|-----|-----|---|---|-----|--------|--------|--------|--------|
+| 1 | 0 | 1 | 1 | `0x034` | 30 | 31 | 32 | 77 |
+| 1 | 1 | 1 | 0 | `0x091` | 40 | 41 | 99 | 43 |
+| 2 | 0 | 1 | 0 | `0x0E9` | 70 | 71 | 72 | 73 |
+| 2 | 1 | 1 | 0 | `0x07D` | 60 | 61 | 62 | 63 |
+
+In beiden Sets ist danach Weg 0 LRU. Im DRAM ändert sich nur `0x2458` von 42 auf 99.
+Veraltet ist `0x0D1C` mit 33, der Cache hält dort 77 mit D = 1. Write-Back schreibt
+erst beim Verdrängen zurück; zulässig, solange alle Zugriffe über diesen Cache laufen. (2 P)
 :::
 
 {{< pagebreak >}}
