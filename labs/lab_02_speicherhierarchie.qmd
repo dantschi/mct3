@@ -228,8 +228,109 @@ A zeilenweise, B spaltenweise. Keine anderen Zugriffe oder Optimierungen.
 
 {{< pagebreak >}}
 
-## Optional: am Rechner prüfen
+## Optional: Aufgabe 6 im Cache-Simulator Ripes
 
-Erzeugen Sie die beiden Adressspuren aus Aufgabe 6 in einem kurzen Programm.
-Vergleichen Sie sie mit einem verfügbaren Cache-Simulator bei 128 und 512 Byte.
-Zählen Sie ausschließlich diese Loads; dokumentieren Sie Anfangszustand und Einstellungen.
+Das folgende RV32I-Programm erzeugt die beiden Spuren aus Aufgabe 6.
+Die einzigen Datenzugriffe sind die 96 `lw`; `feld` liegt am Beginn des
+`.data`-Segments, in Ripes standardmäßig `0x10000000` statt `0x3000`.
+
+```asm
+# Ripes, RV32I: Spuren aus Aufgabe 6, uint32_t feld[12][8]
+# MODUS 0 = Spur A (zeilenweise), MODUS 1 = Spur B (spaltenweise)
+
+.data
+feld:   .zero 384           # 12 * 8 Elemente * 4 Byte
+
+.text
+main:
+        li   t0, 0          # MODUS hier umstellen: 0 = A, 1 = B
+        la   s0, feld       # erstes Element der Außenschleife
+        bnez t0, spur_b
+        li   s1, 12         # A: außen 12 Zeilen
+        li   s2, 8          #    innen 8 Spalten
+        li   s3, 32         #    außen +32 Byte: nächste Zeile
+        li   s4, 4          #    innen +4 Byte: nächstes Element
+        j    start
+spur_b:
+        li   s1, 8          # B: außen 8 Spalten
+        li   s2, 12         #    innen 12 Zeilen
+        li   s3, 4          #    außen +4 Byte: nächste Spalte
+        li   s4, 32         #    innen +32 Byte: nächste Zeile
+start:
+        li   a0, 0          # Summe aller Elemente
+aussen:
+        mv   t1, s0         # Adresse des ersten Elements
+        mv   t2, s2         # Zähler der Innenschleife
+innen:
+        lw   t3, 0(t1)      # einziger Datenzugriff
+        add  a0, a0, t3
+        add  t1, t1, s4
+        addi t2, t2, -1
+        bnez t2, innen
+        add  s0, s0, s3
+        addi s1, s1, -1
+        bnez s1, aussen
+        li   a7, 10         # Ecall exit: Programm beenden
+        ecall
+```
+
+**Cache-Simulation.** Ripes (Desktop oder [ripes.dk](https://ripes.dk/)),
+Prozessor *Single-cycle processor*, RISC-V 32 Bit: Pipeline-Modelle können
+beim Anhalten zusätzliche Zugriffe zählen. Ausgewertet wird nur der Datencache
+*L1 Data Cache*; der Befehlscache *L1 Instr. Cache* zählt die Befehlsabrufe.
+Ripes erwartet Sets, Ways und Words per Line als Exponent $N$ von $2^N$;
+ein Wort hat vier Byte. Ersetzung LRU, Wr. hit *Write-back*,
+Wr. miss *Write allocate* (ohne Wirkung, da das Programm nicht schreibt).
+Vor jedem Lauf MODUS setzen, Cache einstellen und *Reset* drücken;
+die Zähler stehen unter der Cache-Ansicht.
+
+| Lauf | MODUS | $N$: Sets, Ways, Words | Cache | Prognose: Hits, Misses | Ripes: Reads, Hits, Misses |
+|------|---------|-----------------|--------------------------|-------------------|-----------------------|
+| 1 | 0 = A | 2, 0, 3 | 128 Byte, Direct Mapped | | |
+| 2 | 1 = B | 2, 0, 3 | 128 Byte, Direct Mapped | | |
+| 3 | 1 = B | 4, 0, 3 | 512 Byte, Direct Mapped | | |
+| 4 | 1 = B | 1, 1, 3 | 128 Byte, 2-Way, LRU | | |
+
+1. Tragen Sie vor jedem Lauf Ihre Prognose aus Aufgabe 6 ein, danach die
+   Ripes-Zähler. Warum zeigt der Datencache genau 96 Reads?
+2. Lauf 2 im Einzeltakt (*Clock*): Notieren Sie für die ersten fünf Loads
+   Adresse, Set, Tag und Hit/Miss. Welche Arrayzeile verdrängt Zeile 0?
+   Warum trifft der erste Load der zweiten Spalte Zeile 0 nicht mehr an?
+3. Lauf 4 hat die Kapazität von Lauf 2, aber zwei Wege. Erklären Sie sein
+   Ergebnis im Vergleich zu Lauf 3: Konflikt oder fehlende Kapazität?
+4. Die Set-Indizes stimmen mit Aufgabe 6 überein, die Tags nicht. Warum?
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
+
+**Ihre Lösung:**
+
+\vspace*{3cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
+**Musterlösung (optional)**
+
+| Lauf | Reads | Hits | Misses | Hitrate |
+|------|-------|------|--------|---------|
+| 1 | 96 | 84 | 12 | 0,875 |
+| 2 | 96 | 0 | 96 | 0 |
+| 3 | 96 | 84 | 12 | 0,875 |
+| 4 | 96 | 0 | 96 | 0 |
+
+1. Nur die `lw` greifen auf Daten zu; `la` und `li` lesen keinen Speicher,
+   Befehlsabrufe zählt der Befehlscache. Writes und Writebacks bleiben null.
+2. `0x10000000`, `0x10000020`, `0x10000040`, `0x10000060`, `0x10000080`;
+   Sets 0, 1, 2, 3, 0; Tag (Adresse $\gg 7$) `0x200000` für Zeilen 0–3,
+   `0x200001` für Zeile 4; alle Miss. Zeile 4 verdrängt Zeile 0 aus Set 0,
+   danach belegt Zeile 8 dieses Set. Spalte 1 beginnt wieder bei Zeile 0: Miss.
+3. Eine Spalte berührt zwölf Lines, 128 Byte halten nur vier.
+   Im 2-Way-Cache wechseln sich je Set sechs Zeilen auf zwei Plätzen ab;
+   LRU verdrängt jede Zeile, bevor sie wiederkommt. Es fehlt Kapazität,
+   nicht Assoziativität. 512 Byte halten alle zwölf Zeilen: nur Pflicht-Misses.
+4. `0x3000` und `0x10000000` sind Vielfache von 512. Die unteren neun
+   Adressbits mit Offset und Index sind daher gleich, nur die Tagbits
+   unterscheiden sich, bei 128 Byte etwa `0x60` statt `0x200000` für Zeile 0.
+:::
