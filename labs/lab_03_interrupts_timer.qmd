@@ -10,246 +10,265 @@ highlight-style: ../assets/styles/dhbw-code.theme
 > **Musterlösung**
 :::
 
-## Aufgabe 1: Eine externe Trap-Anforderung (6 Punkte)
+## Aufgabe 1: Drehgeber abfragen (4 Punkte)
 
-RV32-Lehrmodell: ein Hart im Machine Mode, keine Delegation und zunächst kein Nesting.
-Vor dem Eintritt sind globale MIE- und externe MEIE-Freigabe eins.
-`mcause` erhält `0x8000000B`.
+Eine Hauptschleife beobachtet einen Drehgeberstatus alle $400\,\mu$s.
+Die Anforderung lautet: Ereignisse innerhalb von $120\,\mu$s erkennen.
+Weitere Verzögerungen werden zunächst vernachlässigt.
 
-1. Trennen Sie Interrupt-Bit und Cause-Code. Was unterscheidet den Wert von `0x00000002`? (2 P)
-2. Geben Sie MIE und MPIE nach Eintritt sowie MIE nach korrektem mret an.
-   Wer sichert die benötigten allgemeinen Register? (2 P)
-3. Später wartet eine Timeranforderung bei MTIE null und MIE eins.
-   Wird sie angenommen? Läuft mtime weiter? (2 P)
-
-MIE: globale Freigabe, MPIE: gespeicherte vorherige Freigabe;
-MEIE/MTIE: externe/Timerfreigabe. Ein Hart ist ein Hardware-Ausführungskontext.
+1. Skizzieren Sie den ungünstigsten Ereigniszeitpunkt zwischen zwei Abfragen.
+   Ist die Frist garantiert? Begründen Sie mit einer Zeitgrenze. (2 P)
+2. Der Eingang liefert nur einen ungespeicherten $30\,\mu$s-Impuls.
+   Garantieren Abfragen alle $100\,\mu$s dessen Erkennung? (1 P)
+3. Hardware speichert stattdessen ein Bereitschaftsbit bis zur Bearbeitung.
+   Drei Impulse treffen vorher ein. Welche Information bleibt erhalten,
+   welche nicht? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
 
-**Ihre Lösung:**
+**Ihre Zeitachse und Begründung:**
 
 \vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
+\Needspace{5\baselineskip}
 
 **Musterlösung 1**
 
-1. Interrupt-Bit eins, Code elf: Machine External Interrupt.
-   `0x00000002` ist eine synchrone Illegal-Instruction-Exception. (2 P)
-2. Eintritt: MIE null, MPIE eins. mret stellt MIE aus MPIE wieder auf eins.
-   Software sichert die nötigen allgemeinen Register. (2 P)
-3. Kein Timer-Trap ohne MTIE. Die Zeitquelle läuft weiter. (2 P)
+1. Abfragen bei null und $400\,\mu$s, Ereignis unmittelbar nach null.
+   Die Wartezeit kann nahezu $400\,\mu$s betragen: $120\,\mu$s sind nicht garantiert. (2 P)
+2. Nein. Ein $30\,\mu$s-Impuls kann vollständig zwischen zwei Beobachtungen liegen. (1 P)
+3. Erhalten bleibt „mindestens ein Ereignis“. Die Anzahl drei und zugehörige
+   einzelne Daten sind aus diesem Bit allein nicht rekonstruierbar. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 2: Neue Vektorbasis (5 Punkte)
+## Aufgabe 2: Eintritt und Fortsetzung (6 Punkte)
 
-`BASE = 0x80400200`, mtvec-Modus Vectored mit MODE eins;
-die Basis erfüllt die Ausrichtung des Modells.
+RV32-Lehrmodell: ein Hart im Machine Mode, keine Weiterleitung an andere
+Privilegstufen und keine verschachtelten Interrupts.
+Ein Hart ist ein Hardware-Ausführungskontext.
+Bei einem Trap erhält `mcause` den Wert `0x8000000B`.
+Bit 31 unterscheidet Interrupt und Exception, Code elf bezeichnet Machine External.
 
-1. Bestimmen Sie den mtvec-Registerwert. (1 P)
-2. Bestimmen Sie die Einsprünge für Interrupt-Codes sieben und elf
-   sowie eine Exception mit Code zwei. (3 P)
-3. Eine externe PLIC-Quelle hat Geräte-ID elf. Bedeutet die Gleichheit mit dem Cause-Code,
-   dass Claim entfallen darf? Begründen Sie. (1 P)
-
-Ein Vektorslot enthält einen ausführbaren Befehl, keinen automatisch geladenen Zeiger.
+1. Was sagt der Rohwert aus? Ist damit bereits eine externe Geräte-ID bekannt? (2 P)
+2. In einem separaten Zustand wartet eine Timeranforderung.
+   Timerfreigabe MTIE ist eins, globale Freigabe MIE null.
+   Wird der Timer-Trap angenommen? Läuft die Hardwarezeit weiter? (2 P)
+3. Welche Seite erhält jeweils den Zustand: Hardware oder Software?
+   Gesucht sind die Fortsetzungsadresse in `mepc` und ein vom Handler
+   verändertes, im Hauptprogramm noch benötigtes allgemeines Register. (1 P)
+4. Vectored-Modus: BASE `0x80400400`, Interrupt-Code elf.
+   Berechnen Sie den ersten Einsprung mit $\mathrm{BASE}+4c$. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
 
-**Ihre Lösung:**
+**Ihre Zustände und Einsprungadresse:**
 
 \vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
+\Needspace{5\baselineskip}
 
 **Musterlösung 2**
 
-1. `0x80400201`. (1 P)
-2. Interrupt sieben: `0x8040021C`, Interrupt elf: `0x8040022C`,
-   Exception: `0x80400200`. Für Interrupts gilt BASE plus viermal Cause,
-   für Exceptions die Basis. (3 P)
-3. Nein: Cause bezeichnet die Kategorie, Claim liefert die konkrete wartende Geräte-ID. (1 P)
+1. Interrupt-Bit eins, Code elf: externe Maschinen-Interruptkategorie.
+   Die konkrete Geräte-ID fehlt und wird erst per Controller-Claim ermittelt. (2 P)
+2. Kein betrachteter Timer-Trap bei MIE null. Die Zeitquelle läuft weiter. (2 P)
+3. Hardware hält die Fortsetzungsadresse in `mepc` fest.
+   Software muss das benötigte allgemeine Register sichern und wiederherstellen. (1 P)
+4. $4\cdot11=44=\mathtt{0x2C}$ Byte, Einsprung `0x8040042C`.
+   Auch dort muss noch die externe Gerätequelle ausgewählt werden. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 3: Zeitquelle und Halbwörter (5 Punkte)
+## Aufgabe 3: Gerätebehandlung vollständig machen (6 Punkte)
 
-mtime zählt mit zwölf MHz, ein Intervall soll $2{,}5$ ms dauern.
-mtime und mtimecmp sind 64 Bit breit; RV32-Zugriffe umfassen je 32 Bit.
-Little Endian und starke Gerätezugriffsordnung sind vorgegeben.
-
-1. Bestimmen Sie die Tickzahl. Ändert eine CPU-Frequenz von 96 MHz dieses Ergebnis? (1 P)
-2. Beim Überlauf ändern sich die Halbwörter wie folgt (hexadezimal).
-   HI wird vorher als drei gelesen, LO danach als null.
-   Welcher Mischwert entsteht? Wie erkennt HI–LO–HI den Fehler? (2 P)
-
-   | Zustand | HI | LO |
-   |---------|----|----|
-   | vorher | `00000003` | `FFFFFFFF` |
-   | nachher | `00000004` | `00000000` |
-
-3. Bestimmen Sie für folgende Werte den Zwischenvergleich bei neuem LO zuerst.
-   Geben Sie die geeignete Dreischrittfolge an. Beide Halbwörter sind hexadezimal. (2 P)
-
-   | Wert | HI | LO |
-   |------|----|----|
-   | alter Vergleich | `00000003` | `FFFFFFC0` |
-   | neuer Vergleich | `00000004` | `00000060` |
-   | aktuelle Zeit | `00000003` | `FFFFFF00` |
-
-::: {.content-hidden when-profile="solution"}
-\Needspace{8\baselineskip}
-
-**Ihre Lösung:**
-
-\vspace*{3cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
-
-**Musterlösung 3**
-
-1. $12\cdot10^6\cdot0{,}0025=30000$ Ticks, unabhängig von der separat vorgegebenen CPU-Frequenz. (1 P)
-2. Mischwert `0x00000003_00000000`. HI wechselt von drei auf vier;
-   bei ungleichen HI-Lesungen wird der Versuch wiederholt. (2 P)
-3. LO zuerst erzeugt `0x00000003_00000060`, kleiner als die aktuelle Zeit.
-   Stattdessen LO `FFFFFFFF`, HI vier, LO `00000060` schreiben.
-   Die Zwischenvergleiche liegen hier in der Zukunft. (2 P)
-:::
-
-{{< pagebreak >}}
-
-## Aufgabe 4: Ein 2,5-ms-Sollraster (5 Punkte)
-
-Zwölf MHz Zeitquelle, Periode 30000 Ticks, nächster Solltermin 240000.
-Kein Zählerumlauf oder arithmetischer Überlauf.
-
-1. Behandlung bei now 249000: Vergleichen Sie now plus Periode
-   mit dem nächsten absoluten Solltermin, jeweils in Ticks und ms. (2 P)
-2. Separat now 346000: Wie viele Solltermine sind fällig?
-   Welcher nächste Termin liegt strikt in der Zukunft? (2 P)
-3. Warum ist die Zahl der Handleraufrufe kein sicherer Zähler verstrichener Perioden? (1 P)
-
-::: {.content-hidden when-profile="solution"}
-\Needspace{8\baselineskip}
-
-**Ihre Lösung:**
-
-\vspace*{3cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
-
-**Musterlösung 4**
-
-1. Relativ 279000 Ticks $=23{,}25$ ms; absolut 270000 Ticks $=22{,}5$ ms.
-   Relative Planung übernimmt die Verspätung. (2 P)
-2. $k=\lfloor(346000-240000)/30000\rfloor+1=4$;
-   nächster Termin 360000 Ticks $=30$ ms. Fällig sind 20, 22,5, 25 und 27,5 ms. (2 P)
-3. Pending ist kein Ereigniszähler; versäumte Perioden können zusammenfallen,
-   und eine Anzeigeänderung kann verzögert sichtbar werden. (1 P)
-:::
-
-{{< pagebreak >}}
-
-## Aufgabe 5: PLIC mit unsortierten Geräte-IDs (6 Punkte)
-
-Ein Kontext, alle Quellen freigegeben und anfangs pending:
+Ein PLIC-Kontext, alle Quellen wartend und freigegeben, Schwellenwert null.
+PLIC bedeutet Platform-Level Interrupt Controller.
+Höhere Priorität gewinnt, bei Gleichstand die kleinere Geräte-ID.
 
 | ID | Quelle | Priorität |
 |----|--------|-----------|
-| 9 | UART | 4 |
+| 9 | serielle Schnittstelle | 4 |
 | 12 | Beschleunigungssensor | 8 |
 | 5 | Drehgeber | 8 |
 
-Threshold sechs. Bei gleicher Priorität gewinnt die kleinere ID.
-Explizite Claims werden nicht vom Threshold gefiltert.
-
-1. Besteht eine Benachrichtigung? Welche ID wird zuerst geliefert? (2 P)
-2. Führen Sie vier Claims aus. Nach jeder Nichtnull-ID werden Geräteursache und
-   Complete vollständig bearbeitet; keine neuen Ereignisse.
-   Notieren Sie ID, noch wartende Quellen und Benachrichtigung nach jedem Schritt. (2 P)
-3. Was bedeutet ID null? Was droht bei Complete ohne Behandlung einer weiterhin aktiven Level-Ursache? (2 P)
+1. Nennen Sie die ersten beiden Claim-IDs. Nach jedem Claim wird vollständig
+   behandelt und abgeschlossen; keine neuen Ereignisse. Begründen Sie. (2 P)
+2. Was ändert Claim am Controller? Ist damit die Ursache im Gerät beseitigt? (1 P)
+3. Ein fehlerhafter Handler führt nur Claim und Complete aus.
+   Das Gerät hält seine Level-Anforderung weiter aktiv.
+   Ergänzen Sie den fehlenden Schritt und erklären Sie die mögliche Folge. (2 P)
+4. Ein späterer Claim liefert null. Welche Gerätebearbeitung und welches
+   Complete sind dann vorgesehen? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
 
-**Ihre Lösung:**
+**Ihre Reihenfolge und korrigierte Behandlungskette:**
 
 \vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
+\Needspace{5\baselineskip}
+
+**Musterlösung 3**
+
+1. ID fünf, danach zwölf. Beide haben Priorität acht, im Gleichstand gewinnt fünf. (2 P)
+2. Claim übernimmt eine Quelle und löscht atomar deren PLIC-Pending.
+   Die Geräteursache kann weiter bestehen. (1 P)
+3. Zwischen Claim und Complete Daten beziehungsweise Status nach Gerätevertrag
+   bearbeiten und die Ursache passend quittieren. Eine weiter aktive
+   Level-Ursache kann nach Complete erneut gemeldet werden. (2 P)
+4. Keine Gerätebearbeitung und kein Complete für ID null. (1 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 4: Ein 2,5-ms-Sollraster (7 Punkte)
+
+Hardwarezeit `mtime`: zwölf MHz, Prozessortakt: 96 MHz.
+Sollperiode $2{,}5$ ms, nächster Solltermin $d=240000$ Timer-Ticks.
+`mtimecmp` enthält den Vergleichstermin. Zeitwerte werden konsistent gelesen
+und geschrieben; kein Zählerumlauf oder arithmetischer Überlauf.
+
+1. Bestimmen Sie die Sollperiode in Timer-Ticks.
+   Würde eine Änderung nur des Prozessortakts auf 48 MHz diesen Wert ändern? (2 P)
+2. Die Behandlung beginnt bei now $249000$.
+   Vergleichen Sie now plus Periode mit dem nächsten absoluten Rastertermin,
+   jeweils in Ticks und Millisekunden. (2 P)
+3. Separat now $346000$: Wie viele Solltermine sind fällig?
+   Welcher nächste Termin liegt auf dem Raster und strikt in der Zukunft? (2 P)
+4. Der Sensor hält nur seinen neuesten Messwert bereit.
+   Lassen sich die verpassten historischen Messwerte durch unmittelbar
+   wiederholtes Lesen nachholen? Begründen Sie. (1 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
+
+**Ihre Zeitrechnung und Entscheidung:**
+
+\vspace*{3cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{5\baselineskip}
+
+**Musterlösung 4**
+
+1. $12\cdot10^6\cdot0{,}0025=30000$ Ticks.
+   Die separat vorgegebene Timerfrequenz bleibt unverändert. (2 P)
+2. Relativ: $249000+30000=279000$ Ticks $=23{,}25$ ms.
+   Absolut: $240000+30000=270000$ Ticks $=22{,}5$ ms.
+   Die relative Planung übernimmt die Eintrittsverspätung. (2 P)
+3. $k=\lfloor(346000-240000)/30000\rfloor+1=4$.
+   Fällig sind 20, 22,5, 25 und 27,5 ms.
+   Nächster Termin: $240000+4\cdot30000=360000$ Ticks $=30$ ms. (2 P)
+4. Nein. Wiederholtes aktuelles Lesen rekonstruiert keine zuvor ungespeicherten
+   Werte. Erforderlich wäre ihre rechtzeitige Erfassung und Speicherung. (1 P)
+:::
+
+{{< pagebreak >}}
+
+## Aufgabe 5: Zwei verschiedene Reaktionsfristen (4 Punkte)
+
+1. Prozessor 80 MHz, 500 vollständige ISR pro Sekunde,
+   je 640 Prozessorzyklen einschließlich Ein- und Austritt.
+   Berechnen Sie Dauer und mittleren Prozessorzeitanteil. (2 P)
+2. Separates Reaktionsmodell: Bis zum Beginn einer eigenen Behandlung
+   fallen höchstens $60\,\mu$s Blockierung und $4\,\mu$s Eintritt an.
+   Das Sichern der Daten benötigt weitere $6\,\mu$s.
+   Die spätere Auswertung wartet höchstens $120\,\mu$s und dauert $40\,\mu$s.
+   Zeichnen Sie die Zeitkette. Wann sind Daten gesichert, wann ist das Ergebnis fertig? (1 P)
+3. Für welchen dieser Endpunkte ist eine Frist von $100\,\mu$s eingehalten?
+   Erklären Sie, warum der mittlere Zeitanteil aus Teil 1 allein nicht genügt. (1 P)
+
+ISR bedeutet Interrupt Service Routine. Alle Zeiten sind Lehrannahmen;
+zusätzliche Verzögerungen sind im jeweiligen Modell ausgeschlossen.
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{8\baselineskip}
+
+**Ihre Rechnungen und Zeitkette:**
+
+\vspace*{3cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{5\baselineskip}
 
 **Musterlösung 5**
 
-1. Ja, acht ist größer als sechs. Zuerst ID fünf wegen des Gleichstands mit zwölf. (2 P)
-
-| Claim | ID | Danach pending | Benachrichtigung |
-|-------|----|----------------|------------------|
-| 1 | 5 | 9, 12 | ja |
-| 2 | 12 | 9 | nein |
-| 3 | 9 | keine | nein |
-| 4 | 0 | keine | nein |
-
-Tabelle 2 P. ID null: kein Handler und kein Complete mit null.
-Eine weiter aktive Level-Ursache kann erneut gemeldet werden. (2 P)
+1. $640/(80\cdot10^6)=8\,\mu$s.
+   $500\cdot8\,\mu\mathrm{s}/\mathrm{s}=0{,}004=0{,}4\,\%$. (2 P)
+2. Daten gesichert nach $60+4+6=70\,\mu$s.
+   Ergebnis fertig nach $70+120+40=230\,\mu$s. (1 P)
+3. Nur die Datensicherung erfüllt $100\,\mu$s.
+   Mittlere Auslastung begrenzt weder maximale Blockierung noch spätere Wartezeit. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 6: Umlauf und verschachtelter Kontext (5 Punkte)
+## Aufgabe 6: Ereignisse sicher übernehmen (5 Punkte)
 
-1. Ein 32-Bit-Millisekundenzähler wechselt von last `0xFFFFFFD8`
-   zu now `0x00000018`. Bestimmen Sie die Differenz und ihre Gültigkeitsgrenze. (1 P)
-2. Hauptprogramm liest Flag eins; eine ISR setzt erneut eins;
-   danach löscht das Hauptprogramm auf null. Bleibt der zweite Hinweis erhalten?
-   Hilft volatile allein? (1 P)
-3. Für ISR-Frames sind 360 Byte verfügbar, ein Frame braucht 72 Byte.
-   Wie viele Frames passen? Andere Stacknutzung ist bereits abgezogen. (1 P)
-4. Äußerer Trap: mepc `0x80403000`. Vor Sicherung wird erneut freigegeben;
-   innerer Trap überschreibt mepc mit `0x80404120`.
-   Welche Information fehlt, und was ist vor Wiederfreigabe nötig? (2 P)
+Ein Hart, keine verschachtelten Interrupts. Ein Zähler hält die Anzahl
+noch zu bearbeitender Ereignisse fest und steht anfangs auf zwei.
+Einzelne Wortzugriffe sind im Plattformmodell unteilbar, die folgende Gesamtfolge nicht.
+
+| Schritt | Hauptprogramm | ISR |
+|---------|---------------|-----|
+| 1 | liest Zähler zwei in einen lokalen Merker | |
+| 2 | | erhöht den Zähler auf drei |
+| 3 | beendet ein Ereignis und schreibt Merker minus eins zurück | |
+
+1. Welcher Zählerstand entsteht, welcher wäre nach einem bearbeiteten Ereignis richtig?
+   Behebt `volatile` allein den Fehler? (1 P)
+2. Skizzieren Sie stattdessen eine kurze geschützte Folge, die den gesamten
+   Zählerstand lokal übernimmt und den gemeinsamen Zähler auf null setzt.
+   Wo liegt die längere Verarbeitung? (2 P)
+3. Warum wird danach der vorherige Freigabestand wiederhergestellt,
+   statt grundsätzlich alle Interrupts einzuschalten? (1 P)
+4. Die Anforderung ändert sich: Alle einzelnen Messwerte müssen erhalten bleiben.
+   Reicht ein Ereigniszähler? Begründen Sie die benötigte Datenablage. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
 
-**Ihre Lösung:**
+**Ihr korrigierter Ablauf und seine Grenzen:**
 
 \vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
+\Needspace{5\baselineskip}
 
 **Musterlösung 6**
 
-1. $40+24=64$ ms modulo $2^{32}$. Kein ganzer unbemerkter Umlauf darf dazwischenliegen. (1 P)
-2. Der neue Hinweis geht beim Löschen verloren; volatile macht die Gesamtfolge nicht atomar. (1 P)
-3. $360/72=5$ Frames. (1 P)
-4. Die äußere Fortsetzungsadresse `0x80403000` fehlt.
-   Benötigten allgemeinen und Trap-Kontext vor Wiederfreigabe sichern;
-   Quellen, Tiefe und Stackbudget begrenzen. (2 P)
+1. Es entsteht eins statt zwei: Ein Ereignis geht in der Zählung verloren.
+   `volatile` macht die mehrschrittige Änderung nicht atomar. (1 P)
+2. Vorherigen Freigabestand sichern, betreffende Interrupts sperren,
+   Zähler lokal übernehmen und auf null setzen, Freigabestand wiederherstellen.
+   Die lokal übernommene Anzahl wird danach außerhalb der Sperre verarbeitet. (2 P)
+3. Eine bereits zuvor gewollte Sperre darf nicht unerwartet aufgehoben werden. (1 P)
+4. Nein. Ein Zähler erhält nur die Anzahl, nicht die Werte.
+   Benötigt wird ein ausreichend großer Datenpuffer mit konsistenter Übergabe
+   und einer Regel für Überlast beziehungsweise Überlauf. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Optional: am Rechner prüfen
+## Optional: Terminrechnung als C-Funktion prüfen
 
 Implementieren Sie die Zukunftsterminrechnung aus Aufgabe 4 als reine C-Funktion.
 Prüfen Sie bei Starttermin 240000 und Periode 30000 die now-Werte
 239999, 240000 und 346000. Erwartet: 240000, 270000 und 360000.
-Ein Simulator ist dafür nicht nötig.
+Ein Simulator ist dafür nicht nötig. Die Hardwarezugriffe aus den Vertiefungsfolien
+sind keine Voraussetzung für diese Prüfung.

@@ -154,12 +154,69 @@ def nesting():
     p += [text(20,310,"Rückkehr: innen → außen → Main; Register und Status ebenfalls erhalten.",24)]
     save("nesting",335,p,"Überschriebenes mepc und die nötigen getrennten Sicherungsrahmen.")
 
+def event_capture():
+    p=[text(20,30,"Ereignisse, gespeicherter Zustand und spätere Beobachtung",25)]
+    p += [text(20,105,"Impulse",24),text(20,195,"Bereitschaft",24)]
+    pulse_path="M200,110 H300 V65 H330 V110 H480 V65 H510 V110 H600 V65 H630 V110 H950"
+    p += [f'<path d="{pulse_path}" fill="none" stroke="{RED}" stroke-width="3"/>']
+    p += [f'<path d="M200,205 H300 V160 H950" fill="none" stroke="{INK}" stroke-width="3"/>',
+          text(240,195,"0",22,"middle"),text(400,150,"1",22,"middle"),
+          f'<path d="M850,50 V225" stroke="{MUTED}" stroke-width="2" stroke-dasharray="5 5"/>',
+          text(850,280,"Status lesen: 1",24,"middle"),
+          arrow(200,240,950,240),text(950,225,"Zeit",23,"end"),
+          text(20,325,"Das Bit erhält einen Hinweis; die Zahl der Impulse bleibt unbekannt.",24)]
+    save("event-capture",350,p,"Drei Ereignisse ergeben in einem Bereitschaftsbit nur einen gespeicherten Hinweis.")
+
+def timer_vs_external():
+    p=[box(20,35,350,80),text(195,68,"Timer",26,"middle"),
+       text(195,99,"mtime / mtimecmp",24,"middle"),
+       box(20,180,350,90),text(195,215,"UART 1 · Sensor 2 · Taster 3",23,"middle"),
+       text(195,250,"externe Geräte-IDs",23,"middle"),
+       box(450,180,160,90),text(530,235,"PLIC",28,"middle"),
+       box(780,35,200,235),text(880,77,"Hart",29,"middle"),
+       text(880,123,"Kategorie 7",23,"middle"),text(880,234,"Kategorie 11",23,"middle"),
+       '<path d="M370,75 H690 V110 H780" fill="none" stroke="'+MUTED+'" stroke-width="2" marker-end="url(#arrow)"/>',
+       arrow(370,225,450,225),arrow(610,225,780,225),
+       text(560,52,"Timer-Anforderung",23,"middle"),text(690,205,"extern",22,"middle"),
+       f'<path d="M880,270 V325 H530 V270" fill="none" stroke="{MUTED}" stroke-width="2" marker-end="url(#arrow)"/>',
+       text(20,350,"Software fragt zusätzlich:",23),text(705,365,"Claim → konkrete Geräte-ID",24,"middle",RED)]
+    save("timer-vs-external",390,p,"Timerkategorie und externe Sammelkategorie sind von der Geräte-ID aus Claim getrennt.")
+
+def response_budget():
+    # A single linear time axis: x=100+5*t, t in microseconds.
+    p=[text(20,30,"Zwei Endpunkte derselben Ereignisbehandlung",25)]
+    segments=[(0,40,"1",BG),(40,5,"2",HAIR),(45,8,"3",BG),
+              (53,80,"4",BG),(133,30,"5",HAIR)]
+    for start,duration,label,fill in segments:
+        x=100+5*start
+        p += [f'<rect x="{x}" y="85" width="{5*duration}" height="60" fill="{fill}" stroke="{MUTED}"/>',
+              text(x+2.5*duration,123,label,22,"middle")]
+    p += [arrow(100,175,945,175)]
+    for t in (0,40,53,133,163):
+        x=100+5*t
+        p += [line(x,170,x,180),text(x,208,t,22,"middle")]
+    for t,label,anchor in [(53,"Daten gesichert","start"),(163,"Ergebnis fertig","end")]:
+        x=100+5*t
+        p += [line(x,72,x,155,RED),text(x,65,label,23,anchor,RED)]
+    p += [text(100,245,"Zeit ab Ereignis [µs]",23),
+          text(20,295,"1  Blockierung: 40 µs",23),text(365,295,"2  Eintritt: 5 µs",23),
+          text(670,295,"3  Sicherung: 8 µs",23),
+          text(20,335,"4  Warten auf Hauptprogramm: 80 µs",23),text(600,335,"5  Auswertung: 30 µs",23)]
+    save("response-budget",365,p,"Datensicherung nach 53 Mikrosekunden und fertige Auswertung nach 163 Mikrosekunden.")
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--png",action="store_true")
     parser.add_argument("--chromium",default="/usr/bin/chromium")
+    builders={"poll-vs-irq":poll,"trap-state":trap,"two-levels":levels,"mtvec":mtvec,
+              "timer-gates":timer,"hi-lo":hilo,"tick-drift":drift,"plic-table":plic,
+              "claim":claim,"foreground":foreground,"nesting":nesting,
+              "event-capture":event_capture,"timer-vs-external":timer_vs_external,
+              "response-budget":response_budget}
+    parser.add_argument("--only",nargs="+",choices=builders,
+                        help="Nur die benannten Abbildungen erzeugen")
     args=parser.parse_args()
-    for build in (poll,trap,levels,mtvec,timer,hilo,drift,plic,claim,foreground,nesting):build()
+    for name in args.only or builders:builders[name]()
     if args.png:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
