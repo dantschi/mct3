@@ -7,8 +7,8 @@
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
 <link href="../site_libs/quarto-html/light-border.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
-  <meta name="generator" content="quarto-1.10.19">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-17888a1159294d3eb470f19f6f52f5a5.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.10.20">
 
   <meta name="author" content="Prof.&nbsp;Dr.-Ing. Daniel Klünder">
   <title>Mikrocomputertechnik 3 – 03 · Interrupts &amp; Timer</title>
@@ -225,6 +225,8 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 </ul>
 <p>Zwei Minuten zu zweit: Vorschlag und fehlende Annahme nennen.</p>
 <aside class="notes">
+<p>Ein Mikrocontroller wertet gerade 4 ms lang alte Messdaten aus. Währenddessen meldet sein ADC einen neuen Wert, der nach 100 µs überschrieben wird. Wie kommt dieser Wert rechtzeitig in den Speicher?</p>
+<p>ADC bedeutet Analog-to-Digital Converter, Analog-Digital-Umsetzer. Er wandelt ein analoges Eingangssignal in einen digitalen Messwert um.</p>
 <p>Beginnen Sie mit der Diskussion, bevor Sie Interruptregister erklären. Die Studierenden kennen aus den bisherigen Einheiten Prozessor, Geräteadressen und unterschiedlich schnelle Speicherzugriffe. Sie sollen diese Kenntnisse anwenden und erkennen, welche Information für eine zeitliche Zusage noch fehlt. Die Zahlen beschreiben ein Lehrszenario, keine gemessene Plattform. Die Frist endet beim Sichern der Daten aus dem Gerät, nicht erst nach ihrer vollständigen Auswertung.</p>
 <p>Eine Verdopplung der Rechengeschwindigkeit verkürzt die vier Millisekunden im idealisierten Fall auf zwei Millisekunden. Eine Abfrage erst nach dieser Rechnung käme im ungünstigen Fall weiterhin deutlich später als hundert Mikrosekunden. Ein schnellerer Cache beantwortet ebenfalls nicht, an welcher Programmstelle die nächste Abfrage stattfindet. Periodisches Prüfen, eine Unterbrechung oder eine hardwaregestützte Übernahme sind mögliche Vorschläge, deren Voraussetzungen erst untersucht werden müssen.</p>
 <p>Fragen Sie nach dem genauen Ablauf: Bleiben Daten und Bereitschaft gespeichert? Kann die Rechnung unterbrochen werden? Was passiert bei einem zweiten Messwert? Sammeln Sie mehrere begründete Ansätze. Die endgültige Entscheidung wird am Ende erneut aufgegriffen. Der Einstieg soll vorhandene Vorstellungen sichtbar machen und keine noch unbekannten Registernamen verlangen.</p>
@@ -288,17 +290,24 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 </section>
 <section id="vorkenntnisse-und-lehrmodell" class="slide level2">
 <h2>Vorkenntnisse und Lehrmodell</h2>
-<ul>
-<li>Aus Vorlesung 1–2: Geräteadressen, Speicherzugriffe und Cache-Kopien</li>
-<li>Aus der Programmierung: C-Zeiger, Bits und einfache Schleifen</li>
-<li>RV32: RISC-V mit <span class="math inline">\(32\)</span>-Bit-Integerregistern</li>
-<li>Ein Hart im Machine Mode, ohne verschachtelte Interrupts</li>
-</ul>
+<div style="font-size: 0.9em; text-align: left;">
+<p><strong>Was Sie mitbringen</strong><br>
+Geräteadressen, Speicherzugriffe und Cache-Kopien (VL 1–2)<br>
+C-Zeiger, Bitoperationen, einfache Schleifen<br>
+STM32-Timer mit Prescaler, ARR und CNT aus dem Labor</p>
+<p><strong>Vereinfachungen dieser Vorlesung (neu)</strong><br>
+RV32: RISC-V mit <span class="math inline">\(32\)</span>-Bit-Registern<br>
+Ein Hart: genau ein Befehlsstrom, vereinfacht ein Prozessorkern<br>
+Machine Mode: höchste Privilegstufe mit vollem Zugriff auf Prozessor und Geräte<br>
+Keine Verschachtelung: Eine laufende Interruptbehandlung wird nicht von weiteren Interrupts unterbrochen</p>
 <p>Geräteadressen und Timerfrequenzen sind plattformabhängig.</p>
+</div>
 <aside class="notes">
-<p>Ein Hart ist ein Hardware-Ausführungskontext eines RISC-V-Prozessors. RV32 bezeichnet zweiunddreißig Bit breite Integerregister. Machine Mode ist die Maschinenprivilegstufe. Hauptprogramm und Unterbrechungsbehandlung laufen im Modell auf demselben Hart in dieser Stufe. Es gibt keine Weiterleitung an andere Privilegstufen und zunächst keine Verschachtelung: Eine laufende Interruptbehandlung wird nicht von einer weiteren der betrachteten Interruptanforderungen unterbrochen.</p>
-<p>Die Gerätezugriffe knüpfen an Memory-Mapped Input/Output an, Ein- und Ausgabe über Geräteadressen aus Vorlesung 1. Caches aus Vorlesung 2 erklären Zugriffskosten, ersetzen aber weder eine Gerätebenachrichtigung noch die Eigenschaften eines Statusregisters. Lesen eines Geräts kann anders als Lesen eines Arrays einen Seiteneffekt besitzen.</p>
-<p>Der Hauptteil verwendet einen klassischen lokalen Timer und einen externen Interruptcontroller. Deren Namen und Aufgaben werden erst bei Bedarf eingeführt. Die Beispiele sind ausdrücklich Lehrmodelle mit angegebenen Frequenzen und Zuständen. Eine konkrete Firmware benötigt zusätzlich die Plattformbeschreibung und geprüfte Gerätezugriffe. Es wird hier keine ausgeführte RISC-V-Firmware vorausgesetzt. So bleibt der Gedankengang ohne Kenntnisse späterer Vorlesungen oder einer bestimmten Laborplatine nachvollziehbar.</p>
+<p>Die Folie trennt vorhandenes Wissen von den neuen Modellannahmen. VL bedeutet Vorlesung. Aus den Vorlesungen 1–2 werden Geräteadressen, Speicherzugriffe und Cache-Kopien vorausgesetzt. Aus der C-Programmierung benötigen wir Zeiger als gespeicherte Adressen, Bitoperationen zum Prüfen oder Ändern einzelner Bits und einfache Schleifen. Gerätezugriffe knüpfen an Memory-Mapped Input/Output an, Ein- und Ausgabe über Geräteadressen. Ein Gerätestatus kann beim Lesen einen Seiteneffekt besitzen; eine Cache-Kopie ist kein Ersatz für dessen Benachrichtigung.</p>
+<p>Aus dem Labor sind außerdem STM32-Timer mit Prescaler, dem Vorteiler, ARR, Auto-Reload Register, und CNT, Counter, bekannt. ARR legt im betrachteten Aufwärtszählbetrieb die Periodengrenze fest, CNT enthält den laufenden Zählwert. Daran knüpfen wir den Unterschied zwischen einer von Hardware wiederholten Periode und einem einzeln programmierten Vergleichstermin an. Der frei laufende Output-Compare-Betrieb mit Vergleichsereignissen wird als Brücke erklärt und nicht als bereits beherrschte Voraussetzung verlangt.</p>
+<p>RV32, Hart und Machine Mode sind hier neue Begriffe. RV32 bezeichnet die RISC-V-Variante mit zweiunddreißig Bit breiten allgemeinen Integerregistern; daraus folgt nicht, dass jedes Geräte- oder Timerregister ebenfalls nur zweiunddreißig Bit breit ist. Ein Hart ist ein Hardware-Ausführungskontext mit einem eigenen Befehlsstrom. Für unser Ein-Hart-Modell genügt die Vorstellung eines einzelnen Prozessorkerns. Allgemein kann ein physischer Kern mehrere solche Ausführungskontexte besitzen. Hauptprogramm und Unterbrechungsbehandlung laufen hier nacheinander auf demselben Hart.</p>
+<p>Machine Mode ist die höchste RISC-V-Privilegstufe. Im Lehrmodell haben Hauptprogramm und Behandlung dort vollen Zugriff auf die benötigten Prozessorregister und Geräte; andere Privilegstufen und zusätzliche Zugriffsbeschränkungen werden nicht modelliert. Eine Weiterleitung der Behandlung an andere Privilegstufen betrachten wir ebenfalls nicht. Keine Verschachtelung bedeutet: Eine laufende Interruptbehandlung wird nicht von einem weiteren der betrachteten maskierbaren Interrupts unterbrochen. Neue Anforderungen können trotzdem entstehen und warten. Synchrone Exceptions, Ausnahmen durch den gerade ausgeführten Befehl, sind damit nicht ausgeschlossen; die Unterscheidung wird später erklärt.</p>
+<p>Die konkreten Geräteadressen und die Frequenz der Timerzeitquelle liefert die jeweilige Plattform, nicht allein der Name RISC-V. Alle Zahlenbeispiele bleiben ausdrücklich Lehrannahmen. Eine reale Firmware benötigt passende Gerätezugriffe und eine Plattformbeschreibung; ihre Ausführung wird hier nicht vorausgesetzt. So können wir zunächst den Ereignis- und Zeitpfad verstehen, ohne mehrere Kerne und verschachtelte Behandlungen gleichzeitig berücksichtigen zu müssen.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -352,7 +361,7 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 <p>Die vier Vertiefungsfolien nach dem Abschluss gehören zur Selbstlektüre.</p>
 <aside class="notes">
 <p>Vier Schulstunden umfassen viermal fünfundvierzig, insgesamt hundertachtzig Unterrichtsminuten; Pausen kommen hinzu. Hundertzehn Minuten sind für Erklärung, Einstiegsdiskussion, kurze Denkfragen und gemeinsame Auswertung vorgesehen, fünfundfünfzig für angeleitete Aufgaben und fünfzehn für das Quiz. Die sechs Pflichtaufgaben beginnen ohne längere Einführung direkt mit neuen Situationen.</p>
-<p>Die angeleitete Arbeitszeit dient ausgewählten Teilaufgaben und dem Vergleich der Lösungswege. Für die vollständige selbstständige Bearbeitung nennt das Übungsblatt weiterhin etwa sechzig bis fünfundsiebzig Minuten. Besonders in der letzten Stunde sind die Rechenansätze vorbereitet und werden an den neuen Werten kurz überprüft; offene Teilaufgaben können anschließend fertiggestellt werden.</p>
+<p>Die angeleitete Arbeitszeit dient ausgewählten Teilaufgaben und dem Vergleich der Lösungswege. Für die vollständige selbstständige Bearbeitung nennt das überarbeitete Übungsblatt etwa fünfundsiebzig bis neunzig Minuten. Besonders in der letzten Stunde werden ausgewählte Entwurfsentscheidungen gemeinsam begründet; offene Teilaufgaben können anschließend fertiggestellt werden.</p>
 <p>Der Foliensatz umfasst fünfzig Folien, davon sechsundvierzig im Hauptteil. Die vier folgenden Vertiefungen sind Nachschlagematerial zu Gerätezugriffen, Verschachtelung und Controllerdetails. Sie füllen keine zusätzlich vorausgesetzte Unterrichtszeit und werden weder für die Pflichtaufgaben noch das Quiz benötigt. Bei langsamerem Diskussionsverlauf hat die nachvollziehbare Begründung Vorrang vor einer gleichmäßigen Minutenverteilung über die Folien.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
@@ -375,9 +384,20 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 <li>Bearbeiten: Daten sichern und Ursache behandeln</li>
 </ul>
 <aside class="notes">
-<p>Die Abbildung zeigt oben drei kurze Ereignisimpulse entlang einer gemeinsamen Zeitachse. In der mittleren Bahn speichert die Hardware die Aussage „mindestens ein Ereignis ist eingetroffen“ in einem Bereitschaftsbit. Dieses Bit steigt beim ersten Ereignis auf eins und bleibt bis zur späteren Bearbeitung gesetzt. Weitere Impulse ändern den bereits gesetzten Wert nicht. Unten markiert der senkrechte Strich den Zeitpunkt, zu dem Software den Zustand liest. Die roten Markierungen verbinden Ereignis und gespeicherten Zustand; die Zeitachse besitzt keine konkrete Einheit, weil hier die Reihenfolge zählt.</p>
-<p>Erfassen, Benachrichtigen und Bearbeiten sind verschiedene Aufgaben. Eine kurze Flanke ohne gespeicherten Zustand kann verschwinden, bevor Software sie bemerkt. Ein gespeichertes Bit kann später durch Polling, regelmäßiges Abfragen, oder über einen Interrupt, eine Unterbrechungsanforderung, Aufmerksamkeit erhalten. Keiner der beiden Wege rekonstruiert automatisch die Anzahl der drei Impulse.</p>
-<p>Wenn alle Messwerte benötigt werden, muss ein geeigneter Datenpuffer oder ein anderes Erfassungsverfahren sie erhalten. Die spätere Softwarebehandlung kann nur das nutzen, was tatsächlich gespeichert wurde. Diese Trennung liefert das erste Kriterium für den Vergleich von Polling und Interrupts: Ein anderer Benachrichtigungsweg behebt nicht von selbst fehlende Ereignis- oder Datenspeicherung.</p>
+<p>Diese Folie legt die Grundidee der ganzen Vorlesung: Damit ein Ereignis eine Reaktion auslöst, sind drei getrennte Aufgaben zu erfüllen. Jede kann für sich scheitern. Erfassen, Benachrichtigen und Bearbeiten bilden gemeinsam den Weg vom Ereignis zur gewünschten Wirkung.</p>
+<p><strong>Was die Grafik zeigt</strong></p>
+<p>Die obere rote Bahn zeigt drei kurze Impulse entlang einer gemeinsamen Zeitachse. Das sind Ereignisse eines Geräts, etwa eines Sensors, der kurz „neuer Wert da“ signalisiert. Ein solcher Impuls ist flüchtig: Ist er vorbei, ist er weg. Die Achse besitzt keine konkrete Zeiteinheit, weil hier zunächst die Reihenfolge der Vorgänge zählt.</p>
+<p>Die mittlere Bahn zeigt ein Bereitschaftsbit in der Hardware. Als technische Vorstellung eignet sich ein Flipflop, ein Schaltungselement zum Speichern eines Bits. Der gespeicherte Zustand springt beim ersten Impuls von null auf eins und bleibt im dargestellten Modell bis zum Rücksetzen erhalten. Der zweite und dritte Impuls ändern nichts mehr, denn das Bit steht bereits auf eins. Die Grafik zeigt damit eine Zustandsmarkierung, keinen Ereigniszähler.</p>
+<p>Die gestrichelte senkrechte Linie markiert den Zeitpunkt, an dem die Software das Statusregister liest. Ein Statusregister enthält hier den beobachtbaren Gerätezustand. Die Software sieht eine Eins und erfährt: „Mindestens ein Ereignis ist eingetroffen.“ Dass es drei waren, kann sie nicht erkennen. Genau darauf weist die Bildunterschrift hin. Die Abbildung zeigt die Beobachtung; ein späteres Rücksetzen des Bits ist nicht eingezeichnet.</p>
+<p><strong>Die drei Schritte</strong></p>
+<p><em>Erfassen</em> heißt, dass das flüchtige Ereignis einen bis zur Bearbeitung erhaltenen Zustand hinterlässt. In der Grafik leistet das das Bereitschaftsbit. Ohne einen solchen Speicher kann ein Impuls, der vollständig zwischen zwei Beobachtungen der Software liegt, spurlos verloren gehen. Die spätere Software kann ein nicht gespeichertes Ereignis nicht nachträglich rekonstruieren.</p>
+<p><em>Benachrichtigen</em> heißt, dass die Software von diesem Zustand erfährt. Dafür betrachten wir zwei Wege: Sie schaut selbst nach, Polling genannt, wie an der gestrichelten Linie. Oder die Hardware fordert aufgrund des gesetzten Zustands einen Interrupt an, eine Unterbrechung der laufenden Programmausführung. Der tatsächliche Eintritt benötigt zusätzlich passende Freigaben; das wird später erläutert.</p>
+<p><em>Bearbeiten</em> heißt, die benötigten Daten rechtzeitig zu sichern und die Ursache passend zu behandeln. In unserem einfachen Bitmodell gehört dazu, die Bereitschaft nach der Behandlung wieder zurückzusetzen, damit neue Arbeit angezeigt werden kann. Wie eine reale Geräteursache quittiert wird, legt die Gerätebeschreibung fest; bloßes Lesen setzt nicht jedes Statusbit automatisch zurück.</p>
+<p><strong>Die eigentliche Botschaft</strong></p>
+<p>Die drei Aufgaben lassen sich unterscheiden, ersetzen einander aber nicht. Wer Polling durch Interrupts ersetzt, ändert zunächst den Benachrichtigungsweg. Hat die Hardware ein Ereignis nicht erfasst, kann auch ein schneller Interruptpfad diese fehlende Information nicht wiederherstellen. Umgekehrt bedeutet ein gesetztes Bereitschaftsbit noch nicht, dass die Daten bereits gesichert oder ausgewertet wurden.</p>
+<p>Wenn die Anwendung alle drei Ereignisse unterscheiden muss, reicht ein einzelnes Bit nicht. Ein Zähler kann die Anzahl erhalten. Werden dagegen die drei einzelnen Messwerte benötigt, müssen auch diese Werte in einem geeigneten Datenpuffer gespeichert werden. Ein Zähler allein enthält sie nicht. Kapazität und mögliche Überläufe müssen zur Anwendung passen; Folie 9 vertieft diese Unterscheidung.</p>
+<p>Damit beantwortet die Folie auch die dritte Einstiegsfrage aus Folie 1: Die Hardware muss mindestens die Bereitschaft bis zur Beobachtung festhalten. Wenn jeder Messwert zählt, müssen zusätzlich die Werte selbst bis zur Übernahme erhalten bleiben. Ein gesetztes Bit schützt einen Messwert nicht vor dem Überschreiben.</p>
+<p>Als Gedankenbild eignet sich ein Briefkasten mit einem Fähnchen. Stellen Sie sich vor, das Fähnchen gehe beim ersten eingeworfenen Brief hoch und bleibe oben, egal wie viele Briefe folgen. Wer vorbeischaut, weiß, dass Post da ist, aber nicht, wie viel. Das Fähnchen entspricht dem Bereitschaftsbit; die im Kasten aufbewahrten Briefe entsprechen zusätzlich gespeicherten Daten. Der Blick auf das Fähnchen ist die Benachrichtigung durch Polling, das Herausnehmen der Briefe und Zurücksetzen des Fähnchens die Bearbeitung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -422,9 +442,19 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 <li>Interrupt: eigene Eintrittslatenz und Behandlungszeit</li>
 </ul>
 <aside class="notes">
-<p>Die gemeinsame horizontale Achse der Abbildung ist Zeit in Millisekunden. Die senkrechte rote Linie markiert das Ereignis bei <span class="math inline">\(1{,}2\)</span> ms. Die obere Bahn zeigt Dauer-Polling, das den Prozessor zum wiederholten Prüfen belegt. Die mittlere zeigt Abfragen bei null, eins und zwei Millisekunden. Unter der Annahme eines bis zur Behandlung gespeicherten Ereignisses entdeckt sie es bei zwei Millisekunden, also <span class="math inline">\(2-1{,}2=0{,}8\)</span> ms später.</p>
-<p>Die untere Bahn zeigt ein getrenntes Interruptmodell. Main bezeichnet dort das Hauptprogramm. Nach einer angenommenen Eintrittslatenz von <span class="math inline">\(0{,}1\)</span> ms beginnt bei <span class="math inline">\(1{,}3\)</span> ms die ISR, Interrupt Service Routine, Unterbrechungsbehandlung. Im gezeichneten Beispiel endet sie nach weiteren <span class="math inline">\(0{,}2\)</span> ms; anschließend läuft das Hauptprogramm weiter. Diese Zeiten sind Lehrwerte. Die Eintrittslatenz ist nicht dieselbe Größe wie die Wartezeit auf das Ereignis.</p>
-<p>Die Bahnen sind alternative Abläufe, keine gleichzeitig laufenden Prozessoren. Ein Interrupt kann durch Maskierung noch länger warten. Wird in seiner kurzen Behandlung nur Arbeit vorgemerkt, kommt bis zur eigentlichen Bearbeitung im Hauptprogramm eine weitere Verzögerung hinzu. Deshalb muss für jede Reaktionsanforderung der relevante Anfangs- und Endpunkt benannt werden.</p>
+<p><strong>Aufbau der Grafik</strong></p>
+<p>Die waagrechte Achse zeigt die Zeit von null bis zwei Millisekunden. Die rote senkrechte Linie bei <span class="math inline">\(1{,}2\)</span> ms markiert das Ereignis, etwa „Sensor hat einen neuen Wert“. Die drei Bahnen sind alternative Programmentwürfe für dieselbe Situation, keine drei gleichzeitig laufenden Prozessoren. Für den Vergleich nehmen wir an, dass die Hardware das Ereignis wie auf Folie 5 in einem Bereitschaftsbit bis zur Bearbeitung festhält. Das speichert den Hinweis, aber nicht automatisch den zugehörigen Messwert oder die Anzahl mehrerer Ereignisse.</p>
+<p><strong>Die drei Bahnen</strong></p>
+<p><em>Busy-Wait, oben:</em> Busy Waiting bedeutet beschäftigtes Warten. Der Prozessor liest ständig das Statusbit, statt andere Arbeit zu erledigen. Im gezeichneten Modell bemerkt er das Ereignis näherungsweise bei <span class="math inline">\(1{,}2\)</span> ms. Auch eine solche Schleife braucht in Wirklichkeit Zeit für ihre einzelnen Abfragen; „praktisch sofort“ ist hier eine Vereinfachung. Der Preis der kurzen Reaktion ist, dass während dieser Wartephase keine andere Nutzarbeit erfolgt. Die vier Millisekunden lange Auswertung aus dem Einstieg käme in dieser Zeit nicht voran.</p>
+<p><em>Periodisch, Mitte:</em> Die Software fragt nur zu festen Zeitpunkten ab, hier bei null, eins und zwei Millisekunden. Die Punkte markieren die Statusbeobachtungen. Die Verbindungslinie steht für die dazwischen verfügbare Zeit, in der andere Arbeit erledigt werden kann. Das Ereignis bei <span class="math inline">\(1{,}2\)</span> ms liegt nach der Abfrage bei einer Millisekunde und wird erst bei zwei Millisekunden erkannt. Die Wartezeit beträgt <span class="math inline">\(2-1{,}2=0{,}8\)</span> ms. Im ungünstigsten Fall entsteht das Ereignis unmittelbar nach einer Abfrage und wartet nahezu ein volles Intervall. Folie 8 verallgemeinert diese Überlegung auf eine begrenzte Abfragelücke.</p>
+<p><em>Interrupt, unten:</em> Zunächst läuft das Hauptprogramm. Nach dem Ereignis beginnt bei <span class="math inline">\(1{,}3\)</span> ms die rot umrandete ISR, Interrupt Service Routine, Unterbrechungsbehandlung. Der Abstand zum Ereignis beträgt <span class="math inline">\(1{,}3-1{,}2=0{,}1\)</span> ms und heißt hier Eintrittslatenz. Er ist eine Lehrannahme für den Weg bis zum Beginn der eingezeichneten Behandlung, keine gemessene reine Hardwarelatenz. Die Grafik zerlegt diesen Eintrittspfad nicht in seine Hardware- und Softwareanteile. Neben der Hardwareerkennung und dem Einsprung kann auch die nötige Sicherung von Registerwerten zum Aufwand bis zur eigentlichen Gerätearbeit beitragen. Es wäre deshalb falsch, die gesamten hundert Mikrosekunden allein mit dem Abschluss des laufenden Befehls zu erklären. Folie 15 erläutert die Aufgaben von Hardware und Software beim Eintritt.</p>
+<p>Die ISR endet bei <span class="math inline">\(1{,}5\)</span> ms. Ihre eingezeichnete Dauer beträgt somit <span class="math inline">\(1{,}5-1{,}3=0{,}2\)</span> ms. Danach setzt das Hauptprogramm fort; „Main“ ist die englische Beschriftung dafür. Eine zusätzliche Wartezeit durch gesperrte Interrupts wird in diesem Zahlenbeispiel nicht gesondert eingezeichnet. Bei anderen Voraussetzungen muss sie ebenfalls berücksichtigt werden.</p>
+<p><strong>Die eigentliche Botschaft</strong></p>
+<p>Erstens gibt es keinen Sieger ohne Bedingungen. Busy-Wait reagiert im gezeichneten Modell schnell, belegt dafür aber den Prozessor mit Abfragen. Periodisches Polling, regelmäßiges Nachfragen, lässt Rechenzeit für andere Arbeit frei, entdeckt das Ereignis hier jedoch später. Ein Interrupt lässt zunächst das Hauptprogramm arbeiten und lenkt es bei einer Anforderung in die Behandlung um. Er besitzt eigene Eintritts- und Behandlungszeiten und kann zusätzlich warten, wenn Freigaben fehlen oder andere Behandlung im Weg ist. Ob die Reaktion rechtzeitig erfolgt, entscheidet der ganze Ablauf.</p>
+<p>Zweitens bezeichnen die Zahlen verschiedene Größen. Die <span class="math inline">\(0{,}8\)</span> ms beim Polling sind Wartezeit bis zur Entdeckung. Die <span class="math inline">\(0{,}1\)</span> ms beim Interrupt sind Eintrittslatenz, die <span class="math inline">\(0{,}2\)</span> ms die Dauer des gezeichneten ISR-Blocks. Diese Größen haben unterschiedliche Anfangs- und Endpunkte und dürfen nicht gleichgesetzt werden.</p>
+<p>Drittens muss die geforderte Wirkung feststehen. Zählt der Beginn der ISR, hier <span class="math inline">\(0{,}1\)</span> ms nach dem Ereignis, ihr Ende nach <span class="math inline">\(0{,}3\)</span> ms oder erst eine spätere Auswertung im Hauptprogramm? Wann innerhalb der ISR der Messwert gesichert wird, gibt diese Grafik nicht an. Setzt die ISR nur eine Arbeitsmarkierung, entstehen bis zur Nutzarbeit zusätzliche Warte- und Bearbeitungszeiten. Folie 38 greift diese Frage mit zwei ausdrücklich unterschiedenen Endpunkten auf: Daten gesichert nach <span class="math inline">\(53\,\mu\)</span>s und Ergebnis fertig nach <span class="math inline">\(163\,\mu\)</span>s.</p>
+<p><strong>Eine mögliche Stolperfalle</strong></p>
+<p>Die Eintrittslatenz von <span class="math inline">\(0{,}1\)</span> ms entspricht genau den hundert Mikrosekunden aus dem Einstiegsfall. Mit diesen Zahlen ist dessen Datensicherung deshalb nicht rechtzeitig nachgewiesen: Die ISR beginnt erst beim Ablauf der Frist, für eine anschließende Übernahme bleibt kein Zeitbudget. Die Werte dieser Grafik wurden zur Veranschaulichung der drei Wege gewählt und sind keine Lösung des Messgerät-Szenarios. Die eigentliche Fristprüfung erfolgt auf Folie 38 mit anderen ausdrücklich angenommenen Grenzen: vierzig Mikrosekunden Blockierung, fünf Mikrosekunden Eintritt und acht Mikrosekunden Datensicherung ergeben dreiundfünfzig Mikrosekunden. Auch diese Werte sind ein Lehrmodell und kein Messnachweis für einen realen Mikrocontroller.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -450,9 +480,16 @@ U=\frac{3}{250}=1{,}2\,\%
 <li>Die größte tatsächliche Abfragelücke zählt</li>
 </ul>
 <aside class="notes">
-<p><span class="math inline">\(W_{\max}\)</span> ist die größte Wartezeit vom gespeicherten Ereignis bis zur nächsten Statusbeobachtung. Das vereinfachte Modell setzt voraus, dass die Beobachtungszeitpunkte wirklich alle zweihundertfünfzig Mikrosekunden liegen. Trifft das Ereignis unmittelbar nach einer Beobachtung ein, wartet es nahezu ein volles Intervall. Die Nutzarbeit nach dem Erkennen ist dabei noch nicht enthalten. Eine Frist von hundert Mikrosekunden kann also schon bis zur Erkennung nicht zugesagt werden.</p>
-<p><span class="math inline">\(U\)</span> bezeichnet den mittleren Anteil der Prozessorzeit für die Abfragen. Jede Abfrage belegt drei Mikrosekunden, daher ergeben sich <span class="math inline">\(3/250=0{,}012=1{,}2\)</span> Prozent. Bei unverändertem Aufwand und einem Intervall von fünfzig Mikrosekunden wären es sechs Prozent. Beide Zahlen sind Lehrannahmen ohne Geräte- oder Compilermessung.</p>
-<p>Eine durchschnittlich kurze Hauptschleife reicht als Nachweis nicht aus. Enthält sie gelegentlich eine vier Millisekunden lange Rechnung ohne Abfrage, ist diese längere Lücke maßgebend. Zusätzliche Verzögerungen und die eigentliche Datenübernahme müssen in eine vollständige Reaktionsrechnung eingehen. Die Aufgabe für den Systementwurf lautet daher: Ist die größte Abfragelücke bekannt und klein genug? Wenn nicht, kann ein Interrupt einen anderen Ausführungspfad eröffnen, dessen Verzögerungen ebenfalls geprüft werden müssen.</p>
+<p>Folie 7 zeigte ein Ereignis an einer bestimmten Stelle zwischen zwei Abfragen und kam auf <span class="math inline">\(0{,}8\)</span> ms Wartezeit. Für eine zeitliche Zusage reicht dieser einzelne Ablauf nicht aus; wir benötigen den ungünstigsten Fall. Trifft das Ereignis unmittelbar nach einer Statusbeobachtung ein, wartet es fast ein volles Abfrageintervall. Voraussetzung bleibt, dass die Hardware den Ereignishinweis bis zur Bearbeitung speichert.</p>
+<p>Wir nennen die tatsächliche Periode zwischen Statusbeobachtungen <span class="math inline">\(P\)</span>. <span class="math inline">\(W_{\max}\)</span> bezeichnet die obere Grenze der Wartezeit vom Ereignis bis zur nächsten Beobachtung. Im Modell gilt <span class="math inline">\(W_{\max}=P\)</span>, hier also zweihundertfünfzig Mikrosekunden. Damit ist bereits die Erkennung innerhalb von hundert Mikrosekunden nicht garantiert. Das anschließende Sichern der Daten benötigt zusätzlich Zeit und ist erst recht nicht durch diese Abfrageperiode abgesichert.</p>
+<p><strong>Die zweite Größe: der Preis des Nachfragens</strong></p>
+<p><span class="math inline">\(U\)</span> ist die Auslastung durch die Abfragen, also der mittlere Anteil der Prozessorzeit, den sie belegen. Der angenommene gesamte Aufwand einer Abfrage beträgt <span class="math inline">\(C=3\,\mu\)</span>s. Bei einer Abfrage je Periode ergibt sich <span class="math inline">\(U=C/P=3/250=0{,}012=1{,}2\)</span> Prozent. Die übrige Zeit kann im Modell für andere Arbeit genutzt werden. Bei unverändertem Abfrageaufwand und einer Periode von fünfzig Mikrosekunden steigt der Anteil auf <span class="math inline">\(3/50=0{,}06=6\)</span> Prozent.</p>
+<p>Die Periode bestimmt damit beide Größen zugleich, aber gegenläufig: Eine kürzere Periode senkt die mögliche Wartezeit und erhöht den Abfrageaufwand. Das ist der Zielkonflikt der Folie. Ein niedriger mittlerer Abfrageaufwand beweist keine kurze Reaktionszeit; eine kurze Reaktionszeit durch häufigeres Prüfen kostet dagegen Prozessorzeit. Die Zahlen sind ausdrücklich Lehrannahmen ohne Geräte- oder Compilermessung.</p>
+<p>Hier schließt die obere Bahn aus Folie 7 an: Busy Waiting bedeutet beschäftigtes Warten und lässt zwischen den Abfragen keine Zeit für andere Arbeit. Man kann es als Grenzfall periodischen Pollings, des regelmäßigen Nachfragens, mit der kürzestmöglichen Periode auffassen. Im vereinfachten Modell nähert sich <span class="math inline">\(P\)</span> dem Abfrageaufwand <span class="math inline">\(C\)</span>, und <span class="math inline">\(U=C/P\)</span> nähert sich eins, also hundert Prozent. Die Wartezeit wird klein, aber nicht automatisch null: Auch eine einzelne Statusabfrage braucht Zeit. Eine Periode kleiner als der gesamte Abfrageaufwand wäre auf unserem einzelnen Prozessor ohne Überlappung nicht ausführbar.</p>
+<p><strong>Der dritte Punkt ist der wichtigste</strong></p>
+<p>„Die größte tatsächliche Abfragelücke zählt“ führt zurück zum Einstieg. Das Rechenmodell setzt voraus, dass die Statusbeobachtungen wirklich alle zweihundertfünfzig Mikrosekunden erfolgen. Enthält das Programm gelegentlich eine vier Millisekunden lange Rechnung ohne Abfrage, ist diese längere Lücke maßgebend, unabhängig davon, wie kurz die Hauptschleife sonst ist. Eine durchschnittliche Schleifendauer genügt deshalb nicht. Genau diese ununterbrochene Auswertung ist das Problem des Messgeräts aus Folie 1.</p>
+<p>Eine mögliche Polling-Lösung müsste die Rechnung in ausreichend kurze Abschnitte teilen und dazwischen den Gerätestatus prüfen. Als zusätzliches Lehrbeispiel nehmen wir an, dass von der Statusbeobachtung bis zur abgeschlossenen Datensicherung höchstens acht Mikrosekunden vergehen und keine weiteren Verzögerungen hinzukommen. Bei einer tatsächlichen Abfragelücke von höchstens neunzig Mikrosekunden wäre die Sicherung dann nach spätestens <span class="math inline">\(90+8=98\,\mu\)</span>s abgeschlossen. Zur Frist von hundert Mikrosekunden blieben zwei Mikrosekunden Reserve. Die neunzig Mikrosekunden folgen also aus einem gewählten Zeitbudget; sie sind keine allgemeine Vorgabe für jedes Gerät. Der Abfrageaufwand von drei Mikrosekunden ist Teil der Periode zwischen Beobachtungen und wird nicht nochmals pauschal zur Wartezeit addiert.</p>
+<p>Die Größenordnung des Eingriffs zeigt <span class="math inline">\(4000/90\approx44{,}4\)</span>: Über einen Zeitraum von vier Millisekunden wären rund fünfundvierzig Statusbeobachtungen nötig. Eine Schleife kann dabei dieselbe Abfragestelle wiederholt benutzen. Zusätzlicher Abfrageaufwand verlängert die ursprünglich vier Millisekunden reine Auswertung, sodass die genaue Anzahl von der entstehenden Gesamtdauer abhängt. Vor allem müssen alle Rechenabschnitte auch bei ungünstigen Speicherzugriffen kurz genug bleiben. Eine solche Aufteilung ist möglich, kann aber unhandlich und fehleranfällig werden. Das motiviert den Interrupt als anderen Ausführungspfad: Die Benachrichtigung benötigt dann keine entsprechend verteilten Abfragen in der Rechnung. Eintritt, mögliche Blockierung und Datensicherung brauchen dennoch ein eigenes geprüftes Reaktionsbudget.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -496,6 +533,8 @@ U=\frac{3}{250}=1{,}2\,\%
 </table>
 <p>Welche Information braucht das Messgerät aus dem Einstieg?</p>
 <aside class="notes">
+<p><strong>Was die Tabelle zeigt</strong></p>
+<p>Ausgangslage sind wieder drei Ereignisse vor der Bearbeitung, wie auf Folie 5. Die Tabelle fragt, was die Software danach noch erkennen kann, je nachdem, was die Hardware gespeichert hat. Von oben nach unten steigt der Informationsgehalt: von möglicherweise keiner bleibenden Spur über den Hinweis „mindestens ein Ereignis“ und die Anzahl der Ereignisse bis zu den einzelnen gespeicherten Daten. Dabei gelten die jeweils genannten Voraussetzungen: Der Zähler läuft nicht über und der Datenpuffer ist ausreichend groß.</p>
 <p>Das gespeicherte Objekt muss zur Anforderung passen. Ein Bereitschaftsbit enthält nur zwei Zustände und kann die Anzahl drei nicht darstellen. Mehrfaches Setzen auf eins führt wieder zum Wert eins. Ein Ereigniszähler erhält die Anzahl nur innerhalb seiner Kapazität und bei geeigneter Erfassung. Ein Datenpuffer speichert zusätzlich die zugehörigen Werte, solange er nicht überläuft und seine Übergabe korrekt organisiert ist.</p>
 <p>Im Einstiegsfall ist zunächst nur gefordert, neue Sensordaten rechtzeitig aus dem Gerät zu sichern. Ob jeder Messwert erhalten bleiben muss oder nur der jeweils neueste, ist noch offen. Diese fehlende Anforderung muss vor der Wahl von Flag, Zähler oder Puffer geklärt werden. Ein Flag ist eine einzelne Zustandsmarkierung; es genügt beispielsweise für „bitte den aktuellen Zustand neu auswerten“, aber nicht für „alle seitdem aufgenommenen Werte liefern“.</p>
 <p>Ein Pending-Bit, eine wartende Interruptanforderung, ist ebenfalls kein unbegrenzter Ereignisspeicher. Auch bei einem Interrupt können mehrere Ereignisse vor der Behandlung zusammenfallen. Diese Folie vertieft deshalb die Erfassung, statt nur einen weiteren Registerbegriff einzuführen. Später wird dieselbe Frage bei der Übergabe von der Unterbrechungsbehandlung an das Hauptprogramm erneut gestellt.</p>
@@ -540,9 +579,59 @@ U=\frac{3}{250}=1{,}2\,\%
 </tbody>
 </table>
 <aside class="notes">
-<p>Die Tabelle ist eine Entscheidungshilfe, keine feste Zuordnung eines Geräts zu einer einzigen Programmiertechnik. Bleibt ein Zustand bis zur Bearbeitung sichtbar, kann Polling, regelmäßiges Abfragen, ihn finden. Die maximale Zeit bis zur nächsten Abfrage muss dann zur Reaktionsfrist passen. Ein kurzer Impuls erfordert dagegen eine Erfassung, etwa ein gespeichertes Statusbit oder einen passenden Eingang.</p>
-<p>Auch ein Pending-Bit, eine Markierung für eine wartende Anforderung, ist noch keine beliebig lange Ereigniswarteschlange. Mehrere Ereignisse können zusammenfallen. Bei vielen eingehenden Daten braucht das Gerät oder die Software möglicherweise einen Puffer. Die Behandlung jedes einzelnen Ereignisses als Interrupt kann zusätzlich erheblichen Aufwand erzeugen.</p>
-<p>Eine Reaktionsfrist ist eine späteste zulässige Zeit für die gewünschte Wirkung. Zu prüfen sind Erfassung, Wartezeit, Eintritt und Nutzarbeit. Der Vorteil einer ereignisgesteuerten Behandlung liegt darin, andere Arbeit zwischen Ereignissen zuzulassen; kurze Reaktion ist dennoch eine Eigenschaft des ganzen Ablaufs. Nun untersuchen wir, wie der Prozessor tatsächlich in eine Behandlung eintritt.</p>
+<p>Die Tabelle ordnet nicht „Gerät X bekommt Polling, Gerät Y einen Interrupt“ zu. Sie zeigt, welche Frage man in welcher Situation stellen muss. Polling bedeutet regelmäßiges Abfragen, ein Interrupt ist eine Unterbrechungsanforderung. Jede Zeile bündelt einen Gesichtspunkt aus den vorherigen Folien; mehrere Zeilen können für dieselbe Anwendung gleichzeitig gelten.</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 34%">
+<col style="width: 34%">
+<col style="width: 31%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Situation</th>
+<th>Zu prüfen</th>
+<th>Herkunft</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Bereitschaft bleibt sichtbar</td>
+<td>Passt die Abfrageperiode zur Frist?</td>
+<td>Folie 6, 8</td>
+</tr>
+<tr class="even">
+<td>Kurzer Impuls</td>
+<td>Wird er überhaupt erfasst?</td>
+<td>Folie 5, 6</td>
+</tr>
+<tr class="odd">
+<td>Sehr viele Ereignisse</td>
+<td>Aufwand pro Ereignis und Puffergröße</td>
+<td>Folie 9</td>
+</tr>
+<tr class="even">
+<td>Feste Reaktionsfrist</td>
+<td>Gesamte Verzögerung vom Ereignis bis zur Wirkung</td>
+<td>Folie 7</td>
+</tr>
+</tbody>
+</table>
+<p>Die erste Zeile verlangt eine passende größte Abfragelücke. Die zweite liegt davor: Ohne Erfassung oder Speicherung kann ein kurzer Impuls verschwinden, bevor Software reagiert. Die Wahl des Benachrichtigungswegs ersetzt diese Voraussetzung nicht. Auch ein Pending-Bit, eine einzelne Markierung für eine wartende Anforderung, speichert keine beliebige Anzahl von Ereignissen.</p>
+<p><strong>Die dritte Zeile: Viele Ereignisse kosten wiederholt Zeit</strong></p>
+<p>Diese Zeile macht einen bisher nur angedeuteten Gesichtspunkt ausdrücklich: Ein Interrupt pro Ereignis benötigt jedes Mal Ein- und Austritt und die jeweilige Gerätebearbeitung. ISR bedeutet Interrupt Service Routine, Unterbrechungsbehandlung. Als Lehrannahme übernehmen wir die fünf Mikrosekunden Gesamtaufwand je vollständiger ISR von Folie 37, einschließlich Ein- und Austritt. Das ist ein angenommener Zeitanteil für den ganzen Behandlungspfad, keine Messung und keine isolierte Angabe nur für den Hardwareeinsprung.</p>
+<p>Ein Beispiel liefert eine UART, Universal Asynchronous Receiver/Transmitter, eine serielle Sende- und Empfangsschnittstelle. Für die Rechnung genügt folgende Annahme: kontinuierlicher Empfang im Format 8N1, also acht Datenbits, kein zusätzliches Paritätsbit zur Fehlererkennung und ein Stoppbit. Zusammen mit einem Startbit sind das zehn Leitungsbits je Nutzbyte. Start- und Stoppbit markieren Beginn und Ende dieses Rahmens. Baud bezeichnet Symbole pro Sekunde; bei dieser binären Übertragung entspricht ein Symbol einem Bit. Weitere Übertragungsdetails folgen in der Vorlesung zu seriellen Bussystemen.</p>
+<p>Bei <span class="math inline">\(115200\)</span> Baud kommen damit <span class="math inline">\(115200/10=11520\)</span> Byte pro Sekunde an. Wenn jedes Byte genau eine vollständige ISR mit fünf Mikrosekunden Aufwand auslöst, beträgt der mittlere Prozessorzeitanteil</p>
+<p><span class="math display">\[
+U=11520\,\mathrm{s}^{-1}\cdot5\,\mu\mathrm{s}
+=0{,}0576=5{,}76\,\%\approx6\,\%.
+\]</span></p>
+<p>Bei einem MBaud, einer Million Symbole pro Sekunde, ergibt dieselbe Annahme <span class="math inline">\(100000\)</span> Byte pro Sekunde und <span class="math inline">\(U=100000\cdot5\cdot10^{-6}=0{,}5=50\)</span> Prozent. Diese Zahlen setzen die angegebene konstante Behandlungsdauer, das gewählte Rahmenformat und lückenlosen Empfang voraus. Ein anderer Gerätetreiber oder Pausen im Datenstrom ändern das Ergebnis.</p>
+<p>Damit wird das Sammeln mehrerer Daten vor einer gemeinsamen Benachrichtigung interessant. Kann ein Gerätepuffer mehrere Byte halten und eine Behandlung mehrere Byte übernehmen, verteilen sich feste Ein- und Austrittskosten auf mehrere Daten. Die Übernahme und Verarbeitung der Byte selbst bleiben nötig. Ein zusätzlicher Softwarepuffer allein senkt die Interruptzahl nicht, solange weiterhin jedes Byte einzeln einen Interrupt auslöst. Außerdem muss die zusätzliche Wartezeit des Sammelns zur Frist passen, und der Puffer darf nicht überlaufen. Es gibt deshalb keine allgemeingültige Ereignisrate, ab der eine Technik immer gewinnt.</p>
+<p><strong>Die vierte Zeile verweist voraus</strong></p>
+<p>Eine Reaktionsfrist ist die späteste zulässige Zeit für eine geforderte Wirkung. Zum gesamten Weg gehören Erfassung, mögliche Wartezeit, Eintritt in die Behandlung und Nutzarbeit. Eine kurze mittlere ISR-Dauer sagt noch nicht, wie lange ein einzelnes Ereignis vorher warten muss. Ebenso ist das Setzen einer Arbeitsmarkierung nicht schon die spätere Auswertung. Folie 38 rechnet diese Kette mit getrennten Endpunkten durch: dreiundfünfzig Mikrosekunden bis zur Datensicherung und hundertdreiundsechzig Mikrosekunden bis zum fertigen Ergebnis.</p>
+<p><strong>Didaktischer Vorschlag</strong></p>
+<p>Lassen Sie die Studierenden das Messgerät aus dem Einstieg mit der Tabelle einordnen. Es fällt in mehrere Zeilen zugleich: Unter der Annahme eines gespeicherten Bereitschaftsbits bleibt die Meldung sichtbar, also ist die Abfrageperiode zu prüfen. Zugleich müssen die Daten innerhalb von hundert Mikrosekunden gesichert werden; die vollständige Verzögerung ist maßgebend. Bei Dauerbetrieb können außerdem viele Ereignisse und damit Behandlungsaufwand und Pufferkapazität relevant werden.</p>
+<p>Bitten Sie um eine Begründung je zutreffender Zeile und um die noch fehlenden Angaben, etwa Ereignisrate oder Dauer der Datenübernahme. So wird sichtbar, dass die Tabelle mehrere Prüfungen nebeneinander verlangt und keine einfache Gerätezuordnung liefert. Nachdem die Auswahlbedingungen geklärt sind, untersuchen wir, wie der Prozessor tatsächlich in eine Behandlung eintritt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -566,6 +655,7 @@ U=\frac{3}{250}=1{,}2\,\%
 <aside class="notes">
 <p>Ein Interrupt entsteht unabhängig vom gerade ausgeführten Befehl, etwa weil die Hardware-Zeitquelle einen Vergleichswert erreicht hat. Eine Exception, Ausnahme, entsteht synchron aus der Befehlsausführung, beispielsweise wenn der Prozessor einen nicht unterstützten Befehl erkennt. Trap ist der Oberbegriff für den Übergang in die zuständige Behandlung.</p>
 <p>Die beiden Fälle können denselben Eintrittsmechanismus und dieselben Register benutzen. Trotzdem müssen sie unterschieden werden. Nach einem Interrupt wird gewöhnlich die unterbrochene Ausführung fortgesetzt. Bei einer Exception muss die Software dagegen entscheiden, ob und wie der auslösende Fehler behoben wird. Eine Rückkehr ohne geeignete Behandlung kann denselben Fehler erneut auslösen.</p>
+<p>Als Bild für die Vorlesung: Beim Lesen klingelt das Telefon (Interrupt), oder man stößt auf ein unbekanntes Wort (Exception). In beiden Fällen legt man ein Lesezeichen ein und unterbricht, das ist der Trap. Nach dem Telefonat liest man einfach weiter. Beim unbekannten Wort muss man es erst nachschlagen, sonst stolpert man beim Weiterlesen sofort wieder.</p>
 <p>Interruptfreigaben sperren im folgenden Modell die betrachteten maskierbaren Interrupts, nicht automatisch synchrone Exceptions. Wer global Interrupts deaktiviert, kann also weiterhin durch einen ungültigen Speicherzugriff oder Befehl einen Trap erzeugen. Diese Unterscheidung erklärt das zusätzliche Interrupt-Bit im Ursachenregister und begrenzt später die Aussage, während einer ISR könne nichts mehr dazwischenkommen.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
@@ -590,10 +680,17 @@ U=\frac{3}{250}=1{,}2\,\%
 <li><code>mie</code>: Machine Interrupt Enable, Kategorienfreigaben</li>
 <li><code>mstatus.MIE</code>: globale Freigabe der betrachteten M-Interrupts</li>
 </ul>
+<div style="font-size: 0.8em;">
+<p>CSR: Control and Status Register, Steuer- und Statusregister. <code>mip</code>, <code>mie</code> und <code>mstatus</code> sind CSRs im Prozessor; <code>MIE</code> ist ein Bit in <code>mstatus</code>.</p>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb1-1"><a aria-label="1"></a>csrsi mstatus<span class="op">,</span> <span class="dv">8</span>    <span class="op">#</span> MIE setzen<span class="op">,</span> andere Bits erhalten</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
-<p>Pending bedeutet, dass eine Unterbrechungsanforderung wartet. <code>mip</code>, Machine Interrupt Pending, zeigt solche Zustände für die Kategorien. <code>mie</code>, Machine Interrupt Enable, enthält deren einzelne Freigaben. Das MIE-Bit in <code>mstatus</code>, Machine Interrupt Enable im Statusregister, ist zusätzlich die globale Freigabe. Registername <code>mie</code> und Statusbit MIE sind daher zwei unterschiedliche Dinge.</p>
+<p>CSR bedeutet Control and Status Register, Steuer- und Statusregister im Prozessor. Solche Register werden durch dafür vorgesehene Prozessorbefehle angesprochen, nicht durch einen gewöhnlichen Zugriff auf eine Geräteadresse. <code>mip</code>, <code>mie</code> und <code>mstatus</code> sind CSRs. Ein Bit ist dagegen ein einzelnes Feld innerhalb eines solchen Registers. Die Schreibweise <code>mstatus.MIE</code> benennt das MIE-Bit im Register <code>mstatus</code>.</p>
+<p>Pending bedeutet, dass eine Unterbrechungsanforderung wartet. <code>mip</code>, Machine Interrupt Pending, zeigt solche Zustände für die Kategorien. <code>mie</code>, Machine Interrupt Enable, enthält deren einzelne Freigaben. <code>mstatus</code>, Machine Status, enthält unter anderem MIE, Machine Interrupt Enable, die globale Freigabe der betrachteten Maschinen-Interrupts. Registername <code>mie</code> und Statusbit MIE sind daher zwei unterschiedliche Dinge.</p>
 <p>Die Formel gilt für unser Modell: ein Hart, ein Hardware-Ausführungskontext, läuft bereits im Machine Mode ohne Delegation. Das logische Und, <span class="math inline">\(\land\)</span>, verlangt alle drei Bedingungen. Ein pending Timer bei deaktivierter Timerfreigabe wird nicht genommen. Ein freigegebener Timer ohne Pending ebenfalls nicht. Ist MIE null, bleiben die betrachteten maskierbaren Maschinen-Interrupts trotz Pending zurückgestellt.</p>
 <p>Das Sperren der Freigabe muss die Ursache nicht löschen. Nach Wiederfreigabe kann eine erhaltene Anforderung wirksam werden. Umgekehrt ist ein einziges Pending-Bit kein Zähler für alle während der Sperrzeit eingetroffenen Ereignisse. Synchrone Exceptions, Ausnahmen aus Befehlen, sind durch diese Formel nicht beschrieben. Die Trennung wird bei Timer und externen Geräten jeweils konkretisiert.</p>
+<p>Der RISC-V-Assemblerbefehl <code>csrsi mstatus, 8</code> macht den Registerzugriff greifbar. <code>csrsi</code> steht für CSR Set Immediate, Setzen durch eine unmittelbar im Befehl enthaltene Bitmaske. MIE liegt an der architektonisch festgelegten Bitposition drei, von null gezählt; seine Maske ist <span class="math inline">\(2^3=8\)</span>. Die Anweisung verknüpft die Maske mit dem bisherigen Registerwert durch bitweises Oder. Sie setzt MIE auf eins und erhält die anderen Bits, statt das ganze Register durch den Wert acht zu ersetzen. Der verwandte Befehl <code>csrci mstatus, 8</code>, CSR Clear Immediate, löscht gezielt dieses Bit und erhält die übrigen.</p>
+<p>Das Beispiel setzt die CSR-Befehle und die nötige Berechtigung im Machine Mode voraus. Es ist ein Lehrbefehl, keine hier ausgeführte Firmware. Eine Freigabe darf erst erfolgen, wenn Stack, Trap-Eintritt und Gerätebehandlung vorbereitet sind; bei bereits wartender und einzeln freigegebener Anforderung kann sie sonst sofort einen Trap erlauben. Folie 31 ordnet diesen Zugriff in die Initialisierung ein. Die Semantik der Befehle beschreibt die <a href="https://docs.riscv.org/reference/isa/unpriv/zicsr.html">RISC-V-Spezifikation der CSR-Befehle</a>.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -683,13 +780,21 @@ U=\frac{3}{250}=1{,}2\,\%
 <td><code>mstatus</code></td>
 <td>Status und Interruptfreigaben</td>
 </tr>
+<tr class="odd">
+<td><code>mip</code></td>
+<td>wartende Interruptanforderungen</td>
+</tr>
+<tr class="even">
+<td><code>mie</code></td>
+<td>Freigaben der Interrupt-Kategorien</td>
+</tr>
 </tbody>
 </table>
-<p>CSR: Control and Status Register.</p>
 <aside class="notes">
 <p>Kontext bezeichnet den Zustand, der zum korrekten Fortsetzen einer Ausführung nötig ist. Dazu gehören allgemeine Register mit Zwischenergebnissen und Adressen sowie besondere Statusinformationen. CSR bedeutet Control and Status Register, Steuer- und Statusregister. Ein CSR wird durch dafür vorgesehene Prozessorbefehle angesprochen und ist nicht dasselbe wie ein Gerät an einer Speicheradresse.</p>
-<p><code>mepc</code> heißt Machine Exception Program Counter und speichert die Rückkehradresse eines Traps. PC steht für Program Counter, Befehlsadresszähler. <code>mcause</code>, Machine Cause, enthält die Ursache. <code>mstatus</code>, Machine Status, enthält unter anderem Interruptfreigaben. Das Präfix m kennzeichnet hier den Machine Mode, die Maschinenprivilegstufe.</p>
+<p><code>mepc</code> heißt Machine Exception Program Counter und speichert die Rückkehradresse eines Traps. PC steht für Program Counter, Befehlsadresszähler. <code>mcause</code>, Machine Cause, enthält die Ursache. <code>mstatus</code>, Machine Status, enthält unter anderem das globale Freigabebit MIE, Machine Interrupt Enable. <code>mip</code>, Machine Interrupt Pending, zeigt wartende Anforderungen, während <code>mie</code>, Machine Interrupt Enable, die einzelnen Interrupt-Kategorien freigibt. Register <code>mie</code> und Bit MIE in <code>mstatus</code> bleiben zu unterscheiden. Das Präfix m kennzeichnet hier den Machine Mode, die Maschinenprivilegstufe.</p>
 <p>Die Hardware aktualisiert beim Trap einige dieser speziellen Register. Sie sichert jedoch nicht automatisch sämtliche allgemeinen Register auf dem Softwarestack. Der Stack ist ein Speicherbereich für Aufruf- und Sicherungsrahmen. Benutzt der Handler Register der unterbrochenen Ausführung, müssen diese passend erhalten werden. Deshalb reicht ein Sprung zur richtigen Funktion noch nicht für einen vollständigen, korrekten Interruptpfad.</p>
+<p>Die Tabelle erläutert die verschiedenen Zustände und ist keine pauschale Liste zurückzuschreibender Register. Insbesondere zeigen Pending-Bits aktuelle Anforderungen an; ihre Werte werden nicht einfach als Teil eines alten Programmzustands wiederhergestellt. Welche Sicherungen Software benötigt, hängt vom Behandlungspfad und den von ihm veränderten Registern ab.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -711,6 +816,7 @@ U=\frac{3}{250}=1{,}2\,\%
 </ul>
 <aside class="notes">
 <p>Die Abbildung liest sich von links nach rechts als Ablauf. Vor dem Trap läuft das Hauptprogramm. Die Hardware schreibt die Fortsetzungsadresse nach <code>mepc</code>, Machine Exception Program Counter, und die Ursache nach <code>mcause</code>, Machine Cause. Sie kopiert das alte MIE-Bit, Machine Interrupt Enable, globale Maschinen-Interruptfreigabe, in MPIE, Machine Previous Interrupt Enable, und setzt MIE auf null. MPP, Machine Previous Privilege, hält die vorherige Privilegstufe; im Modell ist das Machine Mode.</p>
+<p>Ein Bild für die Vorlesung: Der Machine Mode ist der Hausmeister mit Generalschlüssel, der User Mode ein Mieter, der nur seine eigene Wohnung öffnen kann. Machine Mode bezeichnet den Maschinenmodus mit höchsten Rechten, User Mode den Benutzermodus mit eingeschränkten Rechten. Die Analogie veranschaulicht die unterschiedlichen Berechtigungen; die konkreten Grenzen für Speicher- und Gerätezugriffe ergeben sich aus den eingerichteten Schutzmechanismen. In unserem Lehrmodell laufen Hauptprogramm und Unterbrechungsbehandlung beide im Machine Mode. Der Trap bedeutet hier deshalb keinen Wechsel vom User Mode in den Machine Mode.</p>
 <p>Danach erhält die Software im Prolog, dem Eintrittsteil, die benötigten allgemeinen Register auf einem Stackrahmen. Der Handler bearbeitet die Ursache. Im Epilog, dem Austrittsteil, stellt die Software ihre Sicherungen wieder her. <code>mret</code>, Machine Return, verwendet <code>mepc</code> als Rückkehradresse und stellt unter anderem MIE aus MPIE sowie die vorherige Privilegstufe her.</p>
 <p>Die Kästen unterscheiden Hardwareaktionen von Softwareaufgaben; die Pfeile zeigen zeitliche Reihenfolge, keine gemessenen Dauern. <code>mret</code> lädt nicht automatisch den Softwarestack. Fehlt eine Registerwiederherstellung, kann das Hauptprogramm mit falschen Werten weiterlaufen, obwohl die Rückkehradresse stimmt. Ein normaler Funktionsrücksprung ist ebenfalls kein Ersatz für die Trap-Rückkehr.</p>
 <style type="text/css">
@@ -754,7 +860,15 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
 </tbody>
 </table>
 <aside class="notes">
-<p><code>mcause</code>, Machine Cause, ist das Ursachenregister eines Traps. RV32 bedeutet zweiunddreißig Bit breite Integerregister. Das höchste Bit, Bit einunddreißig, unterscheidet einen Interrupt von einer Exception. Der Rohwert raw ist der vollständige Registerinhalt. Die Rechtsverschiebung <span class="math inline">\(\gg31\)</span> und bitweises Und <span class="math inline">\(\&amp;1\)</span> gewinnen das Interrupt-Bit <span class="math inline">\(I\)</span>. Die Maske <code>0x7FFFFFFF</code> entfernt es; <span class="math inline">\(c\)</span> ist der verbleibende Ursachencode. Hexadezimale Werte tragen <code>0x</code>.</p>
+<p>Folie 16 zeigt, wie die Software nach einem Trap herausfindet, was passiert ist. Ein Trap ist der Übergang in die Behandlung eines Interrupts oder einer Exception. <code>mcause</code>, Machine Cause, ist das zugehörige Ursachenregister. Die Kernaussage: Dieses Register enthält zwei Informationen in einem Wort, und man braucht beide, um die Ursache richtig zu deuten.</p>
+<p><strong>Aufbau des Registers</strong></p>
+<p>Auf RV32, der RISC-V-Variante mit zweiunddreißig Bit breiten Integerregistern, ist auch <code>mcause</code> zweiunddreißig Bit breit. Es ist in zwei Felder geteilt:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource text number-lines code-with-copy"><code class="sourceCode"><span id="cb2-1"><a aria-label="1"></a> Bit 31  Bit 30                              Bit 0</span>
+<span id="cb2-2"><a aria-label="2"></a>+-------+-----------------------------------------+</span>
+<span id="cb2-3"><a aria-label="3"></a>|   I   |                 Code c                  |</span>
+<span id="cb2-4"><a aria-label="4"></a>+-------+-----------------------------------------+</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Das oberste Bit <span class="math inline">\(I\)</span> sagt, ob ein Interrupt (<span class="math inline">\(I=1\)</span>) oder eine Exception (<span class="math inline">\(I=0\)</span>) vorliegt. Ein Interrupt ist eine asynchrone Unterbrechungsanforderung, eine Exception eine synchrone Ausnahme aus der Befehlsausführung. Die übrigen einunddreißig Bits enthalten den Code <span class="math inline">\(c\)</span>, also welche Interrupt-Kategorie oder welche Exception vorliegt. Der Code muss deshalb zusammen mit dem Interrupt-Bit gelesen werden.</p>
+<p>Der Rohwert <code>raw</code> in der Formel ist der vollständige Registerinhalt. Die Rechtsverschiebung <span class="math inline">\(\gg31\)</span> bringt das oberste Bit an die niedrigste Stelle; bitweises Und <span class="math inline">\(\&amp;1\)</span> isoliert den Wert von <span class="math inline">\(I\)</span>. Die Maske <code>0x7FFFFFFF</code> enthält eine Null an Bit einunddreißig und Einsen an den übrigen Stellen. Bitweises Und mit dieser Maske entfernt das Interrupt-Bit und erhält den Ursachencode <span class="math inline">\(c\)</span>. Hexadezimale Werte tragen <code>0x</code>.</p>
 <p><code>0x80000007</code> hat <span class="math inline">\(I=1\)</span> und <span class="math inline">\(c=7\)</span>, Machine Timer Interrupt. <code>0x8000000B</code> hat <span class="math inline">\(I=1\)</span> und <span class="math inline">\(c=11\)</span>, Machine External Interrupt, externe Kategorie. <code>0x00000002</code> hat <span class="math inline">\(I=0\)</span> und <span class="math inline">\(c=2\)</span>, Illegal Instruction, ungültiger Befehl. Der Begriff Exception Code in der Spezifikation benennt das Codefeld auch dann, wenn das Interrupt-Bit gesetzt ist.</p>
 <p>Eine Geräte-ID wird daraus nicht gewonnen. Auch ein Timer und eine externe Quelle mit zufällig gleicher Zahlen-ID wären verschiedene Ebenen. Wer nur die niedrigen Bits vergleicht, ohne Interrupt und Exception zu unterscheiden, kann die falsche Behandlung wählen. Die nächste Folie zeigt daher die zweite Identifikationsebene.</p>
 <style type="text/css">
@@ -777,9 +891,18 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
 <li>PLIC-Claim: Welches externe Gerät wurde übernommen?</li>
 </ul>
 <aside class="notes">
-<p>Die Abbildung trennt oben den lokalen Timerpfad und unten den externen Gerätepfad. Ein Hart ist der Hardware-Ausführungskontext. <code>mtime</code>, Machine Time, und <code>mtimecmp</code>, Machine Time Compare, erzeugen im oberen Pfad die Timerbedingung mit Ursachencode sieben. PLIC bedeutet Platform-Level Interrupt Controller. Er sammelt unten Anforderungen von UART, Sensor und Taster. UART steht für Universal Asynchronous Receiver/Transmitter, eine serielle Schnittstelle, deren Übertragungsdetails erst später behandelt werden.</p>
-<p>Die drei externen Quellen besitzen eigene Geräte-IDs, Identifikationsnummern eins, zwei und drei. Sie teilen sich auf dem Weg zum Hart aber den externen Ursachencode elf. <code>mcause</code>, Machine Cause, benennt diese Kategorie und noch nicht das einzelne Gerät. Erst Claim, ein Übernahmezugriff beim Controller, liefert dessen konkrete ID. Die untere Verbindung in der Abbildung zeigt diesen zusätzlichen Zugriff der Software auf den Controller.</p>
-<p>Die Pfeile beschreiben unterschiedliche Informationswege, keine gemessenen Latenzen. Eine externe Geräte-ID sieben wäre weiterhin eine externe Quelle und würde nicht zum lokalen Timer mit Kategorie sieben. Die Zahlen gehören zu verschiedenen Namensräumen. Die Trennung genügt für den Hauptteil; zusätzliche lokale Softwareinterrupts sind für diese beiden Behandlungswege nicht erforderlich.</p>
+<p>Folie 17 zeigt, dass die Identifikation bei externen Interrupts zweistufig ist. <code>mcause</code>, Machine Cause, sagt zunächst nur, welche Art von Interrupt vorliegt. Bei externen Geräten muss die Software anschließend beim PLIC, Platform-Level Interrupt Controller, nachfragen, welche konkrete Gerätequelle zur Bearbeitung übernommen wird. Der Kategoriencode und die Geräte-ID beantworten also unterschiedliche Fragen.</p>
+<p><strong>Aufbau der Grafik</strong></p>
+<p>Die Abbildung zeigt zwei getrennte Wege zum Hart, einem Hardware-Ausführungskontext des Prozessors. Oben liegt der lokale Timerpfad, unten der Pfad für externe Geräte. Beide Wege können eine Unterbrechungsanforderung auslösen, liefern aber unterschiedlich genaue Informationen über ihre Herkunft.</p>
+<p><em>Oben</em> liegt der Timerbaustein mit <code>mtime</code>, Machine Time, der Zeitquelle, und <code>mtimecmp</code>, Machine Time Compare, dem Vergleichswert. Sein Anforderungsweg führt im dargestellten Modell ohne PLIC zum Hart und meldet die Kategorie sieben, Machine Timer Interrupt. Im klassischen Modell hat jeder Hart seinen zugeordneten Timervergleich; die Zeitquelle selbst kann gemeinsam genutzt werden. Mit Kategorie sieben ist dieser Vergleichspfad identifiziert, eine weitere Geräteauswahl per PLIC-Claim entfällt. Die Timerbehandlung bleibt trotzdem nötig. Die beiden Register werden in der dritten Unterrichtsstunde ab Folie 27 genauer erklärt; hier genügt dieser Vorgriff auf ihre Aufgabe.</p>
+<p><em>Unten</em> liegt der Gerätepfad. UART, Sensor und Taster melden ihre Anforderungen an den PLIC. UART heißt Universal Asynchronous Receiver/Transmitter, eine serielle Sende- und Empfangsschnittstelle. Der PLIC bündelt die externen Anforderungen und meldet dem Hart zunächst nur die Kategorie elf, Machine External Interrupt. Aus dieser gemeinsamen Kategorie kann die Software nicht ablesen, welches der drei Geräte gerade bearbeitet werden soll.</p>
+<p>Der Pfeil vom Hart zurück zum PLIC stellt keine weitere Interruptleitung dar, sondern einen Softwarezugriff: Der Handler, die Behandlungsroutine, liest das Claim-Register des Controllers über eine Geräteadresse. Claim bedeutet Übernehmen; der Zugriff liefert die Identifikationsnummer der ausgewählten Quelle, die Geräte-ID. Er ist nicht bloß ein passives Nachsehen, sondern hat einen Seiteneffekt, den Folie 22 erläutert. Die Pfeile zeigen Informations- und Zugriffswege, keine Zeitdauern oder gemessenen Latenzen.</p>
+<p><strong>Warum zwei Stufen?</strong></p>
+<p>Die betrachtete klassische Organisation verwendet wenige Maschinen-Interruptkategorien, insbesondere Software, Timer und extern. Diese Kategorien sind von der Zahl der Peripheriegeräte zu unterscheiden; sie sind auch keine allgemeine Aussage über die genaue Zahl physischer Prozessoranschlüsse. Ein Mikrocontroller kann Dutzende externe Quellen besitzen. Statt jede davon als eigene Kategorie am Hart zu unterscheiden, sammelt der PLIC ihre Anforderungen und führt sie für den betrachteten Machine-Mode-Kontext auf die gemeinsame externe Benachrichtigung zusammen. Machine Mode ist die Maschinenprivilegstufe; der Kontext bezeichnet hier das Ziel dieser Benachrichtigung.</p>
+<p>Die <a href="https://github.com/riscv/riscv-plic-spec/blob/master/riscv-plic.adoc">klassische PLIC-Spezifikation</a> sieht bis zu 1023 Interruptquellen vor. Das ist eine Obergrenze, keine Zusage über die tatsächlich vorhandene Quellenzahl eines konkreten Chips. Die Geräteauswahl wandert damit zum Controller und zum Claim-Zugriff. Eine externe Geräte-ID sieben wäre weiterhin eine externe Quelle der Kategorie elf und würde nicht zum lokalen Timer der Kategorie sieben. Die Zahlen gehören zu verschiedenen Namensräumen.</p>
+<p><strong>Woher die Geräte-IDs kommen</strong></p>
+<p>Im betrachteten fest verdrahteten System ist die Zuordnung von Gerätequelle zu PLIC-ID durch die Anbindung im Chip vorgegeben und in der Plattformbeschreibung dokumentiert. Die Software wählt diese Nummern nicht frei. Für die Abbildung wurden UART als Quelle eins, Sensor als Quelle zwei und Taster als Quelle drei angenommen; auf einer anderen Plattform kann die Zuordnung anders lauten. Einstellbar sind dagegen die Prioritäten im Rahmen der unterstützten Werte. Folie 21 zeigt, wie sie die Auswahl wartender Quellen beeinflussen.</p>
+<p>ID null ist reserviert und bezeichnet kein Gerät. Liefert ein Claim null, wurde für den betrachteten Kontext keine Quelle übernommen. Folie 22 erläutert diesen Fall genauer. Die zweite Stufe liefert somit eine Geräte-ID für die konkrete Bearbeitung, während <code>mcause</code> weiterhin die gemeinsame Interrupt-Kategorie enthält.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -792,8 +915,10 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
           display:block!important;
       }</style></aside>
 </section>
-<section id="direct-und-vectored-nur-der-erste-einsprung" class="slide level2">
-<h2>Direct und Vectored: nur der erste Einsprung</h2>
+<section id="direct-vectored-erster-einsprung" class="slide level2">
+<h2>Direct / Vectored: erster Einsprung</h2>
+<div style="font-size: 0.9em; text-align: left;">
+<p><code>mtvec</code>: BASE in den oberen Bits, MODE in Bits <span class="math inline">\(1{:}0\)</span>. MODE <span class="math inline">\(0\)</span>: Direct, MODE <span class="math inline">\(1\)</span>: Vectored.</p>
 <table class="caption-top">
 <thead>
 <tr class="header">
@@ -816,13 +941,43 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
 </tr>
 </tbody>
 </table>
-<p><span class="math inline">\(c\)</span>: Cause-Code ohne Interrupt-Bit; Konfiguration über <code>mtvec</code>.</p>
-<p>Beispiel: BASE <code>0x80000100</code>, Timer-Code <span class="math inline">\(7\)</span> → <code>0x8000011C</code>.</p>
-<p>Externe Geräte brauchen in beiden Modi weiterhin eine Geräteauswahl.</p>
+<p><span class="math inline">\(c\)</span>: Code ohne Interrupt-Bit. Slotabstand: <span class="math inline">\(4\)</span> Byte.</p>
+<p>BASE <code>0x80000100</code>: Timer (<span class="math inline">\(c=7\)</span>) → <code>0x8000011C</code>.</p>
+<ul>
+<li>Am Slot steht ein Befehl, etwa <code>j timer_entry</code>, kein geladener Zeiger</li>
+<li>Externe Geräte teilen Kategorie <span class="math inline">\(11\)</span>; PLIC-Claim bleibt nötig</li>
+</ul>
+<p>Partnerfrage: Code <span class="math inline">\(11\)</span> als Interrupt? Als Exception (<code>ecall</code> im Machine Mode)?</p>
+</div>
 <aside class="notes">
-<p><code>mtvec</code> bedeutet Machine Trap-Vector Base Address, das Register für Basis und Einsprungmodus der Maschinen-Traps. Direct führt alle betrachteten Traps zuerst zur Basisadresse BASE. Ein gemeinsamer Dispatcher, eine Verzweigung nach der Ursache, wählt dort den zuständigen Pfad. Er kann danach ebenso eine Geräte-ID verwenden wie ein vektorisierter Eintritt; Direct erzwingt keine lineare Suche durch sämtliche Geräte.</p>
-<p>Vectored addiert bei Interrupts vier Byte mal Cause-Code <span class="math inline">\(c\)</span> zur Basis. Der Code enthält nicht das höchste Interrupt-Bit aus <code>mcause</code>, Machine Cause. Beim Timer ergibt sich <span class="math inline">\(4\cdot7=28=\texttt{0x1C}\)</span> Byte und damit <code>0x8000011C</code>. Eine Exception, synchrone Ausnahme aus einem Befehl, geht auch in diesem Modus zur Basis. Der Kategorienplatz enthält einen ausführbaren Befehl, keinen automatisch geladenen Funktionszeiger.</p>
-<p>Die gemeinsame externe Kategorie wird durch Vectored nicht in einzelne Geräte aufgeteilt. Der PLIC, Platform-Level Interrupt Controller, liefert diese Auswahl weiterhin per Claim. Für den Hauptteil genügt dieser Vergleich mit einer kleinen Adressrechnung. Bitkodierung, Linkerplatzierung, Assemblerdirektiven und Sprungreichweiten einer vollständigen Tabelle sind keine zusätzlichen Pflichtlernziele. Der Modus allein belegt auch keine feste Reaktionszeit.</p>
+<p>Folie 18 klärt, wohin der Prozessor beim Trap springt. Ein Trap ist der Übergang in die Behandlung eines Interrupts oder einer Exception. Direct und Vectored bestimmen nur die Adresse des allerersten ausgeführten Befehls dieser Behandlung. Die anschließende Sicherung, weitere Verzweigungen und die Gerätebearbeitung bleiben Aufgaben der Software. Ein Einsprungmodus ist noch kein vollständiger Handler.</p>
+<p><strong>Das Register mtvec</strong></p>
+<p><code>mtvec</code> bedeutet Machine Trap-Vector Base Address. Es ist ein CSR, Control and Status Register, also ein Steuer- und Statusregister im Prozessor. Die oberen Registerbits kodieren die Basisadresse BASE, die untersten beiden Bits den Modus MODE: null für Direct und eins für Vectored. Die Basisadresse ist mindestens auf vier Byte ausgerichtet; ihre beiden niedrigsten Adressbits sind daher null. Im Register können an diesen Stellen stattdessen die Modusbits stehen. Bei BASE <code>0x80000100</code> lautet der Registerwert für Direct <code>0x80000100</code>, für Vectored <code>0x80000101</code>. Die Hardware trennt Basis und Modus, statt zur ungeraden Adresse des Registerwerts zu springen.</p>
+<p>Diese Ausrichtung ist eine Anforderung an die Trap-Basis, keine allgemeine Aussage, dass alle RISC-V-Befehle vier Byte lang oder vier Byte ausgerichtet seien. Mit komprimierten Befehlen sind auch zwei Byte lange Befehle und entsprechende Befehlsgrenzen möglich. Eine konkrete Implementierung kann für Vectored strengere Anforderungen an BASE haben oder nur bestimmte Modi unterstützen. Für die Folie genügt die Trennung von Basisadresse und Modus; ein vollständiger Tabellenaufbau ist nicht vorausgesetzt.</p>
+<p><strong>Direct</strong></p>
+<p>In Direct führt jeder betrachtete Trap zuerst an dieselbe Adresse BASE. Dort beginnt ein gemeinsamer Dispatcher, eine Routine, die anhand der Ursache die passende Behandlung auswählt. Sie liest <code>mcause</code>, Machine Cause, und trennt wie auf Folie 16 Interrupt-Bit und Ursachencode. Bei externen Interrupts folgt anschließend die Geräteauswahl des PLIC, Platform-Level Interrupt Controller, aus Folie 17.</p>
+<p>Direct heißt nicht, dass die Software alle Ursachen oder Gerätestatus nacheinander durchprobieren muss. Sie kann beispielsweise nach Prüfung des Interrupt-Bits den Code als Index einer geeigneten Sprungtabelle verwenden. Eine solche Tabelle enthält Ziele für die anschließende Softwareverzweigung; ihre Einträge sind von den ausführbaren Befehlen an den Hardware-Vektorplätzen zu unterscheiden. Unbekannte oder nicht unterstützte Codes benötigen eine definierte Behandlung.</p>
+<p><strong>Vectored</strong></p>
+<p>Bei einem Interrupt berechnet die Hardware die erste Befehlsadresse als <span class="math inline">\(\mathrm{BASE}+4c\)</span>. <span class="math inline">\(c\)</span> ist der Code ohne das höchste Interrupt-Bit. Mit BASE <code>0x80000100</code> ergibt sich für den Timer <span class="math inline">\(4\cdot7=28=\texttt{0x1C}\)</span> Byte, also <code>0x8000011C</code>. Die folgende Adressskizze zeigt ausgewählte Plätze, kein vollständiges Assemblerprogramm; die nicht aufgeführten Zwischenplätze dürfen in einer realen Tabelle nicht einfach entfallen:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource text number-lines code-with-copy"><code class="sourceCode"><span id="cb3-1"><a aria-label="1"></a>0x80000100: j exception_entry  # BASE: alle Exceptions</span>
+<span id="cb3-2"><a aria-label="2"></a>0x8000010C: j software_entry   # Interrupt-Code 3</span>
+<span id="cb3-3"><a aria-label="3"></a>0x8000011C: j timer_entry      # Interrupt-Code 7</span>
+<span id="cb3-4"><a aria-label="4"></a>0x8000012C: j external_entry   # Interrupt-Code 11</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>j</code> steht für einen unbedingten Sprung, ohne einen normalen Funktionsaufruf vorzubereiten. Die Zielnamen bezeichnen hier die jeweiligen Eintrittsroutinen; sie sind keine bereits implementierten Repository-Funktionen. Kategorie drei bezeichnet den klassischen Maschinen-Softwareinterrupt, eine durch Software ausgelöste Anforderung. Sieben bezeichnet den Timer, elf die externe Maschinenkategorie.</p>
+<p>Der Abstand der Vektorplätze beträgt stets vier Byte. Für die Skizze nehmen wir je Platz einen vier Byte langen Sprung an. Daraus folgt nicht, dass allgemein nur ein einziger Befehl in diesen Abstand passt: Zwei komprimierte Zwei-Byte-Befehle wären ebenfalls möglich. Entscheidend ist, dass ein realer Aufbau die vorgegebenen Eintrittsadressen einhält. Der Assembler übersetzt Befehle, der Linker platziert sie; ihre Umformungen dürfen die vorgesehenen Plätze nicht verschieben. Die Skizze ist keine vollständige Vorlage für diese Platzierung oder für die Kontextsicherung.</p>
+<p><strong>Warum Exceptions immer zu BASE gehen</strong></p>
+<p>Das ist die festgelegte Regel der betrachteten RISC-V-Architektur. Sie wird nicht daraus abgeleitet, dass Exceptions angeblich selten oder grundsätzlich wenig zeitkritisch wären. An BASE kann die Software eine zur jeweiligen Exception passende Behandlung auswählen. Die Codes für Interrupts und Exceptions gehören zu getrennten Namensräumen und dürfen dieselbe Zahl verwenden.</p>
+<p>Ein anschaulicher Vergleich ist <code>ecall</code>, Environment Call, eine bewusst ausgelöste Anforderung an die Ausführungsumgebung. Wird dieser Befehl im Machine Mode, der Maschinenprivilegstufe unseres Modells, ausgeführt, erzeugt er eine Exception mit Code elf. Auch der externe Maschineninterrupt hat Code elf, aber sein Interrupt-Bit ist eins. Im Vectored-Modus geht die <code>ecall</code>-Exception deshalb nach BASE, während der externe Interrupt nach BASE plus vierundvierzig Byte geht. Die überlappenden Codes machen die Bedeutung des Interrupt-Bits deutlich; sie beweisen nicht, dass jede denkbare Architektur dieselbe Vektorisierungsregel wählen müsste. Schon rechnerisch würde ein Interrupt mit Code null ebenfalls bei BASE liegen; im hier betrachteten klassischen Maschinenmodell ist das keine regulär belegte Interrupt-Kategorie.</p>
+<p><strong>Befehl oder Adresse: Vergleich mit Cortex-M</strong></p>
+<p>Für Studierende mit ARM-Erfahrung hilft ein gezielter Vergleich: Die Handler-Einträge einer Cortex-M-Vektortabelle enthalten Adressen, die die Hardware lädt. Bei der hier betrachteten RISC-V-Vektorisierung stehen an den Eintrittsplätzen dagegen Befehle, die ausgeführt werden, typischerweise Sprünge zu den eigentlichen Behandlungen. Dort wird kein Funktionszeiger automatisch geladen. Beide Tabellen sehen deshalb trotz des gemeinsamen Wortes Vektor unterschiedlich aus.</p>
+<p><strong>Die wichtigste Einschränkung</strong></p>
+<p>Vectored verteilt nach Interrupt-Kategorien, nicht nach den einzelnen Geräten hinter dem PLIC. Alle diese externen Geräte teilen den Platz für Code elf. Die dortige Eintrittsroutine muss weiterhin per Claim, dem Übernahmezugriff beim PLIC, eine konkrete Geräte-ID erhalten. Ein eigener Kategorieplatz ersetzt weder diese Auswahl noch die Gerätequittierung.</p>
+<p>Das Fehlbild „Vectored bedeutet einen eigenen Handler für jedes Gerät“ ist daher zu vermeiden. Auch bei Cortex-M mit dem NVIC, Nested Vectored Interrupt Controller, kann ein externer Interruptvektor mehrere Geräte- oder Unterursachen zusammenfassen. Als Ausblick kann der CLIC, Core Local Interrupt Controller, erwähnt werden: Diese alternative RISC-V-Interruptorganisation ermöglicht unter anderem quellenbezogene Vektorisierung. Daraus folgt keine Änderung der hier erklärten Regeln für <code>mtvec</code> und den klassischen PLIC. Die weiteren CLIC-Verfahren und ihr konkreter Versionsstand sind nicht Gegenstand dieser Folie.</p>
+<p><strong>Was Vectored bringt und was nicht</strong></p>
+<p>Bei entsprechend aufgebauten Eintrittsroutinen kann Vectored die erste Auswahl zwischen Interrupt-Kategorien vorwegnehmen und damit Auswahlbefehle eines gemeinsamen Dispatchers einsparen. Das bedeutet nicht, dass <code>mcause</code> nie mehr gelesen wird; etwa für weitere Unterscheidungen oder Diagnose kann es weiterhin nötig sein. Ob und wie viel Zeit tatsächlich gespart wird, hängt vom Codeaufbau und der Plattform ab. Der Modus allein belegt keine feste Reaktionszeit.</p>
+<p>Insbesondere verschwinden durch den anderen Einsprung weder gesperrte Interrupts noch eine bereits laufende, nicht verschachtelte ISR, Interrupt Service Routine, Unterbrechungsbehandlung. Die auf Folie 38 angenommenen vierzig Mikrosekunden Blockierung bleiben ein eigener Teil des Reaktionsbudgets. Aus dieser Lehrzahl folgt keine allgemeine Größenordnung für das Verhältnis von Blockierung und eingesparten Befehlszeiten.</p>
+<p><strong>Didaktischer Hinweis</strong></p>
+<p>Lassen Sie die Studierenden nach dem Timerbeispiel die Adresse für einen externen Interrupt mit Code elf berechnen: <span class="math inline">\(4\cdot11=44=\texttt{0x2C}\)</span> Byte, also <code>0x8000012C</code>. Fragen Sie anschließend, wohin die <code>ecall</code>-Exception aus dem Machine Mode springt. Die Antwort lautet BASE, also <code>0x80000100</code>, obwohl ihr Code ebenfalls elf ist. Wer beide Fälle an denselben Platz legt, hat das Interrupt-Bit oder die Sonderregel für Exceptions übersehen. Die Frage prüft damit die Verbindung zwischen den Folien 16 bis 18, statt das Auswendiglernen weiterer Codes zu verlangen.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -869,9 +1024,18 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
 <li>Globale Ursache im Lehrmodell: Machine External, Code <span class="math inline">\(11\)</span></li>
 </ul>
 <aside class="notes">
-<p>PLIC heißt Platform-Level Interrupt Controller, Plattform-Interrupt-Controller. Er nimmt Anforderungen externer Geräte über Gateways, Quellanbindungen, an. Das Modell verwendet UART als Quelle eins, einen Sensor als Quelle zwei und einen Taster als Quelle drei. UART heißt Universal Asynchronous Receiver/Transmitter, serielle Sende- und Empfangsschnittstelle; Einzelheiten der Busse sind hier nicht nötig.</p>
-<p>Jede Quelle besitzt eine Identifikationsnummer, Geräte-ID, und eine Priorität. Der PLIC verwaltet ihre Pending-Zustände, wartende Anforderungen. Ein Kontext ist ein Ziel mit Zuordnung zu einem Hart, Hardware-Ausführungskontext, und einer Privilegstufe. Es ist daher präziser als die pauschale Bezeichnung „Kern“. Für diesen Kontext existieren Quellenfreigaben und ein Schwellenwert.</p>
-<p>Die Abbildung zeigt das Sammeln und Weiterleiten von links nach rechts. Sie ist keine konkrete Memory Map und keine Zeitmessung. Der Machine-Mode-Kontext, die Maschinenprivilegstufe im Zielhart, meldet dem Hart die Kategorie Machine External Interrupt, Ursachencode elf. Die Geräte-ID erhält die Software erst bei Claim, dem Abholen einer Quelle. Zunächst betrachten wir die Regeln, die eine Benachrichtigung zulassen.</p>
+<p>Folie 20 öffnet den PLIC, der auf Folie 17 noch weitgehend ein geschlossener Kasten war. PLIC heißt Platform-Level Interrupt Controller, Plattform-Interrupt-Controller. Die Kernaussage: Er verwaltet Zustand und Einstellungen auf zwei Ebenen, pro Gerätequelle und pro Empfänger, dem Kontext. Dieser Begriff wird hier systematisch erklärt.</p>
+<p>Die Grafik liest sich von links nach rechts: UART, Sensor und Taster führen zum PLIC, dieser zum Hart null im Machine Mode. UART heißt Universal Asynchronous Receiver/Transmitter, serielle Sende- und Empfangsschnittstelle. Die angenommenen Geräte-IDs, Identifikationsnummern, sind eins, zwei und drei. Die Pfeile zeigen das Sammeln und Weiterleiten von Anforderungen, keine Zeitdauern oder konkreten Geräteadressen.</p>
+<p><strong>Was der PLIC pro Quelle verwaltet</strong></p>
+<p>Jede Gerätequelle besitzt eine durch ihre Anbindung vorgegebene ID und eine von Software einstellbare Priorität im Rahmen der unterstützten Werte. Ein Pending-Bit zeigt an, dass für diese Quelle eine wartende Anforderung vorliegt. Dieser Pending-Zustand gehört zur Quelle und wird gemeinsam verwaltet; es ist kein eigenes Pending-Bit für jeden möglichen Empfänger.</p>
+<p>An der Quellanbindung sitzt ein Gateway, das in der Grafik nicht separat eingezeichnet ist. Es setzt das Gerätesignal in eine Anforderung an den Controller um und lässt pro Quelle höchstens eine noch nicht abgeschlossene Anforderung zum PLIC weiter. Nach der Weitergabe bleibt die Anbindung für eine weitere solche Anforderung gesperrt, bis der Abschluss gemeldet wird. Ob zusätzliche Ereignisse zwischengespeichert werden, hängt von Gerät und Gateway ab; daraus folgt keine unbegrenzte Warteschlange. Auf den Folien 23 und 24 wird wichtig, dass Claim und Abschluss verschiedene Schritte sind.</p>
+<p><strong>Was der PLIC pro Kontext verwaltet</strong></p>
+<p>Ein Kontext ist ein Empfänger, der einem Hart und einer Privilegstufe zugeordnet ist. Ein Hart ist ein Hardware-Ausführungskontext des Prozessors. Unser Lehrmodell verwendet genau einen PLIC-Kontext: Hart null im Machine Mode, der höchsten RISC-V-Privilegstufe. M-Mode in der Grafik ist die Kurzform dafür. MEI steht dort für Machine External Interrupt, die externe Maschinen-Interruptkategorie mit Code elf.</p>
+<p>Für jeden Kontext gibt es eigene Enable-Bits, Freigabebits, eines je Quelle. Sie legen fest, welche Geräte diesen Empfänger erreichen dürfen. Dazu kommen ein kontextbezogener Threshold, Schwellenwert, und ein Claim/Complete-Zugriff. Der Schwellenwert bleibt im Hauptteil null. Lesen des Claim/Complete-Registers übernimmt eine Gerätequelle, Claim genannt; Schreiben der übernommenen ID meldet ihren Abschluss, Complete genannt. Die nächsten Folien erklären diese Aktionen genauer.</p>
+<p>Als Gedankenbild für Studierende der Elektrotechnik eignet sich eine Matrix: Die Zeilen sind die Quellen, die Spalten die Kontexte. An jedem Kreuzungspunkt sitzt ein Enable-Bit, das die Zuordnung freigibt oder sperrt. Die Priorität und der Pending-Zustand gehören dagegen zur ganzen Quellenzeile, der Schwellenwert zur Empfängerspalte. Ein gesetztes Enable allein genügt noch nicht zur Benachrichtigung; Pending, Priorität und Schwellenwert müssen ebenfalls passen. Auf der Hart-Seite kommen weitere Freigaben hinzu.</p>
+<p><strong>Warum Kontext und nicht einfach Kern?</strong></p>
+<p>Ein Hart kann externe Interrupts für verschiedene Privilegstufen empfangen. Stellen wir uns als zusätzliches Beispiel eine Plattform mit zwei Harts vor, deren PLIC für jeden Hart einen Machine- und einen Supervisor-Kontext bereitstellt: Dann gibt es <span class="math inline">\(2\cdot2=4\)</span> Kontexte. Der Supervisor Mode ist eine Privilegstufe für Betriebssystemsoftware unterhalb des Machine Mode. Die vier Empfänger sind eine Annahme dieses Beispiels, keine automatische Zusage für jede Plattform mit zwei Harts.</p>
+<p>Bei entsprechend eingerichteter Plattform und Weiterleitung kann die UART etwa zum Betriebssystem auf Hart eins gelangen, der Sensor zur Firmware auf Hart null. Die zugehörigen Kategorien unterscheiden sich: Machine External Interrupt hat Code elf, Supervisor External Interrupt Code neun. Welche Ziele und Weiterleitungsregeln unterstützt werden, muss zur Plattform passen. Für die Vorlesung genügt dies als Begründung des Begriffs Kontext; der weitere Hauptteil bleibt beim einen Machine-Mode-Kontext aus der Grafik.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -943,9 +1107,53 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
 <li>Die Ursache im Gerät ist dadurch noch nicht bearbeitet</li>
 </ul>
 <aside class="notes">
-<p>Claim ist der Übernahmezugriff beim PLIC, Platform-Level Interrupt Controller. Er wird typischerweise durch Lesen eines kontextbezogenen MMIO-Registers ausgelöst. MMIO bedeutet Memory-Mapped Input/Output, Gerätezugriff über Speicheradressen. Anders als ein normales Lesen einer C-Variablen besitzt dieser Zugriff einen Seiteneffekt: Der Controller liefert die ID der gewählten Quelle und löscht deren Pending, Wartemarkierung, atomar.</p>
-<p>Atomar bedeutet hier, dass Übernahme und zugehörige Pending-Änderung nicht als getrennte konkurrierende Schritte beobachtet werden. Wenn mehrere Harts, Hardware-Ausführungskontexte, dieselbe Quelle beanspruchen, kann derselbe wartende Vorgang nicht gleichzeitig zweimal übernommen werden. Andere wartende Quellen bleiben jedoch claimbar. Eine gelesene ID null bedeutet keine Quelle und darf weder für einen Gerätehandler noch ein Complete verwendet werden.</p>
-<p>Der Claim liest nicht automatisch die Nutzdaten eines UART, einer seriellen Schnittstelle, und löscht nicht zwangsläufig dessen Statusursache. Ein Debugger oder Diagnoseausdruck, der das Claim-Register noch einmal liest, kann also eine weitere Quelle abholen. Software sollte den gelesenen Wert speichern und denselben Wert später für die passende Abschlussmeldung verwenden.</p>
+<p>Folie 22 führt eine Eigenschaft ein, die für viele Studierende ungewohnt ist: einen Lesezugriff, der etwas verändert. Claim ist der Übernahmezugriff beim PLIC, Platform-Level Interrupt Controller. Das Lesen seines Claim-Registers ist kein bloßes Nachschauen, sondern eine Aktion. Es übernimmt eine wartende Anforderung. Das hat Folgen, wenn man den Zugriff unbedacht wiederholt.</p>
+<p><strong>Was beim Lesen passiert</strong></p>
+<p>Die Software liest ein bestimmtes MMIO-Register des PLIC, das zu ihrem Kontext gehört. MMIO bedeutet Memory-Mapped Input/Output, Gerätezugriff über Speicheradressen. Ein Kontext ist der auf Folie 20 erklärte Empfänger aus Hart und Privilegstufe. Der PLIC liefert bei Claim die ID, Identifikationsnummer, der höchstpriorisierten wartenden und für diesen Kontext freigegebenen Quelle mit positiver Priorität. Dabei löscht er deren Pending-Bit, die Markierung für die wartende Controlleranforderung. Auswahl und Entfernen dieses Pending-Zustands bilden eine atomare, unteilbare Übernahme.</p>
+<p>Ein zweites Lesen führt einen neuen Claim aus. Solange die gerade übernommene Quelle nicht abgeschlossen wurde, erhält die Software bei diesem weiteren Zugriff eine andere wartende Quelle oder null. Sie liest keine unveränderte Kopie des ersten Ergebnisses. Deshalb muss die einmal gelesene ID für Gerätebearbeitung und Abschluss gespeichert werden.</p>
+<p>Ein vertrauter Vergleich aus dem Labor ist eine UART, Universal Asynchronous Receiver/Transmitter, eine serielle Sende- und Empfangsschnittstelle, deren Empfangsregister beim Lesen ein Byte aus einem Empfangspuffer entnimmt. Ein weiterer Lesezugriff kann dann das nächste gepufferte Byte liefern. Ob und wie genau ein konkretes UART-Register diesen Seiteneffekt hat und was bei leerem Puffer geschieht, bestimmt die Gerätebeschreibung. Das Beispiel macht die auf Folie 6 angedeutete Eigenschaft greifbar: Ein Gerätezugriff muss sich nicht wie das Lesen gewöhnlichen Speichers verhalten.</p>
+<p><strong>Warum atomar wichtig ist</strong></p>
+<p>Die Unteilbarkeit wird besonders bei mehreren Harts, Hardware-Ausführungskontexten, sichtbar. Ist dieselbe Quelle für zwei Kontexte freigegeben und sind deren weitere Benachrichtigungsbedingungen erfüllt, können beide Empfänger benachrichtigt werden. Lesen anschließend zwei Harts ihren Claim, bekommt nur einer diese wartende Quellen-ID. Der andere erhält null oder eine andere Quelle, weil das gemeinsame Pending bereits entfernt wurde.</p>
+<p>So wird dieselbe wartende PLIC-Anforderung nicht gleichzeitig zweimal übernommen. Das ist eine Aussage über die Controllerübernahme, keine Garantie, dass beliebig viele physische Einzelereignisse zuvor erfasst wurden oder die Gerätebearbeitung schon abgeschlossen wäre. Die Grenzen eines einzelnen Ereignisbits aus den Folien 5 und 9 bleiben bestehen.</p>
+<p><strong>Warum es ID null gibt</strong></p>
+<p>Ein Handler, die Behandlungsroutine, kann nach einer Benachrichtigung eintreten und beim Claim trotzdem null erhalten, etwa weil ein anderer Hart schneller war. Zwischen Benachrichtigung und Übernahme kann sich der wartende Zustand bereits verändert haben. Null bezeichnet kein Gerät und muss deshalb abgefangen werden: keine Gerätebehandlung und kein Complete mit null. Die Software führt dann ihren korrekten Trap-Rückkehrpfad aus, einschließlich der nötigen Kontextwiederherstellung.</p>
+<p><strong>Claim ist nicht Gerätebehandlung</strong></p>
+<p>Claim verändert den Pending-Zustand im PLIC, nicht automatisch die Ursache im Gerät. Empfangsdaten können weiterhin im UART-Puffer liegen und ein Gerätestatus kann weiterhin aktiv sein. Der Treiber muss diese Ursache nach Gerätebeschreibung behandeln. Complete ist anschließend die Abschlussmeldung derselben zuvor übernommenen ID an den Controller. Es sind damit drei getrennte Stellen zu beachten:</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 17%">
+<col style="width: 40%">
+<col style="width: 42%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Stelle</th>
+<th>Was dort ansteht</th>
+<th>Passender Schritt</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>PLIC</td>
+<td>Pending-Bit der Quelle</td>
+<td>Claim</td>
+</tr>
+<tr class="even">
+<td>Gerät</td>
+<td>Statusflag und Daten</td>
+<td>Gerätebehandlung nach Datenblatt</td>
+</tr>
+<tr class="odd">
+<td>Gateway</td>
+<td>offene Weitergabe, weitere Anforderung gesperrt</td>
+<td>Complete derselben übernommenen ID</td>
+</tr>
+</tbody>
+</table>
+<p>Das Gateway war bereits durch die Weitergabe der Anforderung belegt. Claim allein öffnet es nicht wieder. Complete erlaubt die nächste Weitergabe; eine weiterhin aktive Geräteursache kann dann erneut gemeldet werden. Die Folien 23 und 24 führen diesen Lebenszyklus weiter aus.</p>
+<p><strong>Die Debugger-Falle</strong></p>
+<p>Ein Debugger oder ein Diagnoseausdruck, der das Claim-Register tatsächlich liest, kann eine Quelle übernehmen. Wird die gelieferte ID anschließend nicht für die normale Behandlung und Complete verwendet, fehlt ihr Abschluss. Das Pending-Bit ist zwar verschwunden, das Gateway wartet aber weiter auf die Abschlussmeldung und leitet keine neue Anforderung dieser Quelle zum PLIC durch. Das Gerät kann weiterarbeiten, während seine Interruptquelle für das laufende Programm scheinbar dauerhaft verstummt. Der Zustand bleibt bestehen, bis der passende Abschluss nachgeholt oder der betroffene Controllerzustand zurückgesetzt wird.</p>
+<p>So kann ein automatisch aktualisiertes Beobachtungsfenster im Debugger genau den Fehler auslösen, den man gerade sucht. Auch eine Diagnoseausgabe mit der C-Funktion <code>printf</code>, die für die Ausgabe erneut das Claim-Register liest, kann eine weitere Quelle übernehmen und ohne Abschluss zurücklassen. Die bereits gespeicherte ID an <code>printf</code> zu übergeben, löst dagegen keinen weiteren Claim aus. Die praktische Regel lautet deshalb: Claim genau einmal für die beabsichtigte Übernahme lesen, das Ergebnis speichern und für Auswertung sowie Complete dieselbe ID verwenden.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1006,13 +1214,13 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
 <section id="normaler-externer-behandlungspfad" class="slide level2">
 <h2>Normaler externer Behandlungspfad</h2>
 <p>Pseudocode für bekannte, konfigurierte Quellen:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource text number-lines code-with-copy"><code class="sourceCode"><span id="cb1-1"><a aria-label="1"></a>id = einmal Claim lesen</span>
-<span id="cb1-2"><a aria-label="2"></a>wenn id = 0: keine Gerätebearbeitung</span>
-<span id="cb1-3"><a aria-label="3"></a>sonst:</span>
-<span id="cb1-4"><a aria-label="4"></a>    Daten / Status des Geräts id bearbeiten</span>
-<span id="cb1-5"><a aria-label="5"></a>    Geräteursache nach Gerätebeschreibung quittieren</span>
-<span id="cb1-6"><a aria-label="6"></a>    dieselbe id als Complete schreiben</span>
-<span id="cb1-7"><a aria-label="7"></a>Kontext wiederherstellen und Trap-Rückkehr</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource text number-lines code-with-copy"><code class="sourceCode"><span id="cb4-1"><a aria-label="1"></a>id = einmal Claim lesen</span>
+<span id="cb4-2"><a aria-label="2"></a>wenn id = 0: keine Gerätebearbeitung</span>
+<span id="cb4-3"><a aria-label="3"></a>sonst:</span>
+<span id="cb4-4"><a aria-label="4"></a>    Daten / Status des Geräts id bearbeiten</span>
+<span id="cb4-5"><a aria-label="5"></a>    Geräteursache nach Gerätebeschreibung quittieren</span>
+<span id="cb4-6"><a aria-label="6"></a>    dieselbe id als Complete schreiben</span>
+<span id="cb4-7"><a aria-label="7"></a>Kontext wiederherstellen und Trap-Rückkehr</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p><code>id</code> ist die Identifikationsnummer einer externen Gerätequelle. Claim, der Übernahmezugriff beim PLIC, Platform-Level Interrupt Controller, wird einmal gelesen und gespeichert. Eine zweite diagnostische Lesung wäre kein bloßer Blick auf denselben Wert, sondern könnte eine weitere Quelle übernehmen. Liefert der Zugriff null, entfällt die Gerätebearbeitung und es wird keine Complete-Meldung für null geschrieben.</p>
 <p>Bei einer bekannten Quelle erfolgen Datenübernahme und Quittierung nach ihrer Gerätebeschreibung. Quittieren bedeutet, die behandelte Ursache passend zurückzunehmen; ein allgemeingültiges Registerrezept gibt es dafür nicht. Complete schließt danach genau die zuvor übernommene ID beim Controller ab. Die Software stellt ihren Kontext wieder her und führt die Trap-Rückkehr mit <code>mret</code>, Machine Return, aus.</p>
@@ -1040,8 +1248,9 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
 </ul>
 <p>Unser Hauptmodell bleibt kurz und nicht verschachtelt.</p>
 <aside class="notes">
-<p>ISR bedeutet Interrupt Service Routine, Unterbrechungsbehandlung. MIE ist Machine Interrupt Enable, die globale Freigabe im Maschinenstatus. Die Hardware setzt sie beim Trap-Eintritt auf null. Eine weitere maskierbare Maschinen-Interruptanforderung kann währenddessen entstehen, wird im Grundmodell aber nicht als neuer Interrupt-Trap angenommen. Die Ursache oder ihr gespeicherter Hinweis kann weiter warten.</p>
+<p>ISR bedeutet Interrupt Service Routine, Unterbrechungsbehandlung. MIE ist Machine Interrupt Enable, die globale Freigabe im Maschinenstatus <code>mstatus</code>. Für den Vortrag ist die Trennung zwischen Hardwareaktion und Softwareentscheidung wichtig: „Die Hardware setzt MIE beim Eintritt auf 0. Im Grundmodell lässt die Software es dabei.“ Eine weitere maskierbare Maschinen-Interruptanforderung kann währenddessen entstehen, wird im Grundmodell aber nicht als neuer Interrupt-Trap angenommen. Die Ursache oder ihr gespeicherter Hinweis kann weiter warten.</p>
 <p>PLIC heißt Platform-Level Interrupt Controller. Seine Quellenpriorität bestimmt, welche externe Quelle als Nächstes übernommen wird. Sie ist keine Anweisung, eine bereits laufende ISR sofort zu unterbrechen. Eine höher priorisierte Quelle kann deshalb durch die Restdauer einer niedrigeren Behandlung aufgehalten werden. Auch der Timer gewinnt nicht allein durch seine lokale Anbindung automatisch Vorrang.</p>
+<p>Zum Vergleich mit dem STM32-Labor: Der NVIC, Nested Vectored Interrupt Controller, im Cortex-M kann bei passenden Freigaben und entsprechender Prioritätskonfiguration eine laufende Behandlung durch höher priorisierte Arbeit unterbrechen. Unser Grundmodell lässt MIE dagegen während der gesamten ISR null. Die höhere Quellenpriorität im PLIC allein stellt deshalb kein solches Unterbrechen bereit.</p>
 <p>Software könnte Interrupts während einer Behandlung wieder freigeben. Damit entstehen jedoch zusätzliche Anforderungen an gesicherten Zustand, Auswahlregeln und Stackverbrauch. Das ist eine eigene Entwurfsentscheidung und wird in der optionalen Vertiefung eingegrenzt. Für den Hauptteil ist die belastbarere erste Maßnahme, die unmittelbare Gerätebehandlung kurz zu halten und längere Auswertung passend aufzuschieben. Die nächste Frage lautet, wie überhaupt eine zeitliche Anforderung entsteht, wenn kein externes Gerät sie liefert.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
@@ -1066,7 +1275,23 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
 <aside class="notes">
 <p><code>mtime</code> heißt Machine Time und ist ein vierundsechzig Bit breiter Zähler der Plattformzeit. RV32, die Variante mit zweiunddreißig Bit breiten Integerregistern, verkürzt seine Registerbreite nicht. Der Zähler schreitet mit einer von der Plattform angegebenen konstanten Frequenz fort und kann bei Überlauf umlaufen. Er ist nicht automatisch ein Zähler seit dem Start dieses C-Programms.</p>
 <p>Ein Programm kann einen Startwert <span class="math inline">\(t_0\)</span> speichern und vergangene Ticks durch eine Differenz zu <code>mtime</code> bestimmen. Ein Tick bedeutet hier einen Zählschritt der Hardware-Zeitquelle; derselbe Ausdruck wird später auch für periodische Softwaretermine benutzt. Wir unterscheiden diese Bedeutungen ausdrücklich.</p>
-<p><code>mtime</code> wird hier über MMIO, Memory-Mapped Input/Output, Ein- und Ausgabe durch Geräteadressen, erreicht. Die Gerätezugriffe werden durch eine zur Plattform passende Funktion gekapselt. Wie ein vierundsechzig Bit breiter Wert auf RV32 konsistent gelesen wird, ist eine Implementierungsfrage der optionalen Vertiefung. Ein variabler Prozessortakt muss nicht dieselbe Frequenz wie die Zeitquelle haben, weshalb deren Einheit separat festgelegt wird.</p>
+<p><strong>Warum 64 Bit, auch auf RV32?</strong></p>
+<p>Die Breite lohnt eine kleine Rechnung mit der Lehrfrequenz aus Folie 28. Zehn Megahertz, also <span class="math inline">\(10^7\)</span> Zählschritte pro Sekunde, ergeben für einen zweiunddreißig Bit breiten Zähler die Umlaufzeit</p>
+<p><span class="math display">\[
+T_{32}=\frac{2^{32}}{10^7\,\mathrm{s}^{-1}}
+=429{,}4967296\,\mathrm{s}\approx7{,}16\,\mathrm{min}.
+\]</span></p>
+<p><span class="math inline">\(T_{32}\)</span> ist die Zeit für einen vollständigen Umlauf über alle darstellbaren Zählerstände. Schon nach gut sieben Minuten wäre wieder derselbe Wert erreicht. Für vierundsechzig Bit gilt dagegen</p>
+<p><span class="math display">\[
+T_{64}=\frac{2^{64}}{10^7\,\mathrm{s}^{-1}}
+\approx1{,}845\cdot10^{12}\,\mathrm{s}
+\approx58454\ \text{Jahre}.
+\]</span></p>
+<p>Für die Umrechnung sind <span class="math inline">\(365{,}25\)</span> Tage je Jahr und <span class="math inline">\(86400\)</span> Sekunden je Tag angenommen. Die Größenordnung beträgt damit rund achtundfünfzigtausend Jahre. Bei einem Zählerstart bei null liegt sein Umlauf weit außerhalb der kurzen betrachteten Abläufe. Das macht die Annahme auf den Folien 33 und 35 plausibel, dass im jeweiligen Beispiel kein Umlauf stattfindet. Sie bleibt ausdrücklich eine Modellannahme über Startwert und Zeitraum: Ein bereits nahe seiner Grenze stehender Zähler wäre anders zu behandeln. Auch die Überlauffreiheit der arithmetischen Zwischenergebnisse der Terminrechnung ist zusätzlich vorausgesetzt.</p>
+<p><strong>Die Kehrseite: zwei Hälften müssen zusammenpassen</strong></p>
+<p><code>mtime</code> wird hier über MMIO, Memory-Mapped Input/Output, Ein- und Ausgabe durch Geräteadressen, erreicht. Im betrachteten RV32-MMIO-Modell sind diese Zugriffe zweiunddreißig Bit breit. Der vierundsechzig Bit breite Zeitwert wird deshalb aus zwei gelesenen Hälften zusammengesetzt. RV32 allein garantiert hier keinen atomaren Vierundsechzig-Bit-Gerätezugriff; maßgebend sind die bereitgestellten Zugriffsmöglichkeiten der konkreten Plattform.</p>
+<p>Fällt zwischen den Lesezugriffen ein Übertrag von der unteren in die obere Hälfte, können eine alte obere und eine neue untere Hälfte einen falschen Mischwert ergeben. Schon ein Fehler um <span class="math inline">\(2^{32}\)</span> Zählschritte entspricht bei zehn Megahertz rund <span class="math inline">\(429{,}5\)</span> Sekunden, also gut sieben Minuten. Die große Gesamtbreite verhindert diesen Zugriffsfehler nicht.</p>
+<p>Die optionale Folie 47 zeigt mit <code>read_mtime32</code>, einer C-Funktion zum konsistenten Lesen, wie ein geeigneter Zugriff das Problem erkennt und kapselt. Im Hauptteil genügt der Vertrag, dass die verwendete Plattformfunktion einen konsistenten Zeitwert liefert; die zusätzliche Leseprüfung muss hier nicht selbst implementiert werden. Ein variabler Prozessortakt muss zudem nicht dieselbe Frequenz wie die Zeitquelle haben, weshalb deren Einheit separat festgelegt wird.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1123,11 +1348,21 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
 <section id="vergleich-und-freigaben-des-timers" class="slide level2">
 <h2>Vergleich und Freigaben des Timers</h2>
 <p><img data-src="../assets/figures/03_interrupts_timer/timer-gates.png" alt="mtime größer oder gleich mtimecmp erzeugt die Timeranforderung; MTIE und globale MIE-Freigabe erlauben im Modell den Trap."></p>
-<p><code>mtimecmp</code> muss für den nächsten Termin in der Zukunft liegen.</p>
+<ul>
+<li>STM32-Update: ARR erzeugt das Periodenraster in Hardware</li>
+<li>Hier: <code>mtime</code> zählt weiter, <code>mtimecmp</code> setzt einen einzelnen Termin</li>
+</ul>
 <aside class="notes">
 <p><code>mtimecmp</code> heißt Machine Time Compare, Vergleichswert der Maschinenzeit. Er ist wie <code>mtime</code>, Machine Time, vierundsechzig Bit breit. Die Hardware betrachtet beide Werte vorzeichenlos und setzt die Timeranforderung, sobald <code>mtime</code> größer oder gleich <code>mtimecmp</code> ist. Die Abbildung liest sich vom Vergleich über die Freigaben zum Trap.</p>
 <p>MTIP bedeutet Machine Timer Interrupt Pending, wartender Maschinen-Timerinterrupt im Register <code>mip</code>. MTIE bedeutet Machine Timer Interrupt Enable und ist die Timerfreigabe in <code>mie</code>. MIE bedeutet Machine Interrupt Enable, globale Freigabe in <code>mstatus</code>. Im Modell mit bereits laufendem Machine Mode müssen Pending, MTIE und MIE zusammen wirksam sein. Die Kästen zeigen getrennte logische Bedingungen, keine Verzögerungen.</p>
 <p>Ein Vergleichswert hundert bei aktuellem Zählerstand hundert ist schon fällig. Ein neuer Termin muss daher größer als die aktuelle Zeit sein, wenn die Bedingung wieder falsch werden soll. Ein Interrupt ist hier keine kurze einzelne Flanke des Vergleichers; die Anforderung bleibt grundsätzlich bestehen, bis die Bedingung beseitigt ist. Das erklärt die nötige Aktion im Handler.</p>
+<p><strong>Die Brücke zum bekannten STM32-Timer</strong></p>
+<p>Die Studierenden kennen bereits den periodischen Update-Betrieb mit PSC, Prescaler, dem Vorteiler, ARR, Auto-Reload Register, und CNT, Counter, dem Zählwert. Wir betrachten stetiges Aufwärtszählen bei unveränderten Einstellungen. CNT durchläuft null bis einschließlich ARR und beginnt dann wieder bei null. Die Periodenlänge beträgt daher ARR plus eins Zählschritte. Der Zeitpunkt dieser Hardwaregrenze hängt nicht davon ab, wann eine ISR, Interrupt Service Routine, ausgeführt wird. Die ISR kann verspätet beginnen, ohne dadurch die nächste Hardwareperiode nach hinten zu verschieben.</p>
+<p>Ein didaktisches Beispiel mit hundert Megahertz Timer-Eingangstakt, PSC neunundneunzig und ARR neunhundertneunundneunzig ergibt einen Megahertz Zählfrequenz und eine Millisekunde Periodendauer. Das Hardware-Raster besitzt hier keine durch verspätete ISR-Eintritte verursachte Drift. Genauigkeit und Schwankungen der Taktquelle sowie eine geänderte Konfiguration sind davon zu unterscheiden. Die genannten Werte sind Lehrannahmen, keine Messung eines konkreten STM32.</p>
+<p>Der Ankersatz für den Vortrag lautet: „Beim bekannten STM32-Update-Timer erzeugt ARR die Periode in Hardware. Dieser RISC-V-Systemtimer hat keinen solchen Periodenreset; er vergleicht eine weiterlaufende Zeitquelle mit einem einzelnen Termin. Die Periode bauen wir in Software.“ Funktional erinnert <code>mtimecmp</code> an ein CCR, Capture/Compare Register, am frei laufenden Zähler. Diese Analogie wird auf Folie 32 präzisiert. Sie bedeutet nicht, dass alle STM32- und RISC-V-Timer dieselben Ereignis- und Quittierungsregeln besitzen. Ein RISC-V-System kann zusätzlich andere Peripherietimer mit eigener Periodenhardware enthalten.</p>
+<p><strong>Warum eine fortlaufende Zeitbasis und einzelne Termine sinnvoll sind</strong></p>
+<p>Im klassischen RISC-V-Modell kann <code>mtime</code> als gemeinsame Zeitbasis mehrerer Harts, Hardware-Ausführungskontexte, dienen. Jeder Hart besitzt seinen zugeordneten Vergleich <code>mtimecmp</code>. Ein periodisches Zurücksetzen der gemeinsamen Zeitquelle für den Takt einer einzelnen Anwendung würde ihre fortlaufenden Zeitdifferenzen auch für andere Nutzer stören. Deshalb wird die Zeit im normalen Betrieb nicht zur Bildung jeder Softwareperiode zurückgesetzt.</p>
+<p>Ein frei wählbarer nächster Termin ermöglicht außerdem tickless-Betrieb: zeitgesteuertes Arbeiten ohne zwingenden periodischen Softwaretick. Ein Betriebssystem oder eine einfache Anwendung kann den nächsten Interrupt für den Zeitpunkt planen, an dem tatsächlich wieder Arbeit ansteht. Weniger unnötige Aufweckvorgänge können Energie sparen, wenn Plattform und Software passende Schlafzustände nutzen. Das sind nützliche Eigenschaften dieser Organisation, keine behauptete vollständige historische Entwurfsbegründung. Für unseren Hauptteil bleibt zunächst ein periodisches Sollraster das Beispiel.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1153,6 +1388,7 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
 <p><code>mtime</code>, Machine Time, ist die Zeitquelle und <code>mtimecmp</code>, Machine Time Compare, ihr Vergleichswert. Die Timerbedingung bleibt wahr, solange die vorzeichenlos gelesene Zeit mindestens den Vergleich erreicht hat. <code>mret</code>, Machine Return, stellt den Trap-Rückkehrzustand einschließlich der vorherigen globalen Freigabe her. Es verändert jedoch nicht den Vergleichswert.</p>
 <p>Bei unveränderter fälliger Bedingung und wirksamen Freigaben kann deshalb unmittelbar eine weitere Timerbehandlung folgen. Nur eine Softwarevariable zu erhöhen oder aus einer C-Funktion zurückzukehren behebt die Hardwarebedingung nicht. Die geeignete Aktion ist, einen neuen Vergleichstermin zu schreiben, der beim betrachteten Zeitstand tatsächlich noch in der Zukunft liegt. Gleichheit ist bereits fällig.</p>
 <p>Die Anzeige der zurückgenommenen Timeranforderung muss eine Vergleichsänderung auf realen Plattformen nicht verzögerungsfrei widerspiegeln. Der Behandlungspfad sollte daher auch einen Eintritt verkraften, bei dem der nächste Solltermin noch nicht erreicht ist. Das ist ein Grund, die aktuelle Zeit zu lesen und nicht jeden Handler-Aufruf als eine verstrichene Periode zu zählen. Die Feinheit gehört zur Erklärung eines robusten Ablaufs, nicht zu einer zusätzlichen auswendig zu lernenden Registersequenz. Die folgende Initialisierungsfolge und die spätere Planungsfunktion berücksichtigen diese Trennung.</p>
+<p>Der Vergleich zum STM32-Labor hilft bei der Quittierung. Im periodischen Update-Betrieb signalisiert UIF, Update Interrupt Flag, ein Update-Ereignis. Das Flag muss nach den Regeln des Referenzhandbuchs behandelt und gelöscht werden. Solange es bei wirksamen Interruptfreigaben gesetzt bleibt, kann die Behandlung nach der Rückkehr erneut angefordert werden. Beim hier betrachteten RISC-V-Timer ist dagegen der Vergleich <code>mtime</code> größer oder gleich <code>mtimecmp</code> die Ursache; ein Zukunftstermin nimmt diese Bedingung zurück. In beiden Fällen kann unvollständige Ursachenbehandlung zu wiederholten Eintritten, einem Interruptsturm, führen. Der STM32-Update-Timer benötigt zum Fortsetzen seines Hardware-Rasters kein neues ARR, Auto-Reload Register, in jeder ISR. Beim STM32-Compare-Betrieb ist zusätzlich das passende Kanalflag zu behandeln; dieses ist vom Update-Flag zu unterscheiden.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1176,7 +1412,14 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
 </ol>
 <aside class="notes">
 <p>Die Reihenfolge verhindert einen Eintritt in unvorbereitete Software. Der Stack ist der Speicherbereich für Sicherungsrahmen; der Stackzeiger muss bereits gültig sein. <code>mtvec</code>, Machine Trap-Vector Base Address, muss auf einen geeigneten Trap-Eintritt zeigen. Die Freigabe MIE, Machine Interrupt Enable in <code>mstatus</code>, bleibt bis zum Abschluss dieser Vorbereitungen aus.</p>
-<p>Bei zehn Megahertz Zeitquellenfrequenz wird etwa ein erster Termin als aktuell gelesene Zeit plus zehntausend Timer-Ticks für eine Millisekunde gewählt. <code>mtimecmp</code>, Machine Time Compare, erhält diesen Wert durch eine zur Plattform passende Zugriffsfunktion. Erst danach werden MTIE, Machine Timer Interrupt Enable, die Timerkategorienfreigabe in <code>mie</code>, und MIE, Machine Interrupt Enable, die globale Freigabe in <code>mstatus</code>, gesetzt. Andere Registerfelder müssen dabei erhalten bleiben. Die Bitnummern sind bei einer konkreten Implementierung nachzuschlagen; der begründete Ablauf ist das Lernziel.</p>
+<p>Bei zehn Megahertz Zeitquellenfrequenz wird etwa ein erster Termin als aktuell gelesene Zeit plus zehntausend Timer-Ticks für eine Millisekunde gewählt. <code>mtimecmp</code>, Machine Time Compare, erhält diesen Wert durch eine zur Plattform passende Zugriffsfunktion. Erst danach werden MTIE, Machine Timer Interrupt Enable, die Timerkategorienfreigabe in <code>mie</code>, und MIE, Machine Interrupt Enable, die globale Freigabe in <code>mstatus</code>, gesetzt. Andere Registerfelder müssen dabei erhalten bleiben.</p>
+<p>Die Positionen dieser standardisierten Bits sind in der privilegierten RISC-V-Spezifikation festgelegt: MIE ist Bit drei in <code>mstatus</code>, MTIE Bit sieben in <code>mie</code> und MEIE, Machine External Interrupt Enable, Bit elf in <code>mie</code>. Die entsprechenden Anzeigen MTIP, Machine Timer Interrupt Pending, und MEIP, Machine External Interrupt Pending, liegen an Bit sieben und elf in <code>mip</code>. Diese Bitnummern sind keine frei gewählten Eigenschaften einer konkreten Plattform. Welche Interruptquellen und weiteren Funktionen tatsächlich vorhanden sind, muss dagegen anhand der Implementierung geprüft werden.</p>
+<p>CSR bedeutet Control and Status Register, Steuer- und Statusregister im Prozessor. Die Geräteadressen für <code>mtime</code> und <code>mtimecmp</code> sowie den PLIC, Platform-Level Interrupt Controller, sind MMIO-Adressen: Memory-Mapped Input/Output, Ein- und Ausgabe über den Speicheradressraum. Sie stammen ebenso wie die Timerfrequenz aus der Plattformbeschreibung. Eine CSR-Bitposition ist deshalb von einer Geräteadresse und von der unterstützten Ausstattung zu unterscheiden.</p>
+<p>Ein RISC-V-Assembler-Lehrausschnitt für die letzten beiden Freigabeschritte lautet, nachdem Stack, Trap-Eintritt und erster Timervergleich vorbereitet sind:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb5-1"><a aria-label="1"></a>li    t0<span class="op">,</span> <span class="dv">128</span>       <span class="op">#</span> Maske fuer MTIE<span class="op">:</span> Bit <span class="dv">7</span></span>
+<span id="cb5-2"><a aria-label="2"></a>csrs  mie<span class="op">,</span> t0       <span class="op">#</span> Timerkategorie freigeben</span>
+<span id="cb5-3"><a aria-label="3"></a>csrsi mstatus<span class="op">,</span> <span class="dv">8</span>    <span class="op">#</span> MIE<span class="op">:</span> Bit <span class="dv">3</span><span class="op">,</span> zuletzt freigeben</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<p><code>li</code>, Load Immediate, lädt hier die Bitmaske <span class="math inline">\(2^7=128\)</span> in das allgemeine temporäre Register <code>t0</code>. <code>csrs</code>, CSR Set, verknüpft die Maske aus diesem Register mit dem bisherigen Inhalt von <code>mie</code> durch bitweises Oder. <code>csrsi</code>, CSR Set Immediate, setzt anschließend MIE mit der unmittelbar angegebenen Maske acht. Beide CSR-Zugriffe erhalten die nicht ausgewählten Bits. Die unmittelbare Maske von <code>csrsi</code> ist nur fünf Bit breit: Acht passt hinein, hundertachtundzwanzig nicht. Für MTIE wird deshalb die Registerform <code>csrs</code> benutzt. Die verwandten Befehle <code>csrc</code> und <code>csrci</code>, CSR Clear beziehungsweise CSR Clear Immediate, löschen ausgewählte Bits anhand einer Register- beziehungsweise unmittelbaren Maske. Das Beispiel wurde nicht als RISC-V-Firmware ausgeführt.</p>
 <p>Die Folie ist eine Initialisierungsreihenfolge, kein vollständiges Bootprogramm. Plattformzustand, Geräteordnung und Abbruchfälle bleiben Aufgaben der konkreten Implementierung. Wenn die Vorbereitung länger als das gewählte Intervall dauert, kann der Termin bei Freigabe bereits fällig sein; entscheidend ist, dass dann ein gültiger Handler existiert. Die spätere periodische Planung benötigt außerdem eine Entscheidung, ob der nächste Termin relativ zur tatsächlichen Bearbeitung oder zu einem Sollraster liegt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
@@ -1190,17 +1433,82 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
           display:block!important;
       }</style></aside>
 </section>
-<section id="periodisch-planen-sollraster-oder-neue-wartezeit" class="slide level2">
-<h2>Periodisch planen: Sollraster oder neue Wartezeit?</h2>
-<p><img data-src="../assets/figures/03_interrupts_timer/tick-drift.png" alt="Ein Termin bei 10 ms wird erst bei 10,2 ms bedient; now plus 1 ms verschiebt auf 11,2 ms, das absolute Raster bleibt bei 11 ms."></p>
+<section id="vom-arr-raster-zum-softwaretermin" class="slide level2">
+<h2>Vom ARR-Raster zum Softwaretermin</h2>
+<div style="font-size: 0.9em; text-align: left;">
+<p>STM32-Update: Hardware-Raster durch Prescaler und ARR.</p>
+<p><img data-src="../assets/figures/03_interrupts_timer/tick-drift.png" alt="Zwei Softwareplanungen am frei laufenden Zähler: Behandlung bei 10,2 ms nach Solltermin 10 ms; relativ folgt 11,2 ms, im absoluten Sollraster 11 ms."></p>
+<p>Brücke zum STM32-Compare: CNT läuft frei, ARR ist maximal.</p>
 <ul>
-<li>Relativ: nächster Termin aus der Bearbeitungszeit</li>
-<li>Absolut: nächster Termin aus dem bisherigen Sollwert</li>
+<li><code>CCR1 += period</code> bzw. <span class="math inline">\(d+\Delta\)</span>: Sollraster</li>
+<li><code>CCR1 = CNT + period</code> bzw. <span class="math inline">\(\mathrm{now}+\Delta\)</span>: relativ</li>
 </ul>
+</div>
 <aside class="notes">
-<p>Die Zeitachse zeigt einen Solltermin bei zehn Millisekunden und einen verspäteten Handler-Eintritt bei <span class="math inline">\(10{,}2\)</span> ms. Rot kennzeichnet diese Verzögerung. Mit einem Millisekundenintervall ergibt die relative Planung <code>now + interval</code> einen nächsten Termin bei <span class="math inline">\(11{,}2\)</span> ms. Die Eintrittsverspätung wird damit in die Phase des Zeitrasters übernommen.</p>
-<p>Eine absolute Planung addiert das Intervall zum bisherigen Solltermin: zehn plus eins ergibt elf Millisekunden. Die Verzögerung der aktuellen Bearbeitung verschiebt dann nicht automatisch alle späteren Solltermine. Die Intervalle sind hier in der Abbildung in Zeit dargestellt; die Software speichert die entsprechenden Timer-Ticks. <code>now</code> bedeutet aktuell gelesene Zeit, <code>interval</code> das gewünschte Intervall.</p>
-<p>Beide Strategien können sinnvoll sein. Eine neue Wartezeit nach Abschluss einer Aktion ist ein anderes Ziel als ein festes periodisches Raster. Ein System-Tick ist ein Softwarekonzept für wiederkehrende Termine und kein universell vorgeschriebener Betriebssystemmechanismus. Das absolute Raster verhindert nicht, dass Software zu spät reagiert. Wenn bereits mehrere Termine vergangen sind, reicht das einmalige Addieren eines Intervalls nicht mehr, um den Vergleich in die Zukunft zu bringen.</p>
+<p><strong>Vom bekannten Update-Betrieb zum Vergleichstermin</strong></p>
+<p>Beim bekannten STM32-Timer stellt sich die folgende Planungsfrage im periodischen Update-Grundbetrieb mit festem ARR zunächst nicht. PSC, Prescaler, bestimmt als Vorteiler die Zählfrequenz; ARR, Auto-Reload Register, die Periodengrenze. CNT, Counter, beginnt nach dem Durchlaufen von null bis ARR wieder bei null. Dieses Raster entsteht in Hardware. Eine verspätete ISR verschiebt seine folgenden Periodengrenzen nicht. ISR bedeutet Interrupt Service Routine, Unterbrechungsbehandlung.</p>
+<p>Der RISC-V-Systemtimer arbeitet anders: <code>mtime</code>, Machine Time, liefert die fortlaufende Zeit, und <code>mtimecmp</code>, Machine Time Compare, legt nur den nächsten Vergleichstermin fest. Er setzt den Zeitwert nicht nach jeder gewünschten Softwareperiode zurück. Deshalb muss die Software entscheiden, wie sie den nächsten Termin berechnet. Genau diese Entscheidung zeigt die Abbildung; ihre beiden Bahnen stellen Softwareplanungen dar, nicht die automatische Wiederholung durch ARR.</p>
+<p><strong>Eine Brücke über STM32-Output-Compare</strong></p>
+<p>Output Compare bedeutet hier Betrieb mit Vergleichsereignissen. Ein geeigneter STM32-Timer lässt sich mit ARR am maximalen Zählwert frei laufen. CCR1, Capture/Compare Register des ersten Kanals, enthält einen Vergleichstermin. Die Software verschiebt CCR1 nach einem Treffer zum nächsten Termin. Die beiden schematischen Alternativen lauten <code>CCR1 += period</code> für das Sollraster und <code>CCR1 = CNT + period</code> für einen neuen Abstand ab der gelesenen Zeit. <code>period</code> ist die gewünschte positive Periode in den Zählschritten dieses Timers. Die Zeilen zeigen Registerprinzipien, keinen vollständigen STM32-Treiber.</p>
+<p>Bei mehreren verfügbaren Compare-Kanälen kann jeder Kanal seinen Vergleich um eine eigene Periode fortsetzen. Die Kanäle teilen sich CNT und den Vorteiler; unabhängig sind ihre geplanten Vergleichstermine, nicht beliebig viele separate Taktquellen. Ein Kanal kann etwa im Ein-Millisekunden-Raster arbeiten und ein anderer in einem anderen Raster. Welche Kanäle und Betriebsarten vorhanden sind, bestimmt der konkrete Timer.</p>
+<p>Die Analogie ist funktional: <code>mtime</code> übernimmt die Rolle einer Zeitbasis wie CNT, <code>mtimecmp</code> die eines Vergleichswerts wie CCR1. Es gibt aber zwei wichtige Unterschiede. Erstens läuft auch ein STM32-Zähler mit maximalem ARR irgendwann um; die zusätzliche Umlauflogik wird auf Folie 35 eingegrenzt. Zweitens entsteht der STM32-Compare-Treffer im betrachteten Betrieb bei Gleichheit von CNT und CCR1 und setzt das Kanalflag CC1IF, Capture/Compare 1 Interrupt Flag. Wird ein bereits verpasster Vergleich eingetragen, kann der nächste Treffer erst nach einem Zählerumlauf erfolgen. Bei RISC-V bleibt die Bedingung <code>mtime</code> größer oder gleich <code>mtimecmp</code> dagegen anstehend. Ein passender Zukunftstermin und die richtige Ursachenbehandlung sind in beiden Fällen nötig, ihre Mechanismen sind nicht identisch.</p>
+<p><strong>Die Planungsfrage im frei gewählten Vergleich</strong></p>
+<p>Der RISC-V-Timer soll nun jede Millisekunde eine Behandlung anfordern. Sein Solltermin war <span class="math inline">\(10{,}0\)</span> ms, der Handler beginnt aber erst bei <span class="math inline">\(10{,}2\)</span> ms, etwa weil zuvor eine andere ISR lief. Folie 26 erklärte, warum im Grundmodell auch eine höher priorisierte Anforderung warten kann. Die Frage lautet: Wo soll der nächste Vergleichstermin liegen?</p>
+<p>Die Abbildung zeigt zwei Antworten auf derselben Zeitachse. Rot kennzeichnet die Verspätung. <code>now</code> bedeutet die aktuell gelesene Zeit, <span class="math inline">\(d\)</span> den bisherigen Solltermin und <span class="math inline">\(\Delta\)</span> die positive Periode. Alle Größen müssen dieselbe Einheit besitzen. Die Grafik verwendet Millisekunden, die Software die entsprechenden Timer-Ticks, Zählschritte der Hardware-Zeitquelle.</p>
+<p><strong>Die zwei Strategien</strong></p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 26%">
+<col style="width: 36%">
+<col style="width: 36%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>Relativ</th>
+<th>Absolut, Sollraster</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Formel</td>
+<td><span class="math inline">\(\mathrm{now}+\Delta\)</span></td>
+<td><span class="math inline">\(d+\Delta\)</span></td>
+</tr>
+<tr class="even">
+<td>Nächster Termin im Beispiel</td>
+<td><span class="math inline">\(11{,}2\)</span> ms</td>
+<td><span class="math inline">\(11{,}0\)</span> ms</td>
+</tr>
+<tr class="odd">
+<td>Wirkung der Verspätung</td>
+<td>wird in die Phase folgender Solltermine übernommen</td>
+<td>verschiebt das Sollraster nicht</td>
+</tr>
+<tr class="even">
+<td>Passt für</td>
+<td>neue Wartezeit ab einem gewählten Ereignis oder Aktionsende</td>
+<td>gleichmäßiges Raster von Sollterminen</td>
+</tr>
+</tbody>
+</table>
+<p>Die relative Planung rechnet hier vom tatsächlichen Handler-Eintritt aus und übernimmt dessen Verspätung: <span class="math inline">\(10{,}2+1=11{,}2\)</span> ms. Die absolute Planung rechnet vom geplanten Termin aus: <span class="math inline">\(10+1=11\)</span> ms. Sie tut für die Terminfolge so, als hätte die Bearbeitung rechtzeitig begonnen. Damit wird die aktuelle Verspätung nicht automatisch auf die späteren Solltermine übertragen. Das entspricht dem Fortschieben des bisherigen STM32-CCR-Werts. Eine andauernde Blockierung kann allerdings auch die nächste tatsächliche Behandlung verspäten; sie verschwindet durch die andere Rechnung nicht. Die numerische Tickzahl für eine Millisekunde hängt in jedem System von der jeweiligen Zählfrequenz ab: Bei einem Megahertz wären es tausend, bei zehn Megahertz zehntausend Schritte.</p>
+<p>Für einen geforderten Mindestabstand nach Abschluss einer Aktion muss der relative Bezugspunkt tatsächlich deren Abschluss sein. Ein bei Handler-Eintritt gelesener <code>now</code>-Wert gewährleistet nicht denselben Abstand nach einer anschließend noch länger dauernden Aktion. Der Bezugspunkt gehört deshalb zur Anforderung und muss ausdrücklich gewählt werden.</p>
+<p><strong>Drift und Jitter</strong></p>
+<p>Bei relativer Planung können sich wiederholte Verspätungen aufaddieren. Die Phase, also die Lage der Termine gegenüber dem ursprünglich gewünschten Raster, wandert zunehmend ab. Diesen fortlaufenden Versatz bezeichnen wir hier als Drift. Als zusätzliches Lehrbeispiel nehmen wir eine konstante Eintrittsverspätung von fünf Mikrosekunden je Periode und keine weiteren Verzögerungen an. Das ist keine gemessene oder für jeden Prozessor typische Latenz.</p>
+<p>Bei einer Sollperiode von tausend Mikrosekunden und relativer Neuplanung bei Eintritt liegen die tatsächlichen Eintritte dann <span class="math inline">\(1000+5=1005\,\mu\)</span>s auseinander. Das Intervall ist <span class="math inline">\(0{,}5\)</span> Prozent länger als gewünscht. Eine Softwareuhr, die trotzdem bei jedem Eintritt nur eine Millisekunde addiert, läuft mit dem Verhältnis <span class="math inline">\(1000/1005\)</span> und verliert nach einer realen Stunde ungefähr</p>
+<p><span class="math display">\[
+3600\,\mathrm{s}\cdot\left(1-\frac{1000}{1005}\right)
+\approx17{,}91\,\mathrm{s}\approx18\,\mathrm{s}.
+\]</span></p>
+<p>Die Hardware-Zeitquelle <code>mtime</code>, Machine Time, läuft dadurch nicht langsamer. Der Fehler entsteht durch Planung und das Zählen von Handler-Aufrufen. Das ist ein weiterer Grund, verstrichene Zeit aus der Zeitquelle abzuleiten.</p>
+<p>Absolute Planung hält dagegen die Solltermine auf dem Raster. Die tatsächlichen Eintritte können trotzdem schwanken; solche zeitlichen Schwankungen heißen Jitter. Bei exakt gleicher Verspätung von fünf Mikrosekunden wären alle Eintritte lediglich um fünf Mikrosekunden verschoben, ohne diese Schwankung. Bei wechselnder Verspätung bleibt Jitter auch mit absoluter Planung bestehen. Der langfristige mittlere Abstand der Eintritte nähert sich der Sollperiode nur unter passenden Voraussetzungen, insbesondere wenn alle Termine behandelt werden und die Verzögerung begrenzt bleibt. Die Genauigkeit der Hardware-Zeitquelle ist zusätzlich zu berücksichtigen; das Sollraster allein garantiert keine exakt gleichmäßigen tatsächlichen Reaktionen.</p>
+<p><strong>Wann welche Strategie richtig ist</strong></p>
+<p>Ein Sollraster passt zu regelmäßigen Verarbeitungs- oder Anzeigeterminen, zur Signalabtastung und zu einem digitalen Regler mit fester Abtastzeit. Viele vertraute Abtast- und Reglermodelle setzen gleichmäßige Zeitabstände voraus. Ein Software-Sollraster allein stellt diese Abstände bei der tatsächlichen Messwerterfassung jedoch noch nicht sicher. Wenn der genaue Abtastzeitpunkt entscheidend ist, kann eine timerabhängige Hardwareerfassung nötig sein, während die spätere Auswertung verzögert erfolgen darf. Eine Uhr gewinnt ihre Zeit ebenfalls aus einer geeigneten Zeitquelle; ein regelmäßiger Anzeigeaufruf ist davon zu unterscheiden.</p>
+<p>Eine relative Wartezeit passt dagegen zu einem Abstand ab einem bestimmten Ereignis: Tasterentprellung zwanzig Millisekunden nach der letzten erfassten Flanke, ein Empfangs-Timeout als Ablauffrist nach dem letzten Byte oder die Erholzeit eines Sensors nach einer abgeschlossenen Messung. Bei einer neuen relevanten Flanke oder einem neuen Byte wird die jeweilige relative Frist erneut von diesem Ereignis aus berechnet.</p>
+<p>Als Alltagsbild eignet sich das Pflanzengießen. „Täglich um acht Uhr gießen“ ist ein Sollraster. „Vierundzwanzig Stunden nach dem letzten Gießen“ ist eine relative Wartezeit. Wird einmal erst um zehn Uhr gegossen und treten danach keine weiteren Verspätungen auf, plant das Sollraster den nächsten Morgen wieder um acht Uhr. Die relative Planung verschiebt den nächsten Termin dagegen auf zehn Uhr und behält diesen neuen Bezugspunkt bei. Beide Regeln sind sinnvoll, beantworten aber unterschiedliche Anforderungen.</p>
+<p><strong>Die Grenze der absoluten Planung</strong></p>
+<p>Schon bei einer Verspätung von mindestens einer ganzen Periode reicht <span class="math inline">\(d+\Delta\)</span> nicht mehr: Dieser Termin liegt dann vor oder genau auf <code>now</code> und ist bereits fällig. Für einen zurückgenommenen Timervergleich muss der nächste Termin strikt in der Zukunft liegen. Die nächste Folie betrachtet deshalb mehrere verstrichene Solltermine und berechnet, wie weit das Raster vorgerückt werden muss. Ein System-Tick ist dabei nur das Softwarekonzept wiederkehrender Termine, kein Nachweis rechtzeitiger Ausführung und kein zwingend vorausgesetztes Betriebssystem.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1213,15 +1521,21 @@ c=\text{raw}\mathbin{\&amp;}\texttt{0x7FFFFFFF}
           display:block!important;
       }</style></aside>
 </section>
-<section id="mehrere-termine-sind-bereits-fällig" class="slide level2">
-<h2>Mehrere Termine sind bereits fällig</h2>
-<p>Sollraster mit Periode <span class="math inline">\(\Delta=1\)</span> ms, nächster Termin <span class="math inline">\(d=10\)</span> ms, Zeit <span class="math inline">\(n=15{,}3\)</span> ms.</p>
+<section id="ein-flag-zählt-keine-perioden" class="slide level2">
+<h2>Ein Flag zählt keine Perioden</h2>
+<p>STM32: <span class="math inline">\(6\)</span> Update-Ereignisse können in <code>UIF = 1</code> zusammenfallen.</p>
+<p>RISC-V-Beispiel: <span class="math inline">\(\Delta=1\)</span> ms, nächster Solltermin <span class="math inline">\(d=10\)</span> ms, aktuelle Zeit <span class="math inline">\(n=15{,}3\)</span> ms.</p>
 <p><span class="math display">\[
 k=\left\lfloor\frac{n-d}{\Delta}\right\rfloor+1=6,\qquad
 d'=d+k\Delta=16\ \mathrm{ms}
 \]</span></p>
 <p>Ein Handler-Aufruf bedeutet hier sechs fällige Solltermine.</p>
+<p>Nachzählen braucht eine erhaltene Zeitbasis, nicht nur ein Flag.</p>
 <aside class="notes">
+<p><strong>Auch der STM32 speichert im Flag keine Ereignisanzahl</strong></p>
+<p>Beim periodischen STM32-Update-Betrieb laufen die Hardwareperioden weiter, auch wenn ihre Interruptbehandlung gesperrt ist. UIF bedeutet Update Interrupt Flag. Wir betrachten hier die durch den Zählerüberlauf erzeugten Update-Ereignisse. Das erste setzt UIF auf eins; weitere setzen dasselbe bereits gesetzte Bit erneut. Nach sechs Perioden kann die Software deshalb weiterhin nur ein gesetztes Flag sehen. Eine später einmal ausgeführte ISR, Interrupt Service Routine, die ihren Softwaretick um genau eine Periode erhöht, verliert in diesem Fall fünf Perioden. Das Hardware-Raster selbst hat sich nicht verschoben; verloren ging die Information in der bloßen Zählung von ISR-Aufrufen.</p>
+<p>Aus UIF und dem periodisch zurückgesetzten CNT, Counter, allein lässt sich ohne weitere Zeitinformation im Allgemeinen nicht bestimmen, wie viele volle Perioden vergangen sind. Mit einer zusätzlich erhaltenen Zeitbasis, etwa einem geeigneten frei laufenden Zähler und einer passenden Umlaufregel, ist eine solche Rekonstruktion auch auf einem STM32 möglich. Der Vorteil des hier benutzten RISC-V-Modells ist, dass <code>mtime</code>, Machine Time, diese fortlaufende Zeit bereits liefert. Das ist keine grundsätzliche Grenze aller STM32-Timer.</p>
+<p><strong>Fällige Solltermine aus der Zeit bestimmen</strong></p>
 <p><span class="math inline">\(d\)</span> ist der bisher nächste Solltermin, <span class="math inline">\(n\)</span> die aktuell gelesene Zeit und <span class="math inline">\(\Delta\)</span> die positive Periode. Alle drei Größen müssen in derselben Einheit stehen; die Folie verwendet Millisekunden zur Anschaulichkeit, die Implementierung Timer-Ticks. Das Modell schließt einen Zählerumlauf und arithmetischen Überlauf im betrachteten Zeitraum aus.</p>
 <p>Es sind die Termine zehn, elf, zwölf, dreizehn, vierzehn und fünfzehn Millisekunden fällig. Die Abrundung in der Formel zählt abgeschlossene weitere Perioden seit <span class="math inline">\(d\)</span>: <span class="math inline">\(\lfloor(15{,}3-10)/1\rfloor=5\)</span>. Mit dem ursprünglichen Termin sind es <span class="math inline">\(k=6\)</span>. Der neue Termin liegt bei <span class="math inline">\(d'=10+6\cdot1=16\)</span> ms, also tatsächlich in der Zukunft und weiterhin auf demselben Sollraster.</p>
 <p>Nur einmal auf elf Millisekunden zu erhöhen ließe den Vergleich weiterhin fällig. Zurückkehren könnte dann sofort weitere Interrupts erzeugen. Die Anzahl fälliger Termine wird aus der Zeitdifferenz gewonnen, nicht aus einem Pending-Bit, einer einzelnen Wartemarkierung. Ob das Programm sechs logische Aktionen nachholt, Ereignisse zusammenfasst oder Überlast meldet, ist eine gesonderte Anwendungspolitik. Die Zeitquelle und die Zahl der Handler-Eintritte dürfen jedenfalls nicht gleichgesetzt werden.</p>
@@ -1237,9 +1551,9 @@ d'=d+k\Delta=16\ \mathrm{ms}
           display:block!important;
       }</style></aside>
 </section>
-<section id="sechs-fällige-termine-sechsmal-messen" class="slide level2">
-<h2>Sechs fällige Termine: sechsmal messen?</h2>
-<p>Ein Handler erreicht das <span class="math inline">\(1\)</span>-ms-Sollraster erst bei <span class="math inline">\(15{,}3\)</span> ms. Die Termine <span class="math inline">\(10\)</span> bis <span class="math inline">\(15\)</span> ms sind fällig.</p>
+<section id="sechs-termine-sechsmal-messen" class="slide level2">
+<h2>Sechs Termine – sechsmal messen?</h2>
+<p>Im Beispiel aus Folie 33 sind die Termine <span class="math inline">\(10\)</span> bis <span class="math inline">\(15\)</span> ms fällig. Der Handler läuft erst bei <span class="math inline">\(15{,}3\)</span> ms.</p>
 <table class="caption-top">
 <colgroup>
 <col style="width: 51%">
@@ -1264,12 +1578,18 @@ d'=d+k\Delta=16\ \mathrm{ms}
 <td>Jeden historischen Messwert erhalten</td>
 <td>zuvor gespeicherte Daten benötigen</td>
 </tr>
+<tr class="even">
+<td>Regelmäßig Messwerte erfassen</td>
+<td>Hardware-Trigger und ausreichenden Puffer prüfen</td>
+</tr>
 </tbody>
 </table>
-<p>Das Sollraster ersetzt keine verlorenen Daten.</p>
+<p>Ein Sollraster ersetzt keine gespeicherten Messwerte.</p>
 <aside class="notes">
 <p>Ein Handler ist die Behandlungsroutine einer Anforderung. Im Beispiel sind sechs logische Solltermine fällig, obwohl nur ein Behandlungseintritt beobachtet wird. Das erklärt eine vergangene Zeit und den nächsten passenden Rastertermin. Daraus folgt aber nicht, dass sechs unmittelbar nacheinander ausgeführte Sensorlesungen die Messwerte der vergangenen Zeitpunkte rekonstruieren.</p>
+<p>Das gilt auch dann, wenn ein STM32 mit ARR, Auto-Reload Register, seine Perioden in Hardware korrekt wiederholt hat. UIF, Update Interrupt Flag, erhält nur den Hinweis auf mindestens ein Update. Es speichert weder die Anzahl noch die einzelnen Messwerte. Umgekehrt bewahrt <code>mtime</code>, Machine Time, zwar eine fortlaufende Zeitbasis und erlaubt die Rechnung aus Folie 33, speichert aber ebenfalls keine Sensordaten. Eine ISR, Interrupt Service Routine, kann verlorene physikalische Beobachtungen nicht nachträglich herstellen.</p>
 <p>Für eine Anzeige kann es genügen, nur den aktuellen Zustand einmal neu auszuwerten. Eine Zeitberechnung verwendet die Hardware-Zeitquelle. Wer dagegen jeden historischen Messwert benötigt, braucht eine vorherige Erfassung mit ausreichend großem Puffer oder einer anderen geeigneten Hardwarefunktion. Noch nicht aufgezeichnete Daten der Zeitpunkte zehn bis fünfzehn Millisekunden sind durch nachträgliches Lesen nicht wiederherstellbar.</p>
+<p>Ein Hardware-Trigger ist ein auslösendes Ereignis aus Hardware. Ein Timer kann damit, sofern die Plattform es unterstützt, die Messwerterfassung zum gewünschten Zeitpunkt anstoßen, während ihre Auswertung später erfolgt. Auch dann müssen die aufgenommenen Werte bis zur Übernahme erhalten bleiben. Ein gleichmäßiges Hardware-Raster, ein gesetztes Interruptflag und ein ausreichend großer Datenpuffer erfüllen drei verschiedene Aufgaben. Welche davon benötigt werden, bestimmt die Anwendung.</p>
 <p>Nachholen, Zusammenfassen oder Überlast melden ist damit eine Entscheidung anhand der Anwendungsanforderung. Ohne diese Entscheidung kann ein gut gemeintes Nachholen die Verzögerung weiter vergrößern. Diese Folie verbindet das Ereignisspeicherproblem vom Einstieg mit der Timerplanung: Die Zahl fälliger Solltermine und die Zahl tatsächlich verfügbarer Daten sind unterschiedliche Größen. Die folgende Hilfsfunktion berechnet ausschließlich den zukünftigen Solltermin und trifft diese Anwendungspolitik bewusst nicht.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
@@ -1283,21 +1603,26 @@ d'=d+k\Delta=16\ \mathrm{ms}
           display:block!important;
       }</style></aside>
 </section>
-<section id="eine-überprüfbare-planungsfunktion" class="slide level2">
-<h2>Eine überprüfbare Planungsfunktion</h2>
-<p>C-Lehrmodell: positive Periode, kein Umlauf oder Überlauf im Zeitraum.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb2-1"><a aria-label="1"></a><span class="dt">uint64_t</span> next_future<span class="op">(</span><span class="dt">uint64_t</span> d<span class="op">,</span> <span class="dt">uint64_t</span> now<span class="op">,</span></span>
-<span id="cb2-2"><a aria-label="2"></a>                     <span class="dt">uint64_t</span> period<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb2-3"><a aria-label="3"></a>    <span class="cf">if</span> <span class="op">(</span>now <span class="op">&lt;</span> d<span class="op">)</span></span>
-<span id="cb2-4"><a aria-label="4"></a>        <span class="cf">return</span> d<span class="op">;</span></span>
-<span id="cb2-5"><a aria-label="5"></a>    <span class="dt">uint64_t</span> k <span class="op">=</span> <span class="op">(</span>now <span class="op">-</span> d<span class="op">)</span> <span class="op">/</span> period <span class="op">+</span> <span class="dv">1</span><span class="bu">u</span><span class="op">;</span></span>
-<span id="cb2-6"><a aria-label="6"></a>    <span class="cf">return</span> d <span class="op">+</span> k <span class="op">*</span> period<span class="op">;</span></span>
-<span id="cb2-7"><a aria-label="7"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Die ISR nutzt das Ergebnis für den Vergleich; vergangene Zeit stammt aus <code>mtime</code>.</p>
+<section id="nächsten-vergleichstermin-planen" class="slide level2">
+<h2>Nächsten Vergleichstermin planen</h2>
+<p>C-Lehrmodell: monotone Zeit, positive Periode, kein Umlauf oder Überlauf.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb6-1"><a aria-label="1"></a><span class="dt">uint64_t</span> next_future<span class="op">(</span><span class="dt">uint64_t</span> d<span class="op">,</span> <span class="dt">uint64_t</span> now<span class="op">,</span></span>
+<span id="cb6-2"><a aria-label="2"></a>                     <span class="dt">uint64_t</span> period<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb6-3"><a aria-label="3"></a>    <span class="cf">if</span> <span class="op">(</span>now <span class="op">&lt;</span> d<span class="op">)</span></span>
+<span id="cb6-4"><a aria-label="4"></a>        <span class="cf">return</span> d<span class="op">;</span></span>
+<span id="cb6-5"><a aria-label="5"></a>    <span class="dt">uint64_t</span> k <span class="op">=</span> <span class="op">(</span>now <span class="op">-</span> d<span class="op">)</span> <span class="op">/</span> period <span class="op">+</span> <span class="dv">1</span><span class="bu">u</span><span class="op">;</span></span>
+<span id="cb6-6"><a aria-label="6"></a>    <span class="cf">return</span> d <span class="op">+</span> k <span class="op">*</span> period<span class="op">;</span></span>
+<span id="cb6-7"><a aria-label="7"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Ergebnis nach <code>mtimecmp</code>; beim STM32-CCR zusätzlich den Zählerumlauf behandeln.</p>
 <aside class="notes">
 <p>Die C-Funktion isoliert die Terminrechnung vom Gerätezugriff. <code>uint64_t</code> aus <code>stdint.h</code> bezeichnet einen vorzeichenlosen Vierundsechzig-Bit-Typ. <code>d</code> ist der nächste Solltermin, <code>now</code> die aktuelle Zeit und <code>period</code> das positive Intervall, alle in Timer-Ticks. <code>k</code> zählt fällige Termine. Ganzzahlige Division positiver Werte entspricht der Abrundung aus der vorherigen Formel.</p>
 <p>Liegt <code>now</code> vor <code>d</code>, gibt die Funktion den unveränderten zukünftigen Termin zurück. Sonst springt sie um genau so viele Intervalle weiter, dass das Ergebnis strikt größer als <code>now</code> ist. Zehntausend Ticks pro Millisekunde ergeben für <code>d=100000</code>, <code>now=153000</code> und <code>period=10000</code> den neuen Wert <code>160000</code>. Bei <code>now=99999</code> bleibt <code>100000</code> bestehen; bei genau <code>100000</code> wird auf <code>110000</code> erhöht.</p>
 <p>Eine ISR, Interrupt Service Routine, kann zuerst <code>mtime</code>, Machine Time, konsistent lesen und diesen Hilfswert für <code>mtimecmp</code> verwenden. Ein zusätzlicher Eintritt bei noch zukünftigem Termin zählt dadurch nicht automatisch als verstrichene Periode. Die Funktion allein quittiert jedoch kein Gerät und enthält keinen Trap-Prolog. Der echte Vergleichszugriff, die Kontextsicherung und ein eventuell veröffentlichter Zeit-Snapshot sind getrennte Schritte. Die reine Rechnung lässt sich auf dem Host prüfen, ohne eine RISC-V-Firmwareausführung zu behaupten.</p>
+<p><strong>Übertragung auf STM32-Compare und RISC-V</strong></p>
+<p>Für den RISC-V-Pfad wird der berechnete Zukunftstermin durch die passende Plattformfunktion nach <code>mtimecmp</code>, Machine Time Compare, geschrieben. Das entspricht funktional dem Fortschieben eines CCR, Capture/Compare Register, am frei laufenden STM32-Zähler. Im normalen, rechtzeitig bedienten Ein-Perioden-Fall reduziert sich die Rechnung auf den bisherigen Vergleich plus Periode. Bei mehreren fälligen Terminen rückt sie bis zum ersten zukünftigen Rasterpunkt vor. Die Entscheidung, wie viele fachliche Aktionen nachgeholt werden, gehört weiterhin nicht zu dieser Funktion.</p>
+<p>Der C-Lehrcode arbeitet jedoch mit Zeitwerten, die im betrachteten Zeitraum nicht umlaufen. Ein STM32-CNT, Counter, bleibt bei maximalem ARR, Auto-Reload Register, ein endlicher Zähler und läuft je nach Timerbreite wieder bei null weiter. Einen solchen Rohwert nur nach <code>uint64_t</code> umzuwandeln macht ihn nicht zu einer fortlaufenden Zeitbasis. Für eine konkrete STM32-Übertragung muss die Software eine passende Umlaufbehandlung oder eine korrekt erweiterte Zeitbasis sowie die zulässigen Abstände zwischen Vergleichsterminen berücksichtigen. Die Funktion ist daher keine unverändert einzusetzende STM32-Treibervorlage.</p>
+<p>Außerdem muss der Compare-Wert rechtzeitig wirksam werden. Bei der betrachteten STM32-Gleichheitsprüfung kann ein schon verpasster CCR-Termin bis zum nächsten Zählerumlauf auf seinen Treffer warten; das Kanalflag ist passend zu quittieren. Beim RISC-V-Vergleich bleibt ein fälliges <code>mtimecmp</code> dagegen anstehend und muss durch einen geeigneten Zukunftswert abgelöst werden. Nach einer langen Behandlung ist deshalb in beiden Fällen die tatsächlich verbleibende Zeit bis zum neuen Termin zu prüfen.</p>
+<p>Ein einzeln frei gewählter Termin erfordert schließlich nicht immer eine Periode. Für tickless-Betrieb, also ohne zwingenden periodischen Softwaretick, kann der nächste relevante absolute Termin direkt gewählt werden. Die gezeigte Funktion löst speziell das Fortschieben eines periodischen Sollrasters und behält deshalb ihre Voraussetzung einer positiven Periode. Die Zeitquelle selbst wird in keinem dieser Fälle zur Bildung der Anwendungsperiode zurückgesetzt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1501,11 +1826,11 @@ U=1000\,\mathrm{s}^{-1}\cdot5\,\mu\mathrm{s}=0{,}5\,\%
 <section id="übernahme-und-löschen-zusammen-schützen" class="slide level2">
 <h2>Übernahme und Löschen zusammen schützen</h2>
 <p>Pseudocode: ein Hart, ein Arbeitsflag, keine verschachtelte ISR.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource text number-lines code-with-copy"><code class="sourceCode"><span id="cb3-1"><a aria-label="1"></a>vorherige Freigabe merken und relevante IRQ sperren</span>
-<span id="cb3-2"><a aria-label="2"></a>    lokal = arbeitsflag</span>
-<span id="cb3-3"><a aria-label="3"></a>    arbeitsflag = 0</span>
-<span id="cb3-4"><a aria-label="4"></a>vorherige Freigabe wiederherstellen</span>
-<span id="cb3-5"><a aria-label="5"></a>wenn lokal gesetzt: längere Arbeit erledigen</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource text number-lines code-with-copy"><code class="sourceCode"><span id="cb7-1"><a aria-label="1"></a>vorherige Freigabe merken und relevante IRQ sperren</span>
+<span id="cb7-2"><a aria-label="2"></a>    lokal = arbeitsflag</span>
+<span id="cb7-3"><a aria-label="3"></a>    arbeitsflag = 0</span>
+<span id="cb7-4"><a aria-label="4"></a>vorherige Freigabe wiederherstellen</span>
+<span id="cb7-5"><a aria-label="5"></a>wenn lokal gesetzt: längere Arbeit erledigen</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Die geschützte Folge bleibt kurz; die Nutzarbeit liegt außerhalb.</p>
 <aside class="notes">
 <p>IRQ bedeutet Interrupt Request, Unterbrechungsanforderung. Ein Arbeitsflag ist eine Markierung mit der Bedeutung „mindestens eine Bearbeitung angefordert“. <code>lokal</code> ist eine nur vom Hauptprogramm verwendete Kopie. Die gezeigten Zeilen sind Pseudocode und keine Namen einer vorhandenen Plattformbibliothek. Die Plattform muss einen geeigneten Mechanismus für Interruptsperre, Wiederherstellung und die erforderliche Compilerordnung bereitstellen.</p>
@@ -1605,7 +1930,7 @@ U=1000\,\mathrm{s}^{-1}\cdot5\,\mu\mathrm{s}=0{,}5\,\%
 <p>Die optionalen Vertiefungen werden nicht vorausgesetzt.</p>
 <aside class="notes">
 <p>Das Quiz ist eine kurze Lernstandsdiagnose zu den Hauptlernzielen. Es enthält zehn Fragen mit jeweils einer richtigen Antwort. Die Erläuterungen der QuizAcademy-Datei erklären die entscheidende Unterscheidung in ein bis zwei Sätzen. Die Fragen verlangen keine Details aus den anschließenden optionalen Folien und keine auswendig gelernte vollständige Registerkarte.</p>
-<p>Die ersten Fragen untersuchen Ereignisspeicherung und Freigaben, danach folgen Hardware- und Softwarekontext, Kategorie und Geräte-ID sowie Gerätequittierung. Zwei Fragen prüfen Timerfrequenz und Sollraster. Die letzten untersuchen den Unterschied zwischen mittlerer Auslastung und Reaktionsfrist sowie eine konsistente Flagübergabe. ISR bedeutet Interrupt Service Routine, PLIC Platform-Level Interrupt Controller; beide gehören zum vorher erklärten Ablaufmodell.</p>
+<p>Die ersten Fragen untersuchen Ereignisspeicherung und Freigaben, danach folgen Hardware- und Softwarekontext, Kategorie und Geräte-ID sowie Gerätequittierung und die Grenzen der Quellenpriorität. Zwei Fragen prüfen Timerfrequenz und Sollraster. Die letzten untersuchen den Unterschied zwischen mittlerer Auslastung und Reaktionsfrist sowie eine konsistente Flagübergabe. ISR bedeutet Interrupt Service Routine, PLIC Platform-Level Interrupt Controller; beide gehören zum vorher erklärten Ablaufmodell.</p>
 <p>Nutzen Sie die fünf Minuten Auswertung für die zwei oder drei häufigsten Fehlentscheidungen. Fragen Sie nach einer falschen Annahme und ihrem Gegenbeispiel, statt nur die korrekte Option vorzulesen. Wer etwa die Anzahl der Handler-Aufrufe mit vergangener Zeit gleichsetzt, soll auf einen verspäteten Solltermin zeigen. Damit ergänzt das Quiz die offenen Papieraufgaben: Es deckt Fehlvorstellungen schnell auf, während die Übung den vollständigen eigenen Lösungsweg sichtbar macht.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
@@ -1648,15 +1973,15 @@ U=1000\,\mathrm{s}^{-1}\cdot5\,\mu\mathrm{s}=0{,}5\,\%
 <section id="vertiefung-mtime-auf-rv32-lesen" class="slide level2">
 <h2>Vertiefung: <code>mtime</code> auf RV32 lesen</h2>
 <p>C-Lehrfunktion; <code>mt[0]</code> ist LO, <code>mt[1]</code> HI:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb4-1"><a aria-label="1"></a><span class="dt">uint64_t</span> read_mtime32<span class="op">(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*</span>mt<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb4-2"><a aria-label="2"></a>    <span class="dt">uint32_t</span> hi<span class="op">,</span> lo<span class="op">,</span> hi_again<span class="op">;</span></span>
-<span id="cb4-3"><a aria-label="3"></a>    <span class="cf">do</span> <span class="op">{</span></span>
-<span id="cb4-4"><a aria-label="4"></a>        hi <span class="op">=</span> mt<span class="op">[</span><span class="dv">1</span><span class="op">];</span></span>
-<span id="cb4-5"><a aria-label="5"></a>        lo <span class="op">=</span> mt<span class="op">[</span><span class="dv">0</span><span class="op">];</span></span>
-<span id="cb4-6"><a aria-label="6"></a>        hi_again <span class="op">=</span> mt<span class="op">[</span><span class="dv">1</span><span class="op">];</span></span>
-<span id="cb4-7"><a aria-label="7"></a>    <span class="op">}</span> <span class="cf">while</span> <span class="op">(</span>hi <span class="op">!=</span> hi_again<span class="op">);</span></span>
-<span id="cb4-8"><a aria-label="8"></a>    <span class="cf">return</span> <span class="op">((</span><span class="dt">uint64_t</span><span class="op">)</span>hi <span class="op">&lt;&lt;</span> <span class="dv">32</span><span class="op">)</span> <span class="op">|</span> lo<span class="op">;</span></span>
-<span id="cb4-9"><a aria-label="9"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb8-1"><a aria-label="1"></a><span class="dt">uint64_t</span> read_mtime32<span class="op">(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*</span>mt<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb8-2"><a aria-label="2"></a>    <span class="dt">uint32_t</span> hi<span class="op">,</span> lo<span class="op">,</span> hi_again<span class="op">;</span></span>
+<span id="cb8-3"><a aria-label="3"></a>    <span class="cf">do</span> <span class="op">{</span></span>
+<span id="cb8-4"><a aria-label="4"></a>        hi <span class="op">=</span> mt<span class="op">[</span><span class="dv">1</span><span class="op">];</span></span>
+<span id="cb8-5"><a aria-label="5"></a>        lo <span class="op">=</span> mt<span class="op">[</span><span class="dv">0</span><span class="op">];</span></span>
+<span id="cb8-6"><a aria-label="6"></a>        hi_again <span class="op">=</span> mt<span class="op">[</span><span class="dv">1</span><span class="op">];</span></span>
+<span id="cb8-7"><a aria-label="7"></a>    <span class="op">}</span> <span class="cf">while</span> <span class="op">(</span>hi <span class="op">!=</span> hi_again<span class="op">);</span></span>
+<span id="cb8-8"><a aria-label="8"></a>    <span class="cf">return</span> <span class="op">((</span><span class="dt">uint64_t</span><span class="op">)</span>hi <span class="op">&lt;&lt;</span> <span class="dv">32</span><span class="op">)</span> <span class="op">|</span> lo<span class="op">;</span></span>
+<span id="cb8-9"><a aria-label="9"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p>Die C-Lehrfunktion setzt Typdefinitionen aus <code>stdint.h</code> voraus. <code>uint32_t</code> und <code>uint64_t</code> sind vorzeichenlose Ganzzahltypen mit genau zweiunddreißig beziehungsweise vierundsechzig Bit, soweit die Implementierung sie bereitstellt. <code>mt</code> ist ein Zeiger auf die untere Hälfte des angenommenen <code>mtime</code>-Registers; die nächste Wortposition enthält die obere Hälfte. Das Modell ist Little Endian und erlaubt passend ausgerichtete, in dieser Reihenfolge wirksame zweiunddreißig Bit breite Gerätezugriffe.</p>
 <p><code>hi</code>, <code>lo</code> und <code>hi_again</code> speichern obere, untere und nochmals obere Hälfte. Die Schleife wiederholt bei unterschiedlichen oberen Werten. Sind sie gleich, gehört die gelesene untere Hälfte zum passenden oberen Bereich, vorausgesetzt ein Leseversuch umfasst nicht einen ganzen Umlauf der unteren Hälfte. Die Umwandlung nach <code>uint64_t</code> erfolgt vor der Verschiebung um zweiunddreißig Bits; bitweises Oder fügt LO ein.</p>
@@ -1676,12 +2001,12 @@ U=1000\,\mathrm{s}^{-1}\cdot5\,\mu\mathrm{s}=0{,}5\,\%
 <section id="vertiefung-mtimecmp-auf-rv32-schreiben" class="slide level2">
 <h2>Vertiefung: <code>mtimecmp</code> auf RV32 schreiben</h2>
 <p>C-Lehrfunktion für Little Endian und stark geordnete Gerätezugriffe:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb5-1"><a aria-label="1"></a><span class="dt">void</span> write_compare32<span class="op">(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*</span>cmp<span class="op">,</span></span>
-<span id="cb5-2"><a aria-label="2"></a>                     <span class="dt">uint64_t</span> value<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb5-3"><a aria-label="3"></a>    cmp<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">=</span> UINT32_MAX<span class="op">;</span></span>
-<span id="cb5-4"><a aria-label="4"></a>    cmp<span class="op">[</span><span class="dv">1</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)(</span>value <span class="op">&gt;&gt;</span> <span class="dv">32</span><span class="op">);</span></span>
-<span id="cb5-5"><a aria-label="5"></a>    cmp<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)</span>value<span class="op">;</span></span>
-<span id="cb5-6"><a aria-label="6"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode numberSource c number-lines code-with-copy"><code class="sourceCode c"><span id="cb9-1"><a aria-label="1"></a><span class="dt">void</span> write_compare32<span class="op">(</span><span class="dt">volatile</span> <span class="dt">uint32_t</span> <span class="op">*</span>cmp<span class="op">,</span></span>
+<span id="cb9-2"><a aria-label="2"></a>                     <span class="dt">uint64_t</span> value<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb9-3"><a aria-label="3"></a>    cmp<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">=</span> UINT32_MAX<span class="op">;</span></span>
+<span id="cb9-4"><a aria-label="4"></a>    cmp<span class="op">[</span><span class="dv">1</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)(</span>value <span class="op">&gt;&gt;</span> <span class="dv">32</span><span class="op">);</span></span>
+<span id="cb9-5"><a aria-label="5"></a>    cmp<span class="op">[</span><span class="dv">0</span><span class="op">]</span> <span class="op">=</span> <span class="op">(</span><span class="dt">uint32_t</span><span class="op">)</span>value<span class="op">;</span></span>
+<span id="cb9-6"><a aria-label="6"></a><span class="op">}</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Ein einzelner <code>uint64_t</code>-Store garantiert auf RV32 keine atomare Aktualisierung.</p>
 <aside class="notes">
 <p><code>mtimecmp</code> ist Machine Time Compare, der vierundsechzig Bit breite Timervergleich. RV32 hat zweiunddreißig Bit breite Integerregister. Zwei normale Halbschreibungen könnten kurzfristig einen Vergleichswert erzeugen, der kleiner als alter und neuer Gesamtwert ist. Die Funktion verwendet daher die in der Spezifikation beschriebene Dreischrittfolge.</p>
