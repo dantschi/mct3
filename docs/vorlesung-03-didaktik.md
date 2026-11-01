@@ -1,6 +1,8 @@
 # Vorlesung 3: Lernziele und Stofftiefe
 
-Überarbeitung vom 23. Oktober 2026 für das fünfte Bachelorsemester.
+Stand: 1. November 2026. Grundüberarbeitung vom 23. Oktober 2026,
+anschließend Erläuterungen, STM32-Bezüge, Übung und Quiz überarbeitet.
+Zielgruppe ist das fünfte Bachelorsemester.
 
 ## Kritische Einordnung
 
@@ -31,24 +33,28 @@ erfüllt sein müssen.
 
 | Kompetenz | Vorlesung | Papierübung | Quizfragen |
 |-----------|-----------|-------------|------------|
-| Ereignisse erfassen und Benachrichtigung wählen | Speicherung, Polling-Lücke, Aufwand | Aufgabe 1: Drehgeber und Impulse | 1 |
-| Trap und Gerätepfad korrekt erklären | Freigaben, Kontext, Kategorie/ID, Claim–Gerät–Complete | Aufgaben 2–3: Zustände, Adresse, Gerätefehler | 2–6 |
-| Zeit aus einer Zeitquelle ableiten und Termine planen | Tickeinheiten, Vergleich, absolutes Raster, versäumte Termine | Aufgabe 4: andere Frequenz und anderes Sollraster | 7–8 |
-| Reaktionsfrist und Datenübergabe begründen | mittlere Last gegenüber Zeitgrenze, kurze ISR, kritische Übergabe | Aufgaben 5–6: zwei Endpunkte und verlorenes Zählerereignis | 9–10 |
+| Ereignisse erfassen und Benachrichtigung wählen | Speicherung, Polling-Lücke, Aufwand | Aufgabe 1: begründete Auswahl und Hardware-Schrittzähler | 1 |
+| Trap und Gerätepfad korrekt erklären | Freigaben, Kontext, Kategorie/ID, Claim–Gerät–Complete | Aufgaben 2–3: Exception, Vektorziel, Initialisierung und Gerätefehler | 2–6 |
+| Zeit aus einer Zeitquelle ableiten und Termine planen | Tickeinheiten, Vergleich, absolutes Raster, versäumte Termine | Aufgabe 4: fehlerhafte Timer-Routine analysieren und korrigieren | 7–8 |
+| Reaktionsfrist und Datenübergabe begründen | Blockierung, Prioritätsgrenzen, kurze ISR, kritische Übergabe | Aufgaben 5–6: Reaktionsentwurf, Dauerbetrieb und verlorenes Zählerereignis | 9–10 |
 
 Die Vorlesung erklärt und begründet. Die Übung verlangt eigene Skizzen,
 Rechnungen und korrigierte Abläufe mit gegenüber den Folien geänderten
 Situationen. Das Quiz dient der schnellen Diagnose typischer Fehlvorstellungen;
 es ersetzt keine offene Entwurfs- oder Rechenaufgabe. Seine zehn Fragen besitzen
-je vier Antworten und genau eine richtige Antwort. Bei drei Fragen ist die
-richtige Option allein am längsten; ihre Position folgt keinem einfachen Zyklus.
+je vier Antworten und genau eine richtige Antwort. Die am 1. November
+bereitgestellte Ersatzdatei wurde unverändert übernommen. Darin ist bei einer
+Frage die richtige Option allein am längsten; ihre Position folgt keinem
+einfachen Zyklus.
 
 ## Was bleibt, was entfällt aus dem Hauptteil?
 
-- Direct/Vectored bleibt als kompakter Vergleich mit einer Adressrechnung.
-  Modusbitkodierung, vollständiger Tabellenaufbau und Assemblerdirektiven entfallen.
+- Direct/Vectored bleibt als Vergleich mit Adressrechnungen, BASE/MODE-Erklärung
+  und ausgewählten Einsprungplätzen. Ein vollständiger Tabellenaufbau und
+  Assemblerdirektiven sind keine zusätzlichen Pflichtaufgaben.
 - Trap-Kontext und die Aufgaben von Hardware und Software bleiben zentral.
-  Ausführlicher GCC-Attributvertrag und eigene Prologimplementierung entfallen.
+  Einzelne CSR-Zugriffe machen Setzen und Löschen von Freigabebits greifbar.
+  Ein ausführlicher GCC-Attributvertrag und eigene Prologimplementierung entfallen.
 - Der lokale Timer und externe PLIC-Pfad bleiben. Ein separater Softwareinterrupt-
   und Mehrkernbenachrichtigungspfad entfällt an dieser Stelle.
 - Die Pflichtbeispiele verwenden einen PLIC-Schwellenwert von null. Der Unterschied
@@ -59,9 +65,10 @@ richtige Option allein am längsten; ihre Position folgt keinem einfachen Zyklus
 - Nicht verschachtelte ISR bleiben das Grundmodell. Warum Verschachtelung
   zusätzlichen Rückkehrzustand benötigt, steht in einer Vertiefungsfolie.
   Frame-Budgetrechnung und Verschachtelungsaufgabe sind keine Pflichtaufgaben mehr.
-- Das zusätzliche 32-Bit-Umlaufbeispiel entfällt. Die Grenzen der verwendeten
-  Terminrechnung bleiben ausdrücklich genannt: positive Periode, kein Umlauf
-  oder arithmetischer Überlauf im betrachteten Zeitraum.
+- Die Notizen vergleichen die Umlaufzeiten von 32- und 64-Bit-Zählern und erklären
+  den möglichen Mischwert bei Halbzugriffen. Die Terminrechnung verlangt weiterhin
+  eine positive Periode und keinen Umlauf oder arithmetischen Überlauf im
+  betrachteten Zeitraum.
 
 Die gewonnene Erklärzeit fließt in Ereignisspeicherung, ungünstigste Polling-Lücke,
 Anwendungspolitik bei versäumten Terminen, zwei unterschiedliche Reaktionsendpunkte
@@ -74,13 +81,15 @@ Der Foliensatz enthält 46 Hauptfolien mit vollständigen Skriptnotizen und vier
 optionale Vertiefungen. Die Planung umfasst weiterhin vier Schulstunden mit
 110 Minuten gemeinsamer Erarbeitung, 55 Minuten angeleiteter Aufgabenarbeit
 und 15 Minuten Quiz. Das vollständige Übungsblatt umfasst sechs Pflichtaufgaben
-mit 32 Orientierungspunkten und etwa 60–75 Minuten selbstständiger Bearbeitung;
+mit 36 Orientierungspunkten und etwa 75–90 Minuten selbstständiger Bearbeitung;
 in den Präsenzphasen werden ausgewählte Teilaufgaben bearbeitet und verglichen.
 
 Vorausgesetzt werden Geräteadressen und Speichergrundlagen aus den Vorlesungen
-1–2 sowie C-Zeiger, Bits und Schleifen. Neue Architekturbegriffe werden lokal
-erklärt. Vorlesung 4 kann auf Zeitquelle, Vergleich, ISR und Reaktionsfristen
-aufbauen. Die Interrupt- und Timerfragen der bestehenden Probeklausur bleiben
+1–2 sowie C-Zeiger, Bits und Schleifen. Die bekannte STM32-Timerkonfiguration mit
+Prescaler und ARR dient als Anker; der frei laufende Output-Compare-Betrieb wird
+erklärt. Update-Flag und Vergleichsereignis werden dabei unterschieden.
+Neue Architekturbegriffe werden lokal erklärt. Vorlesung 4 kann auf Zeitquelle,
+Vergleich, ISR und Reaktionsfristen aufbauen. Die Interrupt- und Timerfragen der bestehenden Probeklausur bleiben
 durch den Hauptteil abgedeckt. Übung und Quiz verlangen keine optionale Vertiefung.
 
 ## Prüfung der überarbeiteten Fassung
@@ -93,6 +102,17 @@ Die Zahlenbeispiele wurden unabhängig nachgerechnet und die reine C-Terminplanu
 mit 1.170.000 Fällen gegen eine schrittweise Rasterberechnung geprüft, einschließlich
 Compilerwarnungen und Address-/UndefinedBehaviorSanitizer. CSV-Struktur,
 Antwortlängen und UTF-8-Prüfung waren ebenfalls erfolgreich.
+
+Die neue Übung ergänzt Entscheidungen zur Ereignisbehandlung, eine Exception
+mit demselben Code wie ein externer Interrupt, Initialisierung und Fehleranalyse
+einer Timer-Routine. Der integrierte Reaktionsfall setzt ausdrücklich voraus,
+dass nach einer Sperre oder Behandlung der wartende höher priorisierte Sensor
+vor weiterer Hauptprogrammarbeit bedient wird. Unter diesen Annahmen ist die
+Blockierung das Maximum aus UART-Behandlung und Hauptprogrammsperre, nicht deren
+Summe. Dauerbetrieb und endliche Puffer werden getrennt vom Einzelereignis geprüft.
+Die fehlerhafte und die korrigierte C-Routine wurden mit Zeit-/Vergleichsstubs
+auf dem Host übersetzt und mit Sanitizern an frühen und verspäteten Aufrufen
+geprüft. Die übernommene Quizdatei wurde zusätzlich auf Bytegleichheit geprüft.
 
 Diese Prüfungen betreffen Lehrmodelle, reine Host-Rechnung und Darstellung.
 Eine konkrete RISC-V-Firmware oder eine reale Reaktionszeit wurde damit nicht gemessen.

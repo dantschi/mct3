@@ -1,6 +1,6 @@
 ---
 title: "Übungsblatt 3: Interrupts und Timer"
-subtitle: "Mikrocomputertechnik 3 · 32 Orientierungspunkte · ca. 60–75 Minuten"
+subtitle: "Mikrocomputertechnik 3 · 36 Orientierungspunkte · ca. 75–90 Minuten"
 header-includes: |
   \usepackage{needspace}
 highlight-style: ../assets/styles/dhbw-code.theme
@@ -10,26 +10,29 @@ highlight-style: ../assets/styles/dhbw-code.theme
 > **Musterlösung**
 :::
 
-## Aufgabe 1: Drehgeber abfragen (4 Punkte)
+## Aufgabe 1: Ereignisbehandlung auswählen (4 Punkte)
 
-Eine Hauptschleife beobachtet einen Drehgeberstatus alle $400\,\mu$s.
-Die Anforderung lautet: Ereignisse innerhalb von $120\,\mu$s erkennen.
-Weitere Verzögerungen werden zunächst vernachlässigt.
-
-1. Skizzieren Sie den ungünstigsten Ereigniszeitpunkt zwischen zwei Abfragen.
-   Ist die Frist garantiert? Begründen Sie mit einer Zeitgrenze. (2 P)
-2. Der Eingang liefert nur einen ungespeicherten $30\,\mu$s-Impuls.
-   Garantieren Abfragen alle $100\,\mu$s dessen Erkennung? (1 P)
-3. Hardware speichert stattdessen ein Bereitschaftsbit bis zur Bearbeitung.
-   Drei Impulse treffen vorher ein. Welche Information bleibt erhalten,
-   welche nicht? (1 P)
+1. Ein Füllstandssensor hält seine Bereitschaft bis zur Abfrage gespeichert.
+   Erkennung spätestens $1{,}2$ ms nach dem Ereignis genügt.
+   Eine Hauptschleife kann die Statusbeobachtungen mit höchstens $900\,\mu$s Abstand
+   durchführen; weitere Verzögerungen sind ausgeschlossen.
+   Empfehlen Sie Polling oder Interrupt und begründen Sie mit einer Zeitgrenze,
+   ob ein Interrupt für diese Anforderung nötig ist. (2 P)
+2. Separater Fall: Jeder Schritt eines Förderbands muss gezählt werden.
+   Die $35\,\mu$s langen Impulse liegen mindestens $80\,\mu$s auseinander.
+   Software kann den Eingang nur alle zwei ms beobachten.
+   Zur Wahl stehen ein gespeichertes Bereitschaftsbit und ein Hardwarezähler,
+   der jeden Impuls erfasst und modulo $2^{16}$ zählt.
+   Wählen Sie eine Lösung und begründen Sie deren Voraussetzung für eine
+   eindeutige Zählung zwischen zwei Beobachtungen. Encoder-Modus-Kenntnisse
+   werden nicht vorausgesetzt. (2 P)
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
 
-**Ihre Zeitachse und Begründung:**
+**Ihre Entscheidungen und Begründungen:**
 
-\vspace*{3cm}
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -37,39 +40,54 @@ Weitere Verzögerungen werden zunächst vernachlässigt.
 
 **Musterlösung 1**
 
-1. Abfragen bei null und $400\,\mu$s, Ereignis unmittelbar nach null.
-   Die Wartezeit kann nahezu $400\,\mu$s betragen: $120\,\mu$s sind nicht garantiert. (2 P)
-2. Nein. Ein $30\,\mu$s-Impuls kann vollständig zwischen zwei Beobachtungen liegen. (1 P)
-3. Erhalten bleibt „mindestens ein Ereignis“. Die Anzahl drei und zugehörige
-   einzelne Daten sind aus diesem Bit allein nicht rekonstruierbar. (1 P)
+1. Polling ist unter den genannten Anforderungen ausreichend:
+   höchstens $900\,\mu$s bis zur Beobachtung liegen unter $1200\,\mu$s.
+   Die Bereitschaft bleibt erhalten. Ein Interrupt ist dafür nicht erforderlich.
+   Eine alternative Empfehlung ist bei nachvollziehbaren zusätzlichen Zielen
+   zulässig, etwa dem Vermeiden laufender Abfragen; diese Ziele und die
+   erforderlichen Zeitgrenzen müssen genannt werden. (2 P)
+2. Den Hardwarezähler wählen: Das Bit erhält nur „mindestens ein Schritt“,
+   nicht die Anzahl mehrerer Schritte. Den Zählerstand konsistent beobachten
+   und die Differenz modulo $2^{16}$ bilden. Zwischen zwei Beobachtungen
+   dürfen keine $2^{16}$ Schritte unbemerkt vergehen. Bei mindestens $80\,\mu$s
+   Abstand benötigt ein voller Zählumlauf mindestens
+   $65536\cdot80\,\mu\mathrm{s}=5{,}24288$ s, deutlich länger als zwei ms.
+   Die Hardwareerfassung jedes Impulses ist ausdrücklich vorgegeben. (2 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 2: Eintritt und Fortsetzung (6 Punkte)
+## Aufgabe 2: Ursache, Einsprung und Vorbereitung (7 Punkte)
 
 RV32-Lehrmodell: ein Hart im Machine Mode, keine Weiterleitung an andere
 Privilegstufen und keine verschachtelten Interrupts.
 Ein Hart ist ein Hardware-Ausführungskontext.
-Bei einem Trap erhält `mcause` den Wert `0x8000000B`.
-Bit 31 unterscheidet Interrupt und Exception, Code elf bezeichnet Machine External.
+Nach einem Trap steht in `mcause` der Rohwert `0x0000000B`.
 
-1. Was sagt der Rohwert aus? Ist damit bereits eine externe Geräte-ID bekannt? (2 P)
-2. In einem separaten Zustand wartet eine Timeranforderung.
-   Timerfreigabe MTIE ist eins, globale Freigabe MIE null.
-   Wird der Timer-Trap angenommen? Läuft die Hardwarezeit weiter? (2 P)
-3. Welche Seite erhält jeweils den Zustand: Hardware oder Software?
-   Gesucht sind die Fortsetzungsadresse in `mepc` und ein vom Handler
-   verändertes, im Hauptprogramm noch benötigtes allgemeines Register. (1 P)
-4. Vectored-Modus: BASE `0x80400400`, Interrupt-Code elf.
-   Berechnen Sie den ersten Einsprung mit $\mathrm{BASE}+4c$. (1 P)
+1. Bestimmen Sie Interrupt-Bit und Code und benennen Sie die Ursache. (1 P)
+2. Vectored-Modus, BASE `0x80400800`: Ein Kollege behauptet,
+   der erste Befehl liege bei `0x8040082C`.
+   Prüfen Sie die Behauptung für den Rohwert und begründen Sie die richtige Adresse.
+   Wohin ginge stattdessen ein externer Interrupt mit Code elf? (2 P)
+3. Wer erhält jeweils den nötigen Zustand: Hardware oder Software?
+   Gefragt sind die Fortsetzungsadresse in `mepc` und der Wert von `t0`,
+   den die Behandlung verändert, das Hauptprogramm aber noch benötigt.
+   Begründen Sie auch den Umgang mit dem temporären Register. (2 P)
+4. Vor dem ersten Timer-Interrupt ist die globale Freigabe MIE null.
+   Ordnen Sie die Schritte zu einer geeigneten Initialisierung und erläutern Sie
+   das Risiko einer zu frühen globalen Freigabe. (2 P)
+
+   - A: Timerkategorie MTIE freigeben.
+   - B: Gültigen Stack und Trap-Eintritt über mtvec bereitstellen.
+   - C: Globale MIE-Freigabe setzen.
+   - D: Zeit konsistent lesen und ersten Zukunftstermin nach mtimecmp schreiben.
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
 
-**Ihre Zustände und Einsprungadresse:**
+**Ihre Ursachenanalyse, Adressen und Reihenfolge:**
 
-\vspace*{3cm}
+\vspace*{3.5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -77,13 +95,21 @@ Bit 31 unterscheidet Interrupt und Exception, Code elf bezeichnet Machine Extern
 
 **Musterlösung 2**
 
-1. Interrupt-Bit eins, Code elf: externe Maschinen-Interruptkategorie.
-   Die konkrete Geräte-ID fehlt und wird erst per Controller-Claim ermittelt. (2 P)
-2. Kein betrachteter Timer-Trap bei MIE null. Die Zeitquelle läuft weiter. (2 P)
-3. Hardware hält die Fortsetzungsadresse in `mepc` fest.
-   Software muss das benötigte allgemeine Register sichern und wiederherstellen. (1 P)
-4. $4\cdot11=44=\mathtt{0x2C}$ Byte, Einsprung `0x8040042C`.
-   Auch dort muss noch die externe Gerätequelle ausgewählt werden. (1 P)
+1. Interrupt-Bit null, Code elf: eine `ecall`-Exception aus dem Machine Mode.
+   Die gleiche Codezahl wie bei Machine External macht sie nicht zum Interrupt. (1 P)
+2. Die Exception geht auch in Vectored nach BASE `0x80400800`.
+   Nur der externe Interrupt mit Code elf geht nach
+   $\mathtt{0x80400800}+4\cdot11=$ `0x8040082C`. (2 P)
+3. Die Hardware hält die Fortsetzungsadresse in `mepc` fest. (1 P)
+   Software muss den benötigten Wert von `t0` sichern und wiederherstellen.
+   „Temporär“ erlaubt das Verändern bei normalen Funktionsaufrufen,
+   ersetzt aber keine Sicherung bei asynchroner Unterbrechung. (1 P)
+4. Eine geeignete Reihenfolge ist B, D, A, C: erst einen gültigen Behandlungspfad
+   und Zukunftstermin bereitstellen, zuletzt global freigeben.
+   Andere unter globaler Sperre sichere Reihenfolgen sind ebenfalls zulässig;
+   entscheidend ist, dass die Vorbereitungen vor C abgeschlossen sind. (1 P)
+   Eine bereits wartende Anforderung könnte sonst in unvorbereitete Software
+   eintreten, etwa ohne gültigen Stack oder Trap-Eintritt. (1 P)
 :::
 
 {{< pagebreak >}}
@@ -102,12 +128,13 @@ Höhere Priorität gewinnt, bei Gleichstand die kleinere Geräte-ID.
 
 1. Nennen Sie die ersten beiden Claim-IDs. Nach jedem Claim wird vollständig
    behandelt und abgeschlossen; keine neuen Ereignisse. Begründen Sie. (2 P)
-2. Was ändert Claim am Controller? Ist damit die Ursache im Gerät beseitigt? (1 P)
+2. Was ändert Claim am Controller? Begründen Sie, ob damit auch die Ursache
+   im Gerät beseitigt ist. (1 P)
 3. Ein fehlerhafter Handler führt nur Claim und Complete aus.
    Das Gerät hält seine Level-Anforderung weiter aktiv.
    Ergänzen Sie den fehlenden Schritt und erklären Sie die mögliche Folge. (2 P)
 4. Ein späterer Claim liefert null. Welche Gerätebearbeitung und welches
-   Complete sind dann vorgesehen? (1 P)
+   Complete sind dann vorgesehen? Begründen Sie. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
@@ -124,82 +151,134 @@ Höhere Priorität gewinnt, bei Gleichstand die kleinere Geräte-ID.
 
 1. ID fünf, danach zwölf. Beide haben Priorität acht, im Gleichstand gewinnt fünf. (2 P)
 2. Claim übernimmt eine Quelle und löscht atomar deren PLIC-Pending.
-   Die Geräteursache kann weiter bestehen. (1 P)
+   Die Geräteursache kann weiter bestehen, weil kein Gerätestatus und keine
+   Nutzdaten durch diesen Controllerzugriff behandelt werden. (1 P)
 3. Zwischen Claim und Complete Daten beziehungsweise Status nach Gerätevertrag
    bearbeiten und die Ursache passend quittieren. Eine weiter aktive
    Level-Ursache kann nach Complete erneut gemeldet werden. (2 P)
-4. Keine Gerätebearbeitung und kein Complete für ID null. (1 P)
+4. Keine Gerätebearbeitung und kein Complete für ID null,
+   denn es wurde keine Quelle übernommen. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 4: Ein 2,5-ms-Sollraster (7 Punkte)
+## Aufgabe 4: Fehler im Softwaretick (8 Punkte)
 
-Hardwarezeit `mtime`: zwölf MHz, Prozessortakt: 96 MHz.
-Sollperiode $2{,}5$ ms, nächster Solltermin $d=240000$ Timer-Ticks.
-`mtimecmp` enthält den Vergleichstermin. Zeitwerte werden konsistent gelesen
-und geschrieben; kein Zählerumlauf oder arithmetischer Überlauf.
+Hardwarezeit mtime: zwölf MHz, Prozessortakt: 96 MHz, Sollperiode $2{,}5$ ms.
+Der nächste Solltermin und mtimecmp stehen anfangs auf 240000 Timer-Ticks.
+Kein Zählerumlauf oder arithmetischer Überlauf.
 
-1. Bestimmen Sie die Sollperiode in Timer-Ticks.
-   Würde eine Änderung nur des Prozessortakts auf 48 MHz diesen Wert ändern? (2 P)
-2. Die Behandlung beginnt bei now $249000$.
-   Vergleichen Sie now plus Periode mit dem nächsten absoluten Rastertermin,
-   jeweils in Ticks und Millisekunden. (2 P)
-3. Separat now $346000$: Wie viele Solltermine sind fällig?
-   Welcher nächste Termin liegt auf dem Raster und strikt in der Zukunft? (2 P)
-4. Der Sensor hält nur seinen neuesten Messwert bereit.
-   Lassen sich die verpassten historischen Messwerte durch unmittelbar
-   wiederholtes Lesen nachholen? Begründen Sie. (1 P)
+C-Lehrschema für den ISR-Rumpf: Ein- und Austritt sowie Kontextsicherung sind
+bereitgestellt. Die angegebenen Schnittstellen lesen die Zeit konsistent und
+schreiben den Vergleich korrekt. `period` ist die konstante Sollperiode in Ticks.
+Eine Softwareuhr berechnet ihre Zeit aus `periods_seen` mal $2{,}5$ ms.
+
+```c
+#include <stdint.h>
+uint64_t read_mtime(void);
+void write_mtimecmp(uint64_t value);
+volatile uint32_t periods_seen;
+static uint64_t deadline = 240000u;
+void timer_work(uint64_t period) {
+    ++periods_seen;
+    uint64_t now = read_mtime();
+    deadline = now + period;
+    write_mtimecmp(deadline);
+}
+```
+
+1. Berechnen Sie `period`. Geht der Prozessortakt in diese Rechnung ein? (1 P)
+2. Nennen Sie zwei voneinander zu unterscheidende Ursachen dafür, dass die
+   Softwareuhr nachgeht: bei wiederholter Eintrittsverspätung und nach langen
+   Phasen ohne Interruptbehandlung. (2 P)
+3. Statt des fehlerhaften Codes soll das Sollraster erhalten bleiben.
+   Separater Fall: now 346000 bei bisherigem Termin 240000.
+   Bestimmen Sie die Anzahl fälliger Termine und den ersten zukünftigen
+   Rastertermin in Ticks und Millisekunden. (2 P)
+4. Korrigieren Sie den ISR-Rumpf. Die Funktion `next_future` aus Folie 35
+   darf verwendet werden. Geben Sie außerdem an, wie die Anwendung ihre
+   verstrichene Zeit zuverlässig bestimmt. (2 P)
+5. Der Sensor hält nur seinen neuesten Messwert bereit.
+   Können wiederholte aktuelle Lesungen die historischen Werte der
+   versäumten Termine ersetzen? Begründen Sie. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
 
-**Ihre Zeitrechnung und Entscheidung:**
+**Ihre Fehleranalyse, Zeitrechnung und Korrektur:**
 
 \vspace*{3cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{5\baselineskip}
+{{< pagebreak >}}
 
 **Musterlösung 4**
 
 1. $12\cdot10^6\cdot0{,}0025=30000$ Ticks.
-   Die separat vorgegebene Timerfrequenz bleibt unverändert. (2 P)
-2. Relativ: $249000+30000=279000$ Ticks $=23{,}25$ ms.
-   Absolut: $240000+30000=270000$ Ticks $=22{,}5$ ms.
-   Die relative Planung übernimmt die Eintrittsverspätung. (2 P)
+   Der separat vorgegebene Prozessortakt geht nicht ein. (1 P)
+2. `deadline = now + period` übernimmt jede Eintrittsverspätung in die Phase
+   der folgenden Termine; wiederholt ergibt das Drift. (1 P)
+   `periods_seen` zählt Aufrufe statt verstrichener Sollperioden.
+   Mehrere fällige Termine müssen nicht mehrere Aufrufe erzeugen;
+   `volatile` ändert daran nichts. (1 P)
 3. $k=\lfloor(346000-240000)/30000\rfloor+1=4$.
-   Fällig sind 20, 22,5, 25 und 27,5 ms.
-   Nächster Termin: $240000+4\cdot30000=360000$ Ticks $=30$ ms. (2 P)
-4. Nein. Wiederholtes aktuelles Lesen rekonstruiert keine zuvor ungespeicherten
-   Werte. Erforderlich wäre ihre rechtzeitige Erfassung und Speicherung. (1 P)
+   Fällig sind 20, 22,5, 25 und 27,5 ms. (1 P)
+   Nächster Termin: $240000+4\cdot30000=360000$ Ticks $=30$ ms. (1 P)
+4. Die Schnittstellen und der vorbereitete Anfangstermin bleiben wie angegeben.
+   Der korrigierte Rumpf lautet: (1 P)
+
+   ```c
+   void timer_work(uint64_t period) {
+       uint64_t now = read_mtime();
+       deadline = next_future(deadline, now, period);
+       write_mtimecmp(deadline);
+   }
+   ```
+
+   Verstrichene Zeit wird aus einer konsistent gelesenen Hardwarezeit minus
+   einem gespeicherten Startwert gewonnen und über die Timerfrequenz umgerechnet.
+   `periods_seen` entfällt als Zeitbasis. Bei Weitergabe eines mehrteiligen
+   Snapshots ist zusätzlich eine konsistente Übergabe nötig. (1 P)
+5. Nein. Aktuelles Lesen rekonstruiert keine zuvor ungespeicherten Werte.
+   Erforderlich wäre ihre rechtzeitige Erfassung und Speicherung. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 5: Zwei verschiedene Reaktionsfristen (4 Punkte)
+## Aufgabe 5: Priorität, Frist und Dauerbetrieb (6 Punkte)
 
-1. Prozessor 80 MHz, 500 vollständige ISR pro Sekunde,
-   je 640 Prozessorzyklen einschließlich Ein- und Austritt.
-   Berechnen Sie Dauer und mittleren Prozessorzeitanteil. (2 P)
-2. Separates Reaktionsmodell: Bis zum Beginn einer eigenen Behandlung
-   fallen höchstens $60\,\mu$s Blockierung und $4\,\mu$s Eintritt an.
-   Das Sichern der Daten benötigt weitere $6\,\mu$s.
-   Die spätere Auswertung wartet höchstens $120\,\mu$s und dauert $40\,\mu$s.
-   Zeichnen Sie die Zeitkette. Wann sind Daten gesichert, wann ist das Ergebnis fertig? (1 P)
-3. Für welchen dieser Endpunkte ist eine Frist von $100\,\mu$s eingehalten?
-   Erklären Sie, warum der mittlere Zeitanteil aus Teil 1 allein nicht genügt. (1 P)
+Ein Hart, ein PLIC-Kontext, nur Sensor (Priorität sieben) und UART
+(Priorität drei), beide freigegeben, Schwellenwert null, keine Verschachtelung.
+UART bedeutet Universal Asynchronous Receiver/Transmitter.
 
-ISR bedeutet Interrupt Service Routine. Alle Zeiten sind Lehrannahmen;
-zusätzliche Verzögerungen sind im jeweiligen Modell ausgeschlossen.
+Das Hauptprogramm sperrt Interrupts höchstens $20\,\mu$s am Stück.
+Eine UART-Behandlung belegt einschließlich Ein- und Austritt höchstens $50\,\mu$s.
+Nach Ende einer Sperre oder Behandlung wird die höchstpriorisierte wartende
+Quelle vor weiterer Hauptprogrammarbeit übernommen.
+Für ein einzelnes neues Sensorereignis braucht der Eintritt höchstens $4\,\mu$s,
+anschließend die Datensicherung weitere $6\,\mu$s.
+Daten müssen spätestens $50\,\mu$s nach dem Ereignis gesichert sein.
+Andere Verzögerungen und eine bereits laufende Sensorbehandlung sind ausgeschlossen.
+
+1. Zeichnen Sie den ungünstigsten Weg bis zur Datensicherung.
+   Begründen Sie insbesondere, ob die zwei möglichen Blockierungen addiert
+   werden müssen. Ist die Frist eingehalten? (2 P)
+2. Ein Kollege möchte die Sensorpriorität auf das Maximum erhöhen.
+   Bewerten Sie, ob dies die gefundene Fristverletzung beseitigt. (1 P)
+3. Welche maximale UART-Behandlungsdauer wäre rechnerisch noch zulässig?
+   Welche Arbeit sollte die UART-Behandlung dafür ins Hauptprogramm abgeben? (2 P)
+4. Separat zum Einzelfall treffen im Dauerbetrieb alle $0{,}8$ ms neue Messwerte ein.
+   Die Auswertung eines Werts belegt den Prozessor bereits eine ms.
+   Kann ein endlicher Puffer diesen Betrieb dauerhaft verlustfrei machen?
+   Begründen Sie anhand der Raten. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
 
-**Ihre Rechnungen und Zeitkette:**
+**Ihre Zeitachse und Entwurfsentscheidungen:**
 
-\vspace*{3cm}
+\vspace*{3.5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
@@ -207,12 +286,23 @@ zusätzliche Verzögerungen sind im jeweiligen Modell ausgeschlossen.
 
 **Musterlösung 5**
 
-1. $640/(80\cdot10^6)=8\,\mu$s.
-   $500\cdot8\,\mu\mathrm{s}/\mathrm{s}=0{,}004=0{,}4\,\%$. (2 P)
-2. Daten gesichert nach $60+4+6=70\,\mu$s.
-   Ergebnis fertig nach $70+120+40=230\,\mu$s. (1 P)
-3. Nur die Datensicherung erfüllt $100\,\mu$s.
-   Mittlere Auslastung begrenzt weder maximale Blockierung noch spätere Wartezeit. (1 P)
+1. Größte Blockierung $\max(20,50)=50\,\mu$s, nicht siebzig. (1 P)
+   Während der Hauptprogrammsperre beginnt keine UART-Behandlung.
+   Danach gewinnt der bereits wartende Sensor die Auswahl. Nach einer
+   laufenden UART-Behandlung wird ebenfalls der Sensor vor neuer
+   Hauptprogrammarbeit bedient. Die ungünstigste Restdauer ist daher
+   entweder die Sperre oder die UART-Behandlung.
+   Gesamt: $50+4+6=60\,\mu$s; die Frist von fünfzig Mikrosekunden ist verletzt. (1 P)
+2. Nein. Der Sensor hat schon die höhere Priorität, kann die bereits laufende
+   UART-Behandlung im nicht verschachtelten Modell aber nicht unterbrechen. (1 P)
+3. $\max(20,T_\mathrm{UART})+4+6\leq50$ verlangt
+   $T_\mathrm{UART}\leq40\,\mu$s. Der Grenzfall hat keine Zeitreserve. (1 P)
+   Unmittelbar nötige Datenübernahme und Quittierung bleiben in der ISR,
+   längere Auswertung und Textformatierung kommen ins Hauptprogramm. (1 P)
+4. Nein. Es kommen $1/0{,}0008=1250$ Werte pro Sekunde an,
+   aber selbst ohne Interruptaufwand sind höchstens tausend auswertbar.
+   Die wartende Menge wächst; ein endlicher Puffer verschiebt nur den Überlauf.
+   Nötig sind etwa weniger Daten, kürzere Auswertung oder zulässiges Zusammenfassen. (1 P)
 :::
 
 {{< pagebreak >}}
@@ -230,8 +320,8 @@ Einzelne Wortzugriffe sind im Plattformmodell unteilbar, die folgende Gesamtfolg
 | 3 | beendet ein Ereignis und schreibt Merker minus eins zurück | |
 
 1. Welcher Zählerstand entsteht, welcher wäre nach einem bearbeiteten Ereignis richtig?
-   Behebt `volatile` allein den Fehler? (1 P)
-2. Skizzieren Sie stattdessen eine kurze geschützte Folge, die den gesamten
+   Behebt `volatile` allein den Fehler? Begründen Sie. (1 P)
+2. Skizzieren Sie eine kurze geschützte Folge, die den gesamten
    Zählerstand lokal übernimmt und den gemeinsamen Zähler auf null setzt.
    Wo liegt die längere Verarbeitung? (2 P)
 3. Warum wird danach der vorherige Freigabestand wiederhergestellt,
