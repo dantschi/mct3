@@ -9,6 +9,26 @@ Herzlich willkommen zur Vorlesung **Mikrocomputertechnik 3 (MCT3)** an der Duale
 
 Das Modul vertieft digitale Rechnerarchitektur und die Hardware/Software-Schnittstelle am Beispiel der **RISC-V**-Architektur. Aufbauend auf MCT1 zoomen wir vom isolierten CPU-Kern hinaus zum **System-on-Chip (SoC)**: Speicherphysik und -hierarchie, Interrupts und Timer, Aktorik, serielle Busse, DMA, moderne CPU-Features, Edge-AI-Beschleuniger und Multicore — bis hin zu hardwarenaher C-Programmierung am Gesamtsystem.
 
+## Kursrahmen und Lernziele
+
+Die folgenden Angaben beschreiben die Planung dieser Materialien; ein
+Modulhandbuch mit Fassung und verbindlichen Prüfungsregeln liegt hier nicht vor.
+
+| Rahmen | Angaben zur Veranstaltung |
+|--------|---------------------------|
+| Modul und Zielgruppe | Mikrocomputertechnik 3, Bachelor Elektro- und Informationstechnik, fünftes Semester |
+| Voraussetzungen | MCT1/2, binäre und hexadezimale Zahlen, C-Zeiger und Arrays, Bitoperationen und Schleifen; bekannte STM32-Timer mit Prescaler und ARR |
+| Zeitplanung | Je Einheit vier Schulstunden (180 Minuten) einschließlich Übung und Quiz; zusätzliche selbstständige Bearbeitungszeiten stehen auf den Übungsblättern |
+| Prüfungsvorbereitung | Probeklausur mit 60 Minuten und 60 Punkten, Multiple Choice und offenen Papieraufgaben; verbindliche Prüfungsform und Hilfsmittel sind gesondert festzulegen |
+| Technischer Rahmen | RISC-V-Lehrmodelle, RV32 soweit angegeben; C-Lehrcode und Hostversuche mit jeweils ausdrücklich genannten Voraussetzungen; konkrete Registeradressen und Zeitwerte sind plattformabhängig |
+
+Nach Abschluss der Veranstaltung können Sie:
+
+- Speicherarten und Cacheorganisationen erklären, Zugriffe zerlegen und deren Folgen berechnen.
+- Interrupt-, Timer- und Peripherieabläufe herleiten und Reaktionsfristen unter benannten Annahmen prüfen.
+- Datenübertragung, DMA und gemeinsame Datenzugriffe einschließlich Fehlerfällen begründet entwerfen.
+- Prozessorparallelität, KI-Beschleuniger und Multicore im Hinblick auf Durchsatz, Speicher und Synchronisation beurteilen.
+
 ## Kursübersicht
 
 Der rote Faden der Veranstaltung:
@@ -61,6 +81,36 @@ Zur Vertiefung empfohlen:
 | **Renode** | SoC-Simulator (CPU, Busse, Speicher, Peripherie) für Labor und Treiber | [renode.io](https://renode.io/) |
 | **Compiler Explorer** | C live als RISC-V-Assembler betrachten (Optimierung, Scheduling) | [godbolt.org](https://godbolt.org/) |
 | **Ripes** | Visueller RISC-V-Simulator (u. a. Data-Cache-Ansicht) | [github.com/mortbopet/Ripes](https://github.com/mortbopet/Ripes) |
+
+### Kursglossar
+
+Das [Kursglossar](GLOSSAR.md) hält die eingeführten Fachbegriffe und ihre
+Zuordnung zu englischen Bezeichnungen und Registern fest.
+
+## Materialien weiterentwickeln
+
+Die [Build- und Autorenanleitung](TEMPLATE.md) beschreibt Einrichtung,
+Ausgabeformate, sechs Autoren-Skills und geprüfte Startcode-Pakete. Die
+Projektregeln stehen in [AGENTS.md](AGENTS.md) und [FACHREGELN.md](FACHREGELN.md).
+
+Nach Einrichtung der gemeinsamen Toolchain:
+
+```bash
+source scripts/activate.sh
+python3 scripts/build-materials.py all
+```
+
+Dieser Aufruf baut Website, alle Handouts sowie Übungsblätter und Probeklausur
+jeweils für Studierende und mit Musterlösungen. Vorhandene Programmierprojekte
+werden zusätzlich geprüft und als Startcode-ZIP paketiert. Ein Paket enthält
+Anleitung, Startcode und freigegebene Tests; Referenzlösungen bleiben außerhalb
+des ZIPs, sind in diesem öffentlichen Repository aber weiterhin einsehbar.
+Das [Template-Beispiel](examples/template/README.md) erläutert die Paketstruktur
+außerhalb des MCT3-Stoffplans.
+
+GitHub Actions verwendet denselben vollständigen Build bei Pull Requests und
+Pushes auf `main`. Der Deploy-Schritt veröffentlicht nur nach erfolgreicher
+Prüfung die bereits gebauten Dateien aus `_site/`.
 
 ## OER und Lizenz
 
