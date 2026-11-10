@@ -23,7 +23,7 @@ if [[ "$mode" == --system-deps ]]; then
   [[ -z "${HTTP_PROXY:-}" ]] || proxy_options+=(-o "Acquire::http::Proxy=$HTTP_PROXY")
   "${privilege[@]}" apt-get "${proxy_options[@]}" update
   "${privilege[@]}" apt-get "${proxy_options[@]}" install -y --no-install-recommends \
-    ca-certificates curl python3 xz-utils dpkg libnss3 libgbm1 libasound2t64 \
+    ca-certificates curl python3 perl xz-utils dpkg libnss3 libgbm1 libasound2t64 \
     libatk-bridge2.0-0t64 libcups2t64 libxcomposite1 libxdamage1 libxrandr2 \
     libcairo2 libcairo-gobject2 libglib2.0-0t64 libxml2 libpango-1.0-0 \
     libpangocairo-1.0-0 libdav1d7 libfontconfig1
@@ -62,10 +62,34 @@ if [[ "$mode" == --quarto-only ]]; then
   exit 0
 fi
 command -v dpkg-deb >/dev/null || { echo 'dpkg-deb is required (see --system-deps).' >&2; exit 1; }
+command -v perl >/dev/null || { echo 'perl is required for tlmgr (see --system-deps).' >&2; exit 1; }
 install_tar "$toolchain_dir/node-$NODE_VERSION" "$toolchain_dir/downloads/node-$NODE_VERSION.tar.xz" "$NODE_SHA256" \
   "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz"
-install_tar "$toolchain_dir/texlive-$TEXLIVE_VERSION" "$toolchain_dir/downloads/tinytex-$TEXLIVE_VERSION.tar.xz" "$TEXLIVE_SHA256" \
+texlive_dir="$toolchain_dir/texlive-$TEXLIVE_VERSION"
+install_tar "$texlive_dir" "$toolchain_dir/downloads/tinytex-$TEXLIVE_VERSION.tar.xz" "$TEXLIVE_SHA256" \
   "https://github.com/rstudio/tinytex-releases/releases/download/v$TEXLIVE_VERSION/TinyTeX-linux-x86_64-v$TEXLIVE_VERSION.tar.xz"
+# Pinned TeX Live packages that the TinyTeX bundle omits (TEXLIVE_PACKAGES in
+# toolchain.env). The container is verified here because tlmgr cannot check a
+# local file itself; it installs from that file without contacting a repository.
+install_tex_package() {
+  local name="$1" revision="$2" digest="$3"
+  local marker="$texlive_dir/.installed-$name-sha256" archive="$toolchain_dir/downloads/texlive-$name.r$revision.tar.xz" log
+  [[ ! -f "$marker" ]] || [[ "$(cat "$marker")" != "$digest" ]] || return 0
+  download "$TEXLIVE_ARCHIVE_URL/$name.r$revision.tar.xz" "$archive" "$digest"
+  log="$(mktemp "$toolchain_dir/.tlmgr.XXXXXX")"
+  "$texlive_dir/bin/x86_64-linux/tlmgr" install --file "$archive" </dev/null >"$log" 2>&1 \
+    && grep -qx "revision $revision" "$texlive_dir/tlpkg/tlpobj/$name.tlpobj" || {
+    cat "$log" >&2
+    echo "Installing the TeX Live package failed: $name r$revision (log: $log)." >&2
+    exit 1
+  }
+  rm -f "$log"
+  printf '%s\n' "$digest" > "$marker"
+  echo "TeX Live package installed: $name r$revision"
+}
+while read -r name revision digest; do
+  [[ -z "$name" ]] || install_tex_package "$name" "$revision" "$digest"
+done <<< "$TEXLIVE_PACKAGES"
 chrome_dir="$toolchain_dir/chrome-$CHROME_VERSION"
 if [[ ! -f "$chrome_dir/.installed-sha256" ]] || [[ "$(cat "$chrome_dir/.installed-sha256")" != "$CHROME_SHA256" ]]; then
   [[ ! -e "$chrome_dir" ]] || { echo "Unrecognized installation: $chrome_dir" >&2; exit 1; }
@@ -105,7 +129,14 @@ node --version
 "$QUARTO_CHROMIUM" --version
 lualatex --version | head -1
 rsvg-convert --version
-for package in tcolorbox.sty sectsty.sty needspace.sty adjustbox.sty texgyreheros-regular.otf; do
+# The second line lists what Quarto's `lang: de` preamble loads under LuaLaTeX.
+for package in tcolorbox.sty sectsty.sty needspace.sty adjustbox.sty texgyreheros-regular.otf \
+  babel.sty luababel.def luatexbase.sty ctablestack.sty ngerman.ldf selnolig.sty loadhyph-de-1996.tex hyph-de-1996.pat.txt; do
   kpsewhich "$package" >/dev/null || { echo "Missing package in pinned TeX bundle: $package" >&2; exit 1; }
 done
+# Without this entry the PDF still builds, but not with German hyphenation rules.
+grep -q "\['ngerman'\]" "$(kpsewhich language.dat.lua)" || {
+  echo 'German hyphenation patterns are not registered for LuaLaTeX (language.dat.lua).' >&2
+  exit 1
+}
 echo 'Toolchain ready. Run: source scripts/activate.sh'

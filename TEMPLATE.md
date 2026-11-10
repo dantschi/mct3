@@ -164,7 +164,7 @@ Ein öffentliches Git-Repository macht auch `solution/` lesbar. Getrennte ZIPs u
 
 ## Build-Umgebung einrichten
 
-Cloud-Umgebung und GitHub Actions verwenden dieselben Setup- und Build-Skripte. Das Setup unterstützt Linux x86_64 mit Debian 13 oder Ubuntu 24.04. Es benötigt `curl`, `python3`, `tar`, `xz`, `sha256sum` und `dpkg-deb`; die Systemabhängigkeiten für den Browser und die SVG-Konvertierung installiert der erste Aufruf mit Root-Rechten bzw. `sudo`:
+Cloud-Umgebung und GitHub Actions verwenden dieselben Setup- und Build-Skripte. Das Setup unterstützt Linux x86_64 mit Debian 13 oder Ubuntu 24.04. Es benötigt `curl`, `python3`, `perl`, `tar`, `xz`, `sha256sum` und `dpkg-deb`; die Systemabhängigkeiten für den Browser und die SVG-Konvertierung installiert der erste Aufruf mit Root-Rechten bzw. `sudo`:
 
 ```bash
 bash scripts/setup.sh --system-deps
@@ -179,10 +179,13 @@ Das Setup prüft die Downloads mit SHA-256 und installiert folgende festgelegte 
 | Quarto | 1.11.9 |
 | Node.js | 24.22.1 |
 | Chrome Headless Shell für Mermaid-PDFs | 157.0.8103.38 |
-| TinyTeX mit vollständigem Paketbestand | 2026.11 |
+| TinyTeX (Paketbündel `TinyTeX`) | 2026.11 |
+| TeX-Live-Pakete für deutschsprachige PDFs: `ctablestack`, `luatexbase`, `babel-german`, `hyphen-german`, `selnolig` | TeX-Live-2026-Stand vom 21.10.2026 |
 | `rsvg-convert` für SVGs in PDFs | 2.60.0 |
 
 `source scripts/activate.sh` in jeder neuen Shell ausführen. Die Aktivierung wählt die installierten Werkzeuge einschließlich Browser und TeX und berücksichtigt die Proxy-Konfiguration der Cloud-Umgebung. Das Setup kann erneut ausgeführt werden. Für eine gemeinsame Installation außerhalb des Checkouts kann vor Setup und Aktivierung `DHBW_TOOLCHAIN_DIR` auf ein beschreibbares Verzeichnis gesetzt werden. Im Build werden fehlende TeX-Pakete nicht automatisch nachinstalliert; nötige Änderungen am Paketbestand gehören zur gemeinsamen Toolchain.
+
+Das TinyTeX-Bündel enthält nicht alle Pakete, die Quarto für `lang: de` unter LuaLaTeX lädt. Die fehlenden Pakete stehen deshalb mit Revision und SHA-256 in `TEXLIVE_PACKAGES`. Das Setup lädt ihre Container aus einem datierten TeX-Live-Archivstand, prüft sie und installiert sie mit `tlmgr install --file` ohne Zugriff auf ein Paket-Repository. Ein weiteres Paket wird dort als zusätzliche Zeile ergänzt; für eine Datei, deren Fehlen bereits beim Setup auffallen soll, zusätzlich die Paketprüfung am Ende von `scripts/setup.sh` erweitern. Das Setup prüft außerdem, dass die deutschen Trennmuster für LuaLaTeX registriert sind: Ohne sie entsteht das PDF zwar, deutscher Text wird aber nicht nach deutschen Regeln getrennt.
 
 Die festgelegten Renderwerkzeuge verringern Unterschiede zwischen Cloud und CI. Betriebssystem und Systembibliotheken bleiben Teil der Umgebung; bytegleiche Ausgaben über verschiedene Betriebssysteme hinweg sind damit nicht garantiert. PlantUML benötigt bei einem Cache-Miss weiterhin Zugriff auf den konfigurierten Kroki-Dienst.
 
