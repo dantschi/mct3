@@ -24,6 +24,36 @@ jobs:
       group: ${{ github.workflow }}-build-${{ github.ref }}
       cancel-in-progress: true
     steps:
+      # TEMPORARY: read-only probe of TeX Live package containers to record their
+      # revisions and SHA-256 digests. Removed again by the commit that pins them.
+      - name: Probe TeX Live package containers (temporary)
+        run: |
+          probe() {
+            local base="$1" pkg file rev
+            echo "===== $base"
+            for pkg in ctablestack luatexbase babel-german hyphen-german selnolig; do
+              file="$(mktemp)"
+              if curl --fail --location --silent --show-error --retry 2 --connect-timeout 15 --max-time 120 "$base/$pkg.tar.xz" -o "$file"; then
+                rev="$(tar -xJOf "$file" "tlpkg/tlpobj/$pkg.tlpobj" | sed -n 's/^revision //p')"
+                echo "$pkg unversioned sha256=$(sha256sum "$file" | cut -d' ' -f1) bytes=$(stat -c %s "$file") revision=$rev"
+                if curl --fail --location --silent --show-error --retry 2 --connect-timeout 15 --max-time 120 "$base/$pkg.r$rev.tar.xz" -o "$file.versioned"; then
+                  echo "$pkg.r$rev versioned sha256=$(sha256sum "$file.versioned" | cut -d' ' -f1)"
+                else
+                  echo "$pkg.r$rev versioned name: download failed"
+                fi
+                tar -xJOf "$file" "tlpkg/tlpobj/$pkg.tlpobj" | grep -v -E '^(longdesc|shortdesc)'
+              else
+                echo "$pkg: download failed"
+              fi
+            done
+          }
+          probe https://ftp.tu-chemnitz.de/pub/tug/historic/systems/texlive/2025/tlnet-final/archive
+          probe https://ftp.math.utah.edu/pub/tex/historic/systems/texlive/2025/tlnet-final/archive
+          probe https://texlive.info/tlnet-archive/2026/10/21/tlnet/archive
+          probe https://mirror.ctan.org/systems/texlive/tlnet/archive
+          echo 'Probe finished; stopping this temporary run before the build.'
+          exit 1
+
       - name: Check out repository
         uses: actions/checkout@v4
         with:
