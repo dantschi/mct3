@@ -13,6 +13,10 @@ for tex_file in "${extra_files[@]}"; do
   fi
 done
 if [[ "$install_extra" == true ]]; then
+  # The fixed TinyTeX bundle can contain an older manager than the repository
+  # requires. Update only the manager before installing the missing packages.
+  echo "Updating the TeX Live package manager from $TEXLIVE_REPOSITORY"
+  tlmgr --verify-repo=all --repository "$TEXLIVE_REPOSITORY" update --self
   echo "Installing German LuaLaTeX dependencies from $TEXLIVE_REPOSITORY"
   tlmgr --verify-repo=all --repository "$TEXLIVE_REPOSITORY" install "${TEXLIVE_EXTRA_PACKAGES[@]}"
 fi

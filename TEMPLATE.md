@@ -190,6 +190,11 @@ automatisch alle benötigten Sprachpakete. Das gemeinsame Setup ergänzt mit
 `babel-german`, `hyphen-german` und `selnolig` einschließlich ihrer Abhängigkeiten.
 Die Paketverwaltung muss dabei Repository-Signaturen mit GnuPG prüfen;
 Archivprüfsummen bleiben ebenfalls aktiviert.
+Vor einer nötigen Paketinstallation aktualisiert das Setup mit `tlmgr update
+--self` ausschließlich die Paketverwaltung. Das ist erforderlich, wenn das
+festgelegte Basisarchiv einen älteren Manager enthält als das Repository
+voraussetzt. Fehler dieses Updates brechen das Setup ab; die gesamte
+TeX-Distribution wird dabei nicht aktualisiert.
 Bezugsquelle ist `https://tlnet.yihui.org`; die dortigen Paketrevisionen werden
 vom TeX-Live-Repository gepflegt und sind nicht durch die Prüfsumme des
 Basisarchivs festgelegt. Das Setup aktualisiert weder die gesamte Distribution

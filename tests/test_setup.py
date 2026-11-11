@@ -44,6 +44,22 @@ if tool == "kpsewhich":
     raise SystemExit(1)
 
 if tool == "tlmgr":
+    update_ready = files / ".tlmgr-self-update-ready"
+    if "update" in args:
+        if args[args.index("update"):] != ["update", "--self"]:
+            print("Unexpected TeX distribution update", file=sys.stderr)
+            raise SystemExit(98)
+        update_ready.unlink(missing_ok=True)
+        result = int(os.environ.get("SETUP_TEST_SELF_UPDATE_EXIT", "0"))
+        if result:
+            print("Deliberate tlmgr self-update failure", file=sys.stderr)
+            raise SystemExit(result)
+        update_ready.write_text("updated fixture\n")
+        raise SystemExit(0)
+    if "install" not in args or not update_ready.is_file():
+        print("Package installation requires a successful tlmgr self-update", file=sys.stderr)
+        raise SystemExit(97)
+    update_ready.unlink()
     result = int(os.environ.get("SETUP_TEST_INSTALL_EXIT", "0"))
     if result:
         print("Deliberate package installation failure", file=sys.stderr)
@@ -171,6 +187,9 @@ class SetupTests(unittest.TestCase):
     def compile_calls(self):
         return [args for args in self.calls("lualatex") if args != ["--version"]]
 
+    def tlmgr_calls(self, action):
+        return [args for args in self.calls("tlmgr") if action in args]
+
     def assert_success(self, result):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
@@ -185,10 +204,12 @@ class SetupTests(unittest.TestCase):
     def test_full_setup_repairs_missing_packages_from_configured_repository(self):
         self.provision(extras=False)
         self.assert_success(self.run_setup())
-        self.assertEqual(self.calls("tlmgr"), [[
+        prefix = [
             "--verify-repo=all", "--repository", self.config["TEXLIVE_REPOSITORY"],
-            "install", *self.packages,
-        ]])
+        ]
+        self.assertEqual(self.calls("tlmgr"), [
+            prefix + ["update", "--self"], prefix + ["install", *self.packages],
+        ])
         self.assertTrue(all((self.files / name).is_file() for name in EXTRA_FILES))
         self.assertEqual(len(self.compile_calls()), 1)
         self.assertEqual(Path(self.compile_calls()[0][-1]), self.root / "scripts/tex-smoke.tex")
@@ -200,6 +221,17 @@ class SetupTests(unittest.TestCase):
         result = self.run_setup(SETUP_TEST_INSTALL_EXIT="37")
         self.assertEqual(result.returncode, 37, result.stdout + result.stderr)
         self.assertIn("Deliberate package installation failure", result.stderr)
+        self.assertEqual(len(self.tlmgr_calls("update")), 1)
+        self.assertEqual(len(self.tlmgr_calls("install")), 1)
+        self.assertFalse(self.compile_calls())
+
+    def test_self_update_failure_stops_before_package_installation_and_compilation(self):
+        self.provision(extras=False)
+        result = self.run_setup(SETUP_TEST_SELF_UPDATE_EXIT="63")
+        self.assertEqual(result.returncode, 63, result.stdout + result.stderr)
+        self.assertIn("Deliberate tlmgr self-update failure", result.stderr)
+        self.assertEqual(len(self.tlmgr_calls("update")), 1)
+        self.assertFalse(self.tlmgr_calls("install"))
         self.assertFalse(self.compile_calls())
 
     def test_existing_babel_does_not_hide_missing_german_language_dependencies(self):
@@ -208,7 +240,8 @@ class SetupTests(unittest.TestCase):
             with self.subTest(missing=name):
                 (self.files / name).unlink()
                 self.assert_success(self.run_setup(helper=True))
-                self.assertEqual(len(self.calls("tlmgr")), count)
+                self.assertEqual(len(self.tlmgr_calls("update")), count)
+                self.assertEqual(len(self.tlmgr_calls("install")), count)
                 self.assertTrue((self.files / name).is_file())
                 self.assertEqual(len(self.compile_calls()), count)
 
@@ -244,8 +277,11 @@ class SetupTests(unittest.TestCase):
     def test_repeated_full_setup_reuses_packages_but_checks_tex_again(self):
         self.provision(extras=False)
         self.assert_success(self.run_setup())
+        first_package_calls = self.calls("tlmgr")
         self.assert_success(self.run_setup())
-        self.assertEqual(len(self.calls("tlmgr")), 1)
+        self.assertEqual(len(self.tlmgr_calls("update")), 1)
+        self.assertEqual(len(self.tlmgr_calls("install")), 1)
+        self.assertEqual(self.calls("tlmgr"), first_package_calls)
         calls = self.compile_calls()
         self.assertEqual(len(calls), 2)
         output = lambda args: next(a for a in args if a.startswith("-output-directory="))
