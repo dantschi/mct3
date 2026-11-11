@@ -1,5 +1,5 @@
 ---
-title: "Übungsblatt 9: Multicore & Finale"
+title: "Übungsblatt 9: Paralleles Rechnen & Multicore"
 subtitle: "Mikrocomputertechnik 3 · 32 Orientierungspunkte · ca. 75–90 Minuten"
 highlight-style: ../assets/styles/dhbw-code.theme
 header-includes: |
@@ -210,19 +210,43 @@ $S(N)=1/(s+(1-s)/N)$, Effizienz $E=S/N$.
 
 {{< pagebreak >}}
 
-## Aufgabe 6: Neue Systemparameter zusammenführen (6 Punkte)
+## Aufgabe 6: Ergebnisse veröffentlichen und übernehmen (6 Punkte)
 
-1. Direct-Mapped-Cache: acht KiB Nutzdaten, 128 Byte je Line,
-   32-Bit-Byteadresse. Bestimmen Sie Sets und Bitfelder;
-   zerlegen Sie `0x30004298` und geben Sie die Linebasis an. (2 P)
-2. Hitzeit drei Takte, Hitrate 92 Prozent, zusätzliche Misspenalty fünfzig Takte.
-   AMAT und Zeit bei 125 MHz? (1 P)
-3. Timer: Eingang zwei MHz, Teiler acht, Zähler inklusiv null bis 1249;
-   HIGH für null bis 499. Frequenz, Periodendauer, HIGH-Zeit und Tastverhältnis?
-   Warum muss die Zählkonvention genannt werden? (2 P)
-4. Ein neuronaler Beschleuniger schreibt über einen Gerätepfad in RAM.
-   Nur die CPU-Caches untereinander sind als kohärent dokumentiert.
-   Was muss vor Nutzung des Ergebnisses gesondert feststehen? (1 P)
+C11-Lehrmodell: Zwei Worker lesen dieselbe unveränderliche Eingabe
+`[3, 6, 9, 12]`. Worker 0 addiert die Elemente mit Index null und eins,
+Worker 1 die mit Index zwei und drei. Jeder schreibt genau einmal ausschließlich
+seinen eigenen Eintrag im gewöhnlichen `int32_t teil[2]`.
+Die atomaren Meldungen `atomic_uint fertig[2]` beginnen bei null.
+Ein separater Sammler liest die Ergebnisse erst, wenn beide Meldungen eins sind.
+Alle Objekte sind vor dem Start initialisiert; kein weiterer Synchronisationsweg
+und kein Wiederverwenden der Meldungen. Die Werte laufen nicht über.
+
+Die C11-Ausschnitte gehören zu verschiedenen Ausführungsfäden:
+
+```c
+/* Worker i, i ist 0 oder 1: */
+teil[i] = lokale_summe;
+atomic_store_explicit(&fertig[i], 1u, memory_order_relaxed);
+
+/* Sammler, gesamt wird nur von ihm verwendet: */
+if (atomic_load_explicit(&fertig[0], memory_order_acquire) == 1u &&
+    atomic_load_explicit(&fertig[1], memory_order_acquire) == 1u)
+    gesamt = teil[0] + teil[1];
+```
+
+1. Welche Teilsummen und welcher Gesamtwert sind beabsichtigt? (1 P)
+2. Beurteilen und reparieren Sie die Veröffentlichung. Zeichnen Sie die nötige
+   Ordnungsbeziehung von jedem Worker bis zum Lesen seines Ergebnisses.
+   Darf dem fehlerhaften C11-Programm eine bestimmte Liste möglicher
+   Gesamtwerte zugeschrieben werden? (2 P)
+3. Separates Layoutmodell: 64-Byte-Cachezeilen, zwei Vier-Byte-Ergebnisse bei
+   `0x20002000` und `0x20002004`; die Kontrollfelder liegen in anderen Zeilen.
+   Welche zusätzliche Kopienkoordination kann trotz verschiedener Ergebnisobjekte
+   entstehen? Wählen Sie eine passende nächste Zeilenadresse für das zweite Objekt.
+   Ersetzt diese Trennung die Reparatur aus Teil 2? (2 P)
+4. Worker 1 erreicht seine Meldung nie. Garantiert eine korrekt geordnete
+   Veröffentlichung trotzdem die vollständige Ergebnisübernahme durch den Sammler?
+   Welche zusätzliche Entwurfsentscheidung fehlt? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
@@ -237,13 +261,29 @@ $S(N)=1/(s+(1-s)/N)$, Effizienz $E=S/N$.
 
 **Musterlösung 6**
 
-1. 64 Sets, Offset sieben Bit, Index sechs Bit, Tag neunzehn Bit.
-   Adresse: Offset 24, Index fünf, Tag `0x18002`, Basis `0x30004280`. (2 P)
-2. $3+0{,}08\cdot50=7$ Takte; acht ns je Takt, also 56 ns. (1 P)
-3. 250000 Zählticks/s, 1250 Intervalle: 200 Hz, fünf ms,
-   HIGH zwei ms, Anteil 40 Prozent. Das inklusive Ende zählt mit. (2 P)
-4. Geräte-Kohärenzdomäne, Pufferbesitz, passende Sichtbarkeit/Ordnung und
-   erfolgreicher vollständiger Abschluss; CPU-Kohärenz allein beweist dies nicht. (1 P)
+1. Worker 0 liefert $3+6=9$, Worker 1 $9+12=21$,
+   insgesamt $9+21=30$. Die Teilsummenberechnung verwendet getrennte lokale
+   Akkumulatoren; gemeinsam verwendet werden erst die Ergebnisplätze. (1 P)
+2. Der `relaxed`-Store macht die Meldung atomar, stellt aber keine
+   Synchronisationsbeziehung zu den gewöhnlichen Ergebniszugriffen her.
+   Jeder Worker schreibt zuerst seinen Ergebnisplatz und veröffentlicht
+   danach mit `memory_order_release`. Der Sammler behält seine Acquire-Loads
+   bei und liest beide Ergebnisplätze erst nach zwei beobachteten Einsen. (1 P)
+   Je Worker gilt: Ergebnis-Store vor Release-Store; dieser synchronisiert mit
+   dem Acquire-Load, der seine einmalige Eins liest; danach folgt der Ergebnis-Load.
+   So entsteht die benötigte Happens-before-Beziehung. Ohne diese oder eine andere
+   passende Synchronisation liegt beim konkurrierenden Zugriff auf den gewöhnlichen
+   Ergebnisplatz ein C11-Data-Race mit undefiniertem Verhalten vor. Eine feste
+   C-Endwertliste darf daraus nicht abgeleitet werden. (1 P)
+3. Beide Ergebnisobjekte liegen in derselben Zeile: unabhängig beschriebene
+   Objekte können False Sharing und zusätzliche Übernahmen des Zeilenschreibrechts
+   verursachen. Eine tatsächliche Laufzeitstrafe ist damit noch nicht gemessen. (1 P)
+   Das zweite Vier-Byte-Objekt kann bei `0x20002040` liegen; die erste Adresse
+   ist bereits auf 64 Byte ausgerichtet. Getrennte Zeilen ersetzen weder Atomizität
+   noch die Release-/Acquire-Ordnung der Veröffentlichung. (1 P)
+4. Nein. Ordnung garantiert keinen Fortschritt und keine beschränkte Wartezeit.
+   Benötigt wird eine vereinbarte Fehler-, Abbruch- oder Überwachungspolitik
+   für ausbleibende Worker; ein Timeout bräuchte zusätzlich ein Zeitmodell. (1 P)
 :::
 
 {{< pagebreak >}}

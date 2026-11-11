@@ -38,7 +38,7 @@ einer unabhängig geprüften Buchseite oder eines Hardwareversuchs.
 
 | Bevorzugte Bezeichnung | Bedeutung und Abgrenzung | Synonyme bzw. Registerzuordnung | Einführung / Fundstelle |
 |---|---|---|---|
-| Hart | Hardware-Ausführungskontext für einen Befehlsstrom. Das Grundmodell der Vorlesung verwendet genau einen Hart im Machine Mode. | Hardware Thread | [VL 3](vorlesungen/03_interrupts_timer.qmd), „Vorkenntnisse und Lehrmodell“ |
+| Hart | Hardware-Ausführungskontext für einen Befehlsstrom. Das Grundmodell in VL 3 verwendet genau einen Hart im Machine Mode; VL 9 betrachtet mehrere Harts und trennt sie von Softwarethreads und physischen Kernen. | Hardware Thread | [VL 3](vorlesungen/03_interrupts_timer.qmd), „Vorkenntnisse und Lehrmodell“; [VL 9](vorlesungen/09_paralleles_rechnen_multicore.qmd), „Thread, Hart und Kern auseinanderhalten“ |
 | Polling | Software fragt einen Gerätezustand selbst ab. Periodisches Polling und beschäftigtes Warten unterscheiden sich durch Abfragelücken und anderweitig verfügbare Rechenzeit. | Abfragen; Busy Waiting als besonderer Entwurf | [VL 3](vorlesungen/03_interrupts_timer.qmd), „Reaktionswege auf einer Zeitachse“ |
 | Interrupt | Asynchrone Anforderung unabhängig vom gerade ausgeführten Befehl. Ein gespeichertes Ereignis, die Freigabe und die Bearbeitung sind getrennte Schritte. | Unterbrechung | [VL 3](vorlesungen/03_interrupts_timer.qmd), „Interrupt, Exception und Trap“ |
 | Exception | Synchron aus der Ausführung eines Befehls entstandene Ausnahme. Vor einer Fortsetzung kann eine Korrektur oder andere Behandlung erforderlich sein. | Ausnahme | [VL 3](vorlesungen/03_interrupts_timer.qmd), „Interrupt, Exception und Trap“ |
@@ -104,3 +104,24 @@ Lehrrechnungen mit vorgegebenen Parametern, keine behaupteten Trainingsergebniss
 | Dense-Schicht | Jeder Ausgang verwendet jeden Eingang mit einem eigenen Gewicht. Zeilen der Gewichtsmatrix gehören zu Ausgängen, Spalten zu Eingängen; ein Bias wird je Ausgang ergänzt. | Fully connected layer | VL 8, KI-Grundlagen und „Dense-Schicht: zwei gewichtete Summen“ |
 | Batch | Mehrere Eingabebeispiele werden gemeinsam betrachtet. In der hier eingeführten Matrixdarstellung stehen die Beispiele als Spalten; die Orientierung ist eine explizite Konvention. | Eingabestapel; batch | VL 8, mehrere Eingaben als Matrix |
 | Matrixprodukt / elementweise Operation | Ein Matrixprodukt bildet gewichtete Summen über eine gemeinsame innere Dimension. Eine elementweise Operation verknüpft die jeweils bezeichneten Elemente und ist eine andere Rechenregel. | Matrix multiplication; elementwise operation | VL 8, Matrix-Grundlagen |
+
+## Gemeinsame Daten und Multicore
+
+Die Begriffe der [Vorlesung 9](vorlesungen/09_paralleles_rechnen_multicore.qmd)
+trennen die Koordination von Cache-Kopien, die Unteilbarkeit einer Operation,
+die Ordnung verschiedener Speicherzugriffe und den Fortschritt eines Programms.
+Das MESI-Lehrmodell K ist dabei ausdrücklich keine universelle Beschreibung
+jedes realen Cache-Protokolls.
+
+| Bevorzugte Bezeichnung | Bedeutung und Abgrenzung | Synonyme bzw. API-Zuordnung | Einführung / Fundstelle |
+|---|---|---|---|
+| Ausführungsfaden / Thread | Softwareseitige Folge von Programmschritten. Ein Thread kann auf einem Hart ausgeführt werden; mehrere Threads bedeuten noch keine gleichzeitige Ausführung auf mehreren Kernen. | Software thread; TLP: Thread-Level Parallelism | VL 9, „Thread, Hart und Kern auseinanderhalten“ und „TLP ergänzt ILP und DLP“ |
+| Cache-Kohärenz | Koordination gültiger Kopien und der Reihenfolge von Änderungen desselben Speicherorts innerhalb der festgelegten Domäne. Macht weder eine Folge von Load/Änderung/Store unteilbar noch veröffentlicht sie allein andere Datenobjekte. | Cache coherence | VL 9, „Drei Mechanismen beantworten drei Fragen“ |
+| MESI | Zustände Modified, Exclusive, Shared und Invalid beschreiben Gültigkeit und Rechte je Zeile. Shared bedeutet sauber und teilbar; die letzte verbliebene S-Kopie muss nicht automatisch E werden. | MESI-Protokoll; Lehrmodell K | VL 9, „MESI: Gültigkeit und Schreibrecht je Zeile“ |
+| False Sharing | Verschiedene, unabhängig beschriebene Objekte teilen eine Kohärenzzeile. Das kann zusätzliche Übernahmen des Zeilenschreibrechts verursachen, ohne dass ein logischer Konflikt auf demselben Objekt vorliegt. | falsches Teilen; Padding als mögliche Layoutmaßnahme | VL 9, „False Sharing: verschiedene Variablen, eine Zeile“ |
+| Atomare RMW | Lesen, Ändern und Schreiben bilden gegenüber konkurrierenden Zugriffen eine unteilbare Operation auf dem betreffenden Objekt. Getrennte atomare Loads und Stores ergeben keine atomare RMW. | Read-modify-write; etwa `atomic_fetch_add_explicit` | VL 9, „Die atomare RMW entscheidet die Übernahme“ |
+| LR/SC | LR liest und reserviert; SC versucht einen bedingten Store. Erfolgsstatus null und geschriebener Datenwert sind getrennt. Bei Fehlschlag muss die Berechnung vom neu gelesenen Wert ausgehen; ein Fehler beweist nicht zwingend einen fremden Store. | Load-Reserved / Store-Conditional; `lr.w`, `sc.w` | VL 9, „LR liest; SC versucht den bedingten Store“ |
+| Acquire / Release | Ordnungssemantik für eine passende Synchronisation. In der einmaligen Veröffentlichung ordnet ein Acquire, das den Release-Wert desselben Flags liest, die vorangehenden Nutzdatenschreibzugriffe vor nachfolgenden Nutzdatenlesezugriffen. | `memory_order_acquire`, `memory_order_release`; Happens-before | VL 9, „Acquire und Release ordnen die Nutzdaten“ und „Einmalige Veröffentlichung: bereit heißt Daten bereit“ |
+| C-Data-Race | Konfligierende Zugriffe verschiedener Threads auf denselben Speicherort, mindestens einer schreibend und mindestens einer nicht atomar, ohne passende Happens-before-Ordnung. In C11 ist das Verhalten undefiniert; daraus folgt keine gültige Liste möglicher Endwerte. | data race; nicht mit jedem logischen Race gleichsetzen | VL 9, „Race Condition und C-Data-Race unterscheiden“ |
+| Deadlock | Beteiligte können wegen einer zyklischen Warteabhängigkeit nicht fortfahren. Atomare Lockoperationen allein verhindern weder einen solchen Kreis noch garantieren sie Fairness oder eine beschränkte Wartezeit. | Verklemmung; Fortschritt: liveness | VL 9, „Deadlock: korrekte Atomics, falsche Wartebeziehung“ |
+| Speedup / Effizienz | Speedup ist die Ein-Kern-Zeit geteilt durch die Zeit mit N Kernen; Effizienz ist Speedup geteilt durch N. Amdahls Grundmodell betrachtet feste Arbeit, einen festen seriellen Anteil und zunächst keinen Zusatzaufwand. | Beschleunigungsfaktor; Amdahl's law | VL 9, „Amdahl: feste Arbeit enthält serielle Zeit“ |
