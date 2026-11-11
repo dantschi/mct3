@@ -62,7 +62,7 @@ Nenne bei Literatur die Ausgabe und eine geprüfte Fundstelle, bei Datenblätter
 
 ### Didaktischer Ansatz
 
-Konzepte klar und schrittweise aufbauen — von Grundlagen zu Anwendungen. Den in den Folien etablierten roten Faden konsistent fortführen: Speicherzelle → Caches → Interrupts → Aktorik → Busse → DMA → moderne CPU-Architekturen → Edge AI → Multicore.
+Konzepte klar und schrittweise aufbauen — von Grundlagen zu Anwendungen. Den aktuellen roten Faden aus der README konsistent fortführen: Speicherzelle → Caches → Interrupts und Timer → moderne CPU-Architekturen → KI-Beschleuniger → Multicore. Die Einheiten 4–6 bleiben mit Folien, Übungen und Quiz im Repository erhalten und sind derzeit aus der README-Kursübersicht ausgeblendet. Für die sichtbaren Einheiten 7–8 werden ihre Inhalte nicht als Vorwissen vorausgesetzt.
 
 Beginne jede Vorlesungseinheit mit einer Frage, die das Vorwissen aktiviert und vorhandene Vorstellungen zum Thema herausfordert. Platzierung, Durchführung, vollständige Notizen und spätere Auflösung stehen in den [Folienregeln zur Einstiegsfrage](vorlesungen/AGENTS.md#aktivierende-einstiegsfrage-je-vorlesung).
 

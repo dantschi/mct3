@@ -61,3 +61,46 @@ einer unabhängig geprüften Buchseite oder eines Hardwareversuchs.
 | MAC | Multiplikation und Akkumulation. Die Konvention, eine MAC als zwei arithmetische Operationen zu zählen, ist keine Aussage über Takte oder Maschinenbefehle. | Multiply-Accumulate | [VL 8](vorlesungen/08_ki_beschleuniger_edge_ai.qmd), „MACs, Parameter und Operationen zählen“ |
 | NPU / Edge AI | Eine NPU ist ein Beschleuniger für neuronale Verarbeitung. Edge AI bezeichnet den Verarbeitungsort am Rand eines vernetzten Systems und setzt keine NPU voraus. | Neural Processing Unit; künstliche Intelligenz am Edge | [VL 8](vorlesungen/08_ki_beschleuniger_edge_ai.qmd), „Edge ist ein Ort, keine Prozessorpflicht“ |
 | Kohärenzdomäne | Teilnehmer und Speicherbereiche, deren gültige Kopien ein gemeinsames Protokoll koordiniert. CPU-Kohärenz umfasst nicht automatisch Geräte oder garantiert die Synchronisation eines Programms. | Coherence Domain | [VL 9](vorlesungen/09_paralleles_rechnen_multicore.qmd), „Welche Teilnehmer gehören zur Kohärenzdomäne?“ |
+
+
+## Grundlagen der CPU-Architektur
+
+Die folgenden Begriffe verbinden die überarbeitete [Vorlesung 7](vorlesungen/07_moderne_cpu_architekturen.qmd)
+mit dem vorhandenen ILP- und IPC-Modell. Breiten und Zeitpunkte gelten immer
+für die jeweils ausdrücklich benannte Stufe des Lehrmodells.
+
+| Bevorzugte Bezeichnung | Bedeutung und Abgrenzung | Synonyme bzw. englische Bezeichnung | Einführung |
+|---|---|---|---|
+| Befehlssatzarchitektur / Mikroarchitektur | Die Befehlssatzarchitektur legt die für Software beschriebene Wirkung fest; die Mikroarchitektur setzt sie mit konkreten Stufen, Puffern und Rechenwerken um. | ISA: Instruction Set Architecture; Microarchitecture | VL 7, „Befehlssatz und Mikroarchitektur trennen“ |
+| Pipeline | Verschiedene Schritte mehrerer Befehle überlappen. Ein einzelner Befehl benötigt weiterhin seine gesamte Verarbeitung; Überlappung allein ist keine Mehrfachstartbreite. | Fließbandverarbeitung | VL 7, Pipeline-Grundlagen |
+| Superskalarität | Eine Mikroarchitektur kann mehrere gewöhnliche Befehle pro Takt starten. Breite ist eine Kapazität und weder eine zugesagte mittlere Rate noch automatisch Out-of-Order-Ausführung. | Superscalar execution | VL 7, Grundlagen und „Superskalarität beschreibt Breite“ |
+| Ausführungseinheit | Hardware, die eine bestimmte Operation ausführen kann. Verfügbare Einheiten und Ports begrenzen gleichzeitig mögliche Starts auch bei unabhängigen Befehlen. | Functional unit; ALU: Arithmetic Logic Unit | VL 7, Ressourcen und Startbreite |
+| Issue / Start | Auswahl und Start einer bereiten Operation in einer Ausführungseinheit nach der Konvention des jeweiligen Modells. Nicht mit Holen, Dekodieren oder Bestätigen gleichsetzen. | Instruction issue | VL 7, Start- und Abschlussmodell |
+| Retire / Commit | Architektonische Bestätigung eines Befehls in der festgelegten Programmreihenfolge. Eine intern bereits fertige Operation kann vorher noch auf Bestätigung warten. | Retirement; Commit | VL 7, Start- und Abschlussmodell |
+| Out-of-Order | Bereite jüngere Operationen dürfen unter den Modellregeln vor wartenden älteren starten. Die sichtbare Befehlswirkung muss trotzdem den Architekturvertrag erfüllen. | OoO | VL 7, „Out-of-Order ändert die Startreihenfolge“ |
+| Latenz / Initiationsintervall | Latenz ist die Dauer bis zum Ergebnis einer gestarteten Operation; das Initiationsintervall ist der kleinste Abstand zwischen Starts auf der betreffenden Ressource. Beides sind keine universellen ISA-Eigenschaften. | Latency; initiation interval | VL 7, „Latenz und Initiationsintervall sind verschieden“ |
+
+## Grundlagen der neuronalen Rechnung
+
+Diese Begriffe werden in der erweiterten [Vorlesung 8](vorlesungen/08_ki_beschleuniger_edge_ai.qmd)
+vor der Beschleunigerarchitektur eingeführt. Die kleinen Zahlenbeispiele sind
+Lehrrechnungen mit vorgegebenen Parametern, keine behaupteten Trainingsergebnisse.
+
+| Bevorzugte Bezeichnung | Bedeutung und Abgrenzung | Synonyme bzw. mathematische Zuordnung | Einführung |
+|---|---|---|---|
+| Modell | Festgelegte Rechenstruktur mit Parametern und einem Eingabe-/Ausgabevertrag. In der hier betrachteten Inferenz wird damit eine konkrete Beobachtung ausgewertet; die Eignung für die Anwendung ist gesondert zu prüfen. | Model; $\widehat y=f_\theta(x)$ | VL 8, „Ein Modell verbindet Eingabe und Ausgabe“ |
+| Eingabemerkmal | Numerischer Bestandteil der beschriebenen Modelleingabe, etwa ein aufbereitetes Sensorsignal. Ein Rohdatenfenster und seine Vorverarbeitung gehören zum Eingabevertrag; Merkmale können in anderen Modellen auch gelernt werden. | Feature | VL 8, KI-Grundlagen |
+| Vorverarbeitung / Sensorfenster | Ein Sensorfenster ist ein zeitlich begrenzter Ausschnitt von Messwerten; Vorverarbeitung ordnet oder transformiert ihn nach einer festgelegten Regel zur Modelleingabe. Reihenfolge, Skalierung und Zeitbezug müssen zur späteren Auswertung passen. | Preprocessing; input window | VL 8, „Vom Sensorfenster zur Eingabe“ |
+| Modellparameter | Beim Training angepasste Zahlen wie Gewichte und Bias. Während der betrachteten Inferenz bleiben sie fest; neue Eingaben sind keine Parameteränderung. | Parameters; weights; bias | VL 8, KI-Grundlagen und „Welche Zahlen speichert ein Netz?“ |
+| Zielwert / Label | Zur überwachten Lernaufgabe gehörende Sollausgabe eines Beispiels, etwa eine bekannte Klasse. Die Modellvorhersage wird damit verglichen; das Label ist kein zusätzlicher Eingang, der bei jeder späteren Inferenz bekannt wäre. | Target; class label | VL 8, Training und Beispieldaten |
+| Training | Parameter anhand von Beispielen und einem festgelegten Fehlermaß anpassen. Gute Ergebnisse auf den Trainingsdaten allein belegen kein zuverlässiges Verhalten auf neuen Eingaben. | Model training; Verlustfunktion: loss function | VL 8, KI-Grundlagen und „Training und Inferenz sind verschiedene Arbeit“ |
+| Inferenz | Neue Eingaben mit den festgelegten Parametern auswerten. Eingabeaufbereitung und die Interpretation der Ausgabe bleiben eigene Anwendungsschritte. | Inference | VL 8, KI-Grundlagen und „Training und Inferenz sind verschiedene Arbeit“ |
+| Validierungsdaten | Von den zur Parameteranpassung verwendeten Beispielen getrennte Daten zur Auswahl von Varianten und Einstellungen. Der anschließend unabhängige Test wird davon unterschieden. | Validation set | VL 8, „Beispiele zum Lernen und zum Prüfen“ |
+| Testdaten | Getrennte Beispiele zur Bewertung eines festgelegten Modells; sie dürfen nicht zugleich als gewöhnliche Trainingsbeispiele die hier geprüften Parameter bestimmen. Eine endliche Prüfung ist keine Garantie für jede reale Eingabe. | Test set | VL 8, Training und Bewertung |
+| Bias | Eingabeunabhängiger Summand je Ausgang. Eine gewichtete Summe mit Bias ist allgemein affin; ohne Nichtlinearität werden mehrere affine Schichten wieder zu einer affinen Abbildung. | Verschiebung; bias vector | VL 8, gewichtete Summe und Schichten |
+| Voraktivierung | Gewichtete Summe einschließlich Bias vor der Aktivierungsfunktion. Im Grundlagenbeispiel heißt sie $z=Wx+b$; im bewusst ohne Aktivierungsfunktion betrachteten älteren Dense-Beispiel wird die Ausgabe $y$ genannt. | Preactivation; affine Abbildung | VL 8, „Eine gewichtete Summe vollständig verfolgen“ |
+| Aktivierungsfunktion | Nachgeschaltete Abbildung auf den berechneten Zahlen; beispielsweise ReLU als Maximum aus null und dem Eingang. Nicht mit den gespeicherten Aktivierungswerten gleichsetzen. | ReLU: Rectified Linear Unit | VL 8, KI-Grundlagen |
+| Aktivierungen | Eingabe-, Zwischen- und Ausgabewerte einer konkreten Auswertung. Sie benötigen neben den Modellparametern eigenen Speicher; sie sind nicht die Aktivierungsfunktion selbst. | Activations | VL 8, „Welche Zahlen speichert ein Netz?“ |
+| Dense-Schicht | Jeder Ausgang verwendet jeden Eingang mit einem eigenen Gewicht. Zeilen der Gewichtsmatrix gehören zu Ausgängen, Spalten zu Eingängen; ein Bias wird je Ausgang ergänzt. | Fully connected layer | VL 8, KI-Grundlagen und „Dense-Schicht: zwei gewichtete Summen“ |
+| Batch | Mehrere Eingabebeispiele werden gemeinsam betrachtet. In der hier eingeführten Matrixdarstellung stehen die Beispiele als Spalten; die Orientierung ist eine explizite Konvention. | Eingabestapel; batch | VL 8, mehrere Eingaben als Matrix |
+| Matrixprodukt / elementweise Operation | Ein Matrixprodukt bildet gewichtete Summen über eine gemeinsame innere Dimension. Eine elementweise Operation verknüpft die jeweils bezeichneten Elemente und ist eine andere Rechenregel. | Matrix multiplication; elementwise operation | VL 8, Matrix-Grundlagen |

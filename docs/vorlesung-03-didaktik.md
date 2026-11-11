@@ -1,7 +1,8 @@
 # Vorlesung 3: Lernziele und Stofftiefe
 
-Stand: 1. November 2026. Grundüberarbeitung vom 23. Oktober 2026,
+Stand: 11. November 2026. Grundüberarbeitung vom 23. Oktober 2026,
 anschließend Erläuterungen, STM32-Bezüge, Übung und Quiz überarbeitet.
+Die aktuelle Fassung ergänzt Abschnittsfolien und durchgehende Lernnotizen.
 Zielgruppe ist das fünfte Bachelorsemester.
 
 ## Kritische Einordnung
@@ -77,8 +78,11 @@ Zusammenhänge und die vereinfachte Kategorie-/Geräteauswahl.
 
 ## Umfang und Einbettung
 
-Der Foliensatz enthält 46 Hauptfolien mit vollständigen Skriptnotizen und vier
-optionale Vertiefungen. Die Planung umfasst weiterhin vier Schulstunden mit
+Der Foliensatz enthält 56 Folien mit vollständigen Lernnotizen: 46 bisherige
+Hauptfolien, fünf neue Abschnittsfolien, einen Orientierungstrenner vor der
+Vertiefung und die vier vorhandenen Vertiefungsfolien. Die fünf Lernabschnitte
+sind Ereignisse, Trap-Eintritt, Geräte/PLIC, Timer und Reaktionszeit/Datenübergabe.
+Kurze Abschnittsmarkierungen machen die Position auch zwischen den Trennern sichtbar. Die Planung umfasst weiterhin vier Schulstunden mit
 110 Minuten gemeinsamer Erarbeitung, 55 Minuten angeleiteter Aufgabenarbeit
 und 15 Minuten Quiz. Das vollständige Übungsblatt umfasst sechs Pflichtaufgaben
 mit 36 Orientierungspunkten und etwa 75–90 Minuten selbstständiger Bearbeitung;
@@ -92,9 +96,9 @@ Neue Architekturbegriffe werden lokal erklärt. Vorlesung 4 kann auf Zeitquelle,
 Vergleich, ISR und Reaktionsfristen aufbauen. Die Interrupt- und Timerfragen der bestehenden Probeklausur bleiben
 durch den Hauptteil abgedeckt. Übung und Quiz verlangen keine optionale Vertiefung.
 
-## Prüfung der überarbeiteten Fassung
+## Frühere Prüfungen vor der Gliederungsüberarbeitung
 
-Die 50 Folien wurden im Browser mit gesetzten Formeln auf überlaufende Inhalte
+Die damaligen 50 Folien wurden im Browser mit gesetzten Formeln auf überlaufende Inhalte
 geprüft. Alle Folien besitzen genau einen zugeordneten Notizblock. Das Skript-PDF
 und beide Übungsblattprofile wurden erzeugt und auf Aufgaben, Lösungstrennung
 und Seitenränder kontrolliert. Die drei neuen Diagramme wurden visuell geprüft.
@@ -116,3 +120,51 @@ geprüft. Die übernommene Quizdatei wurde zusätzlich auf Bytegleichheit geprü
 
 Diese Prüfungen betreffen Lehrmodelle, reine Host-Rechnung und Darstellung.
 Eine konkrete RISC-V-Firmware oder eine reale Reaktionszeit wurde damit nicht gemessen.
+
+
+## Gliederung und Lerntext vom 11. November 2026
+
+Fünf zusätzliche Abschnittsfolien führen jeweils mit einer Leitfrage in
+Ereignisspeicherung, Trap-Eintritt, Geräte/PLIC, Timer und Reaktionszeit mit
+Datenübergabe ein. Ein eigener Trenner kennzeichnet die optionale Vertiefung.
+Die bisherige Reihenfolge der 50 Sach- und Orientierungsfolien bleibt erhalten;
+mit den sechs neuen Trennern enthält die Fassung 56 Folien.
+
+Jede bestehende Folie trägt eine kurze Abschnittsmarkierung. Das dafür
+verwendete Stylesheet ist nur in Vorlesung 3 eingebunden. Die Orientierungszeit
+gehört zu den bereits vorgesehenen Erklär- und Besprechungsphasen; es entsteht
+kein zusätzlicher Pflichtstoff. Die Übung verweist auf den beständigen Titel
+„Nächsten Vergleichstermin planen“ statt auf die frühere Foliennummer.
+
+Alle Notizen sind als fortlaufender Lerntext mit begründeten Übergängen
+überarbeitet. Regieanweisungen und nummernabhängige Querverweise sind durch
+inhaltliche Erklärungen ersetzt. Analogien, Rechenbeispiele, Plattformgrenzen
+und die STM32-Brücke bleiben erhalten. Unabhängiger Originalvergleich:
+Sämtliche ursprünglichen C-, Assembler- und Pseudocode-Blöcke bleiben unverändert;
+die fachliche Reihenfolge und die vorhandenen Abbildungen ebenfalls.
+
+**Aktuelle Prüfungen:** UTF-8 ohne BOM, 56 Überschriften mit genau 56 zugeordneten
+Notizblöcken, reparierter Übungsverweis und Diff-Prüfung. Frische Reveal.js-Fassung
+mit Quarto 1.11.9 erzeugt und in Chromium mit gesetzten Formeln über alle
+56 Folien auf Überlauf, Bildfehler und Notizzuordnung geprüft. Nach Anpassung des
+Abstands zwischen Titel und Abschnittsmarkierung waren diese Prüfungen fehlerfrei.
+Die Abschnitte und mehrere dichte Folien wurden zusätzlich anhand von
+Screenshots angesehen. Eine HTML-Lesefassung enthält alle 56 Notizabschnitte,
+die im Browser sichtbar und mit vollständigen Bildpfaden geprüft wurden.
+Sie lässt sich ohne LaTeX als zusammenhängender Lesetext erzeugen:
+
+```bash
+source scripts/activate.sh
+quarto render vorlesungen/03_interrupts_timer.qmd --profile handout --to html
+```
+
+Ausgabe: `_handout/vorlesungen/03_interrupts_timer.html`.
+
+**Prüfgrenze:** Der vollständige gemeinsame Build wurde ausgeführt. Alle zehn
+Websitequellen wurden gerendert, danach scheiterte der reguläre Handoutlauf
+bereits bei Vorlesung 1 am fehlenden `luatexbase.sty` in der installierten
+TeX-Umgebung. Auch die gezielte PDF-Prüfung mit XeLaTeX gelang wegen fehlender
+Sprachunterstützung (`ngerman`) nicht. Es gibt daher keine aktuelle Freigabe des
+regulären Skript-PDFs oder beider Lab-PDF-Profile. Ältere PDF-Dateien werden nicht
+als Nachweis dieser Fassung verwendet. Die Inhalts- und HTML-Prüfung ist davon
+getrennt; eine Firmwareausführung oder reale Zeitmessung wurde nicht behauptet.
