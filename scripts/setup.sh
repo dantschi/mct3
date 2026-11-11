@@ -23,7 +23,7 @@ if [[ "$mode" == --system-deps ]]; then
   [[ -z "${HTTP_PROXY:-}" ]] || proxy_options+=(-o "Acquire::http::Proxy=$HTTP_PROXY")
   "${privilege[@]}" apt-get "${proxy_options[@]}" update
   "${privilege[@]}" apt-get "${proxy_options[@]}" install -y --no-install-recommends \
-    ca-certificates curl python3 xz-utils dpkg libnss3 libgbm1 libasound2t64 \
+    ca-certificates curl gnupg python3 xz-utils dpkg libnss3 libgbm1 libasound2t64 \
     libatk-bridge2.0-0t64 libcups2t64 libxcomposite1 libxdamage1 libxrandr2 \
     libcairo2 libcairo-gobject2 libglib2.0-0t64 libxml2 libpango-1.0-0 \
     libpangocairo-1.0-0 libdav1d7 libfontconfig1
@@ -105,7 +105,5 @@ node --version
 "$QUARTO_CHROMIUM" --version
 lualatex --version | head -1
 rsvg-convert --version
-for package in tcolorbox.sty sectsty.sty needspace.sty adjustbox.sty texgyreheros-regular.otf; do
-  kpsewhich "$package" >/dev/null || { echo "Missing package in pinned TeX bundle: $package" >&2; exit 1; }
-done
+bash "$repo_dir/scripts/setup-tex.sh"
 echo 'Toolchain ready. Run: source scripts/activate.sh'

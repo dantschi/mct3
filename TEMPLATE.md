@@ -179,10 +179,46 @@ Das Setup prüft die Downloads mit SHA-256 und installiert folgende festgelegte 
 | Quarto | 1.11.9 |
 | Node.js | 24.22.1 |
 | Chrome Headless Shell für Mermaid-PDFs | 157.0.8103.38 |
-| TinyTeX mit vollständigem Paketbestand | 2026.11 |
+| TinyTeX-Basis mit zusätzlichen deutschen LuaLaTeX-Paketen | 2026.11 |
 | `rsvg-convert` für SVGs in PDFs | 2.60.0 |
 
 `source scripts/activate.sh` in jeder neuen Shell ausführen. Die Aktivierung wählt die installierten Werkzeuge einschließlich Browser und TeX und berücksichtigt die Proxy-Konfiguration der Cloud-Umgebung. Das Setup kann erneut ausgeführt werden. Für eine gemeinsame Installation außerhalb des Checkouts kann vor Setup und Aktivierung `DHBW_TOOLCHAIN_DIR` auf ein beschreibbares Verzeichnis gesetzt werden. Im Build werden fehlende TeX-Pakete nicht automatisch nachinstalliert; nötige Änderungen am Paketbestand gehören zur gemeinsamen Toolchain.
+
+Die SHA-256-Prüfsumme fixiert das TinyTeX-Basisarchiv. Dieses enthält nicht
+automatisch alle benötigten Sprachpakete. Das gemeinsame Setup ergänzt mit
+`tlmgr` die in `scripts/toolchain.env` genannten Pakete `luatexbase`,
+`babel-german`, `hyphen-german` und `selnolig` einschließlich ihrer Abhängigkeiten.
+Die Paketverwaltung muss dabei Repository-Signaturen mit GnuPG prüfen;
+Archivprüfsummen bleiben ebenfalls aktiviert.
+Bezugsquelle ist `https://tlnet.yihui.org`; die dortigen Paketrevisionen werden
+vom TeX-Live-Repository gepflegt und sind nicht durch die Prüfsumme des
+Basisarchivs festgelegt. Das Setup aktualisiert weder die gesamte Distribution
+noch bereits vollständig eingerichtete Zusatzpakete bei jedem Aufruf.
+
+`scripts/setup-tex.sh` prüft anschließend die benötigten Dateien und kompiliert
+`scripts/tex-smoke.tex` mit LuaLaTeX. Dieser echte PDF-Test verwendet deutsche
+Babel-Einstellungen, die TeX-Gyre-Schriften, Formeln und die Handout-Boxen.
+Sein Log steht unter `.tools/checks/tex-smoke.log` beziehungsweise im gewählten
+`DHBW_TOOLCHAIN_DIR`. Ein Fehler lässt das Setup und damit auch GitHub Actions
+fehlschlagen. `--quarto-only` benötigt weiterhin kein TeX und führt diesen Test
+nicht aus.
+
+Eine bereits vorhandene TinyTeX-Installation lässt sich ohne erneuten Download
+von Browser oder Quarto vervollständigen:
+
+```bash
+bash scripts/setup-tex.sh
+```
+
+Für Cloud-Umgebungen mit eingeschränktem Netzwerk muss das Setup neben den
+bereits freigegebenen Paketquellen `tlnet.yihui.org` und für Chrome
+`storage.googleapis.com` erreichen können. Zur Kontrolle von Actions-Läufen
+über die GitHub-CLI ist zusätzlich `api.github.com` erforderlich.
+
+Der typische Fehler `luatexbase.sty not found` wird durch `lang: de` und die
+daraus erzeugte Babel-Konfiguration `bidi=basic` unter LuaLaTeX ausgelöst.
+Er tritt bereits in der Dokumentpräambel auf. Die Vorlesungsinhalte müssen
+dafür nicht verändert werden; `lang: de` erhält die deutsche Sprachbehandlung.
 
 Die festgelegten Renderwerkzeuge verringern Unterschiede zwischen Cloud und CI. Betriebssystem und Systembibliotheken bleiben Teil der Umgebung; bytegleiche Ausgaben über verschiedene Betriebssysteme hinweg sind damit nicht garantiert. PlantUML benötigt bei einem Cache-Miss weiterhin Zugriff auf den konfigurierten Kroki-Dienst.
 
