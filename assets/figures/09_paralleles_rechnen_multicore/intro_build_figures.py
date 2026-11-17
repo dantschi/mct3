@@ -74,7 +74,7 @@ def line_rights():
           f'<rect x="624" y="89" width="352" height="78" rx="10" fill="none" stroke="{RED}" stroke-width="3"/>',
           line(640, 305, 960, 251, accent=True), line(640, 251, 960, 305, accent=True),
           text(745, 346, 'K1 ungültig: kein Treffer', 23, RED),
-          text(500, 392, 'Alternative Rechtefälle derselben Zeile; kein Zeitablauf und kein Software-Lock.', 23, MUTED)]
+          text(500, 392, 'Alternative Rechtefälle derselben Zeile; kein Zeitablauf und keine Software-Sperre.', 23, MUTED)]
     save('intro_line_rights', 'Eine Zeile kann lesend geteilt oder zum Schreiben exklusiv übernommen werden', p)
 
 

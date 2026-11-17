@@ -1,6 +1,6 @@
 ---
 title: "Übungsblatt 9: Paralleles Rechnen & Multicore"
-subtitle: "Mikrocomputertechnik 3 · 32 Orientierungspunkte · ca. 75–90 Minuten"
+subtitle: "Mikrocomputertechnik 3 · 76 Orientierungspunkte · Kernteile ca. 60 Minuten"
 highlight-style: ../assets/styles/dhbw-code.theme
 header-includes: |
   \usepackage{needspace}
@@ -12,29 +12,37 @@ header-includes: |
 
 ## Aufgabe 1: MESI mit drei Kernen (6 Punkte)
 
-Drei Write-Back-Caches, anfangs alle I, unterer Speicher L enthält vier.
-Reads ohne weitere Kopie ergeben E. Fremdread auf M schreibt hier nach L zurück,
-alle beteiligten Kopien werden S. Vor M-Auswurf wird zurückgeschrieben.
+Drei Datencaches arbeiten im Lehrmodell K: Write-Back, Write-Allocate und nur
+abgeschlossene Schritte. Anfangs sind alle Kopien I; der vereinfachte untere
+kohärente Stand L enthält 4. Ein Read ohne weitere gültige Kopie ergibt E.
+Ein Fremdread auf M aktualisiert L, danach sind alle beteiligten Kopien S.
+Ein Write auf S verlangt eine abgeschlossene Rechteübernahme, die alle
+fremden gültigen Kopien invalidiert. Vor einem M-Auswurf wird zurückgeschrieben.
 
-1. Ergänzen Sie Zustände samt Werten und L nach jeder Aktion. (3 P)
-2. Welchen unteren Wert darf es nach dem ersten Write geben?
-   Welchen Wert muss der folgende fremde Read liefern? (1 P)
-3. Welche fremden Kopien muss Kern 0 bei seinem späteren Write ungültig machen? (1 P)
-4. Zwei S-Kopien bleiben übrig, eine wird sauber ausgeworfen.
-   Muss die verbleibende automatisch E werden? (1 P)
+**a)** Tragen Sie nach jeder Aktion Zustand und Wert jeder Kopie in der Form
+`E:4` sowie den Inhalt von L ein. (4 P, Kern)
 
-| Aktion | Kern 0 | Kern 1 | Kern 2 | L |
-|--------|--------|--------|--------|---|
-| Kern 2 liest | | | | |
-| Kern 2 schreibt 9 | | | | |
-| Kern 0 liest | | | | |
-| Kern 1 liest | | | | |
-| Kern 0 schreibt 13 | | | | |
-| Kern 0 wirft aus | | | | |
-| Kern 1 liest | | | | |
+**b)** Notieren Sie unter „Koordination“ Datenquelle, Invalidierungen und
+Rückschreibungen nach L. Wie viele Invalidierungen und Rückschreibungen
+entstehen insgesamt? (2 P, Kern)
+
+| Nr. | Aktion | Kern 0 | Kern 1 | Kern 2 | L | Koordination |
+|---:|---|---|---|---|---|---|
+| 0 | Start | I | I | I | 4 | – |
+| 1 | Kern 2 liest | | | | | |
+| 2 | Kern 2 schreibt 9 | | | | | |
+| 3 | Kern 0 liest | | | | | |
+| 4 | Kern 1 liest | | | | | |
+| 5 | Kern 0 schreibt 13 | | | | | |
+| 6 | Kern 0 wirft aus | | | | | |
+| 7 | Kern 1 liest | | | | | |
+
+Begründen Sie Ihre Antworten. Eine Zahl ohne Begründung erhält höchstens
+die Hälfte der Punkte. Die Punkte dienen der Orientierung; verbindliche
+Klausurvorgaben werden damit nicht festgelegt.
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{8\baselineskip}
+\Needspace{6\baselineskip}
 
 **Ihre Lösung:**
 
@@ -42,255 +50,853 @@ alle beteiligten Kopien werden S. Vor M-Auswurf wird zurückgeschrieben.
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
+\Needspace{18\baselineskip}
 
 **Musterlösung 1**
 
-| Aktion | Kern 0 | Kern 1 | Kern 2 | L |
-|--------|--------|--------|--------|---|
-| Read 2 | I | I | E:4 | 4 |
-| Write 2 | I | I | M:9 | 4 |
-| Read 0 | S:9 | I | S:9 | 9 |
-| Read 1 | S:9 | S:9 | S:9 | 9 |
-| Write 0 | M:13 | I | I | 9 |
-| Auswurf 0 | I | I | I | 13 |
-| Read 1 | I | E:13 | I | 13 |
+| Nr. | Kern 0 | Kern 1 | Kern 2 | L | Koordination |
+|---:|---|---|---|---:|---|
+| 0 | I | I | I | 4 | Anfangszustand |
+| 1 | I | I | E:4 | 4 | L liefert 4 an Kern 2. |
+| 2 | I | I | M:9 | 4 | E → M lokal, keine Invalidierung. |
+| 3 | S:9 | I | S:9 | 9 | Kern 2 liefert 9; Rückschreibung nach L. |
+| 4 | S:9 | S:9 | S:9 | 9 | L liefert den aktuellen Wert 9. |
+| 5 | M:13 | I | I | 9 | Die Kopien von Kern 1 und 2 werden I. |
+| 6 | I | I | I | 13 | Kern 0 schreibt 13 nach L zurück. |
+| 7 | I | E:13 | I | 13 | L liefert 13; keine weitere gültige Kopie. |
 
-Tabelle 3 P. L darf zunächst vier bleiben, der fremde Read muss neun erhalten. (1 P)
-Vor abgeschlossenem Write 0 werden die S-Kopien von Kern eins und zwei ungültig. (1 P)
-S darf nach sauberem Fremdauswurf S bleiben; ein automatischer E-Wechsel folgt nicht. (1 P)
+Die Zustands- und Wertfolge ergibt 4 P. In Schritt 4 kann eine reale
+Implementierung die saubere Zeile auch von einem anderen Cache liefern;
+L ist hier ebenfalls aktuell. Die Tabelle wählt L als Datenquelle des
+Lehrmodells. Entscheidend ist der gelieferte Wert 9.
+
+Insgesamt entstehen **2 Invalidierungen** in Schritt 5 und
+**2 Rückschreibungen** nach L: beim Fremdread in Schritt 3 und beim
+M-Auswurf in Schritt 6. (2 P) E → M benötigt hier keine fremde Zustimmung,
+weil E bereits eine alleinige saubere Kopie bezeichnet. Ein alter Wert in L
+bei vorhandener M-Kopie ist dagegen zulässig.
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 2: Acht-Byte-Objekte in einer großen Zeile (4 Punkte)
+## Aufgabe 2: Rechte gelten pro Zeile (12 Punkte)
 
-128-Byte-Cachezeilen, Basis `0x30004000`.
-Kern 0 schreibt nur a bei Offset acht, Kern 1 nur b bei Offset 24;
-beide Objekte sind acht Byte groß und getrennt zugeteilt.
-Anfangs besitzt Kern 1 die Zeile M.
+Zwei Kerne arbeiten im Lehrmodell K aus Aufgabe 1. Die je 4 Byte großen
+Variablen a bei `0x20001000` und b bei `0x20001004` liegen in derselben
+64-Byte-Zeile und beginnen beide bei 0. Kern 0 benutzt nur a, Kern 1 nur b.
+Notieren Sie den Zeileninhalt als Paar `(a,b)`, etwa `M:(5,0)`.
 
-1. Geben Sie Objektadressen und gemeinsamen vollständigen Zeilenbereich an. (1 P)
-2. Schreibfolge 1, 0, 0, 1, 0, 1: Wie oft wechselt der Besitzer? (1 P)
-3. b wird bei Offset 128 platziert. Neue Adresse? Warum reichte Basisausrichtung allein nicht? (1 P)
-4. Repariert das auch verlorene Updates auf einem gemeinsam ungeschützten Zähler? (1 P)
+Für diese Aufgabe gilt zusätzlich: Schreibt ein Kern auf eine Zeile, die ein
+anderer Kern in M hält, liefert der bisherige Besitzer die aktuelle Zeile an
+den Schreiber und wird I. L bleibt bei diesem Besitzerwechsel unverändert.
+Eine verbliebene S-Kopie wird nach einem sauberen Fremdauswurf nicht automatisch E.
+
+| Nr. | Aktion | Kern 0 | Kern 1 | L |
+|---:|---|---|---|---|
+| 0 | Start | I | I | (0,0) |
+| 1 | Kern 0 liest a | | | |
+| 2 | Kern 1 liest b | | | |
+| 3 | Kern 0 schreibt a = 5 | | | |
+| 4 | Kern 1 schreibt b = 7 | | | |
+| 5 | Kern 0 liest a | | | |
+| 6 | Kern 1 wirft aus | | | |
+| 7 | Kern 0 schreibt a = 6 | | | |
+
+**a)** Füllen Sie die Tabelle aus. (5 P)
+
+**b)** In welchen Schritten wird eine gültige Kopie invalidiert, obwohl ihr
+Kern die geschriebene Variable nie verwendet? Wie heißt dieser Effekt,
+und liegt dabei ein C-Data-Race vor? Betrachten Sie nur die getrennten
+Zugriffe auf a und b; Initialisierung erfolgt vor dem Start. (2 P)
+
+**c)** Angenommen, Kern 1 holte die Zeile in Schritt 4 aus L statt vom
+bisherigen Besitzer. Welchen Inhalt hätte seine Kopie nach seinem Store,
+und welchen Wert von a erhielte Kern 0 in Schritt 5? Was folgt daraus für
+die Zusatzregel? (2 P)
+
+**d)** Ein Kommilitone behauptet: „Nach Schritt 6 hält nur noch Kern 0 die
+Zeile, also wechselt er in Schritt 7 still nach M.“ Nehmen Sie Stellung. (1 P)
+
+**e)** Eine Lösung enthält nach Schritt 3 „Kern 0 `M:(5,0)`, Kern 1
+`S:(0,0)`“ und nach Schritt 6 „Kern 0 `E:(5,7)`“. Welche Invariante oder
+Modellregel ist jeweils verletzt? (2 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{8\baselineskip}
+\Needspace{6\baselineskip}
 
 **Ihre Lösung:**
 
-\vspace*{3cm}
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
+\Needspace{6\baselineskip}
 
 **Musterlösung 2**
 
-1. a `0x30004008`, b `0x30004018`, Zeile `0x30004000` bis `0x3000407F`. (1 P)
-2. Vier Wechsel; wiederholte Writes des aktuellen Besitzers brauchen keinen Wechsel. (1 P)
-3. b `0x30004080`. Auch der Objektabstand muss die Zeilentrennung herstellen. (1 P)
-4. Nein. Derselbe Zähler braucht weiterhin atomare RMW oder passende Sperre. (1 P)
+| Nr. | Kern 0 | Kern 1 | L |
+|---:|---|---|---|
+| 0 | I | I | (0,0) |
+| 1 | E:(0,0) | I | (0,0) |
+| 2 | S:(0,0) | S:(0,0) | (0,0) |
+| 3 | M:(5,0) | I | (0,0) |
+| 4 | I | M:(5,7) | (0,0) |
+| 5 | S:(5,7) | S:(5,7) | (5,7) |
+| 6 | S:(5,7) | I | (5,7) |
+| 7 | M:(6,7) | I | (5,7) |
+
+**a)** Die Reads in Schritt 1 und 2 führen zu E beziehungsweise S.
+Schritt 3 übernimmt das Schreibrecht für die ganze Zeile und invalidiert
+Kern 1. In Schritt 4 übernimmt Kern 1 die aktuelle Zeile `(5,0)` vom
+M-Besitzer und ändert nur b. Schritt 5 ist ein Fremdread auf M: Er liefert
+Kern 0 den Wert a = 5 und aktualisiert L auf `(5,7)`. Der saubere Auswurf
+in Schritt 6 ändert den Zustand von Kern 0 nicht. Vor Schritt 7 wird eine
+Rechteübernahme abgeschlossen; es gibt dabei keine weitere gültige Kopie,
+die tatsächlich invalidiert werden müsste. (5 P)
+
+**b)** In Schritt 3 verliert Kern 1 seine Kopie wegen des Writes auf a,
+in Schritt 4 verliert Kern 0 seine Kopie wegen des Writes auf b.
+Das ist False Sharing. a und b sind verschiedene C-Speicherorte; die
+Worker greifen nicht konfliktierend auf dasselbe Objekt zu. Die gemeinsame
+Cachezeile allein begründet deshalb keinen C-Data-Race. (2 P)
+
+**c)** L enthält vor Schritt 4 noch `(0,0)`. Würde Kern 1 diesen veralteten
+Inhalt verwenden und danach b = 7 speichern, entstünde `M:(0,7)`.
+Der folgende Fremdread lieferte Kern 0 a = 0 statt 5. Der bereits
+abgeschlossene Write auf a wäre verloren. Die Zusatzregel muss deshalb
+die aktuelle Zeile vom bisherigen M-Besitzer übernehmen. (2 P)
+
+**d)** Kern 0 bleibt nach Schritt 6 S. S bedeutet nicht, dass es aktuell
+sicher noch eine zweite Kopie gibt. Der Kern erhält durch einen sauberen
+Fremdauswurf keine automatische E-Zusage. S → M benötigt weiterhin die
+abgeschlossene Rechteübernahme; der stille Übergang gilt für E → M. (1 P)
+
+**e)** M erlaubt keine weitere gültige Kopie derselben Zeile: Der erste
+Eintrag verletzt die Invariante des alleinigen Schreibrechts und ließe
+einen veralteten Wert gültig. Der zweite Eintrag verletzt die ausdrücklich
+festgelegte Regel, dass der saubere Fremdauswurf S nicht automatisch zu E
+aufwertet. (2 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 3: LR/SC erhöht einen Wert um zwei (6 Punkte)
+## Aufgabe 3: Ein atomarer Zähler auf drei Ebenen (16 Punkte)
 
-1. Hardwaremodell: Zwei Harts lesen jeweils Zähler zehn, addieren lokal zwei
-   und schreiben beide zurück. Notieren Sie eine Folge und den Endwert statt des erwarteten 14. (2 P)
-2. Wie unterscheidet sich ein gewöhnlicher ungeschützter C-Zähler von diesem
-   vorgegebenen Hardwareablauf? Genügen getrennte atomare Loads und Stores? (1 P)
-3. LR/SC soll dieselbe Addition atomar ausführen. Beide LR lesen anfangs zehn.
-   SC von Hart 1 mit zwölf gelingt, SC von Hart 0 mit zwölf scheitert.
-   Hart 0 wiederholt LR, berechnet neu und sein nächster SC gelingt.
-   Geben Sie gelesene Werte, geschriebene Werte, SC-Status und Endwert an. (2 P)
-4. Warum darf Hart 0 nicht einfach den alten Wert zwölf erneut speichern?
-   Beweist jeder SC-Fehler einen fremden Store? (1 P)
+RISC-V-Modell: RV32I mit A-Erweiterung, 4-Byte-ausgerichtete Wörter in
+gewöhnlichem Speicher, für den die Plattform LR/SC und AMO unterstützt.
+Register `s1` enthält die Adresse eines Zählerworts mit Anfangswert 10.
+H0 und H1 sollen den Zähler jeweils genau einmal um 2 erhöhen;
+erwartet ist der Endwert 14.
+
+**a)** Schreiben Sie die atomare Erhöhung als LR/SC-Schleife. Verwenden Sie
+`t0` für den gelesenen Wert, `t1` für den neuen Wert und `t2` für den
+SC-Status. Weitere Daten werden durch diesen Zähler nicht veröffentlicht. (3 P, Kern)
+
+**b)** Beide Harts führen Ihre Schleife aus. Ergänzen Sie nach jedem Befehl
+die Register des ausführenden Harts und den Speicherwert, bis beide Schleifen
+beendet sind. Für diese Teilaufgabe gilt: Ein SC scheitert genau dann, wenn
+seit dem LR desselben Harts ein anderer Hart auf die Reservationsmenge
+gespeichert hat. (4 P, Kern)
+
+| Nr. | Hart | Befehl | t0 | t1 | t2 | Speicher |
+|---:|---|---|---|---|---|---|
+| 0 | – | Start | – | – | – | 10 |
+| 1 | H0 | `lr.w` | | | | |
+| 2 | H1 | `lr.w` | | | | |
+| 3 | H1 | `addi` | | | | |
+| 4 | H1 | `sc.w` | | | | |
+| 5 | H1 | `bnez` | | | | |
+| 6 | H0 | `addi` | | | | |
+| 7 | H0 | `sc.w` | | | | |
+| 8 | H0 | `bnez` | | | | |
+| 9 | | | | | | |
+| 10 | | | | | | |
+| 11 | | | | | | |
+| 12 | | | | | | |
+
+**c)** Ohne die Annahme aus b darf SC auch ohne Fremdstore scheitern.
+Was ändert sich dann am Ablauf, was am Endwert? Was dürfen Sie aus einem
+SC-Fehlerstatus folglich nicht schließen? (1 P, Kern)
+
+**d)** Zwei Kollegen „vereinfachen“ die Schleife. Beschreiben Sie für die
+Verschachtelung aus b jeweils den Ablauf und ordnen Sie den Fehler als
+Korrektheits- oder Fortschrittsproblem ein. (3 P)
+
+```asm
+# Variante V1
+        lr.w  t0, (s1)
+        addi  t1, t0, 2
+        sc.w  t2, t1, (s1)
+        beqz  t2, fertig
+        sw    t1, 0(s1)
+fertig:
+```
+
+\Needspace{9\baselineskip}
+
+```asm
+# Variante V2
+        lr.w  t0, (s1)
+        addi  t1, t0, 2
+nochmal:
+        sc.w  t2, t1, (s1)
+        bnez  t2, nochmal
+```
+
+**e)** Ersetzen Sie die Schleife durch eine einzige AMO samt nötiger
+Vorbereitung. Welche Werte erhalten die Zielregister beider Harts,
+und was steht danach im Speicher? Was hängt von der Reihenfolge ab? (2 P)
+
+**f)** Zwei POSIX-Threads erhöhen in einem C11-Hostprogramm
+`static atomic_uint zaehler` (anfangs 0) je 5000-mal um 2. Alle Objekte sind
+vor dem Threadstart initialisiert, und es gibt keinen Zahlenüberlauf. (3 P)
+
+1. Schreiben Sie die Inkrementanweisung mit expliziter Speicherordnung und
+   begründen Sie die Wahl.
+2. Wodurch darf der Hauptthread nach beiden Workern den Endwert sicher lesen,
+   und welcher Wert ergibt sich?
+3. Nennen Sie einen Zweck, für den die gewählte Ordnung nicht mehr genügt.
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{8\baselineskip}
+\Needspace{6\baselineskip}
 
 **Ihre Lösung:**
 
-\vspace*{3cm}
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
+\Needspace{6\baselineskip}
 
 **Musterlösung 3**
 
-1. Load 0 zehn, Load 1 zehn, beide Register auf zwölf erhöhen,
-   Store 1 zwölf, Store 0 zwölf: Endwert zwölf statt vierzehn. (2 P)
-2. Ungeschützter konfliktierender C-Zugriff: Data Race, undefiniertes Verhalten.
-   Atomare Einzelzugriffe können weiterhin die logische Gruppenwirkung verlieren. (1 P)
-3. Beide LR liefern zehn. SC 1 schreibt zwölf, Status null;
-   SC 0 schreibt nichts, Status ungleich null.
-   Neuer LR 0 liefert zwölf; Addition ergibt vierzehn;
-   erfolgreicher SC schreibt vierzehn mit Status null. (2 P)
-4. Wiederholung muss vom neu gelesenen Wert ausgehen. SC kann auch ohne fremden Store scheitern. (1 P)
+**a)** Die Wiederholung beginnt beim LR, damit sie einen aktuellen Wert
+liest und eine neue Reservation erhält:
+
+```asm
+wiederholen:
+        lr.w  t0, (s1)
+        addi  t1, t0, 2
+        sc.w  t2, t1, (s1)
+        bnez  t2, wiederholen
+```
+
+LR liest und reserviert. SC speichert den berechneten Wert nur bei Erfolg;
+Status 0 bedeutet Erfolg, ein Nichtnullwert bedeutet Fehlschlag. Die
+Operation ordnet hier keine anderen Datenobjekte; `.aq` und `.rl` werden
+für diesen reinen Zählerzweck nicht benötigt. (3 P)
+
+\Needspace{22\baselineskip}
+
+**b)** „–“ bezeichnet einen noch nicht festgelegten Registerinhalt.
+Als zulässigen exemplarischen Fehlerstatus verwendet die Tabelle 1;
+vorgeschrieben ist nur, dass er ungleich 0 ist.
+
+| Nr. | Hart | Befehl | t0 | t1 | t2 | Speicher |
+|---:|---|---|---:|---:|---:|---:|
+| 0 | – | Start | – | – | – | 10 |
+| 1 | H0 | `lr.w` | 10 | – | – | 10 |
+| 2 | H1 | `lr.w` | 10 | – | – | 10 |
+| 3 | H1 | `addi` | 10 | 12 | – | 10 |
+| 4 | H1 | `sc.w` | 10 | 12 | 0 | 12 |
+| 5 | H1 | `bnez` | 10 | 12 | 0 | 12 |
+| 6 | H0 | `addi` | 10 | 12 | – | 12 |
+| 7 | H0 | `sc.w` | 10 | 12 | 1 | 12 |
+| 8 | H0 | `bnez` | 10 | 12 | 1 | 12 |
+| 9 | H0 | `lr.w` | 12 | 12 | 1 | 12 |
+| 10 | H0 | `addi` | 12 | 14 | 1 | 12 |
+| 11 | H0 | `sc.w` | 12 | 14 | 0 | 14 |
+| 12 | H0 | `bnez` | 12 | 14 | 0 | 14 |
+
+H1s Store invalidiert die Reservation von H0. Der erste SC von H0
+schreibt daher nichts. H0 lädt erneut, addiert auf Basis von 12 und
+schreibt schließlich 14. (4 P)
+
+**c)** Zusätzliche Wiederholungen können nötig werden. Wenn beide Erhöhungen
+erfolgreich beendet sind, bleibt der Endwert 14. Aus einem Fehlerstatus
+folgt nicht zwingend, dass ein anderer Hart gespeichert hat; der Fehler
+beweist auch keine bereits gelungene Erhöhung dieses Aufrufers. Die
+Atomizität allein garantiert keinem Hart eine feste Anzahl von Versuchen. (1 P)
+
+**d)** V1: H1 speichert erfolgreich 12. H0s SC scheitert, danach schreibt
+sein gewöhnlicher Store trotzdem den veralteten Wert 12. Es fehlt eine
+Erhöhung: Korrektheitsproblem, Endwert 12 statt 14. (1,5 P)
+
+V2: Nach H0s fehlgeschlagenem SC fehlt eine neue Reservation. Jeder
+weitere SC ohne neues LR scheitert ebenfalls. Ein SC beendet die Reservation
+unabhängig von seinem Erfolg. H0 bleibt in der Schleife, obwohl H1 bereits
+fertig ist: Fortschrittsproblem. Zudem wird der Rechenwert nicht neu geladen. (1,5 P)
+
+**e)** Beispielsweise:
+
+```asm
+        li        t1, 2
+        amoadd.w  t0, t1, (s1)
+```
+
+Der zuerst ausgeführte AMO liefert im Zielregister 10, der zweite 12.
+Der Speicher enthält danach 14. Nur die Zuordnung der alten Werte zu H0
+und H1 hängt von ihrer Reihenfolge ab. Vorbereitung und AMO sind getrennte
+Befehle; unteilbar ist die Read-modify-write-Wirkung der AMO. (2 P)
+
+**f)** Der Schleifenrumpf lautet:
+
+```c
+atomic_fetch_add_explicit(&zaehler, 2u, memory_order_relaxed);
+```
+
+Die atomare RMW verhindert verlorene Erhöhungen. `relaxed` genügt,
+weil der Zähler hier ausschließlich zählt und keine gewöhnlichen Nutzdaten
+veröffentlicht. Nach zwei erfolgreichen `pthread_join` darf der Hauptthread
+den atomaren Endwert mit einem relaxed Load lesen: Alle Worker sind beendet
+und ihre Schritte sind vor die anschließende Auswertung geordnet.
+Es ergibt sich $2\cdot5000\cdot2=20000$. (2 P)
+
+Soll der Zählerstand dagegen zugleich melden, dass gewöhnliche Nutzdaten
+fertig geschrieben sind, muss deren Veröffentlichung passend synchronisiert
+werden. Eine relaxed RMW allein stellt diese Beziehung nicht her. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 4: Übergabe und ein dreiteiliger Wartekreis (6 Punkte)
+## Aufgabe 4: Übergabe, Sperren und Fortschritt (14 Punkte)
 
-1. Produzent schreibt einmalig gewöhnliche data 73 und danach atomar ready sieben mit Release.
-   Konsument liest genau diese sieben mit Acquire und danach data;
-   keine späteren Überschreibungen. Ergebnis und Synchronisationsvoraussetzung? (2 P)
-2. Separat sind beide Objekte atomar und alle Zugriffe relaxed;
-   data beginnt bei −1. Ist ready sieben mit data −1 erlaubt?
-   Was wäre bei gewöhnlicher ungeschützter Payload anders? (1 P)
-3. A hält X und wartet auf Y, B hält Y und wartet auf Z,
-   C hält Z und wartet auf X. Zeichnen Sie den Kreis und nennen Sie eine
-   globale Erwerbsreihenfolge. Darf ein Timeout fremde Sperren löschen? (2 P)
-4. Ein Treiber hält P und wird unterbrochen; seine ISR wartet auf P.
-   Warum genügt eine atomare Lockoperation nicht?
-   Hält lokale Interruptsperre andere Harts fern? (1 P)
+Für die C11-Teile gelten `stdatomic.h`, `stdint.h` und vor dem Threadstart
+initialisierte Objekte. Produzent und Konsument laufen parallel; vor der
+betrachteten Auswertung gibt es keinen Join als zusätzlichen
+Synchronisationsweg. Nutzdaten werden während der einmaligen Übergabe
+nicht erneut überschrieben.
+
+**a)** Ein Produzent schreibt das gewöhnliche `int32_t messwert` einmalig
+auf 73 und speichert danach das atomare Flag `ready` vom Typ `atomic_uint`
+auf 7. `ready` beginnt bei 0.
+Ein Konsument wartet, bis er `ready == 7` liest, und liest danach `messwert`.
+Später schreibt niemand mehr auf diese Objekte. (3 P, Kern)
+
+1. Wählen Sie die Speicherordnungen für Store und Load von `ready`, sodass
+   der Konsument sicher 73 liest. Zeichnen Sie die Ordnungskette vom
+   Schreiben bis zum Lesen von `messwert` und benennen Sie die Kanten.
+2. Was gilt bei einem `memory_order_relaxed`-Load des Konsumenten?
+   Darf man dann eine Liste möglicher Werte von `messwert` angeben?
+
+**b)** Die folgende RISC-V-Sperre soll gewöhnliche Nutzdaten schützen;
+`a0` enthält die Adresse des Schlossworts, 0 bedeutet frei. Es gilt derselbe
+Speichervertrag wie in Aufgabe 3. Die Folge enthält zwei Ordnungsfehler. (4 P, Kern)
+
+```asm
+acquire: lr.w   t0, (a0)
+         bnez   t0, acquire
+         li     t1, 1
+         sc.w   t2, t1, (a0)
+         bnez   t2, acquire
+         # kritischer Abschnitt: Nutzdaten lesen und schreiben
+release: sw     zero, 0(a0)
+         fence  rw, w
+```
+
+1. Benennen Sie beide Fehler und ihre Folge für den nächsten Besitzer.
+2. Geben Sie die korrigierte Folge an.
+3. Ein Kollege ersetzt `lr.w` und `sc.w` durch `lw` und `sw`.
+   Welche Eigenschaft geht verloren? Zeigen Sie einen Ablauf.
+
+**c)** Drei Threads $T_A$, $T_B$ und $T_C$ laufen auf drei Harts und rufen
+je einmal `f_A`, `f_B` beziehungsweise `f_C` auf. `take` erwirbt eine korrekt implementierte, aktiv wartende Sperre
+(Spinlock), `drop` gibt sie frei. (4 P)
+
+```c
+void f_A(void) {
+    take(&X); take(&Y); /* ... */ drop(&Y); drop(&X);
+}
+void f_B(void) {
+    take(&Y); take(&Z); /* ... */ drop(&Z); drop(&Y);
+}
+void f_C(void) {
+    take(&Z); take(&X); /* ... */ drop(&X); drop(&Z);
+}
+```
+
+1. Geben Sie eine verklemmende Verschachtelung an und zeichnen Sie den
+   Wartegraphen. Tritt die Verklemmung bei jedem Lauf auf?
+2. Legen Sie eine globale Erwerbsreihenfolge fest und ändern Sie den Code minimal.
+3. Beurteilen Sie: „Wer länger als 10 ms wartet, setzt die belegte Sperre
+   einfach auf frei.“
+
+**d)** Ein Treiber auf Hart 0 nimmt P und aktualisiert einen Ringpuffer.
+Währenddessen startet dort eine ISR, die ebenfalls P nehmen will.
+Auf Hart 1 greift ein Thread über P auf denselben Puffer zu. (3 P)
+
+1. Warum kommt Hart 0 trotz atomarem `take` nicht weiter?
+2. Ein Kollege sperrt im Treiber nur die lokalen Interrupts, statt P zu nehmen.
+   Was bedeutet das für den Thread auf Hart 1?
+3. Skizzieren Sie eine Lösung für beide Probleme.
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{8\baselineskip}
+\Needspace{6\baselineskip}
 
 **Ihre Lösung:**
 
-\vspace*{3cm}
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
+\Needspace{6\baselineskip}
 
 **Musterlösung 4**
 
-1. Data 73; passendes Acquire muss den Release-Wert desselben Flags lesen,
-   Payload davor schreiben und während dieser Übergabe unverändert lassen. (2 P)
-2. Ja, ohne übergreifende Synchronisation. Gewöhnliche konfliktierende Payload
-   hätte dagegen einen C-Data-Race mit undefiniertem Verhalten. (1 P)
-3. $A\to Y\to B\to Z\to C\to X\to A$.
-   Alle erwerben X vor Y vor Z, auch bei nur zwei benötigten Locks.
-   Timeout berechtigt nicht zum Löschen fremder noch genutzter Sperren. (2 P)
-4. Der unterbrochene Besitzer kann vor ISR-Rückkehr nicht freigeben.
-   Atomizität löst den Selbstdeadlock nicht; lokale Sperre betrifft keine anderen Harts. (1 P)
+**a)** Der Produzent speichert 7 mit `memory_order_release`.
+Der Konsument lädt in seiner Warteschleife mit `memory_order_acquire`.
+Sein erfolgreicher Load muss die einmalige 7 dieses Release-Stores lesen.
+Danach liest er 73. (1 P)
+
+Seien $W_m$ der gewöhnliche Store auf `messwert`, $S_r$ der Release-Store,
+$L_r$ der Acquire-Load, der 7 liest, und $R_m$ der anschließende gewöhnliche
+Load von `messwert`. Dann gilt:
+
+$$W_m\xrightarrow{\mathrm{sb}}S_r
+\xrightarrow{\mathrm{sw}}L_r\xrightarrow{\mathrm{sb}}R_m.$$
+
+`sb` steht für sequenced-before, die Reihenfolge innerhalb eines Threads.
+`sw` steht für synchronizes-with, die hier passende Release-/Acquire-Kante
+zwischen den Threads. Zusammen ergeben die Kanten eine
+happens-before-Beziehung $W_m\to R_m$. (1 P)
+
+Mit relaxed Load fehlt diese Synchronisation. Der gewöhnliche Store und
+Load auf `messwert` sind dann nicht passend happens-before-geordnet:
+C11-Data-Race, undefiniertes Verhalten. Eine Liste wie „0 oder 73“ beschreibt
+das Programm daher nicht gültig. (1 P)
+
+**b)** Der Erwerb hat keine Acquire-Ordnung für nachfolgende Nutzdatenzugriffe.
+Außerdem steht der Release-Fence nach dem Freigabestore. Er ordnet die
+Nutzdatenschreibzugriffe nicht vor eine bereits erfolgte Freigabe.
+Der nächste Besitzer erhält dadurch keine gesicherte Übergabe der Nutzdaten. (2 P)
+
+Eine korrigierte Folge ist:
+
+```asm
+acquire: lr.w.aq t0, (a0)
+         bnez    t0, acquire
+         li      t1, 1
+         sc.w    t2, t1, (a0)
+         bnez    t2, acquire
+         # kritischer Abschnitt
+release: fence   rw, w
+         sw      zero, 0(a0)
+```
+
+Die Acquire-Wirkung des LR und die Release-Ordnung vor dem Store übernehmen
+verschiedene Seiten der Übergabe. (1 P) Mit gewöhnlichem Load und Store
+ginge zusätzlich die unteilbare Übernahme verloren: Beide Threads können
+0 laden, danach beide 1 speichern und beide eintreten. Ein Fence allein
+macht eine solche Folge nicht zur atomaren RMW. (1 P)
+
+**c)** Eine mögliche Verschachtelung ist: $T_A$ nimmt X, $T_B$ nimmt Y,
+$T_C$ nimmt Z. Danach wartet $T_A$ auf Y, $T_B$ auf Z und $T_C$ auf X.
+Im Wartegraphen zeigt eine Kante zum Besitzer der benötigten Sperre:
+
+$$T_A\xrightarrow{Y}T_B\xrightarrow{Z}T_C\xrightarrow{X}T_A.$$
+
+Der Kreis blockiert alle drei Threads. Andere Verschachtelungen können
+alle Aufrufe nacheinander abschließen; der Deadlock tritt nicht bei jedem
+Lauf auf. (2 P)
+
+Eine feste Ordnung ist $X<Y<Z$. `f_A` und `f_B` halten sie bereits ein.
+Nur `f_C` wird geändert:
+
+```c
+void f_C(void) {
+    take(&X); take(&Z); /* ... */ drop(&Z); drop(&X);
+}
+```
+
+Alle Erwerbe laufen dann in aufsteigender Richtung. Der zyklische
+Erwerbskreis kann nicht mehr entstehen. (1 P)
+
+Ein Timeout berechtigt nicht dazu, eine fremde Sperre freizugeben:
+Ihr bisheriger Besitzer könnte weiterhin im kritischen Abschnitt arbeiten.
+Ein zweiter eintretender Thread verletzte dann den gegenseitigen Ausschluss.
+Eine zulässige Abbruchstrategie gibt nur eigene gehaltene Sperren nach einem
+sicheren Abbruch der eigenen Arbeit frei. (1 P)
+
+**d)** Die ISR wartet auf den unterbrochenen Besitzer auf demselben Hart.
+Dieser kann erst nach der Rückkehr der ISR weiterlaufen und P freigeben:
+Selbstdeadlock trotz atomarer Übernahme. (1 P) Nur lokale Interrupts zu
+sperren lässt den Thread auf Hart 1 weiterhin zugreifen und schützt den
+Ringpuffer nicht zwischen Harts. (1 P)
+
+Im Treiber auf Hart 0 wird zuerst der bisherige Interruptzustand gesichert
+und die betreffende lokale Unterbrechung gesperrt, dann P erworben.
+Nach dem kurzen kritischen Abschnitt folgen Freigabe von P und
+Wiederherstellung des vorherigen Interruptzustands. Auch der Thread auf
+Hart 1 hält für jeden Pufferzugriff P. Damit unterbricht die lokale ISR
+keinen Halter von P auf ihrem eigenen Hart; die Sperre koordiniert die
+beiden Harts. Die Halter müssen weiterlaufen können, und im kritischen
+Abschnitt darf nicht auf einen verdrängten oder gesperrten Teilnehmer
+gewartet werden. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 5: Drei Kerne und ungleiche Teilpakete (4 Punkte)
+## Aufgabe 5: Amdahl rückwärts (12 Punkte)
 
-Ein-Kern-Zeit 150 Einheiten, serieller Anteil 0,3, paralleler Anteil 0,7.
-Zunächst perfekte Verteilung ohne Zusatzaufwand.
-$S(N)=1/(s+(1-s)/N)$, Effizienz $E=S/N$.
+Eine feste Aufgabe benötigt auf einem Kern $T(1)=200$ Zeiteinheiten.
+Diese Referenz enthält keinen Abstimmungsaufwand. Für $N\geq2$ gleiche
+Kerne gilt mit unbekanntem seriellem Anteil s und Aufwandkonstante c:
 
-1. Zeit, Speedup und Effizienz bei drei Kernen? (1 P)
-2. Zeit, Speedup, Effizienz bei sechzig Kernen und theoretische Speedupgrenze? (1 P)
-3. Bei drei Kernen kommen sechs Zeiteinheiten hinzu. Neue Zeit, Speedup und normierter Zusatz $h(3)$? (1 P)
-4. Ohne diesen Zusatz: Die 105 parallelen Einheiten sind als 15, 25, 65 verteilt.
-   Parallele Abschlusszeit, Gesamtzeit und Speedup? (1 P)
+$$T(N)=T(1)\left(s+\frac{1-s}{N}+h(N)\right),
+\qquad h(N)=cN.$$
+
+Zwei Messungen innerhalb dieses Modells ergeben $T(4)=84$ und $T(8)=68$.
+
+**a)** Bestimmen Sie s und c. (4 P, Kern)
+
+**b)** Berechnen Sie $S(8)$ und $E(8)$. Welchen Speedup sagt das ideale
+Amdahl-Modell mit demselben s für 8 Kerne voraus? Welche Grenze ergibt es
+für $N\to\infty$? (2 P, Kern)
+
+**c)** Bei welcher ganzzahligen Kernzahl wird $T(N)$ minimal, und welcher
+Speedup ist höchstens erreichbar? Vergleichen Sie $T(32)$ mit $T(8)$ und
+deuten Sie das Ergebnis. (3 P)
+
+**d)** Nun gelten $c=0$, der Anteil s aus a und 3 Kerne. Der parallele Teil
+besteht aus 6 unteilbaren Paketen mit den Zeiten 40, 30, 30, 20, 20 und 20
+in dieser Reihenfolge. (3 P)
+
+1. Jeder Kern erhält zwei aufeinanderfolgende Pakete. Berechnen Sie Gesamtzeit
+   und Speedup.
+2. Finden Sie eine bessere Zuteilung und zeigen Sie, dass keine schneller
+   sein kann.
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{8\baselineskip}
+\Needspace{6\baselineskip}
 
 **Ihre Lösung:**
 
-\vspace*{3cm}
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
+\Needspace{6\baselineskip}
 
 **Musterlösung 5**
 
-1. $45+105/3=80$, Speedup 1,875, Effizienz 62,5 Prozent. (1 P)
-2. $T=46{,}75$, $S\approx3{,}20856$, $E\approx5{,}3476\,\%$,
-   Grenzfaktor $1/0{,}3\approx3{,}333$. (1 P)
-3. Zeit 86, Speedup $150/86\approx1{,}74419$, $h(3)=6/150=0{,}04$. (1 P)
-4. Paralleler Abschluss 65, gesamt 110, Speedup $150/110\approx1{,}36364$. (1 P)
+**a)** Nach Division durch die Referenzzeit erhält man:
+
+$$0{,}42=\frac14+\frac34s+4c,
+\qquad0{,}34=\frac18+\frac78s+8c.$$
+
+Also gelten $0{,}75s+4c=0{,}17$ und $0{,}875s+8c=0{,}215$.
+Die doppelte erste Gleichung minus die zweite liefert
+$0{,}625s=0{,}125$, somit $s=0{,}2$. Einsetzen ergibt
+$4c=0{,}02$ und $c=0{,}005$. Zur Kontrolle:
+$T(4)=40+40+4=84$ und $T(8)=40+20+8=68$. (4 P)
+
+**b)** Mit dem Aufwand gilt:
+
+$$S(8)=\frac{200}{68}=\frac{50}{17}\approx2{,}9412,
+\qquad E(8)=\frac{S(8)}8\approx36{,}76\,\%.$$
+
+Ohne Aufwand wäre die Zeit $40+160/8=60$, also
+$S_{\mathrm{ideal}}(8)=200/60\approx3{,}3333$.
+Die ideale Grenzbeschleunigung ist $1/s=5$. (2 P)
+
+**c)** Für $N\geq2$ ist $T(N)=40+160/N+N$.
+Kontinuierlich wird die Zeit minimal bei
+$T'(N)=-160/N^2+1=0$, also $N=\sqrt{160}\approx12{,}649$.
+Die benachbarten ganzzahligen Werte sind:
+
+| N | $T(N)$ |
+|---:|---:|
+| 12 | $65{,}3333$ |
+| 13 | $65{,}3077$ |
+| 14 | $65{,}4286$ |
+
+Die Ableitung ist vor dem Minimum negativ und danach positiv.
+Daher liegt das ganzzahlige Minimum bei 13 Kernen. Es beträgt
+$849/13$ Zeiteinheiten, der größte Speedup ist
+$2600/849\approx3{,}0624$. (2 P)
+
+Für 32 Kerne gilt $T(32)=40+5+32=77>68=T(8)$.
+Die zusätzliche Koordination überwiegt hier die eingesparte parallele Zeit.
+Das Modell mit wachsendem Aufwand hat somit eine optimale Kernzahl;
+die ideale Grenze 5 ist keine erreichbare Zusage für dieses Modell. (1 P)
+
+**d)** Der serielle Teil dauert $0{,}2\cdot200=40$,
+die Pakete zusammen 160. Bei benachbarten Paaren entstehen die Lasten
+$40+30=70$, $30+20=50$ und $20+20=40$.
+Der parallele Abschluss wartet auf 70; Gesamtzeit 110 und
+$S=200/110\approx1{,}8182$. (1 P)
+
+Eine bessere Zuteilung ist $(40+20),(30+20),(30+20)$ mit Lasten
+60, 50 und 50. Gesamtzeit $40+60=100$, Speedup 2. (1 P)
+Jede Zuteilung benötigt mindestens $160/3\approx53{,}33$ parallele
+Zeiteinheiten. Alle möglichen Paketlasten sind Vielfache von 10;
+daher sind mindestens 60 nötig. Die bessere Zuteilung erreicht diese
+untere Schranke und ist optimal. (1 P)
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 6: Ergebnisse veröffentlichen und übernehmen (6 Punkte)
+## Aufgabe 6: Drei Worker, ein Sammler (16 Punkte)
 
-C11-Lehrmodell: Zwei Worker lesen dieselbe unveränderliche Eingabe
-`[3, 6, 9, 12]`. Worker 0 addiert die Elemente mit Index null und eins,
-Worker 1 die mit Index zwei und drei. Jeder schreibt genau einmal ausschließlich
-seinen eigenen Eintrag im gewöhnlichen `int32_t teil[2]`.
-Die atomaren Meldungen `atomic_uint fertig[2]` beginnen bei null.
-Ein separater Sammler liest die Ergebnisse erst, wenn beide Meldungen eins sind.
-Alle Objekte sind vor dem Start initialisiert; kein weiterer Synchronisationsweg
-und kein Wiederverwenden der Meldungen. Die Werte laufen nicht über.
-
-Die C11-Ausschnitte gehören zu verschiedenen Ausführungsfäden:
+Drei Worker summieren je ein Drittel des unveränderlichen Arrays
+`const int32_t x[3*n]`. Ein Sammler bildet danach `gesamt`.
+Es gilt $n>0$; Index- und Summenrechnungen laufen nicht über. Alle Objekte
+sind vor dem Threadstart initialisiert. In der ersten Fassung akkumulieren
+die Worker direkt im Ergebnisfeld:
 
 ```c
-/* Worker i, i ist 0 oder 1: */
-teil[i] = lokale_summe;
-atomic_store_explicit(&fertig[i], 1u, memory_order_relaxed);
-
-/* Sammler, gesamt wird nur von ihm verwendet: */
-if (atomic_load_explicit(&fertig[0], memory_order_acquire) == 1u &&
-    atomic_load_explicit(&fertig[1], memory_order_acquire) == 1u)
-    gesamt = teil[0] + teil[1];
+/* Basis 0x20003000, vor dem Start mit 0 belegt: */
+static int32_t teil[3];
+/* Worker i, i = 0, 1 oder 2: */
+for (size_t j = i * n; j < (i + 1) * n; ++j)
+    teil[i] += x[j];
 ```
 
-1. Welche Teilsummen und welcher Gesamtwert sind beabsichtigt? (1 P)
-2. Beurteilen und reparieren Sie die Veröffentlichung. Zeichnen Sie die nötige
-   Ordnungsbeziehung von jedem Worker bis zum Lesen seines Ergebnisses.
-   Darf dem fehlerhaften C11-Programm eine bestimmte Liste möglicher
-   Gesamtwerte zugeschrieben werden? (2 P)
-3. Separates Layoutmodell: 64-Byte-Cachezeilen, zwei Vier-Byte-Ergebnisse bei
-   `0x20002000` und `0x20002004`; die Kontrollfelder liegen in anderen Zeilen.
-   Welche zusätzliche Kopienkoordination kann trotz verschiedener Ergebnisobjekte
-   entstehen? Wählen Sie eine passende nächste Zeilenadresse für das zweite Objekt.
-   Ersetzt diese Trennung die Reparatur aus Teil 2? (2 P)
-4. Worker 1 erreicht seine Meldung nie. Garantiert eine korrekt geordnete
-   Veröffentlichung trotzdem die vollständige Ergebnisübernahme durch den Sammler?
-   Welche zusätzliche Entwurfsentscheidung fehlt? (1 P)
+Jeder Durchlauf führt tatsächlich einen Store auf `teil[i]` aus,
+etwa bei einer Übersetzung ohne Optimierung. Cachezeilen sind 64 Byte groß.
+
+**a)** Geben Sie die drei Slotadressen und den gemeinsamen Zeilenbereich an.
+Welche Kopienkoordination entsteht während der Schleifen? Liegt zwischen
+den Workerzugriffen ein C-Data-Race vor? (3 P)
+
+**b)** Vergleichen Sie einen lokalen Akkumulator mit nur einem abschließenden
+Store nach `teil[i]` und Slots im Abstand von 64 Byte. Geben Sie für die
+zweite Maßnahme die Slotadressen und passenden C11-Code zur Platzierung an.
+Vergleichen Sie Speicherbedarf und Anzahl der Ergebnisstores und entscheiden
+Sie sich begründet. (3 P)
+
+**c)** Schreiben Sie das Ende eines Workers und den Sammler in C11.
+Verwenden Sie `static atomic_uint fertig[3]` mit Anfangswert 0 und explizite
+Speicherordnungen. Der Sammler soll auf alle drei Meldungen warten und erst
+dann `gesamt` bilden. Es gibt vor seiner Auswertung keinen zusätzlichen
+Join und kein Wiederverwenden der Meldungen. (4 P, Kern)
+
+**d)** Zeichnen Sie für Worker 2 die Ordnungskette vom Schreiben von
+`teil[2]` bis zum Lesen im Sammler und benennen Sie jede Kante. (2 P)
+
+**e)** Ein Kollege ersetzt die Warteschleifen durch genau eine Abfrage
+`if (alle drei Meldungen sind 1) gesamt = ...;`.
+Welcher Fehler entsteht unabhängig von der Speicherordnung? (1 P)
+
+**f)** Worker 2 fällt aus, bevor er seine Meldung speichert. (3 P)
+
+1. Was geschieht mit dem Sammler aus c?
+2. Entwerfen Sie eine Timeout-Regel. Warum darf der Sammler `teil[2]`
+   nach Ablauf des Timeouts nicht einfach lesen?
+3. Wann dürfen `teil` und `fertig` für einen neuen Durchlauf zurückgesetzt werden?
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{8\baselineskip}
+\Needspace{6\baselineskip}
 
 **Ihre Lösung:**
 
-\vspace*{3cm}
+\vspace*{4cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
+\Needspace{6\baselineskip}
 
 **Musterlösung 6**
 
-1. Worker 0 liefert $3+6=9$, Worker 1 $9+12=21$,
-   insgesamt $9+21=30$. Die Teilsummenberechnung verwendet getrennte lokale
-   Akkumulatoren; gemeinsam verwendet werden erst die Ergebnisplätze. (1 P)
-2. Der `relaxed`-Store macht die Meldung atomar, stellt aber keine
-   Synchronisationsbeziehung zu den gewöhnlichen Ergebniszugriffen her.
-   Jeder Worker schreibt zuerst seinen Ergebnisplatz und veröffentlicht
-   danach mit `memory_order_release`. Der Sammler behält seine Acquire-Loads
-   bei und liest beide Ergebnisplätze erst nach zwei beobachteten Einsen. (1 P)
-   Je Worker gilt: Ergebnis-Store vor Release-Store; dieser synchronisiert mit
-   dem Acquire-Load, der seine einmalige Eins liest; danach folgt der Ergebnis-Load.
-   So entsteht die benötigte Happens-before-Beziehung. Ohne diese oder eine andere
-   passende Synchronisation liegt beim konkurrierenden Zugriff auf den gewöhnlichen
-   Ergebnisplatz ein C11-Data-Race mit undefiniertem Verhalten vor. Eine feste
-   C-Endwertliste darf daraus nicht abgeleitet werden. (1 P)
-3. Beide Ergebnisobjekte liegen in derselben Zeile: unabhängig beschriebene
-   Objekte können False Sharing und zusätzliche Übernahmen des Zeilenschreibrechts
-   verursachen. Eine tatsächliche Laufzeitstrafe ist damit noch nicht gemessen. (1 P)
-   Das zweite Vier-Byte-Objekt kann bei `0x20002040` liegen; die erste Adresse
-   ist bereits auf 64 Byte ausgerichtet. Getrennte Zeilen ersetzen weder Atomizität
-   noch die Release-/Acquire-Ordnung der Veröffentlichung. (1 P)
-4. Nein. Ordnung garantiert keinen Fortschritt und keine beschränkte Wartezeit.
-   Benötigt wird eine vereinbarte Fehler-, Abbruch- oder Überwachungspolitik
-   für ausbleibende Worker; ein Timeout bräuchte zusätzlich ein Zeitmodell. (1 P)
+**a)** Die Slots beginnen bei `0x20003000`, `0x20003004` und `0x20003008`.
+Alle liegen in der Zeile `0x20003000` bis `0x2000303F`. (1 P)
+Bei wechselnden Schreibern muss das Schreibrecht für diese gemeinsame Zeile
+zwischen den Caches wandern, obwohl jeder nur seinen eigenen Slot ändert:
+False Sharing. Die tatsächliche Zahl der Wechsel hängt vom Interleaving ab. (1 P)
+
+Die Worker schreiben verschiedene C-Speicherorte. Bei unveränderlicher
+Eingabe liegt zwischen ihnen kein C-Data-Race vor. Die spätere Auswertung
+durch den Sammler benötigt zusätzlich die Synchronisation aus c. (1 P)
+
+**b)** Mit lokalem Akkumulator gibt es nur 3 Ergebnisstores statt $3n$.
+Das gemeinsame Ergebnisarray belegt weiterhin 12 Byte. Jeder Worker benötigt
+seinen eigenen Akkumulator; ob er in einem Register oder in privatem
+Speicher liegt, entscheidet die Übersetzung. Die verbleibenden Ergebnisstores
+können dieselbe Zeile betreffen, aber nicht mehr bei jeder Addition. (1 P)
+
+Mit Abstand 64 Byte liegen die Ergebnisplätze bei `0x20003000`,
+`0x20003040` und `0x20003080`, wenn die neue Basis dieselbe bleibt.
+Ein C11-Layout für die hier angenommenen 4-Byte-Werte ist beispielsweise:
+
+```c
+#include <stdalign.h>
+alignas(64) static int32_t getrennt[3][16];
+/* Worker i verwendet getrennt[i][0]. */
+```
+
+Die erste Dimension adressiert den Slot, die zweite reserviert genau
+$16\cdot4=64$ Byte je Slot. Die Plattform muss diese Ausrichtung unterstützen;
+bei realem Einsatz ist ihre tatsächliche Kohärenzzeilengröße zu prüfen.
+Nur `alignas(64)` vor einem gewöhnlichen `teil[3]` änderte den Abstand
+seiner Elemente nicht. Dieses Layout belegt 192 Byte. (1 P)
+
+Bei unverändertem direkten Akkumulieren bleiben es $3n$ Ergebnisstores,
+nun auf getrennte Zeilen. Für die abschließende Summenbildung ist der lokale
+Akkumulator vorzuziehen: Er spart geteilte Stores und benötigt weniger
+Ergebnisspeicher. Eine Kombination beider Maßnahmen ist möglich, aber hier
+nicht automatisch wirtschaftlicher. Eine reale Laufzeitersparnis müsste
+am konkreten System gemessen werden. (1 P)
+
+**c)** Die gewöhnlichen Ergebnisplätze werden vor der passenden atomaren
+Meldung geschrieben. Ein Ausschnitt mit `stdatomic.h`, `stdint.h` und
+`stddef.h` lautet:
+
+```c
+static int32_t teil[3];
+static atomic_uint fertig[3] = {0, 0, 0};
+
+/* Ende von Worker i nach seiner lokalen Rechnung: */
+teil[i] = lokale_summe;
+atomic_store_explicit(&fertig[i], 1u, memory_order_release);
+
+/* Sammler: */
+for (size_t i = 0; i < 3; ++i) {
+    while (atomic_load_explicit(&fertig[i],
+                                memory_order_acquire) != 1u) {
+        /* Auf genau diese einmalige Meldung warten. */
+    }
+}
+gesamt = teil[0] + teil[1] + teil[2];
+```
+
+Jeder Worker veröffentlicht seinen eigenen Slot mit Release. Der Sammler
+beobachtet für jeden Slot die passende einmalige 1 mit Acquire und liest die
+Ergebnisse erst danach. Alle drei Meldungen sind erforderlich; die Meldung
+eines Workers ordnet nicht automatisch die Zugriffe der anderen. (4 P)
+
+**d)** Für Worker 2 heißen $W_2$ sein letzter Store auf `teil[2]`,
+$S_2$ sein Release-Store auf `fertig[2]`, $L_2$ der Acquire-Load des Sammlers,
+der dessen 1 liest, und $R_2$ das Lesen von `teil[2]` im Sammler:
+
+$$W_2\xrightarrow{\mathrm{sb}}S_2
+\xrightarrow{\mathrm{sw}}L_2\xrightarrow{\mathrm{sb}}R_2.$$
+
+Die beiden sequenced-before-Kanten liegen innerhalb der jeweiligen Threads;
+synchronizes-with verbindet die passende Release-/Acquire-Übergabe.
+Zusammen entsteht $W_2\mathrel{\mathrm{happens\mbox{-}before}}R_2$.
+Auch die vorausgehenden Ergebniswrites desselben Workers sind damit vor
+seine spätere Ergebnisübernahme geordnet. (2 P)
+
+**e)** Wenn die eine Prüfung zu früh erfolgt, führt der Sammler die Addition
+nicht aus und prüft nie wieder. Selbst später eintreffende Meldungen erzeugen
+dann kein Gesamtergebnis. Korrekte Ordnung ersetzt das nötige Warten
+beziehungsweise eine erneute Benachrichtigung nicht. (1 P)
+
+**f)** Der Sammler bleibt ohne andere Fehlerpolitik in der Schleife für
+Worker 2. Release/Acquire legt eine Ordnung für eine tatsächlich beobachtete
+Übergabe fest und erzeugt keine fehlende Meldung. (1 P)
+
+Eine Timeout-Regel kann eine monotone Deadline ab Start festlegen: Bis zu
+dieser Deadline werden die Meldungen mit Acquire geprüft; fehlt dann eine,
+endet der Durchlauf mit Fehler statt mit einer Gesamtsumme. Ohne beobachtete
+Meldung fehlt die gesicherte Veröffentlichung von `teil[2]`. Ein langsamer
+Worker könnte sogar noch schreiben; das gewöhnliche Lesen könnte einen
+Data-Race erzeugen. Auch ein unvollständiger Zwischenwert ist kein gültiges
+fertiges Teilergebnis. (1 P)
+
+Vor dem Zurücksetzen müssen alle Worker des alten Durchlaufs nachweislich
+beendet oder sicher angehalten sein und dessen Sammler darf die Objekte
+nicht mehr verwenden. Beispielsweise folgen nach angefordertem kooperativem
+Abbruch erfolgreiche Joins aller Worker. Erst danach werden Ergebnisse
+und Meldungen vor dem neuen Threadstart initialisiert. Ein Timeout allein
+belegt das Ende eines alten Workers nicht; ein verspäteter Store dürfte
+sonst eine Meldung des nächsten Durchlaufs vortäuschen. (1 P)
 :::
 
 {{< pagebreak >}}
 
+## Papierphasen und Nachbereitung
+
+| Phase | Nach dem Thema | Zeit | Kernteile |
+|---:|---|---:|---|
+| 1 | Cachekopien | 15 min | Aufgabe 1 |
+| 2 | Atomizität | 15 min | Aufgabe 3 a–c |
+| 3 | Ordnung und Fortschritt | 15 min | Aufgabe 4 a–b |
+| 4 | Skalierung und Zusammenführung | 15 min | Aufgabe 5 a–b und 6 c |
+
+Die Kernteile umfassen 31 Orientierungspunkte und sind für insgesamt
+60 Minuten angeleitete Papierarbeit vorgesehen. Die übrigen Teilaufgaben
+gehören zur selbstständigen Nacharbeit oder ins Tutorium. Die Zeitangaben
+sind Schätzungen. Die längeren Aufgaben 2, 3, 5 und 6 dienen auch der
+Vorbereitung auf offene Rechen-, Begründungs- und Codeaufgaben.
+Das Abschlussquiz enthält 12 Fragen.
+
 ## Optional: am Rechner prüfen
 
-Erweitern Sie `src/lab09_atomics.c` um drei Worker mit je 7000 atomaren Additionen:
-Der Zähler beginnt bei null und muss nach allen Joins 21000 enthalten.
-Prüfen Sie außerdem die einmalige Veröffentlichung von Payload 73.
-Führen Sie kein gewöhnliches ungeschütztes C-Race als Zahlenbeweis aus.
+Die vorhandene Funktionsprüfung verwendet C11 und POSIX-Threads.
+Vom Repository-Stamm aus:
+
+```bash
+gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic -pthread \
+    labs/src/lab09_atomics.c -o /tmp/lab09_atomics
+/tmp/lab09_atomics
+```
+
+Das bestehende Programm prüft getrennte Teilsummen, eine absichtlich
+vorgegebene Folge getrennter atomarer Loads und Stores, einen atomaren
+Zähler, einen mit einer Sperre geschützten Zähler und eine einmalige
+Release-/Acquire-Veröffentlichung. `pthread_create` startet einen Thread;
+`pthread_join` wartet auf sein Ende und ordnet dessen Schritte vor die
+anschließende Auswertung im wartenden Thread. Führen Sie kein gewöhnliches
+ungeschütztes C-Race als Zahlenbeweis aus.
+
+1. Erweitern Sie `labs/src/lab09_atomics.c` um 3 Worker mit je 7000 atomaren
+   Additionen von 1. Nach allen 3 Joins muss der Zähler 21000 enthalten.
+   Prüfen Sie außerdem die einmalige Veröffentlichung von 73 aus Aufgabe 4 a.
+2. Implementieren Sie Aufgabe 6 c mit lokalen Akkumulatoren. Belegen Sie x
+   mit den Werten 1 bis $3n$ und vergleichen Sie `gesamt` mit
+   $3n(3n+1)/2$. Wählen Sie n so, dass kein Zahlenüberlauf auftritt.
+3. Drei Threads erhöhen je $10^7$-mal ihren eigenen atomaren Slot.
+   Für Thread i lautet das Inkrement eines Slots `slot[i]`:
+
+   ```c
+   atomic_fetch_add_explicit(&slot[i], 1u,
+                            memory_order_relaxed);
+   ```
+
+   Vergleichen Sie direkt benachbarte Slots mit Slots im Abstand der
+   tatsächlichen Cachezeilengröße. Unter Linux kann
+   `getconf LEVEL1_DCACHE_LINESIZE` einen Plattformhinweis liefern.
+   Prüfen Sie Ausrichtung und Slotabstand zusätzlich an Ihrem Layout.
+   Dokumentieren Sie Host, Compiler, Optionen, Wiederholungen und Messgrenze.
+
+Diese Versuche prüfen Funktionen beziehungsweise die konkrete Hostlast.
+Sie messen kein allgemeines MESI-Timing und ersetzen keine Ausführung auf
+RISC-V-Hardware oder einem dafür geprüften Simulator.
+
+::: {.content-visible when-profile="solution"}
+\Needspace{6\baselineskip}
+
+**Lösungshinweise zu den optionalen Versuchen**
+
+Die unveränderte vorhandene Prüfung erwartet die Teilsummen 10 und 26 mit
+Gesamtwert 36, das getrennte atomare Load-/Store-Beispiel mit Endwert 1,
+40000 atomare Erhöhungen, den geschützten Zähler 40000 und die publizierten
+Daten 42. Diese Zahlen gehören zum vorhandenen Ausgangscode; die folgenden
+Erweiterungen haben andere Testwerte.
+
+1. Der neue Worker führt 7000 RMWs mit Inkrement 1 und relaxed Ordnung aus.
+   Erzeugung und Join werden auf 3 Threads erweitert; der bestehende Helfer
+   `run_pair` startet nur 2. Auch auf einem Erzeugungsfehlerpfad sind alle
+   bereits gestarteten Threads zu verbinden, bevor ihre Daten ungültig
+   werden. Nach 3 erfolgreichen Joins ergibt der relaxed Load
+   $3\cdot7000=21000$. Für den zweiten Test schreibt der Produzent 73 vor
+   seinem Release-Store; der Konsument liest 73 erst nach dem passenden
+   Acquire. Nur eine erwartete Zahl umzubenennen prüft keinen neuen Ablauf.
+2. Bei $n=4$ werden die Werte 1 bis 12 in die drei Bereiche 1–4, 5–8 und
+   9–12 aufgeteilt. Die lokalen Summen sind 10, 26 und 42; der Sammler muss
+   nach den drei passenden Acquire-Beobachtungen $78=12\cdot13/2$ liefern.
+   Die Worker speichern ihre Ergebnisse nur einmal. Die Veröffentlichung
+   entspricht dem Code aus 6 c; ein abschließender Join ist danach für den
+   sicheren Lebensdauerabschluss der Threads weiterhin sinnvoll.
+3. Jede Variante muss nach den Joins in jedem der 3 Slots genau $10^7$
+   enthalten. Für ein kompiliertes Paddinglayout muss die geprüfte
+   Zeilengröße als unterstützte konstante Ausrichtung und als Slotabstand
+   berücksichtigt werden. Ein atomarer Slot darf dabei nicht größer als der
+   gewählte Abstand sein. Initialisierung und Auswertung liegen außerhalb
+   der vereinbarten Messgrenze; beide Varianten verwenden sonst denselben
+   Ablauf. Mehrere Läufe erlauben die Streuung zu beurteilen. Ein möglicher
+   Unterschied ist mit Zeilenübernahmen vereinbar; auch Scheduling,
+   Kernzuordnung und sonstige Systemlast wirken auf die Messung. Ohne
+   tatsächlichen Messlauf wird kein Laufzeitfaktor behauptet.
+:::

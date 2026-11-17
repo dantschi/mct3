@@ -260,8 +260,8 @@ def figures():
     p += [text(500,407,"Status prüfen, dann eintreten · Nutzdatenordnung zusätzlich erforderlich",23,anchor="middle")]
     save("v_check","Logische Race Condition und unteilbare Entscheidung",438,p)
 
-    table("lrsc","Binäres Schloss · freie 0 · belegt 1 · SC-Erfolg ist Status 0",
-          ["Aktion","LR-Wert / SC-Status","Schloss"],
+    table("lrsc","Binäres Schlosswort · freie 0 · belegt 1 · SC-Erfolg ist Status 0",
+          ["Aktion","LR-Wert / SC-Status","Schlosswort"],
           [["beide LR","Wert 0 / Wert 0","0"],["SC Hart 0: 1","Status 0, Erfolg","1"],
            ["SC Hart 1: 1","Status ungleich 0","1"],["neuer LR Hart 1","Wert 1, wartet","1"],
            ["Release, neuer Versuch","LR 0, SC-Status 0","1 nach Übernahme"]],[370,350,240],1)
@@ -279,7 +279,7 @@ def figures():
     for x,labels in [(20,["Übernahme","lr.w.aq / erfolgreicher SC"]),(355,["kritischer Abschnitt","geschützte Reads / Writes"]),(700,["Freigabe","fence rw,w dann sw 0"])]:
         p += box(x,85,280,95,labels)
     p += [line(300,133,350,133,arrow=True),line(635,133,695,133,RED,3,arrow=True),
-          text(500,248,"Die Freigabeordnung steht vor dem Store des freien Schlosswerts",23,anchor="middle")]
+          text(500,248,"Die Freigabeordnung steht vor dem Store des freien Schlossworts",23,anchor="middle")]
     # Assembly labels remain readable inside a single compact phase box.
     p=[e.replace('font-size="24"','font-size="20"') if 'lr.w.aq /' in e or 'Reads /' in e or 'fence rw' in e else e for e in p]
     save("lock","Übernahme, Nutzdaten und geordnete Freigabe",280,p)
@@ -301,11 +301,11 @@ def figures():
     save("v_flag","Atomare Einzelobjekte und geordnete Einmalveröffentlichung",354,p)
 
     p=[text(20,30,"Wartekreis trotz korrekter atomarer Sperrprimitive")]
-    p += marked_box(80,100,330,100,["Kern 0 hält A","will B"])+marked_box(590,100,330,100,["Kern 1 hält B","will A"])
+    p += marked_box(80,100,330,100,["Thread 0 hält A","will B"])+marked_box(590,100,330,100,["Thread 1 hält B","will A"])
     p += [line(420,130,580,130,RED,3,arrow=True),line(580,170,420,170,RED,3,arrow=True),
           text(500,281,"Einheitliche Reihenfolge A vor B verhindert diesen Kreis",24,anchor="middle"),
           text(500,332,"Timeout darf keine fremde aktive Sperre einfach löschen",23,anchor="middle")]
-    save("dead","Zyklisches Warten und feste Lockreihenfolge",364,p)
+    save("dead","Zyklisches Warten und feste Erwerbsreihenfolge",364,p)
 
     p=[text(20,30,"Derselbe Hart · unterbrochener Besitzer kann während der ISR nicht freigeben")]
     for x,labels in [(20,["Kontext hält L"]),(355,["IRQ / ISR","spinnt auf L"]),(700,["Kontext wartet","auf ISR-Rückkehr"])]:p += box(x,105,280,100,labels)
