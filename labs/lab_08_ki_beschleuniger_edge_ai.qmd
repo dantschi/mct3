@@ -1,6 +1,6 @@
 ---
 title: "Übungsblatt 8: KI-Beschleuniger & Edge AI"
-subtitle: "Mikrocomputertechnik 3 · 32 Orientierungspunkte · ca. 60–75 Minuten"
+subtitle: "Mikrocomputertechnik 3 · Teil A: 44 Orientierungspunkte · Teil B: 44 Punkte, ca. 75 Minuten"
 highlight-style: ../assets/styles/dhbw-code.theme
 header-includes: |
   \usepackage{needspace}
@@ -10,247 +10,1220 @@ header-includes: |
 > **Musterlösung**
 :::
 
-## Aufgabe 1: Drei Ausgänge aus zwei Eingängen (5 Punkte)
+## Teil A · Aufgabe 1: Zwei Schichten und eine vermeintliche Abkürzung (7 Punkte)
 
-Dense-Schicht $y=Wx+b$, keine Aktivierungsfunktion:
+Ein Netz besteht aus einer Dense-Schicht mit ReLU und einer zweiten Dense-Schicht
+ohne Aktivierung. Alle Vektoren werden als Spalten dargestellt:
 
-$$W=\begin{bmatrix}2&-1\\-3&4\\1&2\end{bmatrix},\quad
-x=\begin{bmatrix}3\\-2\end{bmatrix},\quad b=\begin{bmatrix}-1\\2\\0\end{bmatrix}.$$
+$$
+z=W_1x+b_1,\qquad h=\operatorname{ReLU}(z),\qquad y=W_2h+b_2,
+$$
+$$
+W_1=\begin{bmatrix}2&-1\\-3&4\\1&2\end{bmatrix},\quad
+x=\begin{bmatrix}3\\-2\end{bmatrix},\quad
+b_1=\begin{bmatrix}-1\\2\\0\end{bmatrix},\quad
+W_2=\begin{bmatrix}1&2&-1\end{bmatrix},\quad b_2=3.
+$$
 
-1. Berechnen Sie alle drei Ausgänge. (2 P)
-2. Zählen Sie Parameter und produktbezogene MACs. (1 P)
-3. Gewichte und Eingaben: Int8, Bias: Int32. Zählen Sie gespeicherte Bytes,
-   anschließend zusätzlich drei Int8-Ausgaben. Ist dies die gesamte Arena? (2 P)
+Für das ganze Blatt gilt: Eine produktbezogene MAC zählt zwei arithmetische
+Operationen. Der Bias initialisiert den Akkumulator und wird nicht als weitere
+MAC gezählt. Indizes beginnen bei null; Zahlen und Zeiten sind Lehrannahmen.
+
+1. Geben Sie die Formen aller Tensoren an. Berechnen Sie `z`, `h` und `y`. (2 P)
+2. Zählen Sie Parameter und produktbezogene MACs je Schicht und für das gesamte Netz. (1 P)
+3. Ein Kollege möchte beide Schichten zu $y'=W'x+b'$ zusammenfassen und MACs
+   sparen. Berechnen Sie $W'=W_2W_1$ und $b'=W_2b_1+b_2$ sowie $y'$ für das
+   gegebene $x$. Erklären Sie eine Abweichung zu Teil 1. Unter welcher Bedingung
+   wäre die Zusammenfassung korrekt, und wie viele MACs würde sie dann sparen? (2 P)
+4. Gewichte und Aktivierungen sind Int8, Biaswerte Int32; Skala eins, Nullpunkt
+   null, keine Begrenzung nötig. Betrachten Sie getrennte Eingabe- und
+   Ausgabetensoren je Dense-Schicht. ReLU überschreibt `z` mit `h`; `x` wird nach
+   Schicht 1 und `h` nach Schicht 2 freigegeben. (2 P)
+   a. Bestimmen Sie die Modellparameterbytes beider Schichten.
+   b. Wie viele Int8-Aktivierungsbytes müssen in diesem Puffermodell höchstens
+      gleichzeitig gültig sein? Temporäre Akkumulatoren werden hier noch nicht gezählt.
+   c. Ordnen Sie Parameter und Aktivierungen im Lehrmodell von Folie 42 Flash
+      beziehungsweise Tensor Arena zu. Nennen Sie zwei zusätzliche Arena-Anteile.
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
 
 **Ihre Lösung:**
 
-\vspace*{3cm}
+\vspace*{5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
+\Needspace{12\baselineskip}
 
-**Musterlösung 1**
+**Musterlösung A1**
 
-1. $y_0=6+2-1=7$, $y_1=-9-8+2=-15$, $y_2=3-4=-1$. (2 P)
-2. Sechs Gewichte, drei Biaswerte: neun Parameter; sechs MACs. (1 P)
-3. $6+12+2=20$ Byte, mit Ausgaben 23 Byte.
-   Metadaten, Ausrichtung und temporäre Arbeitsbereiche fehlen. (2 P)
+
+1. Die Formen sind $x:(2\times1)$, $W_1:(3\times2)$,
+   $b_1,z,h:(3\times1)$, $W_2:(1\times3)$ und $b_2,y:(1\times1)$.
+   Aus den drei gewichteten Summen folgen
+   $$
+   z=\begin{bmatrix}2\cdot3-(-2)-1\\-3\cdot3+4(-2)+2\\3+2(-2)\end{bmatrix}
+    =\begin{bmatrix}7\\-15\\-1\end{bmatrix},\quad
+   h=\begin{bmatrix}7\\0\\0\end{bmatrix},\quad y=7+3=10.
+   $$
+   **Bewertung:** Formen 1 P, Rechnung mit ReLU 1 P.
+
+2. Schicht 1: sechs Gewichte und drei Biaswerte, also neun Parameter und sechs
+   MACs. Schicht 2: drei Gewichte und ein Biaswert, also vier Parameter und drei
+   MACs. Gesamt: 13 Parameter, neun MACs beziehungsweise 18 Operationen.
+   **Bewertung:** vollständige Zählung 1 P.
+
+3. Ohne Berücksichtigung der ReLU ergäben sich
+   $$
+   W'=\begin{bmatrix}-5&5\end{bmatrix},\qquad
+   b'=(-1)+2\cdot2+3=6,\qquad y'=-5\cdot3+5(-2)+6=-19.
+   $$
+   Der Wert weicht von zehn ab, weil negative Voraktivierungen im tatsächlichen
+   Netz auf null gesetzt werden. Zwei affine Abbildungen lassen sich
+   zusammenfassen, die dazwischenliegende Nichtlinearität im Allgemeinen nicht.
+
+   Eine hinreichende Bedingung ist, dass ReLU für alle betrachteten Eingaben
+   identisch wirkt, also alle zugehörigen Komponenten von $z$ nichtnegativ
+   bleiben. Genauer muss $W_2(\operatorname{ReLU}(z)-z)=0$ gelten; einzelne
+   Sonderfälle oder Gewichtskombinationen können deshalb ebenfalls Gleichheit
+   liefern. Ohne ReLU ist die Zusammenfassung immer korrekt. Dann benötigt die
+   zusammengefasste Schicht nur zwei statt neun MACs und spart sieben.
+   **Bewertung:** $W',b',y'$ 1 P, Bedingung und Ersparnis 1 P.
+
+4. Schicht 1 benötigt $6\cdot1+3\cdot4=18$ Byte, Schicht 2
+   $3\cdot1+1\cdot4=7$ Byte, zusammen 25 Byte Modellparameter.
+   Für Aktivierungen gelten in Schicht 1 $2+3=5$ Byte, in Schicht 2
+   $3+1=4$ Byte. Der Spitzenbedarf des angegebenen Lebensdauermodells beträgt
+   fünf Byte, nicht die Summe aller Tensoren über alle Phasen.
+
+   Die konstanten Parameter werden im Lehrmodell im Flash gespeichert;
+   Aktivierungspuffer gehören zum SRAM-Bereich der Tensor Arena. Zur tatsächlichen
+   Arena können zum Beispiel Int32-Akkumulatoren beziehungsweise Scratch-Puffer,
+   Tensor-Metadaten und Ausrichtungslücken hinzukommen. Die 25 Modellbytes sind
+   daher weder der gesamte Flashbedarf noch die gesamte Arena.
+   **Bewertung:** Parameterbytes 1 P, Aktivierungsspitze und Zuordnung 1 P.
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 2: Mehr innere Produkte, andere Roofline (5 Punkte)
+## Teil A · Aufgabe 2: Wie groß muss das Tile sein? (6 Punkte)
 
-Eine MAC zählt zwei Operationen, Operanden vier Byte.
-Grenze: externer Speicher zum lokalen Puffer; zunächst nur Eingangstransfers.
-Peak zwölf Operationen/Takt, Bandbreite sechs Byte/Takt.
-$P\leq\min(P_\mathrm{peak},BI)$.
+Betrachten Sie die Grenze vom externen Speicher zum lokalen Operandenpuffer.
+Peak: $12\,\mathrm{Ops/Takt}$; Bandbreite: $6\,\mathrm{Byte/Takt}$.
+Es gilt die ideale obere Schranke
+$$
+P\leq\min(P_{\mathrm{peak}},B\cdot I).
+$$
+Eine produktbezogene MAC zählt zwei Operationen.
 
-1. Bestimmen Sie Obergrenzen bei Intensität 0,5 und zwei Operationen/Byte sowie den Knick. (2 P)
-2. Ein 2×3-mal-3×2-Matrixprodukt hat zwölf MACs.
-   Naiv werden beide Operanden je MAC neu geladen, mit Wiederverwendung jeder
-   der zwölf verschiedenen Eingangswerte einmal. Bestimmen Sie Bytezahlen und Intensitäten;
-   danach zusätzlich vier Ausgaben zu je vier Byte ohne altes C einzulesen. (2 P)
-3. Peak steigt auf 24, Bandbreite bleibt sechs: Ändert sich die Grenze bei Intensität 0,5? (1 P)
+1. Bestimmen Sie den Knick sowie die Obergrenzen bei
+   $I=0{,}5$ und $I=3\,\mathrm{Ops/Byte}$. (1 P)
+2. Für $C=AB$ mit $A:(2\times3)$ und $B:(3\times2)$ werden Vier-Byte-Operanden
+   verwendet. Bestimmen Sie MAC-Zahl, Eingangsverkehr und Intensität
+   a. beim Neuladen beider Operanden für jede MAC,
+   b. beim einmaligen Laden jedes verschiedenen Eingangswerts.
+   Erweitern Sie beide Rechnungen anschließend um das Schreiben der Ausgaben:
+   vier Byte je Ausgabewert, kein Einlesen eines alten $C$. (2 P)
+3. Allgemein wird ein quadratisches Tile $(T\times T)\cdot(T\times T)$
+   berechnet. Jeder Eingangswert wird einmal geladen, die Breite beträgt
+   $b$ Byte je Operand; zunächst zählt nur Eingangsverkehr.
+   Leiten Sie $I(T)$ her. Welches kleinste ganzzahlige $T$ erreicht den Knick
+   für Float32 ($b=4$) beziehungsweise Int8 ($b=1$)? (2 P)
+4. Der lokale Puffer fasst $1\,\mathrm{KiB}=1024\,\mathrm{Byte}$.
+   Passen beide Float32-Eingangstiles des gefundenen $T$ gleichzeitig hinein?
+   Für ein Float32-Tile mit $T=4$ möchte ein Kollege den Peak auf
+   $24\,\mathrm{Ops/Takt}$ verdoppeln. Vergleichen Sie diese Maßnahme mit der
+   Vergrößerung auf das in Teil 3 gefundene Float32-Tile. (1 P)
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
 
 **Ihre Lösung:**
 
-\vspace*{3cm}
+\vspace*{5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
 \Needspace{4\baselineskip}
 
-**Musterlösung 2**
+**Musterlösung A2**
 
-1. Drei und zwölf Operationen/Takt, Knick bei zwei Operationen/Byte. (2 P)
-2. 24 Operationen: naiv 96 Byte, Intensität 0,25;
-   wiederverwendet 48 Byte, Intensität 0,5.
-   Mit 16 Ausgabebytes: 112 beziehungsweise 64 Byte,
-   Intensitäten $3/14\approx0{,}2143$ und 0,375.
-   Diese letzten Werte verwenden eine erweiterte Transfergrenze. (2 P)
-3. Nein, $\min(24,6\cdot0{,}5)=3$. (1 P)
+
+1. Der Knick liegt bei $I_*=12/6=2\,\mathrm{Ops/Byte}$.
+   Die Obergrenzen sind $\min(12,6\cdot0{,}5)=3$ und
+   $\min(12,6\cdot3)=12\,\mathrm{Ops/Takt}$. **Bewertung:** 1 P.
+
+2. Vier Ausgabewerte benötigen je drei Produkte: zwölf MACs, 24 Operationen.
+   Naiv werden $12\cdot2\cdot4=96$ Byte geladen:
+   $I=24/96=0{,}25\,\mathrm{Ops/Byte}$.
+   Bei Wiederverwendung genügen $(6+6)\cdot4=48$ Byte:
+   $I=24/48=0{,}5\,\mathrm{Ops/Byte}$.
+
+   Die vier Ausgaben ergänzen 16 Byte. Damit folgen
+   $I_{\mathrm{naiv+out}}=24/112=3/14\approx0{,}2143$ und
+   $I_{\mathrm{reuse+out}}=24/64=0{,}375\,\mathrm{Ops/Byte}$.
+   Diese Intensitäten verwenden eine andere, ausdrücklich erweiterte Zählbasis.
+   **Bewertung:** MACs/Eingangsverkehr 1 P, Intensitäten mit Ausgaben 1 P.
+
+3. $T^2$ Ausgänge mit je $T$ Produkten ergeben $2T^3$ Operationen.
+   Die zwei Eingangsquadrate benötigen $2bT^2$ Byte:
+   $$
+   I(T)=\frac{2T^3}{2bT^2}=\frac{T}{b}.
+   $$
+   Der Knick wird bei $T/b\geq2$ erreicht: Float32 braucht mindestens
+   $T=8$, Int8 mindestens $T=2$.
+   **Bewertung:** Herleitung 1 P, beide Mindestgrößen 1 P.
+
+4. Für $T=8$ benötigen die beiden Float32-Eingangstiles
+   $2\cdot8^2\cdot4=512$ Byte und passen in 1024 Byte.
+   Ein $T=4$-Tile hat dagegen $I=4/4=1\,\mathrm{Ops/Byte}$ und ist auf
+   sechs Operationen je Takt begrenzt, sowohl bei Peak zwölf als auch bei
+   Peak 24. Ein $T=8$-Tile erreicht die ideale Obergrenze zwölf beim
+   unveränderten Peak. Hier verbessert Wiederverwendung die Grenze,
+   zusätzliche Rechenkapazität allein nicht. Ausgangs- und Zusatzpuffer sind
+   in der vorgegebenen Pufferrechnung nicht enthalten. **Bewertung:** 1 P.
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 3: Andere Vektorgruppen und längere Latenz (6 Punkte)
+## Teil A · Aufgabe 3: Vektorlängen, eine fehlerhafte Schleife und Chaining (8 Punkte)
 
-RVV: VLEN Registerbits, SEW Elementbits, LMUL Gruppengröße;
-VLMAX $=\mathrm{LMUL}\cdot\mathrm{VLEN}/\mathrm{SEW}$.
-Für unterstützte Konfigurationen gilt: AVL bis VLMAX liefert genau AVL;
-AVL ab zweimal VLMAX liefert VLMAX; dazwischen liegt VL zwischen
-$\lceil AVL/2\rceil$ und VLMAX.
+RVV 1.0: VLEN ist die Registerbreite in Bit, SEW die Elementbreite, LMUL die
+Registergruppengröße. Es gilt $\mathrm{VLMAX}=\mathrm{LMUL}\cdot\mathrm{VLEN}/\mathrm{SEW}$.
+Für unterstützte Konfigurationen wählt `vsetvli` die aktive Länge VL aus der
+gewünschten Restlänge AVL nach diesen Regeln:
 
-1. VLEN 256, SEW 16, LMUL zwei: VLMAX? Folgt daraus die Lanezahl? (1 P)
-2. Separat VLMAX 16, AVL 26: Prüfen Sie $16+10$, $14+12$, $13+13$, $12+14$.
-   Welche Byteinkremente gelten bei $14+12$ für Zwei-Byte-Elemente? (2 P)
-3. Wie viele Iterationen benötigt ein Array mit 250 Elementen bei VLMAX 16? (1 P)
-4. Sechs unabhängige Produkte starten in Takten eins bis sechs, Latenz drei.
-   Zugehörige unabhängige Additionen: Latenz zwei, Startabstand eins.
-   Mit Chaining starten sie frühestens im Takt nach ihrem Produkt;
-   ohne erst nach allen Produkten. Wann endet das letzte Ergebnis jeweils?
-   Ist dies eine Befehlssatzgarantie? (2 P)
+- Für $\mathrm{AVL}\leq\mathrm{VLMAX}$: $\mathrm{VL}=\mathrm{AVL}$.
+- Für $\mathrm{AVL}\geq2\mathrm{VLMAX}$: $\mathrm{VL}=\mathrm{VLMAX}$.
+- Dazwischen: $\lceil\mathrm{AVL}/2\rceil\leq\mathrm{VL}\leq\mathrm{VLMAX}$.
+
+1. VLEN = 256, SEW = 16, LMUL = 2: Bestimmen Sie VLMAX.
+   Warum folgt daraus die Anzahl physischer Lanes nicht? (1 P)
+2. Separat gelten VLMAX = 32 und $N=70$ Arrayelemente. Bestimmen Sie die erste VL.
+   Prüfen Sie die Folgen $32+32+6$, $32+19+19$, $32+18+20$,
+   $35+35$ und $32+26+12$ auf Zulässigkeit.
+   Wie viele Iterationen sind nötig; hängt diese Zahl hier von der Implementierung ab? (2 P)
+3. Die Schleife von Folie 28 wurde auf `int16_t` umgestellt.
+   Für diese separate, unterstützte Konfiguration gelten VLMAX = 32 und LMUL = 1.
+   Die Arrays haben je $N$ gültige Elemente; `a1`, `a2` und `a3` zeigen anfangs
+   auf deren Beginn. (3 P)
+
+~~~asm
+# RVV 1.0; a0=N, a1=A, a2=B, a3=C; int16_t-Arrays
+    beqz    a0, done
+loop:
+    vsetvli t0, a0, e16, m1, ta, ma
+    vle16.v v0, (a1)
+    vle16.v v1, (a2)
+    vadd.vv v2, v0, v1
+    vse16.v v2, (a3)
+    slli    t1, t0, 2
+    add     a1, a1, t1
+    add     a2, a2, t1
+    add     a3, a3, t1
+    sub     a0, a0, t0
+    bnez    a0, loop
+done:
+    ret
+~~~
+
+   a. Finden und korrigieren Sie den Fehler.
+   b. Geben Sie für $N=70$ und die Folge $32+19+19$ die bearbeiteten
+      Elementindizes des fehlerhaften Codes an. Wie viele gültige Elemente
+      bleiben unbearbeitet? Zählen Sie ungültige Positionen pro Array und
+      einzelne Zugriffe insgesamt bei zwei Loads und einem Store.
+      Betrachten Sie eine abstrakte Indexsimulation ohne Speicherzugriffe;
+      ein tatsächlicher fehlerhafter Lauf kann schon beim ersten ungültigen
+      Zugriff abbrechen.
+   c. Statt `slli` und der drei `add` wird nun ein festes Zeigerinkrement von
+      64 Byte verwendet, „weil VLMAX = 32 ist“. Prüfen Sie die Folgen
+      $32+32+6$, $32+19+19$ und $32+26+12$.
+      Welche Aussage erlaubt ein erfolgreicher Test auf nur einer Implementierung?
+
+\Needspace{11\baselineskip}
+
+4. Sechs unabhängige Produkte starten in den Takten 1 bis 6 und haben Latenz drei.
+   Eine Operation mit Start $t$ und Latenz $L$ wird am Ende von $t+L-1$ fertig.
+   Die zugehörigen unabhängigen Additionen haben Latenz zwei und zunächst
+   Initiationsintervall eins. Mit Chaining startet jede Addition frühestens
+   im Takt nach der Fertigstellung ihres Produkts; ohne Chaining erst nach
+   Fertigstellung aller sechs Produkte. (2 P)
+   a. Wann liegt das letzte Ergebnis jeweils vor?
+   b. Jetzt hat der Additionspfad Initiationsintervall zwei. Wann liegt das
+      letzte Ergebnis mit Chaining vor? Vergleichen Sie mit Teil 4a.
+   c. Welche Angaben sind ISA-Eigenschaften, welche nur Annahmen dieses Zeitmodells?
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{8\baselineskip}
+\Needspace{10\baselineskip}
 
 **Ihre Lösung:**
 
-\vspace*{3cm}
+\vspace*{7cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
 \Needspace{4\baselineskip}
 
-**Musterlösung 3**
+**Musterlösung A3**
 
-1. 32 Elemente, keine Aussage über physische Lanes. (1 P)
-2. Erste VL muss 13 bis 16 sein: die ersten drei Folgen sind zulässig,
-   die vierte nicht. Byteinkremente 28 und 24. (2 P)
-3. Vierzehn volle Iterationen verarbeiten 224 Elemente; Rest 26 braucht zwei,
-   zusammen sechzehn Iterationen. (1 P)
-4. Produkte enden drei bis acht. Chaining: Additionen starten vier bis neun,
-   enden fünf bis zehn. Ohne: Starts neun bis vierzehn, Enden zehn bis fünfzehn.
-   Letztes Ende zehn beziehungsweise fünfzehn, nur im gegebenen Modell. (2 P)
+
+1. $\mathrm{VLMAX}=2\cdot256/16=32$ Elemente. Das ist eine
+   Registerkapazität. Die Mikroarchitektur kann dieselben Elemente über
+   unterschiedlich viele Rechen-Lanes und Takte abarbeiten. **Bewertung:** 1 P.
+
+2. Da $70\geq64$, ist die erste VL zwingend 32; danach bleiben 38 Elemente.
+   Für diesen Rest sind $\lceil38/2\rceil=19$ bis 32 zulässig.
+
+| Folge | Zulässig? | Begründung |
+|---|---|---|
+| $32+32+6$ | ja | 32 liegt im Bereich 19–32; der Rest sechs wird vollständig bearbeitet |
+| $32+19+19$ | ja | 19 ist die Untergrenze; der Rest 19 passt anschließend vollständig |
+| $32+18+20$ | nein | 18 unterschreitet die Untergrenze 19 für den Rest 38 |
+| $35+35$ | nein | Bereits die erste VL muss 32 sein; 35 übersteigt VLMAX |
+| $32+26+12$ | ja | 26 liegt im zulässigen Bereich; der Rest zwölf wird vollständig bearbeitet |
+
+   Jede zulässige Wahl im zweiten Durchlauf lässt höchstens 19 Elemente zurück,
+   also genau einen letzten Durchlauf. Hier sind es implementierungsunabhängig
+   drei Iterationen, obwohl die zweite und dritte VL verschieden sein können.
+   **Bewertung:** Folgen 1 P, erste VL und Iterationsbegründung 1 P.
+
+3. Ein `int16_t`-Element hat zwei Byte. Der Shift muss daher
+   `slli t1, t0, 1` lauten; `t0` selbst bleibt die Elementzahl für `sub`.
+
+   Mit dem falschen Faktor vier wächst der Zeiger in Elementen jeweils um
+   $2\mathrm{VL}$. In der abstrakten Simulation werden je Array folgende
+   Bereiche angefordert:
+
+| Iteration | VL | Startindex | Elementindizes | Davon außerhalb 0–69 |
+|---|---:|---:|---|---:|
+| 1 | 32 | 0 | 0–31 | 0 |
+| 2 | 19 | 64 | 64–82 | 13 |
+| 3 | 19 | 102 | 102–120 | 19 |
+
+   Nur 38 verschiedene gültige Positionen werden erreicht: 0–31 und 64–69.
+   Die 32 Positionen 32–63 bleiben unbearbeitet. Die $13+19=32$ ungültigen
+   Positionen pro Array ergeben über die zwei Loads und den Store insgesamt
+   96 angeforderte Einzelzugriffe außerhalb der Arrays. Das ist keine
+   Vorhersage, dass ein reales Gerät alle diese Zugriffe tatsächlich ausführt.
+
+   Mit festem Inkrement 64 Byte, also 32 `int16_t`-Elementen, ergibt sich:
+
+| VL-Folge | Bearbeitete Bereiche | Ergebnis |
+|---|---|---|
+| $32+32+6$ | 0–31, 32–63, 64–69 | korrekt |
+| $32+19+19$ | 0–31, 32–50, 64–82 | 51–63 fehlen, 13 Positionen außerhalb |
+| $32+26+12$ | 0–31, 32–57, 64–75 | 58–63 fehlen, sechs Positionen außerhalb |
+
+   Ein Test auf einer Implementierung mit der ersten Folge kann den Fehler
+   verbergen. Portabler Code verwendet das tatsächlich zurückgegebene VL für
+   Zeigerfortschritt und Restlänge. **Bewertung:** Shiftkorrektur 1 P,
+   Indexbereiche/Zählung 1 P, konstantes Inkrement und Testgrenze 1 P.
+
+4. Die Produkte enden in den Takten 3 bis 8.
+
+| Variante | Starttakte der Additionen | Endtakt des letzten Ergebnisses |
+|---|---|---:|
+| Chaining, Additions-II 1 | 4, 5, 6, 7, 8, 9 | 10 |
+| Ohne Chaining, Additions-II 1 | 9, 10, 11, 12, 13, 14 | 15 |
+| Chaining, Additions-II 2 | 4, 6, 8, 10, 12, 14 | 15 |
+
+   Ein früher Start und ein hoher Durchsatz sind verschiedene Eigenschaften.
+   Das längere Initiationsintervall verbraucht hier den Zeitgewinn gegenüber
+   dem Fall ohne Chaining mit II eins. Bei ebenfalls II zwei würde die
+   Variante ohne Chaining sogar erst Ende Takt 20 fertig.
+
+   Die ISA beschreibt unter anderem aktive Elemente, Registergruppen und die
+   Ergebniswirkung der Befehle. Physische Lanezahl, Latenzen, Startabstände und
+   die konkrete Verfügbarkeit von Chaining werden durch diese RVV-Befehlsfolge
+   nicht als feste Taktzahlen garantiert.
+   **Bewertung:** drei Endzeiten und Ablauf 1 P, Vergleich und ISA-Abgrenzung 1 P.
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 4: Ein längeres Tile im systolischen Array (6 Punkte)
+## Teil A · Aufgabe 4: Ein längeres Tile im systolischen Array (9 Punkte)
 
-$$A=\begin{bmatrix}2&1&-1\\3&0&2\end{bmatrix},\quad
-B=\begin{bmatrix}1&4\\-2&3\\5&-1\end{bmatrix},\quad C=AB.$$
+$$
+A=\begin{bmatrix}2&1&-1\\3&0&2\end{bmatrix},\qquad
+B=\begin{bmatrix}1&4\\-2&3\\5&-1\end{bmatrix},\qquad C=AB.
+$$
 
-Vier Output-Stationary-Zellen, anfangs Summen null; eine gültige MAC je Zelle und Takt.
-A wandert rechts, B unten, je einen Nachbarn pro Takt.
-Einspeisung links in $1+k+i$, oben in $1+k+j$;
-$i,j\in\{0,1\}$, $k\in\{0,1,2\}$.
-Keine Vorlade- oder Auslesezeit im Fenster.
+Vier Output-Stationary-Zellen bilden ein $2\times2$-Array. Ihre Summen beginnen
+bei null; jede Zelle führt höchstens eine gültige MAC je Takt aus. $A$ wandert
+nach rechts, $B$ nach unten, je einen Nachbarn pro Takt. $A_{ik}$ wird links in
+Takt $1+k+i$, $B_{kj}$ oben in Takt $1+k+j$ eingespeist.
+Es gelten $i,j\in\{0,1\}$ und $k\in\{0,1,2\}$.
+Vorladen und Auslesen liegen außerhalb des Fensters.
 
-1. Tragen Sie alle vier Teilsummen nach jedem der fünf Takte ein;
-   markieren Sie deren letzte gültige MAC. (3 P)
-2. Welche Paare erreichen C11 in welchen Takten? Zählt das Produkt mit null als gültige MAC? (1 P)
-3. Bestimmen Sie zeitliche Auslastung über fünf Takte.
-   Dasselbe Tile belegt allein vier Zellen eines 4×4-Arrays:
-   zeitliche Auslastung und räumliche Belegung? Sind die Ergebnisse bereits ausgelesen? (2 P)
+1. Tragen Sie die vier Teilsummen am Ende jedes Takts ein. Zählen Sie die
+   gültigen MACs je Takt und markieren Sie je Zelle die letzte gültige MAC. (3 P)
+2. Welche Operandenpaare erreichen $C_{11}$ in welchen Takten?
+   Warum ist ein Produkt mit dem Wert null anders zu zählen als ein leerer Platz? (1 P)
+3. Bestimmen Sie die zeitliche Auslastung über die fünf Takte. Dasselbe Tile
+   belegt allein die oberen linken vier Zellen eines sonst leeren
+   $4\times4$-Arrays. Bestimmen Sie dessen Auslastung, normiert auf alle
+   physischen Zellen, und die räumliche Belegung. Was fehlt noch, bevor $C$
+   außerhalb des Arrays verfügbar ist? (2 P)
+4. Verallgemeinern Sie auf ein voll belegtes $M\times N$-Array für
+   $(M\times K)\cdot(K\times N)$ mit demselben Einspeiseschema.
+   Wann erfolgt die letzte gültige MAC? Leiten Sie $U(K,M,N)$ her und prüfen
+   Sie die Formel an Folie 38 sowie am vorliegenden Tile.
+   Ab welchem ganzzahligen $K$ erreicht ein voll belegtes $4\times4$-Array
+   mindestens 90 Prozent zeitliche Auslastung? (2 P)
+5. In einer Weight-Stationary-Organisation: Welcher Wert bliebe lokal, welche
+   Werte müssten sich bewegen, und weshalb ist der Zeitplan aus Teil 1
+   nicht einfach übertragbar? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{8\baselineskip}
+\Needspace{12\baselineskip}
+
+| Taktende | $C_{00}$ | $C_{01}$ | $C_{10}$ | $C_{11}$ | Gültige MACs |
+|---|---|---|---|---|---|
+| 1 | | | | | |
+| 2 | | | | | |
+| 3 | | | | | |
+| 4 | | | | | |
+| 5 | | | | | |
 
 **Ihre Lösung:**
 
-\vspace*{3cm}
+\vspace*{5cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
+\Needspace{13\baselineskip}
 
-**Musterlösung 4**
+**Musterlösung A4**
 
-| Takt | C00 | C01 | C10 | C11 | gültige MACs |
-|------|-----|-----|-----|-----|--------------|
+Die Operanden zum Produkt $A_{ik}B_{kj}$ treffen sich in Takt $1+k+i+j$.
+Ein Stern kennzeichnet in der Tabelle die letzte gültige MAC der jeweiligen Zelle.
+
+| Taktende | $C_{00}$ | $C_{01}$ | $C_{10}$ | $C_{11}$ | Gültige MACs |
+|---|---:|---:|---:|---:|---:|
 | 1 | 2 | 0 | 0 | 0 | 1 |
 | 2 | 0 | 8 | 3 | 0 | 3 |
-| 3 | −5 fertig | 11 | 3 | 12 | 4 |
-| 4 | −5 | 12 fertig | 13 fertig | 12 | 3 |
-| 5 | −5 | 12 | 13 | 10 fertig | 1 |
+| 3 | $-5^*$ | 11 | 3 | 12 | 4 |
+| 4 | $-5$ | $12^*$ | $13^*$ | 12 | 3 |
+| 5 | $-5$ | 12 | 13 | $10^*$ | 1 |
 
-Tabelle 3 P. C11 erhält $(3,4)$ in drei, $(0,3)$ in vier,
-$(2,-1)$ in fünf. Numerische null ist kein ungültiger Platz. (1 P)
-Zwölf MACs: $12/(4\cdot5)=60\,\%$;
-im größeren Array 15 Prozent zeitlich, 25 Prozent räumlich.
-Readout benötigt weiterhin einen eigenen Weg. (2 P)
+
+1. Zum Beispiel rechnet $C_{00}$ in den ersten drei Takten
+   $2\cdot1$, $1(-2)$ und $(-1)\cdot5$: Die Teilsummen sind 2, 0 und $-5$.
+   Entsprechend ist
+   $$
+   C=\begin{bmatrix}-5&12\\13&10\end{bmatrix}.
+   $$
+   Insgesamt werden zwölf MACs ausgeführt.
+   **Bewertung:** Summenverlauf 2 P, MAC-Zählung und letzte MACs 1 P.
+
+2. $C_{11}$ erhält $(A_{10},B_{01})=(3,4)$ in Takt 3,
+   $(A_{11},B_{11})=(0,3)$ in Takt 4 und
+   $(A_{12},B_{21})=(2,-1)$ in Takt 5.
+   Das mittlere Produkt verändert die Summe nicht, ist aber eine gültige MAC
+   mit bereitstehenden Operanden. Ein leerer Platz enthält kein gültiges
+   Operandenpaar und wird nicht als MAC gezählt. **Bewertung:** 1 P.
+
+3. Über alle vier Zellen und fünf Takte gilt $U=12/(4\cdot5)=60\,\%$.
+   Im sonst leeren $4\times4$-Array sind es
+   $U=12/(16\cdot5)=15\,\%$; die räumliche Belegung beträgt
+   $4/16=25\,\%$. Auf die tatsächlich belegten vier Zellen normiert bleiben es
+   60 Prozent, also $25\,\%\cdot60\,\%=15\,\%$ für das ganze Array.
+   Die Ergebnisse müssen danach noch aus den Akkumulatoren ausgelesen und
+   übertragen werden; gegebenenfalls folgt eine Requantisierung. Diese Zeiten
+   waren ausgeschlossen. **Bewertung:** Auslastungen/Belegung 1 P, Auslesen 1 P.
+
+4. Die späteste Zelle hat $i=M-1$, $j=N-1$, ihr letztes Produkt $k=K-1$:
+   $$
+   T_{\mathrm{letzte\ MAC}}=1+(K-1)+(M-1)+(N-1)=K+M+N-2.
+   $$
+   Es gibt $MNK$ gültige MACs und $MN(K+M+N-2)$ Zell-Takte:
+   $$
+   U(K,M,N)=\frac{K}{K+M+N-2}.
+   $$
+   Folie 38 verwendet $M=N=K=2$, also $T=4$ und $U=1/2$.
+   Hier sind $M=N=2$, $K=3$, also $T=5$ und $U=3/5$.
+   Für das nur teilweise belegte größere Array darf die Vollbelegungsformel
+   nicht mit $M=N=4$ eingesetzt werden; dort bleibt die gesonderte Rechnung
+   $12/(16\cdot5)=15\,\%$ aus Teil 3 maßgebend.
+   Für ein voll belegtes $4\times4$-Array folgt
+   $K/(K+6)\geq0{,}9$, also $K\geq54$.
+   **Bewertung:** Zeit/Herleitung 1 P, Prüfungen und Mindest-$K$ 1 P.
+
+5. Bei Weight-Stationary bleiben zugeordnete Gewichtswerte in den Zellen.
+   Aktivierungen und je nach Organisation Teilsummen müssen bewegt oder
+   weitergereicht werden. In Output-Stationary bleibt dagegen gerade die
+   Ausgangssumme lokal. Gewichtsbelegung, Zuführung und Reduktionswege ändern
+   sich; ohne ein neues Abbildungs- und Zeitmodell lässt sich der vorherige
+   Plan deshalb nicht übernehmen. **Bewertung:** 1 P.
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 5: Negative Werte quantisieren (6 Punkte)
+## Teil A · Aufgabe 5: Negative Werte, Nullpunkte und Akkumulatorbreite (7 Punkte)
 
-Int8-Bereich $[-128,127]$;
-$q=\operatorname{clip}(\operatorname{round}(r/s)+z)$,
-$\hat r=s(q-z)$; halbe Werte werden weg von null gerundet.
+Für Int8 gilt der Codebereich $[-128,127]$:
+$$
+q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right),
+\qquad \widehat r=s(q-z).
+$$
+Runden Sie zur nächsten ganzen Zahl, halbe Werte weg von null.
 
-1. Skala 0,2, Nullpunkt null: Code, Rückwert und absoluter Fehler für
-   $r=-1{,}37$ und $r=-30$? Welche Fehlerarten liegen vor? (2 P)
-2. Welcher Code repräsentiert reale null bei Nullpunkt fünf? (1 P)
-3. Separat $q_x=[7,-3],z_x=1,s_x=0{,}25$;
-   $q_w=[-2,3],z_w=0,s_w=0{,}1$; Biascode vier mit Skala $s_xs_w$.
-   Berechnen Sie Akkumulation und Realwert. Requantisieren Sie mit $s_y=0{,}08,z_y=3$. (2 P)
-4. Vergleichen Sie 180000 reine Gewichte in Float32 und Int8.
-   Gilt deren prozentuale Ersparnis für die ganze Modelldatei und Arena? (1 P)
+1. Skala $s=0{,}2$, Nullpunkt $z=0$: Bestimmen Sie Code, Rückwert und absoluten
+   Fehler für $r=-1{,}37$ und $r=-30$. Benennen Sie die Fehlerart und geben Sie,
+   wo möglich, eine allgemeine Fehlerschranke an. (2 P)
+2. Skala $0{,}2$, Nullpunkt fünf: Welcher Code repräsentiert reale null?
+   Welcher reale Wertebereich ist ohne Begrenzung darstellbar? (1 P)
+3. Separat: $q_x=[7,-3]$, $z_x=1$, $s_x=0{,}25$;
+   $q_w=[-2,3]$, $z_w=0$, $s_w=0{,}1$.
+   Der Biascode ist vier mit Skala $s_xs_w$ und Nullpunkt null.
+   Bestimmen Sie die Integer-Akkumulation und ihren Realwert.
+   Requantisieren Sie mit $s_y=0{,}08$, $z_y=3$, einmal über den Realwert und
+   einmal mit $M=s_xs_w/s_y$. Geben Sie den Rückwert an. (2 P)
+4. Int8-Eingaben und Int8-Gewichte, beide mit Nullpunkt null, werden ohne Bias
+   aufsummiert. Bestimmen Sie den betragsgrößten Einzelbeitrag.
+   Ab wie vielen Produkten kann Int16 überlaufen, und bis zu wie vielen
+   Produkten ist ein Int32-Akkumulator für alle zulässigen Operanden sicher? (1 P)
+5. Ein Modell hat 180 000 Gewichte und 600 Biaswerte. Vergleichen Sie Float32
+   für beide mit Int8-Gewichten und Int32-Biaswerten. Berechnen Sie die
+   Ersparnis nur für Gewichte sowie für Gewichte einschließlich Bias.
+   Warum beschreibt keiner der Werte die Ersparnis der Tensor Arena? (1 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{8\baselineskip}
+\Needspace{12\baselineskip}
 
 **Ihre Lösung:**
 
-\vspace*{3cm}
+\vspace*{7cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{5\baselineskip}
+
+**Musterlösung A5**
+
+
+1. Für $-1{,}37$ ist $r/s=-6{,}85$, somit $q=-7$,
+   $\widehat r=-1{,}4$ und $|r-\widehat r|=0{,}03$.
+   Es liegt nur Rundungsfehler vor. Ohne Begrenzung gilt allgemein
+   $|r-\widehat r|\leq s/2=0{,}1$.
+
+   Für $-30$ ergäbe Runden zunächst $-150$; der Int8-Code wird auf $-128$
+   begrenzt. $\widehat r=-25{,}6$, absoluter Fehler $4{,}4$:
+   Sättigung beziehungsweise Clipping. Die Rundungsschranke $s/2$ gilt für
+   diesen Fall nicht; außerhalb des darstellbaren Bereichs wächst der Fehler
+   mit dem Abstand zum Randwert. **Bewertung:** beide Rechnungen 1 P,
+   Fehlerarten und Schranke 1 P.
+
+2. Reale null wird als $q=z=5$ gespeichert. Die darstellbaren Randwerte sind
+   $0{,}2(-128-5)=-26{,}6$ und $0{,}2(127-5)=24{,}4$.
+   Dazwischen liegen diskrete Werte im Abstand 0,2; eine beliebige Zahl im
+   Intervall muss weiterhin gerundet werden. **Bewertung:** 1 P.
+
+3. Es gilt
+   $$
+   a=(7-1)(-2)+(-3-1)\cdot3+4=-12-12+4=-20,
+   \qquad r_y=(0{,}25\cdot0{,}1)(-20)=-0{,}5.
+   $$
+   Über den Realwert folgt
+   $q_y=\operatorname{round}(-0{,}5/0{,}08)+3=-6+3=-3$.
+   Ebenso ergibt $M=0{,}025/0{,}08=0{,}3125$ den Wert
+   $\operatorname{round}(Ma)+3=\operatorname{round}(-6{,}25)+3=-3$.
+   Es ist keine Sättigung nötig; der Rückwert lautet
+   $\widehat r_y=0{,}08(-3-3)=-0{,}48$.
+   Der Biascode vier repräsentiert $0{,}1$.
+   **Bewertung:** Akkumulation/Realwert 1 P, beide Requantisierungen/Rückwert 1 P.
+
+4. Der betragsgrößte Beitrag ist $(-128)(-128)=16384$.
+   Schon zwei solche Produkte ergeben 32768 und überschreiten Int16-Maximum
+   32767. Für Int32 ist der positive Grenzfall maßgeblich:
+   $$
+   \left\lfloor\frac{2^{31}-1}{16384}\right\rfloor=131071.
+   $$
+   Der negativste Einzelbeitrag $-128\cdot127=-16256$ verletzt bei dieser
+   Länge auch die negative Grenze nicht. 131 072 maximal positive Produkte
+   würden $2^{31}$ ergeben und überlaufen. Dies ist eine Grenzwertrechnung;
+   sie erfordert keinen tatsächlich ausgeführten vorzeichenbehafteten
+   Überlauf in C. **Bewertung:** 1 P.
+
+5. Gewichte: 720 000 Byte in Float32 statt 180 000 Byte in Int8,
+   also 540 000 Byte beziehungsweise 75 Prozent Ersparnis.
+   Mit Bias: $4(180000+600)=722400$ Byte gegenüber
+   $180000+4\cdot600=182400$ Byte. Die gleiche absolute Ersparnis
+   entspricht dann $540000/722400\approx74{,}751\,\%$.
+   Biaswerte bleiben vier Byte breit. Die Tensor Arena speichert
+   Aktivierungen und Arbeitsbereiche; deren Formen, Lebensdauern und
+   temporäre Breiten können sich anders ändern als die Modellparameter.
+   **Bewertung:** 1 P.
+:::
+
+{{< pagebreak >}}
+
+## Teil A · Aufgabe 6: Speicher, Lebensdauer und Gesamtzeit (7 Punkte)
+
+1. Ein Sensorfenster umfasst 200 Zeitpunkte mit je zwei Kanälen.
+   Bestimmen Sie die Größe der Float32-Quelle und des Int8-Eingabetensors. (1 P)
+2. Plattform: 192 KiB Flash, davon 52 KiB Firmware und 36 KiB vollständiges
+   Modell. 48 KiB SRAM, davon 18 KiB Tensor Arena, das Float32-Quellfenster
+   aus Teil 1, 7 KiB Stackreserve und 5 KiB übrige Daten. Der Int8-Eingabetensor
+   liegt bereits in der Arena; $1\,\mathrm{KiB}=1024$ Byte.
+   Bestimmen Sie die freien Flash- und SRAM-Budgets. (1 P)
+
+Zu Teil 3: C++-artiger Pseudocode, an TensorFlow Lite Micro (TFLM) angelehnt.
+RV32, Zeigerbreite vier Byte. Der dritte Parameter von `quantize` ist die Anzahl
+zu verarbeitender Float32-Elemente. `AllocateTensors` und `Invoke` melden einen
+Status; die konkrete API und zusätzliche Fehlerbehandlung sind vereinfacht.
+
+~~~cpp
+static Interpreter *g_interp;
+void setup(void) {
+    alignas(16) uint8_t arena[18 * 1024];
+    Interpreter interp(model, resolver, arena, sizeof(arena));
+    interp.AllocateTensors();
+    g_interp = &interp;
+}
+int classify(const float *window) {
+    quantize(window, g_interp->input(0), sizeof(window));
+    g_interp->Invoke();
+    return argmax(g_interp->output(0));
+}
+~~~
+
+3. Finden Sie mindestens vier Fehler, begründen Sie deren Folgen und
+   korrigieren Sie diese. Beziehen Sie das Speicherbudget aus Teil 2 ein. (2 P)
+4. Serielle Lehrzeiten auf der CPU: Vorverarbeitung 1,5 ms, Dense 12 ms,
+   übrige Operatoren 2,5 ms, Nachbereitung 0,5 ms.
+   Mit Beschleuniger kommt eine Kopie von 0,75 ms hinzu, Dense dauert 2 ms. (3 P)
+   a. Bestimmen Sie beide Gesamtzeiten, den Dense-Faktor und den Gesamtfaktor.
+   b. Wie kurz müsste Dense werden, damit der Gesamtfaktor 2,5 beträgt?
+      Welche Grenze kann der Gesamtfaktor selbst bei Dense-Zeit null nicht überschreiten?
+   c. Ab welcher Kopierzeit ist der beschleunigte Pfad nicht mehr schneller als die CPU?
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{14\baselineskip}
+
+**Ihre Lösung:**
+
+\vspace*{8cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{5\baselineskip}
+
+**Musterlösung A6**
+
+
+1. $200\cdot2=400$ Elemente benötigen als Float32 $400\cdot4=1600$ Byte
+   und als Int8 400 Byte. **Bewertung:** 1 P.
+
+2. Flash: $192-52-36=104\,\mathrm{KiB}$ frei.
+   SRAM:
+   $$
+   48\cdot1024-18\cdot1024-1600-7\cdot1024-5\cdot1024
+   =16832\,\mathrm{Byte}=16{,}4375\,\mathrm{KiB}.
+   $$
+   Die 400 Int8-Bytes werden nicht nochmals abgezogen, weil sie in den
+   18 KiB Arena enthalten sind. **Bewertung:** beide Budgets 1 P.
+
+3. Wesentliche Fehler und ihre Folgen:
+   - Die lokale Arena lebt nur bis zum Ende von `setup`. Spätere Inferenz würde
+     auf einen abgelaufenen Speicherbereich zugreifen.
+   - Der lokale Interpreter hat dieselbe kurze Lebensdauer. `g_interp` zeigt
+     nach Rückkehr auf kein gültiges Interpreterobjekt.
+   - Die lokale Arena beansprucht außerdem 18 KiB Stack, obwohl nur 7 KiB
+     Stackreserve eingeplant sind. Sie gehört in dauerhaft reservierten SRAM,
+     zum Beispiel in einen statischen, passend ausgerichteten Bereich.
+   - `sizeof(window)` ist auf RV32 vier, weil `window` ein Zeiger ist. Beim
+     angegebenen Vertrag würden nur vier statt 400 Elemente quantisiert.
+     Ein Zeiger trägt keine Arraylänge.
+   - Der Status von `AllocateTensors` und `Invoke` wird ignoriert. Nach einem
+     Fehler dürfen Tensoren beziehungsweise Ausgaben nicht als neu gültig
+     verwendet werden; auch ein Aufruf vor erfolgreichem `setup` ist abzufangen.
+
+   Eine mögliche Korrektur als Pseudocode lautet:
+
+~~~cpp
+alignas(16) static uint8_t arena[18 * 1024];
+static Interpreter *g_interp = nullptr;
+
+bool setup(void) {
+    static Interpreter interp(model, resolver, arena, sizeof(arena));
+    g_interp = nullptr;
+    if (interp.AllocateTensors() != OK)
+        return false;
+    g_interp = &interp;
+    return true;
+}
+
+bool classify(const float *window, size_t n, int *label) {
+    if (g_interp == nullptr || window == nullptr ||
+        label == nullptr || n != 400)
+        return false;
+    // Vorausgesetzt: Tensorform, Datentyp und Quantisierungsparameter
+    // wurden beim Setup gegen den Modellvertrag geprueft.
+    quantize(window, g_interp->input(0), n);
+    if (g_interp->Invoke() != OK)
+        return false;
+    *label = argmax(g_interp->output(0));
+    return true;
+}
+~~~
+
+   `OK`, `quantize` und die Interpreterklasse sind hier bewusst symbolische
+   Schnittstellen, kein unmittelbar kompilierbares TFLM-Programm. Modell und
+   Resolver müssen ebenfalls ausreichend lange leben. Die statische Arena ist
+   dieselbe schon budgetierte 18-KiB-Arena, keine zweite zusätzliche Allokation.
+   Interpreter-Metadaten und sonstige Objekte müssen in die reservierten
+   übrigen Daten passen; ohne deren Größe ist kein genauerer Budgetnachweis
+   möglich. Eine Fehlerbehandlung liefert keine vermeintlich frische Klasse.
+   **Bewertung:** mindestens vier Fehler mit Folgen 1 P,
+   tragfähige Korrektur einschließlich Speicherbudget 1 P.
+
+\Needspace{12\baselineskip}
+
+
+4. Die CPU benötigt
+   $T_{\mathrm{CPU}}=1{,}5+12+2{,}5+0{,}5=16{,}5\,\mathrm{ms}$.
+   Beschleunigt sind es
+   $T_{\mathrm{acc}}=1{,}5+0{,}75+2+2{,}5+0{,}5=7{,}25\,\mathrm{ms}$.
+   Dense allein gewinnt Faktor $12/2=6$; die ganze Anwendung nur
+   $16{,}5/7{,}25\approx2{,}276$.
+
+   Für Gesamtfaktor 2,5 darf die Gesamtzeit höchstens
+   $16{,}5/2{,}5=6{,}6\,\mathrm{ms}$ betragen.
+   Die unveränderten Anteile einschließlich Kopie brauchen 5,25 ms:
+   Dense müsste auf höchstens $6{,}6-5{,}25=1{,}35\,\mathrm{ms}$ sinken.
+   Selbst bei Dense-Zeit null liegt die Grenze bei
+   $16{,}5/5{,}25=22/7\approx3{,}143$.
+
+   Sei die Kopierzeit $c$ variabel und Dense bleibe bei zwei Millisekunden.
+   Dann ist $T_{\mathrm{acc}}=6{,}5\,\mathrm{ms}+c$.
+   Bei $c=10\,\mathrm{ms}$ besteht Gleichstand mit der CPU; ab diesem Wert
+   ist der Pfad nicht mehr schneller, oberhalb davon langsamer.
+   **Bewertung:** Zeiten und Faktoren 1 P, Ziel und obere Grenze 1 P,
+   Kopierschwelle 1 P.
+:::
+
+<!-- Autorenprüfung Teil A: Die sechs Papierfälle übernehmen den gelieferten
+Entwurf mit 44 Orientierungspunkten. A1 verbindet Schichten, Nichtlinearität
+und Tensorlebensdauer; A2 verlangt Tile-Dimensionierung statt bloßer Peak-Rechnung.
+A3 verbindet RVV-Längenauswahl mit Fehlerdiagnose und getrennten Timingannahmen.
+A4 leitet einen vollständigen systolischen Ablauf und seine Skalierung her.
+A5 trennt Rundung, Begrenzung, Nullpunkte und Akkumulatorbreite. A6 verbindet
+Speicherbudget, Lebensdauer und die Gesamtwirkung einer Teilbeschleunigung.
+Die vorgegebenen Zahlen sind Lehrmodelle; die Zeitrichtwerte und Zuordnung der
+Papierphasen stehen im begleitenden Autorenbericht. Reale RVV-Laufzeiten,
+TFLM-API-Aufrufe und Hardwaremessungen werden hier nicht behauptet. -->
+
+{{< pagebreak >}}
+
+## Teil B · K1: Aktivitätserkennung auf dem Mikrocontroller (20 Punkte, ca. 35 Minuten)
+
+Ein Sensorgerät unterscheidet Stehen, Gehen und Laufen. Ein Fenster enthält
+32 Zeitpunkte mit je drei Beschleunigungsachsen, zeitpunktweise geordnet.
+Alle $0{,}5\,\mathrm{s}$ liegt ein neues Fenster vor; spätestens
+$1\,\mathrm{s}$ nach dessen Ende muss eine Entscheidung vorliegen.
+Der Prozessor läuft mit $64\,\mathrm{MHz}$.
+
+Das Modell besteht aus Dense $96\rightarrow16$ mit ReLU und Dense
+$16\rightarrow3$ ohne Aktivierung. Die drei Ausgänge sind Scores.
+Gewichte und Aktivierungen sind Int8, Biaswerte Int32. Eine produktbezogene
+MAC zählt zwei arithmetische Operationen; Bias initialisiert den Akkumulator.
+ReLU-Vergleiche und Adressrechnung werden in dieser Operationsbilanz nicht gezählt.
+Alle folgenden Zeiten und Raten sind Lehrannahmen.
+
+1. Geben Sie die Formen von $x,W_1,b_1,h,W_2,b_2,y$ an. Bestimmen Sie
+   Parameterzahl, produktbezogene MACs und arithmetische Operationen je Fenster. (3 P)
+2. Bestimmen Sie die Modellbytes für die angegebenen Datentypen und für reines
+   Float32. Berechnen Sie die prozentuale Ersparnis. Warum beträgt sie nicht
+   $75\,\%$? (2 P)
+3. Bestimmen Sie die Größe des Float32-Quellfensters und des Int8-Eingabetensors.
+   Wie viele quantisierte Aktivierungsbytes müssen höchstens gleichzeitig
+   gültig sein? Verwenden Sie vollständige Eingangs- und Ausgangstensoren pro
+   Schicht, ReLU im selben Puffer und Freigabe nach der letzten Nutzung;
+   die Float32-Quelle liegt separat außerhalb der Arena. Nennen Sie zwei weitere
+   Anteile, die die Arena vergrößern können. (2 P)
+4. Die Gewichte liegen im Flash und passieren je Auswertung genau einmal die
+   Grenze Flash $\rightarrow$ Rechenwerk, mit einem Byte je Gewicht. Biaswerte
+   und Aktivierungen liegen lokal und werden an dieser Grenze nicht gezählt.
+   Peak: $32\,\mathrm{Operationen/Takt}$; Flash-Bandbreite:
+   $4\,\mathrm{Byte/Takt}$.
+
+   a. Bestimmen Sie Intensität, obere Rate und minimale Taktzahl für ein Fenster.
+
+   b. Beim Batching werden $B$ Fenster mit einmal geladenen Gewichten ausgewertet.
+      Leiten Sie $I(B)$ her. Welches kleinste $B$ erreicht den Roofline-Knick?
+      Wie viele Takte entfallen dann im Mittel auf ein Fenster?
+
+   c. Bewerten Sie das Sammeln von Fenstern zu einem Batch für diese Anwendung.
+      Der Batch startet erst, wenn alle seine Fenster vorliegen. Berücksichtigen
+      Sie Wartezeit, Reaktionsanforderung und Rechenzeit in Mikrosekunden. (5 P)
+5. Schicht 1 wird auf ein $4\times4$-Output-Stationary-Array abgebildet, als
+   Tiles $(4\times96)\cdot(96\times N)$, wobei $N\leq4$ die Zahl gleichzeitig
+   ausgewerteter Fenster ist. Nutzen Sie das Einspeiseschema aus Aufgabe 4:
+   Die letzte MAC eines aktiven $M\times N$-Tiles liegt in Takt $K+M+N-2$.
+   Laden, Auslesen und Überlappung zwischen Tiles liegen außerhalb dieses Modells.
+   Bestimmen Sie für $N=1$ und $N=4$ Tilezahl, Takte je Tile, zeitliche Auslastung
+   und Takte je Fenster. Unterscheiden Sie die Auslastung der aktiven Zellen
+   von der über alle 16 physischen Zellen. (4 P)
+\Needspace{20\baselineskip}
+
+6. Für eine getrennte Gesamtbewertung gelten serielle Lehrzeiten:
+
+   | Pfad | Vorverarbeitung | Kopie | Modell | Nachverarbeitung |
+   |---|---:|---:|---:|---:|
+   | CPU | $0{,}4\,\mathrm{ms}$ | keine | $0{,}9\,\mathrm{ms}$ | $0{,}1\,\mathrm{ms}$ |
+   | NPU | $0{,}4\,\mathrm{ms}$ | $0{,}2\,\mathrm{ms}$ | $0{,}05\,\mathrm{ms}$ | $0{,}1\,\mathrm{ms}$ |
+
+   a. Bestimmen Sie Gesamtzeiten und Gesamtfaktor. Erfüllen beide Pfade im
+      angegebenen Modell ohne Batching die Reaktionsanforderung?
+
+   b. Nennen und begründen Sie zwei weitere Entscheidungskriterien für CPU oder NPU,
+      wenn beide die Zeitanforderung erfüllen.
+
+   c. Die Trainingsdaten stammen von zwölf Personen mit überlappenden Fenstern.
+      Wie teilen Sie Trainings- und Testdaten auf, um die Leistung bei neuen
+      Personen zu prüfen? Welcher Fehler droht bei zufälliger Fensteraufteilung? (4 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{12\baselineskip}
+
+**Ihre Lösung zu K1:** Verwenden Sie bei Bedarf zusätzliche Rechenblätter.
+
+\vspace*{8cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
 \Needspace{4\baselineskip}
 
-**Musterlösung 5**
+**Musterlösung K1**
 
-1. −1,37: Code −7, Rückwert −1,4, Fehler 0,03 durch Rundung.
-   −30: Code −128, Rückwert −25,6, Fehler 4,4 durch Sättigung. (2 P)
-2. Code fünf. (1 P)
-3. Korrigierte Eingaben sechs und −4.
-   $a=6(-2)+(-4)3+4=-20$, Realwert $-20\cdot0{,}025=-0{,}5$.
-   Ausgangscode $\operatorname{round}(-6{,}25)+3=-3$,
-   Rückwert −0,48, Fehler 0,02. (2 P)
-4. 720000 und 180000 Byte, 75 Prozent nur für Gewichtbytes. (1 P)
+
+1. Eingaben stehen als Spalten:
+
+   | Tensor | Form |
+   |---|---|
+   | $x$ | $96\times1$ |
+   | $W_1$ | $16\times96$ |
+   | $b_1,h$ | jeweils $16\times1$ |
+   | $W_2$ | $3\times16$ |
+   | $b_2,y$ | jeweils $3\times1$ |
+
+   Schicht 1 hat $1536$ Gewichte und $16$ Biaswerte, also $1552$ Parameter und
+   $1536$ MACs. Schicht 2 hat $48+3=51$ Parameter und $48$ MACs.
+   Insgesamt: $1603$ Parameter, $1584$ produktbezogene MACs und
+   $3168$ arithmetische Operationen pro Fenster. Der Bias wird gemäß Konvention
+   nicht noch einmal als Addition gezählt.
+   **Bewertung:** Formen 1 P, Parameter 1 P, MACs/Operationen 1 P.
+
+
+2. Es werden $1584$ Gewichte und $19$ Biaswerte gespeichert:
+   $$S_{\mathrm{Int8/Int32}}=1584+19\cdot4=1660\,\mathrm{Byte},$$
+   $$S_{\mathrm{Float32}}=(1584+19)\cdot4=6412\,\mathrm{Byte}.$$
+   Die Ersparnis beträgt
+   $$1-\frac{1660}{6412}=\frac{4752}{6412}\approx74{,}11\,\%.$$
+   Die Gewichte benötigen ein Viertel ihrer Float32-Bytes, die Biaswerte bleiben
+   dagegen vier Byte breit. Metadaten einer realen Modelldatei sind hier nicht
+   enthalten. **Bewertung:** Bytezahlen 1 P, Ersparnis und Begründung 1 P.
+
+
+3. Die Quelle benötigt $32\cdot3\cdot4=384\,\mathrm{Byte}$, der Int8-Eingang
+   $96\,\mathrm{Byte}$. Während Schicht 1 müssen $x$ und $h$ leben:
+   $96+16=112\,\mathrm{Byte}$. Danach reichen für $h$ und $y$ noch
+   $16+3=19\,\mathrm{Byte}$. Die maximale gleichzeitig lebende Aktivierungsmenge
+   beträgt im angegebenen Puffermodell also $112\,\mathrm{Byte}$.
+   Die separate Float32-Quelle kommt zusätzlich hinzu und ist hier kein
+   quantisierter Aktivierungstensor der Arena. Temporäre Operator-Arbeitsbereiche,
+   Verwaltungsdaten und Ausrichtung können den Arena-Bedarf erhöhen.
+   **Bewertung:** Quelle/Eingang 1 P, Lebensdauer und zwei Zusatzanteile 1 P.
+
+
+4. Die gewählte Speichergrenze zählt $1584\,\mathrm{Byte}$ je Gewichtsübertragung.
+   Bei einem Fenster gilt
+   $$I(1)=\frac{3168}{1584}=2\,\mathrm{Operationen/Byte},$$
+   $$P\leq\min(32,4\cdot2)=8\,\mathrm{Operationen/Takt}.$$
+   Das Fenster braucht somit mindestens $3168/8=396$ Takte. Das entspricht
+   $396/(64\,\mathrm{MHz})=6{,}1875\,\mu\mathrm{s}$.
+
+   Für einen Batch werden $3168B$ Operationen mit denselben $1584$ Gewichtsbytes
+   ausgeführt: $I(B)=2B$. Der Knick liegt bei $32/4=8$ Operationen je Byte,
+   also erstmals bei $B=4$. Die ideale untere Schranke der Batchzeit lautet
+   $$T_{\mathrm{Batch}}(B)\geq\max(99B,396)\ \text{Takte}.$$
+   Bei $B=4$ sind das $396$ Takte je Batch beziehungsweise $99$ Takte
+   ($1{,}546875\,\mu\mathrm{s}$) je Fenster im Mittel.
+
+   Der erste Eingang eines Vierer-Batches wartet jedoch bereits
+   $3\cdot0{,}5=1{,}5\,\mathrm{s}$ auf die weiteren Fenster und verfehlt die
+   Ein-Sekunden-Frist schon vor dem Rechnen. Auch $B=3$ ist zu groß: Genau
+   eine Sekunde Wartezeit lässt keinen Raum für die positive Rechenzeit.
+   $B=2$ lässt nach $0{,}5\,\mathrm{s}$ Wartezeit noch $0{,}5\,\mathrm{s}$
+   für die tatsächliche Bearbeitung. Die ideale Mindestzeit der Batchrechnung
+   beträgt zwar nur $6{,}1875\,\mu\mathrm{s}$; daraus folgt aber keine obere
+   Laufzeitschranke. Zweier-Batching ist daher grundsätzlich vereinbar, seine
+   Fristeinhaltung benötigt zusätzlich eine tatsächliche obere Schranke von
+   höchstens $0{,}5\,\mathrm{s}$ für die verbleibende Verarbeitung einschließlich
+   Vor- und Nachbereitung. Größere Batches sind bereits durch ihre Wartezeit
+   ausgeschlossen. Der speicherbezogene Knick ist somit kein hinreichender Grund
+   für Batching; die Raten sind Obergrenzen und beweisen für reale Firmware
+   noch keine garantierte Laufzeit.
+   **Bewertung:** Einzel-Fenster-Bilanz 2 P, Batch/Knick und Takte 2 P,
+   Wartezeit/Fristbewertung 1 P.
+
+
+5. Die 16 Ausgänge der ersten Schicht werden in vier Gruppen zu je vier
+   Ausgängen zerlegt. Daher sind in beiden Fällen vier Tiles nötig.
+
+   | Größe | $N=1$ | $N=4$ |
+   |---|---:|---:|
+   | aktive Zellen je Tile | 4 | 16 |
+   | letzte MAC / Takte je Tile | $96+4+1-2=99$ | $96+4+4-2=102$ |
+   | MACs je Tile | $4\cdot96=384$ | $16\cdot96=1536$ |
+   | zeitliche Auslastung aktiver Zellen | $96/99\approx96{,}97\,\%$ | $96/102\approx94{,}12\,\%$ |
+   | räumliche Belegung | $25\,\%$ | $100\,\%$ |
+   | Auslastung aller 16 Zellen | $384/(16\cdot99)\approx24{,}24\,\%$ | $94{,}12\,\%$ |
+   | vier Tiles, gesamtes Fenster/Batch | 396 Takte | 408 Takte |
+   | Takte je Fenster | 396 | $408/4=102$ |
+
+   Bei $N=1$ ist die zeitliche Auslastung der vier genutzten Zellen hoch,
+   während drei Viertel des Arrays räumlich ungenutzt bleiben. Bei $N=4$
+   verteilt sich der Füll- und Leeraufwand auf vier Fenster. Dies ist nur die
+   erste Schicht und ein anderes, zusätzlich eingeschränktes Zeitmodell als
+   die Roofline-Bilanz des gesamten Modells aus Teil 4.
+   **Bewertung:** Tilezahl 1 P, Takte je Tile 1 P,
+   Auslastung mit eindeutiger Bezugsgröße 1 P, Takte je Fenster 1 P.
+
+
+6. Ohne Batching ergeben sich
+   $$T_{\mathrm{CPU}}=0{,}4+0{,}9+0{,}1=1{,}4\,\mathrm{ms},$$
+   $$T_{\mathrm{NPU}}=0{,}4+0{,}2+0{,}05+0{,}1=0{,}75\,\mathrm{ms},$$
+   $$S=1{,}4/0{,}75\approx1{,}867.$$
+   Beide liegen in diesem seriellen Lehrmodell deutlich unter einer Sekunde.
+   Das ist keine allgemeine Worst-Case-Zusage einer konkreten Plattform.
+
+   Weitere Kriterien sind beispielsweise Energie pro vollständiger Entscheidung
+   einschließlich Übergabe und Leerlauf, unterstützte Operatoren und mögliche
+   CPU-Rückfälle, zusätzlicher Speicherbedarf oder Integrationsaufwand.
+   Die Wahl muss anhand der konkreten Anwendung begründet werden; ein
+   höherer Rechenpeak allein entscheidet sie nicht.
+
+   Für einen Test auf neue Personen müssen die Testpersonen vollständig von den
+   Personen zur Parameteranpassung getrennt bleiben. Auch Validierung und
+   Auswahl von Modellvarianten dürfen die abschließenden Testpersonen nicht
+   einbeziehen. Eine gruppierte Aufteilung nach Personen oder eine entsprechend
+   gruppierte Kreuzvalidierung ist geeignet. Nur Aufnahmen zu trennen genügt
+   nicht, wenn dieselbe Person in beiden Mengen bleibt und die Aussage neue
+   Personen betreffen soll. Zufällig aufgeteilte überlappende Fenster verteilen
+   nahezu dieselben Messabschnitte auf Training und Test; der Test kann die
+   Generalisierung dann deutlich überschätzen.
+   **Bewertung:** Zeiten/Faktor und Frist 2 P,
+   zwei begründete Wahlkriterien 1 P, Trennung und Datenleck 1 P.
 :::
 
 {{< pagebreak >}}
 
-## Aufgabe 6: Andere Plattform und anderes Sensorfenster (4 Punkte)
+## Teil B · K2: Eine quantisierte Dense-Zeile von Realwerten bis Int8 (12 Punkte, ca. 20 Minuten)
 
-1. 192 KiB Flash: Firmware 52 KiB, vollständiges Modell 36 KiB.
-   48 KiB SRAM: Arena 18 KiB, Quellfenster 1600 Byte, Stack sieben KiB,
-   andere Daten fünf KiB. Zieltensor bereits in der Arena.
-   Bestimmen Sie beide freien Budgets. (1 P)
-2. Fenster aus 200 Zeitpunkten mit zwei Kanälen: Float32-Quellgröße und
-   Int8-Zielgröße? Warum hilft sizeof eines Zeigers nicht? (1 P)
-3. Lokale Arena/Interpreter werden nach Setup-Rückkehr weiter benutzt;
-   nach einem Inferenzfehler wird der alte Ausgang als neue Entscheidung verwendet.
-   Benennen Sie beide Korrekturen. (1 P)
-4. Serielle Zeiten: Vorbereitung 1,5 ms, Dense zwölf ms, andere Operatoren 2,5 ms,
-   Nachbereitung 0,5 ms. Beschleunigt: zusätzlich 0,75 ms Kopie, Dense zwei ms.
-   Bestimmen Sie Gesamtzeiten, Dense- und Gesamtfaktor. (1 P)
+Eine Dense-Ausgangszeile mit zwei Eingängen wird in Integer-Arithmetik ausgewertet.
+Verwenden Sie Int8 $[-128,127]$ und Runden zur nächsten ganzen Zahl, bei halben
+Werten weg von null. Der Biascode hat Nullpunkt null und die Skala $s_xs_w$.
+
+| Größe | Realwerte | Skala | Nullpunkt | Datentyp |
+|---|---|---|---:|---|
+| Eingang $x$ | $[0{,}92;-0{,}35]$ | $s_x=0{,}05$ | $z_x=-10$ | Int8 |
+| Gewichte $w$ | $[0{,}43;-0{,}75]$ | $s_w=0{,}03$ | $z_w=0$ | Int8 |
+| Bias $b$ | $0{,}1$ | $s_xs_w$ | 0 | Int32 |
+| Ausgang $y$ | zu berechnen | $s_y=0{,}01$ | $z_y=-50$ | Int8 |
+
+$$q=\operatorname{clip}_{[-128,127]}\bigl(\operatorname{round}(r/s)+z\bigr),
+\qquad \widehat r=s(q-z),$$
+$$a=\sum_i(q_{x,i}-z_x)(q_{w,i}-z_w)+q_b,
+\qquad r_y\approx s_xs_w a.$$
+
+1. Quantisieren Sie Eingänge und Gewichte. Geben Sie Codes, Rückwerte und
+   absolute Fehler an. (3 P)
+2. Bestimmen Sie Biascode und Bias-Rückwert. Berechnen Sie Akkumulation $a$
+   und ihren Realwert. Berechnen Sie zum Vergleich die Float-Referenz
+   $w\cdot x+b$ mit den unquantisierten Ausgangswerten. (3 P)
+3. Requantisieren Sie mit $M=s_xs_w/s_y$. Geben Sie $q_y$, den Rückwert
+   und den Fehler gegenüber der Float-Referenz an. Ordnen Sie den Fehler den
+   beteiligten Rundungsschritten zu. Welcher reale Ausgangsbereich ist ohne
+   Begrenzung darstellbar? (3 P)
+4. Prüfen Sie die Robustheit:
+
+   a. Ein Ausreißer liefert $x_0=7{,}0$. Bestimmen Sie Code und Rückwert und
+      benennen Sie die Fehlerart.
+
+   b. Eine Zeile mit 96 Eingängen verwendet dieselben Nullpunkte. Alle
+      Eingangs- und Gewichtscodes können den vollen Int8-Bereich annehmen.
+      Bestimmen Sie den betragsgrößten Einzelbeitrag $(q_x-z_x)q_w$ und die
+      Mindestbreite eines vorzeichenbehafteten Akkumulators ohne Bias.
+      Reicht Int32? (3 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{8\baselineskip}
+\Needspace{12\baselineskip}
 
-**Ihre Lösung:**
+**Ihre Lösung zu K2:**
 
-\vspace*{3cm}
+\vspace*{8cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
 \Needspace{4\baselineskip}
 
-**Musterlösung 6**
+**Musterlösung K2**
 
-1. Flash 104 KiB frei. SRAM $48-18-1600/1024-7-5=16{,}4375$ KiB frei. (1 P)
-2. 400 Elemente, 1600 Byte Quelle, 400 Byte Ziel; Zeigergröße zählt keine Elemente. (1 P)
-3. Ausreichende Lebensdauer aller Objekte; Status prüfen und nur erfolgreiche aktuelle Ausgaben verwenden. (1 P)
-4. CPU 16,5 ms, Beschleuniger 7,25 ms; Densefaktor sechs,
-   Gesamtfaktor $66/29\approx2{,}276$. (1 P)
+
+1. Die Nullpunkte werden nach dem Runden addiert:
+
+   | Wert | Code | Rückwert | absoluter Fehler |
+   |---|---:|---:|---:|
+   | $x_0=0{,}92$ | $18-10=8$ | $0{,}90$ | $0{,}02$ |
+   | $x_1=-0{,}35$ | $-7-10=-17$ | $-0{,}35$ | 0 |
+   | $w_0=0{,}43$ | 14 | $0{,}42$ | $0{,}01$ |
+   | $w_1=-0{,}75$ | $-25$ | $-0{,}75$ | 0 |
+
+   Alle vier Codes liegen im Int8-Bereich; hier tritt noch keine Sättigung auf.
+   **Bewertung:** Eingangscodes 1 P, Gewichtscodes 1 P,
+   vollständige Rückwerte und Fehler 1 P.
+
+
+2. Die Produktskala ist $s_xs_w=0{,}0015$. Deshalb
+   $$q_b=\operatorname{round}(0{,}1/0{,}0015)=67,
+   \qquad\widehat b=67\cdot0{,}0015=0{,}1005.$$
+   Die korrigierten Eingänge sind $18$ und $-7$:
+   $$a=18\cdot14+(-7)(-25)+67=252+175+67=494,$$
+   $$\widehat r_{\mathrm{vor\ Ausgang}}=494\cdot0{,}0015=0{,}741.$$
+   Die unquantisierte Referenz beträgt
+   $$r_{\mathrm{ref}}=0{,}43\cdot0{,}92+(-0{,}75)(-0{,}35)+0{,}1
+   =0{,}7581.$$
+   **Bewertung:** Bias 1 P, Akkumulation/Realwert 1 P, Referenz 1 P.
+
+
+3. Mit $M=0{,}0015/0{,}01=0{,}15$ folgt
+   $$q_y=\operatorname{clip}\bigl(\operatorname{round}(0{,}15\cdot494)-50\bigr)
+   =74-50=24,$$
+   $$\widehat y=0{,}01(24+50)=0{,}74.$$
+   Der absolute Fehler gegenüber der Referenz ist $0{,}0181$.
+   Vor dem Ausgangsrunden entsteht durch Eingangs-/Gewichtsrundung
+   $0{,}9\cdot0{,}42-0{,}92\cdot0{,}43=-0{,}0176$; die Biasrundung
+   fügt $+0{,}0005$ hinzu. Somit liegen vor der Requantisierung
+   $-0{,}0171$ Abweichung vor. Die Ausgangsrundung von $0{,}741$ auf
+   $0{,}74$ trägt weitere $-0{,}001$ bei. Es gibt hier keine Sättigung.
+
+   Der darstellbare Bereich ergibt sich aus den äußersten Codes:
+   $$\left[0{,}01(-128+50),\;0{,}01(127+50)\right]
+   =[-0{,}78;1{,}77].$$
+   **Bewertung:** Code/Rückwert 1 P, Fehler und Rundungsbeiträge 1 P,
+   Bereich 1 P.
+
+
+4. Für $x_0=7$ wäre der unbeschränkte Code
+   $\operatorname{round}(7/0{,}05)-10=130$. Int8 begrenzt ihn auf 127.
+   Der Rückwert ist $0{,}05(127+10)=6{,}85$, mit Sättigungsfehler
+   $0{,}15$. Der Eingangsbereich reicht nur bis $6{,}85$.
+
+   Da $q_x-z_x=q_x+10\in[-118,137]$ und $q_w\in[-128,127]$ gilt,
+   liegen die Produktgrenzen bei
+   $$p_{\min}=137(-128)=-17536,\qquad p_{\max}=137\cdot127=17399.$$
+   Die anderen Endpunktprodukte sind kleiner im Betrag. Für 96 Summanden
+   entsteht der Bereich
+   $$[-96\cdot17536,\;96\cdot17399]=[-1683456;1670304].$$
+   Ein vorzeichenbehafteter 21-Bit-Wert reicht nur von $-2^{20}$ bis
+   $2^{20}-1$ und ist zu schmal. 22 Bit reichen von $-2^{21}$ bis
+   $2^{21}-1$ und genügen; Int32 ist daher ausreichend. Die Aussage verwendet
+   den vorgegebenen Zeilenumfang und vernachlässigt Bias wie verlangt.
+   **Bewertung:** Ausreißer 1 P, Produktgrenzen 1 P, Mindestbreite/Int32 1 P.
+:::
+
+{{< pagebreak >}}
+
+## Teil B · K3: Vektorschleife, Lanes und Bandbreite (12 Punkte, ca. 20 Minuten)
+
+Elementweise wird $y[i]=w[i]x[i]+b[i]$ für $N=70$ Int32-Elemente berechnet.
+Die Produkte passen in vorzeichenbehaftete 32 Bit; die Addition folgt der
+RVV-Wirkung modulo $2^{32}$. Dies ist kein C-Beispiel mit erlaubtem
+vorzeichenbehaftetem Überlauf. Alle Arrays sind gültig und für die Zugriffsbreite
+ausgerichtet. Das Ausgabearray `Y` überschneidet sich nicht mit `W`, `X` oder `B`.
+RVV 1.0 verwendet hier VLMAX $=32$ und die VL-Regel aus Aufgabe 3.
+`vmul.vv` multipliziert und `vadd.vv` addiert elementweise.
+
+```asm
+# a0=N, a1=W, a2=X, a3=B, a4=Y; Int32-Arrays
+    beqz    a0, done
+loop:
+    vsetvli t0, a0, [L1], m1, ta, ma
+    vle32.v v0, (a1)
+    vle32.v v1, (a2)
+    vle32.v v2, (a3)
+    vmul.vv v3, v0, v1
+    vadd.vv v4, v3, v2
+    vse32.v v4, (a4)
+    slli    t1, t0, [L2]
+    [L3]
+    sub     a0, a0, t0
+    bnez    a0, loop
+done:
+    ret
+```
+
+1. Ergänzen Sie L1 bis L3. Begründen Sie, weshalb der Rest um `t0` und nicht
+   um eine feste Konstante verringert werden muss. (3 P)
+2. Lehrzeitmodell: Ein arithmetischer Vektorbefehl mit VL aktiven Elementen
+   belegt auf $L$ Lanes genau $\lceil\mathrm{VL}/L\rceil$ Takte. Die beiden
+   arithmetischen Befehle laufen nacheinander; Laden, Speichern und skalare
+   Schleifenverwaltung sind ausgeblendet. Bestimmen Sie die arithmetischen
+   Takte der ganzen Schleife für $32+32+6$ und $32+19+19$, jeweils mit
+   $L=4$ und $L=8$. Weshalb verändert die VL-Folge nur bei einer Lanezahl
+   die Zeit? (3 P)
+3. Datenversorgung: Eine Multiplikation und eine Addition zählen zusammen zwei
+   Operationen je Element. Drei Loads und ein Store zu je vier Byte passieren
+   die Grenze Speicher $\leftrightarrow$ Vektorregister. Peak:
+   $12\,\mathrm{Operationen/Takt}$; Bandbreite: $6\,\mathrm{Byte/Takt}$.
+   Bestimmen Sie Intensität, obere Rate und minimale Taktzahl für 70 Elemente.
+   Vergleichen Sie mit Teil 2 und bewerten Sie die Verdopplung der Lanezahl. (3 P)
+4. Datenbreiten:
+
+   a. Ein Skalarprodukt hat Int8-Operanden, VLEN $=128$ Bit, SEW $=8$ und
+      LMUL $=1$. Bestimmen Sie VLMAX. Begründen Sie an einem Zahlenbeispiel,
+      weshalb die Produkte nicht im 8-Bit-Format akkumuliert werden dürfen.
+      Welche LMUL-Gruppe hält dieselbe Elementzahl als Int32-Akkumulatoren?
+
+   b. Für gepackte Bytes gilt $A=\mathtt{0x01FF7F10}$ und
+      $B=\mathtt{0x00010101}$. Bestimmen Sie die Byte-Lane-Addition modulo 256
+      und das gewöhnliche 32-Bit-`add`. Erklären Sie den Unterschied. (3 P)
+
+::: {.content-hidden when-profile="solution"}
+\Needspace{12\baselineskip}
+
+**Ihre Lösung zu K3:**
+
+\vspace*{8cm}
+:::
+
+::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
+**Musterlösung K3**
+
+
+1. L1 ist `e32`, L2 ist `2`, und L3 besteht aus den vier Zeigerupdates:
+
+```asm
+    add     a1, a1, t1
+    add     a2, a2, t1
+    add     a3, a3, t1
+    add     a4, a4, t1
+```
+
+   `t0` enthält die tatsächlich gewählte aktive Elementzahl. Für vier Byte je
+   Element muss jeder Zeiger um $4\cdot\mathrm{VL}$ Byte weitergehen.
+   Der Rest sinkt dagegen um VL Elemente, also um den in `t0` zurückgegebenen Wert. Bei einem Rest zwischen
+   VLMAX und zweimal VLMAX kann die gewählte Länge kleiner als VLMAX sein;
+   eine feste Konstante überspringt dann Elemente oder beendet die Schleife
+   zu früh. **Bewertung:** SEW/Shift 1 P, vier Updates 1 P, VL-Begründung 1 P.
+
+
+2. Es gibt zwei arithmetische Befehle pro Iteration. Daher
+   $$T_{\mathrm{arith}}=2\sum_{\mathrm{Iterationen}}
+   \left\lceil\frac{\mathrm{VL}}{L}\right\rceil.$$
+
+   | Folge | $L=4$ | $L=8$ |
+   |---|---:|---:|
+   | $32+32+6$ | $2(8+8+2)=36$ | $2(4+4+1)=18$ |
+   | $32+19+19$ | $2(8+5+5)=36$ | $2(4+3+3)=20$ |
+
+   Bei vier Lanes ergeben beide Aufteilungen insgesamt 18 Lane-Gruppentakte
+   pro Befehl. Bei acht Lanes braucht die Aufteilung des 38er-Restes in
+   $19+19$ insgesamt sechs statt der fünf Gruppentakte von $32+6$.
+   Die unvollständig genutzten letzten
+   Lane-Gruppen verursachen hier den Unterschied. Das ist eine Wirkung des
+   angegebenen Zeitmodells, keine garantierte RVV-Laufzeit.
+   **Bewertung:** vier Rechnungen 2 P, Erklärung 1 P.
+
+
+3. Die Intensität beträgt $I=2/(3\cdot4+4)=1/8$ Operation je Byte.
+   Die ideale obere Rate ist
+   $$P\leq\min(12,6/8)=0{,}75\,\mathrm{Operationen/Takt}.$$
+   70 Elemente benötigen 140 Operationen und 1120 Byte. Damit gilt
+   $$T\geq\left\lceil\frac{140}{0{,}75}\right\rceil
+   =\left\lceil\frac{1120}{6}\right\rceil=187\ \text{Takte}.$$
+   Das übersteigt alle reinen Arithmetikzeiten aus Teil 2 deutlich.
+   Mehr Lanes ändern die Datenmenge und Bandbreite nicht und erhöhen diese
+   Roofline-Obergrenze deshalb nicht. Die Modelle zählen verschiedene Anteile;
+   187 Takte sind eine untere Schranke und keine Zusage einer realen Laufzeit.
+   **Bewertung:** Intensität/Rate 1 P, ganzzahlige Zeitschranke 1 P,
+   Modell- und Lanevergleich 1 P.
+
+
+4. $\mathrm{VLMAX}=128/8=16$. Schon $(-128)(-128)=16384$ passt nicht in
+   einen vorzeichenbehafteten 8-Bit-Akkumulator; ein abgeschnittenes Produkt
+   lässt sich durch späteres Verbreitern nicht reparieren. 16 Int32-Werte
+   benötigen $16\cdot32=512$ Bit, also LMUL $=512/128=4$.
+   Die Operanden müssen für die Rechnung rechtzeitig verbreitert werden.
+
+   Die Bytepaare, von niedrig nach hoch, sind
+   $\mathtt{10+01}$, $\mathtt{7F+01}$, $\mathtt{FF+01}$ und
+   $\mathtt{01+00}$. Ohne Übertrag zwischen den Lanes entstehen
+   $\mathtt{11,80,00,01}$, insgesamt $\mathtt{0x01008011}$.
+   Das gewöhnliche Wort-`add` ergibt $\mathtt{0x02008011}$: Der Übertrag aus
+   dem dritten Byte erhöht das oberste Byte. Byte-Lane-Moduloaddition und
+   Wortaddition haben somit unterschiedliche Semantik.
+   **Bewertung:** VLMAX/LMUL 1 P, notwendige Breite mit Beispiel 1 P,
+   beide Wortwerte und Übertrag 1 P.
 :::
 
 {{< pagebreak >}}
 
 ## Optional: am Rechner prüfen
 
-Ergänzen Sie `src/lab08_dense.c` um eine eigene 3×2-Dense-Funktion für Aufgabe 1
-und einen 2×3-mal-3×2-Matrixtest für Aufgabe 4. Erwartete Ergebnisse stehen in den Papierlösungen.
-Prüfen Sie zusätzlich die neuen negativen Quantisierungsfälle; die vorhandenen Folien-Testwerte reichen nicht.
+Ergänzen Sie [`src/lab08_dense.c`](src/lab08_dense.c) um eigene C17-Prüfungen.
+Vergleichen Sie mit Ihren Papierlösungen. Dokumentieren Sie Compiler, Version
+und Optionen; Funktionsgleichheit ist kein Nachweis einer bestimmten
+Beschleunigerlaufzeit.
+
+1. Prüfen Sie das zweischichtige Netz aus Aufgabe 1 mit und ohne ReLU sowie die
+   zusammengefasste affine Schicht $W',b'$. Zeigen Sie sowohl eine Übereinstimmung
+   als auch eine Abweichung zwischen dem Netz mit ReLU und der Zusammenfassung.
+2. Prüfen Sie ein allgemeines Matrixprodukt $(M\times K)\cdot(K\times N)$ am
+   $2\times3$-mal-$3\times2$-Fall aus Aufgabe 4.
+3. Bilden Sie die RVV-Längenregel für unterstützte Konfigurationen nach, mit den
+   Strategien „möglichst voll“ und „gleichmäßig teilen“. Simulieren Sie damit
+   die Zeigerfehler aus Aufgabe 3.3 ausschließlich als Indexbereiche;
+   führen Sie keine Zugriffe außerhalb echter Arrays aus.
+4. Prüfen Sie die negativen Quantisierungsfälle aus Aufgabe 5 und die komplette
+   Zeile K2 einschließlich unquantisierter Referenz und Fehler.
+5. Bestimmen Sie für Summen von $(-128)(-128)$ das kleinste $N$, dessen
+   mathematisches Ergebnis nicht in Int16 beziehungsweise Int32 passt.
+   Rechnen Sie dafür in `int64_t` und vergleichen Sie vor einer Konvertierung
+   mit den Bereichsgrenzen. Erzeugen Sie keinen vorzeichenbehafteten
+   C-Überlauf als vermeintlichen Testnachweis.
+
+::: {.content-visible when-profile="solution"}
+\Needspace{4\baselineskip}
+
+**Lösungshinweise zur optionalen Rechnerprüfung**
+
+- Für $x=[3;-2]$ liefert das Netz mit ReLU 10, ohne ReLU und nach affiner
+  Zusammenfassung jeweils $-19$. Für $x=[1;1]$ sind die Voraktivierungen
+  $[0;3;3]$ nichtnegativ; beide Wege liefern dann 6.
+- Das Matrixprodukt aus Aufgabe 4 ergibt
+  $C=\begin{bmatrix}-5&12\\13&10\end{bmatrix}$.
+- Bei VLMAX 32 und 70 Elementen liefern die beiden Strategien beispielsweise
+  $32+32+6$ beziehungsweise $32+19+19$. Vergleichen Sie die gezeichneten
+  Indexbereiche mit den vollständigen Lösungen zu Aufgabe 3.
+- K2 endet mit Ausgangscode 24 und Rückwert $0{,}74$; die vorherigen
+  Akkumulations- und Rundungsschritte müssen ebenfalls geprüft werden.
+- Ein Produkt beträgt 16384. Int16 wird erstmals bei $N=2$ überschritten,
+  Int32 bei $N=131072$. Die Prüfung mit `int64_t` erkennt diese Grenze,
+  ohne einen unzulässigen Signed-Overflow-Lauf auszuführen.
+:::
+
+<!-- Autorenprüfung Teil B: K1 verknüpft Formen, Modell-/Aktivierungsspeicher,
+Roofline, Batch-Wartezeit, systolische Auslastung, Gesamtzeit und personenweise
+Evaluation. K2 verfolgt Nullpunktkorrektur, Bias-/Produktskala, Requantisierung
+und Akkumulatorgrenzen durch einen vollständigen Zahlenfall. K3 verbindet
+korrekte RVV-Schleifenführung mit Lane-Rundung, Speichergrenze und Datenbreite.
+Teil B hat 44 Orientierungspunkte und die vorgegebenen geschätzten Zeiten
+35+20+20=75 Minuten. Dies sind Übungsannahmen, keine garantierte Entsprechung
+zu nicht dokumentierten Prüfungsregeln. Alle Raten und Zeiten sind Lehrmodelle.
+Die optionalen Rechnerprüfungen sind zusätzliche Funktionsversuche. -->

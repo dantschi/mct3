@@ -115,4 +115,9 @@ Dieses Vorlesungsmaterial ist eine **Open Educational Resource (OER)**. Die Vorl
 
 Sie dürfen diese Inhalte teilen und bearbeiten, sofern Sie die Urheberschaft angemessen nennen. Der vollständige Lizenztext liegt in der Datei [`LICENSE`](LICENSE) im Repository.
 
+Die übernommenen [MotionSense-Messdaten](assets/data/08_motion_sense/README.md)
+stehen unter ihrer ursprünglichen MIT-Lizenz; deren Urheber- und Lizenztext
+bleiben bei der Datenauswahl erhalten. Die daraus erzeugten eigenen
+Lehrabbildungen sind als solche dokumentiert.
+
 **Ausnahme:** Hochschullogos und andere geschützte Markenzeichen (einschließlich des DHBW-Logos) sind von dieser Lizenz **ausdrücklich ausgenommen**. Sie unterliegen dem Markenrecht der jeweiligen Rechteinhaber und dürfen ohne deren Genehmigung nicht übernommen oder weiterverwendet werden.
