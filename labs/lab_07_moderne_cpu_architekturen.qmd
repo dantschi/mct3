@@ -1,6 +1,6 @@
 ---
 title: "Übungsblatt 7: CPU-Architekturen"
-subtitle: "Mikrocomputertechnik 3 · 56 Orientierungspunkte · ca. 100–120 Minuten Eigenarbeit"
+subtitle: "Mikrocomputertechnik 3 · 53 Orientierungspunkte · ca. 95–115 Minuten Eigenarbeit"
 highlight-style: ../assets/styles/dhbw-code.theme
 header-includes: |
   \usepackage{needspace}
@@ -418,7 +418,7 @@ T erhöht, NT erniedrigt den Zähler, jeweils mit Sättigung.
 
 {{< pagebreak >}}
 
-## Aufgabe 5: Fertig ist noch nicht bestätigt (8 Punkte)
+## Aufgabe 5: Fertig ist noch nicht bestätigt (5 Punkte)
 
 **Papieraufgabe.** Verwenden Sie Programm, physische Register und Entwurf ON
 von Aufgabe 3. Betrachten Sie zunächst dessen fehlerfreien Ablauf.
@@ -440,15 +440,6 @@ Lehrmodell nicht zusätzlich gehalten.
    Wann tritt der Trap ein? Geben Sie die sichtbaren Werte von `t0`, `t1`, `t3`,
    `t5`, `t6`, die wiederhergestellte bestätigte Registerabbildung und die
    Behandlung der Ziele P22 bis P25 an. Darf P20 hier freigegeben werden? (3 P)
-3. In einem **getrennten** Spekulationsfall wird ein bedingter Pfad später
-   verworfen. Ein geheimer Bytewert $s\in\{0,\ldots,255\}$ kann vorübergehend
-   intern geladen werden. Entwerfen Sie als Pseudocode einen nachfolgenden
-   Probezugriff, dessen Cache-Zeile vom Wert $s$ abhängt.
-   Lehrannahmen: 64-Byte-Cache-Zeilen, 256 gültige Probezeilen, anfangs keine
-   davon im Cache, und kein Rückgängigmachen dieser Cache-Belegung beim
-   Verwerfen. Erklären Sie, was trotz präziser Registerwiederherstellung
-   beobachtbar bleiben kann. Warum beweist ein einzelner schneller Zugriff
-   noch keinen Geheimnisabfluss? (3 P)
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
@@ -494,29 +485,6 @@ Lehrmodell nicht zusätzlich gehalten.
    bereits durch A beziehungsweise B beim Retire freigegeben.
    **Bewertung:** Trapzeitpunkt 1 P, Werte/Abbildung 1 P,
    Freigabe und Verwerfen 1 P.
-
-3. Ein möglicher Pseudocode mit 64-Byte-ausgerichtetem Probeanfang ist:
-
-```text
-s = transient_load(secret_address)   // Lehrannahme: Byte intern verfügbar
-x = transient_load(probe_base + 64*s)
-```
-
-   Die zweite Adresse hängt vom geheimen **Wert** ab. Sie wählt genau eine von
-   256 unterschiedlichen Cache-Zeilen. Später kann man im Lehrmodell die
-   Zugriffszeiten der Probezeilen vergleichen und daraus eine Hypothese über
-   $s$ ableiten. Das Zurücksetzen der Registerabbildung entfernt diese interne
-   Cache-Spur gemäß der gegebenen Annahme nicht. Ein bloßer Load einer festen
-   geheimen Adresse würde dagegen noch keine Probezeile abhängig vom
-   gelesenen Wert auswählen.
-
-   Ein einzelner schneller Zugriff kann auch aus einem anderen Cache-Effekt,
-   Vorladen oder Messrauschen entstehen. Ein Nachweis braucht reproduzierbare
-   wertabhängige Unterschiede gegenüber kontrollierten Vergleichsfällen.
-   Die Aufgabe beschreibt einen bedingten Lehrablauf, keine Behauptung über
-   die Verwundbarkeit eines konkreten Prozessors.
-   **Bewertung:** Wertkopplung/verschiedene Zeilen 1 P,
-   verbleibende Spur 1 P, Nachweisgrenze 1 P.
 :::
 
 {{< pagebreak >}}
@@ -690,6 +658,20 @@ Verarbeiten Sie Restwerte anschließend ohne Zugriff außerhalb des Feldes.
 Verwenden Sie C17; Eingaben sind `uint32_t`, das Ergebnis eine Summe modulo
 $2^{64}$. Bei Länge null darf kein Arrayelement gelesen werden.
 
+Übersetzen und starten Sie das Programm vom Repository-Hauptordner aus,
+beispielsweise mit GCC:
+
+```bash
+gcc -std=c17 -O3 -Wall -Wextra -Werror \
+  labs/src/lab07_ilp.c -o /tmp/lab07_ilp
+/tmp/lab07_ilp
+```
+
+`-std=c17` wählt den Sprachstandard, `-O3` eine hohe Optimierungsstufe;
+`-Wall` und `-Wextra` aktivieren zusätzliche Warnungen, die `-Werror` zu
+Fehlern macht. Ein erfolgreicher Lauf bestätigt nur die geprüften
+Summenergebnisse, keine Laufzeit.
+
 Prüfen Sie die drei Summenvarianten für `{9,1,8,2,7,3,6}`, `{4,10}` und die
 leere Eingabe. Bestimmen Sie vorab die drei Teilsummen des ersten Falls vor und
 nach der Restbehandlung. Untersuchen Sie optional die Übersetzung mit einer
@@ -749,8 +731,9 @@ festzulegen. Hier werden keine Host-Messwerte behauptet.
 Engpassvergleich über Start-, Retire- und Fetch-Breite. A3 verbindet Versionswahl,
 LSU-Initiationsintervall und ROB-Wartezustände. A4 konstruiert ein Gegenbeispiel
 und bewertet Zeit gegen Energie. A5 leitet Wiederherstellung/Freigabe aus A3 ab
-und trennt Registerkorrektheit von internen Spuren. A6 unterscheidet Scheduling,
-Schleifenverwaltung, Wertketten und C-Semantik. 56 Orientierungspunkte; 100–120 min
+und begründet den präzisen Trapzustand; die frühere Teilaufgabe zum Cache-Seitenkanal
+entfiel mit den zugehörigen Folien. A6 unterscheidet Scheduling,
+Schleifenverwaltung, Wertketten und C-Semantik. 53 Orientierungspunkte; 95–115 min
 vollständige Eigenarbeit sind eine Schätzung einschließlich Begründungen. In der
 Vorlesung werden ausgewählte Teilaufgaben angeleitet bearbeitet (zusammen 55 min),
 der übrige Umfang dient der selbstständigen Vertiefung. Papier und einfacher

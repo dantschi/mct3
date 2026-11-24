@@ -88,11 +88,11 @@ Einstieg · Ein Kern und zusätzliche Rechenhardware
 | 4 | Spekulation und Compiler: 15 min | Auswahl aus 5.1–5.2 und 6.1: 15 min; Quiz: 15 min |
 
 ::: notes
-Vier Schulstunden umfassen hundertachtzig Minuten ohne zusätzliche Pausen. Die Planung sieht hundertzehn Minuten für Erklärung, Einstiegsdiskussion, Denkfragen und Lösungsbesprechung vor, fünfundfünfzig Minuten für angeleitete Papierarbeit und fünfzehn Minuten für das Quiz. Die siebzig Folien umfassen kurze Abschnittsorientierungen und zusätzliche Grundlagen; sie verlangen deshalb nicht siebzig gleich lange Einzelvorträge.
+Vier Schulstunden umfassen hundertachtzig Minuten ohne zusätzliche Pausen. Die Planung sieht hundertzehn Minuten für Erklärung, Einstiegsdiskussion, Denkfragen und Lösungsbesprechung vor, fünfundfünfzig Minuten für angeleitete Papierarbeit und fünfzehn Minuten für das Quiz. Die zweiundsechzig Folien umfassen kurze Abschnittsorientierungen und zusätzliche Grundlagen; sie verlangen deshalb nicht zweiundsechzig gleich lange Einzelvorträge.
 
-Der Schwerpunkt der ersten beiden Stunden liegt auf dem Befehlsweg, Pipelineüberlappung und der Frage, wann zusätzliche Ausgabebreite tatsächlich nutzbar wird. Die dritte Stunde verbindet die benannten Registerversionen mit geordneter Bestätigung und Sprungvorhersage. Im letzten Teil werden Spekulationsfolgen, Compileränderungen und die Grenzen eines Funktionsnachweises zusammengeführt. Die detaillierten Abschnitte zu gemeinsam genutzten Vorhersagetabellen, Schutzmaßnahmen und dem Hostversuch sind als Vertiefung zur selbstständigen Lektüre gekennzeichnet, falls die gemeinsame Besprechung mehr Grundlagenzeit benötigt.
+Der Schwerpunkt der ersten beiden Stunden liegt auf dem Befehlsweg, Pipelineüberlappung und der Frage, wann zusätzliche Ausgabebreite tatsächlich nutzbar wird. Die dritte Stunde verbindet die benannten Registerversionen mit geordneter Bestätigung und Sprungvorhersage. Im letzten Teil werden Spekulationsfolgen und Compileränderungen zusammengeführt; abschließend wird die Einstiegsfrage beantwortet. Der Abschnitt zu gemeinsam genutzten Vorhersagetabellen ist als Vertiefung zur selbstständigen Lektüre gekennzeichnet, falls die gemeinsame Besprechung mehr Grundlagenzeit benötigt.
 
-Die Arbeitsphasen wählen passende Teilaufgaben aus. Für das vollständige Übungsblatt mit sechs Papierfällen und sechsundfünfzig Orientierungspunkten sind einschließlich eigener Begründungen ungefähr hundert bis hundertzwanzig Minuten angesetzt. Die erste Arbeitsphase nutzt die sechsstufige Pipeline aus Aufgabe 1. Danach vergleichen die Studierenden in 2.1–2.2 eine lange Kette mit zwei Teilketten. In der dritten Stunde wird aus den Zeitplänen und dem ROB-Zustand in 3.2–3.3 sowie dem Prädiktor-Gegenbeispiel in 4.1 eine passende Auswahl gemeinsam bearbeitet. Die letzte Arbeitsphase verbindet den Fehlerfall und die Registerfreigabe aus 5.1–5.2 mit dem Compiler-Scheduling aus 6.1. Nicht alle ausgewählten Teilaufgaben müssen dabei vollständig in Einzelarbeit gelöst werden; gemeinsame Zwischenergebnisse und Besprechung gehören zu den angegebenen Zeiten.
+Die Arbeitsphasen wählen passende Teilaufgaben aus. Für das vollständige Übungsblatt mit sechs Papierfällen und dreiundfünfzig Orientierungspunkten sind einschließlich eigener Begründungen ungefähr fünfundneunzig bis hundertfünfzehn Minuten angesetzt. Die erste Arbeitsphase nutzt die sechsstufige Pipeline aus Aufgabe 1. Danach vergleichen die Studierenden in 2.1–2.2 eine lange Kette mit zwei Teilketten. In der dritten Stunde wird aus den Zeitplänen und dem ROB-Zustand in 3.2–3.3 sowie dem Prädiktor-Gegenbeispiel in 4.1 eine passende Auswahl gemeinsam bearbeitet. Die letzte Arbeitsphase verbindet den Fehlerfall und die Registerfreigabe aus 5.1–5.2 mit dem Compiler-Scheduling aus 6.1. Nicht alle ausgewählten Teilaufgaben müssen dabei vollständig in Einzelarbeit gelöst werden; gemeinsame Zwischenergebnisse und Besprechung gehören zu den angegebenen Zeiten.
 
 Die übrigen Vergleiche vertiefen selbstständig, welcher Engpass eine Beschleunigung begrenzt und unter welchen Bedingungen ein Umbau überhaupt zulässig ist. Die Aufgaben setzen deshalb nicht bloß andere Zahlen in die Folienrechnung ein: Sie ändern unter anderem den Abhängigkeitsgraphen, die Parallelität der Ladeeinheit oder die Befehlsreihenfolge und verlangen eine Erklärung der Wirkung. Jeder Papierfall nennt seinen eigenen Taktvertrag. Die sechs Stufen aus Aufgabe 1, der kurze Breitenvergleich aus Aufgabe 2 und die zwei Ladeoperationen aus Aufgabe 3 ersetzen nicht die jeweils anders vereinfachten Folienmodelle.
 :::
@@ -593,7 +593,9 @@ Fiktiver Befehlsweg, jeweils höchstens pro Takt:
 Endliche Puffer können kurze Unterschiede abfangen, nicht dauernd wachsen.
 
 ::: notes
-Das Frontend holt und dekodiert Befehle, die Auswahl startet daraus passende Operationen, und Retire bestätigt ihre endgültigen Programmwirkungen. Jede dieser Stationen kann eine andere Breite besitzen. Die Tabelle beschreibt einen fiktiven Weg, in dem die Größen bereits einheitlich als vollständige Befehle pro Takt gezählt werden. Variable Befehlslängen und interne Mikrooperationen sind für diese erste Betrachtung ausgeblendet.
+Das Frontend holt und dekodiert Befehle, die Auswahl startet daraus passende Operationen, und Retire bestätigt ihre endgültigen Programmwirkungen. Jede dieser Stationen kann eine andere Breite besitzen. Die Tabelle beschreibt einen fiktiven Weg, in dem die Größen bereits einheitlich als vollständige Befehle pro Takt gezählt werden.
+
+Wird die Fetch-Breite dagegen in Bytes je Takt angegeben, hängt die Zahl gelieferter Befehle von deren Länge ab. Sechzehn passend ausgerichtete Bytes enthalten vier 32-Bit-Befehle der RV32I-Basis. Mit ausschließlich komprimierten 16-Bit-Befehlen der optionalen C-Erweiterung wären es acht; C bezeichnet hier eine Befehlssatzerweiterung, nicht die Programmiersprache. Gemischte Befehlslängen und Sprungziele verändern diese Aufteilung. Interne Mikrooperationen bleiben in dieser Einheit ausgeblendet.
 
 Obwohl zwei Operationen pro Takt starten können, darf langfristig höchstens ein Befehl pro Takt bestätigt werden, solange dies der einzige Bestätigungspfad bleibt. Andernfalls würden mehr fertige Ergebnisse ankommen als abfließen. Ein endlicher Puffer würde sich füllen und die vorgelagerte Arbeit schließlich anhalten. Ein kurzer Doppelstart widerspricht dieser dauerhaften Grenze nicht.
 
@@ -744,27 +746,8 @@ Latenz ist hier die Zeit vom Operationsstart am Taktbeginn bis zur Fertigstellun
 Die Grafik liest sich zeilenweise von links nach rechts. Vier unabhängige Operationen starten in eins, zwei, drei und vier. Ihre drei grauen Rechenphasen enden in drei, vier, fünf und sechs; rot ist jeweils das Ergebnisende. Ein abhängiger Verbraucher könnte das erste Resultat im Modell erst ab Takt vier nutzen.
 
 Nach dem Füllen entsteht ein Ergebnis pro Takt, nicht nur alle drei Takte. Das ist keine Garantie für eine Kette abhängiger Multiplikationen. RISC in RISC-V heißt Reduced Instruction Set Computer. Ein Maschinenbefehl `mul` braucht dort eine passende Multiplikationserweiterung, nicht nur die RV32I-Integerbasis. Die Zeichnung ist deshalb als abstrakter Rechenblock bezeichnet. Durchsatz, Einzelwartezeit und vorhandener Befehlssatz sind verschiedene Voraussetzungen einer tatsächlichen Ausführung.
-:::
 
-## Fetch-Bytes sind keine feste Befehlszahl
-
-::: {.section-label}
-2 / 5 · Breite und Abhängigkeiten
-:::
-
-- $16$ vollständig ausgerichtete Bytes: vier 32-Bit-Befehle
-- Mit nur 16-Bit-Befehlen wären es acht
-- Mischungen und Grenzen verändern die Aufteilung
-- Decode-, Issue- und Retire-Breite bleiben getrennte Limits
-
-::: notes
-Schon vor der Ausführung kann die Lieferung und Entschlüsselung neuer Befehle einen Engpass bilden.
-
-Fetch bedeutet Befehlsholen, Decode dessen Entschlüsselung, Issue Start in einer ausgewählten Einheit und Retire endgültige Bestätigung. Die Bytezahl eines Fetchpakets ist deshalb keine automatische Anzahl pro Takt bestätigter Befehle.
-
-RISC-V ist die Befehlssatzfamilie; RISC bedeutet Reduced Instruction Set Computer. Im Grundmodell RV32I sind die betrachteten Befehle zweiunddreißig Bit oder vier Bytes breit. Ein passend an vollständigen Befehlen beginnender sechzehn-Byte-Abschnitt enthält dann vier Stück. Die optionale C-Erweiterung unterstützt komprimierte Befehle mit sechzehn Bit, also zwei Bytes; bei ausschließlich solchen Befehlen wären es acht. C bezeichnet hier eine Befehlssatzerweiterung, nicht die Programmiersprache.
-
-Mischungen, Fetchgrenzen, Sprungziele und fehlende Cacheblöcke können die tatsächliche Lieferung verändern. Selbst acht geholte Befehle werden bei einer Decode-Breite von drei nicht sofort alle dekodiert. Ein früher Puffer kann unterschiedliche Breiten kurzzeitig entkoppeln, aber den langsamsten dauerhaften Abschnitt nicht unbegrenzt überholen. Die bereits betrachtete Bestätigungsgrenze begründet dieselbe Sicht auf endliche Puffer: Ein langsamer Abfluss lässt sich nicht unbegrenzt durch Vorrat davor ausgleichen. Als nächste Frage bleibt, welche bereiten Befehle überhaupt ausgewählt werden dürfen.
+Damit sind Breite, Ressourcen und Latenzen als Grenzen gleichzeitiger Starts beschrieben. Als nächste Frage bleibt, welche bereiten Befehle überhaupt ausgewählt werden dürfen, wenn ein älterer Befehl noch auf seinen Operanden wartet.
 :::
 
 ## 3 · Vorziehen und geordnet bestätigen {.section-divider}
@@ -778,7 +761,7 @@ Breite beantwortet die Frage, wie viel Arbeit im selben Takt beginnen kann. Eine
 
 Ein vorgezogener Befehl darf dabei keinen falschen Wert lesen und einen älteren Leser nicht durch eine neue Registerversion stören. Registerumbenennung bindet deshalb Quellen an die passenden Versionen. Die spätere endgültige Bestätigung folgt weiterhin einer kontrollierten Programmordnung. So kann ein Fehlerzustand zu einer gültigen Stelle im Programm gehören, obwohl intern bereits weitere Rechnungen fertig geworden sind.
 
-Der Abschnitt vergleicht zwei vollständig festgelegte Zeitpläne und erläutert die dafür notwendige Verwaltung. Rechnen, Fertigwerden, Bestätigen und externes Sichtbarwerden einer Speicherwirkung werden bewusst unterschieden. Diese Trennung verbindet die internen Zeitmodelle mit den bereits bekannten Interrupts, Exceptions und Cachezuständen.
+Der Abschnitt vergleicht zwei vollständig festgelegte Zeitpläne und erläutert die dafür notwendige Verwaltung. Rechnen, Fertigwerden und endgültiges Bestätigen werden bewusst unterschieden. Diese Trennung verbindet die internen Zeitmodelle mit den bereits bekannten Exceptions und Interrupts. Zum Abschluss des Abschnitts zeigt sich, dass getrennte Registerversionen noch keine unabhängigen Speicherzugriffe garantieren und endliche Puffer das Vorziehen begrenzen.
 :::
 
 ## Breite und Auswahlreihenfolge sind zwei Achsen
@@ -924,7 +907,9 @@ Befehlsbreite und Startreihenfolge sind unabhängige Eigenschaften. Um nur den N
 
 Die bekannte Programmfolge besteht aus A, einem Load nach `t0`, B, einer davon abhängigen Addition nach `t1`, C, einer Subtraktion nach einer neuen `t0`-Version, und D, einem bitweisen Und nach `t6`. Durch Renaming sind die beiden Versionen von `t0` getrennt. A muss deshalb nicht abgewartet werden, um C zu berechnen; B bleibt trotzdem an den Wert aus A gebunden.
 
-Das Zeitfenster beginnt beim ersten Issue. Vor Takt eins sind alle vier Befehle bereits dekodiert, umbenannt und zur Auswahl aufgenommen. A startet in Takt eins und liefert wegen der angenommenen Speicherwartezeit sein Ergebnis erst am Ende von Takt vier. Ein ALU-Ergebnis liegt jeweils am Ende seines Starttakts vor; ein abhängiger Nutzer kann frühestens im nächsten Takt starten. Retire bestätigt höchstens zwei Befehle je Takt, frühestens im Folgetakt ihrer Fertigstellung und stets nach allen älteren Befehlen.
+Das Zeitfenster beginnt beim ersten Issue. Vor Takt eins sind alle vier Befehle bereits dekodiert, umbenannt und zur Auswahl aufgenommen. A startet in Takt eins und liefert gemäß der angenommenen Ladelatenz sein Ergebnis erst am Ende von Takt vier. Ein ALU-Ergebnis liegt jeweils am Ende seines Starttakts vor; ein abhängiger Nutzer kann frühestens im nächsten Takt starten. Retire bestätigt höchstens zwei Befehle je Takt, frühestens im Folgetakt ihrer Fertigstellung und stets nach allen älteren Befehlen.
+
+Die vier Takte sind eine didaktische Wahl. Sie sind lang genug, damit die unabhängige Subtraktion C und das von ihr abhängige D in die Wartezeit des Loads passen, und lassen in der Out-of-Order-Variante trotzdem einen Takt ohne Start übrig. So bleibt sichtbar, dass eine veränderte Auswahl die Ladezeit nutzt, aber nicht verkürzt. Ein Cache-Miss bis zum Hauptspeicher würde mit den Lehrwerten aus Vorlesung 2 deutlich länger dauern; mit nur zwei unabhängigen Befehlen fiele der Vorsprung dann relativ viel kleiner aus.
 
 Beide Vergleichsvarianten besitzen genau diese Ressourcen und Latenzen. In-Order darf den blockierten nächsten Befehl nicht überspringen, Out-of-Order darf einen jüngeren bereiten Befehl auswählen. Die gemeinsame Vorbereitung vor dem ersten Start wird nicht mitgezählt. Damit ist die folgende Differenz eine Aussage über dieses begrenzte Fenster, nicht über die vollständige Laufzeit einer Anwendung auf einem beliebigen Prozessor.
 :::
@@ -966,7 +951,7 @@ A startet wieder in Takt eins. C benötigt den noch fehlenden Loadwert nicht und
 
 Die echten RAW-Abhängigkeiten, Read After Write, bleiben somit A nach B und C nach D. Die Startreihenfolge lautet A, C, D, B. Bei Retire bleibt dagegen die Programmfolge A, B, C, D erhalten: A wird in fünf bestätigt, B und C gemeinsam in sechs, D in sieben. Frühe Fertigstellung erlaubt C und D nicht, B bei dieser endgültigen Bestätigung zu überholen.
 
-Die Diagrammzeilen behalten ihre ursprüngliche Programmordnung; daran wird das Vorziehen gegenüber der waagerechten Taktskala sichtbar. Die roten Retiremarken zeigen die getrennte Bestätigungsregel. Der langsame Load ist nicht schneller geworden und sein Miss nicht verschwunden. Seine Wartezeit wurde teilweise genutzt; das definierte Fenster endet dadurch einen Takt früher.
+Die Diagrammzeilen behalten ihre ursprüngliche Programmordnung; daran wird das Vorziehen gegenüber der waagerechten Taktskala sichtbar. Die roten Retiremarken zeigen die getrennte Bestätigungsregel. Der langsame Load ist nicht schneller geworden; sein Ergebnis liegt weiterhin erst am Ende von Takt vier vor. Seine Wartezeit wurde teilweise genutzt; das definierte Fenster endet dadurch einen Takt früher.
 :::
 
 ## Die Bilanz hängt am ganzen Fenster
@@ -1032,49 +1017,8 @@ Der ROB, Reorder Buffer, erlaubt C und D durchaus, intern früh den Wert fünf z
 Bei anfänglich `t0 = 42`, `t1 = 9` und `t6 = 12` bleiben diese architektonischen Registerwerte erhalten. Die intern fertigen physischen Versionen aus C und D belegen nicht, dass das Programm ihre Werte schon als gültiges Ergebnis gesehen hätte. Die Exceptioninformation benennt den Load A; sie wird nicht willkürlich an eine gerade zuletzt fertig gewordene Operation angehängt.
 
 Die Abbildung ordnet von links nach rechts bestätigte Vorgänger, die Fehlerstelle und den verworfenen jüngeren Bereich. Rot markiert den Fehler und die unterbundene Bestätigung. Gemeint ist keine pauschale Löschung des gesamten Speichers oder früherer korrekter Arbeit. Damit bleibt die bekannte Trap-Grundidee auch bei intern überlappender und vorgezogener Ausführung erhalten.
-:::
 
-## Interrupt und Exception brauchen verschiedene Grenzen
-
-::: {.section-label}
-3 / 5 · Reihenfolge und Bestätigung
-:::
-
-| Ereignis | Zuordnung |
-|----------|-----------|
-| Exception | zu einem bestimmten fehlerhaften Befehl |
-| Interrupt | externe Anforderung, Annahme an zulässiger Grenze |
-
-Ein gültiger Zustand ist ein bestätigter Programmanfang, kein Gemisch beliebiger Fertigstellungen.
-
-::: notes
-Die aus dem Trap-Pfad bekannte Unterscheidung zwischen Interrupt und Exception gilt auch in einem intern parallelen Kern. Eine synchrone Exception gehört zu einem bestimmten Befehl, etwa dem fehlgeschlagenen Load A. Ein Interrupt ist dagegen eine asynchrone Anforderung, beispielsweise von einer Peripherie. Er muss an einer durch die Architektur und Implementierung zulässigen Grenze angenommen werden, statt einer zufällig zuletzt abgeschlossenen internen Operation zugeordnet zu werden.
-
-Ein präziser Grenzzustand entspricht hier einem vollständig bestätigten Anfang der Programmfolge. In der erfolgreichen M3-Ausführung könnte eine vereinbarte Grenze nach A den Wert `t0 = 10` enthalten, während B und die jüngeren Wirkungen noch nicht bestätigt sind. Nicht jede interne Fertigstellung erzeugt sofort eine solche Annahmegrenze. Welche Grenzen tatsächlich genutzt werden, bestimmt die jeweilige Hardware.
-
-Eine Exception an A verlangt einen anderen Schnitt: A erhält keine normale bestätigte Wirkung, und auch die jüngeren Befehle bleiben unbestätigt. Bereits früher bestätigte Arbeit wird in keinem der beiden Fälle pauschal zurückgesetzt. Ein Interrupt ist insbesondere kein automatischer Systemreset und setzt auch eine extern versorgte Peripherie nicht zwangsläufig zurück.
-
-Die Wiederaufnahme benötigt weiterhin eine zur Ursache passende gespeicherte Adresse und Verwaltungsinformation. Geordnetes Retire, die endgültige Bestätigung, hilft dabei, einen gültigen Programmanfang zu erhalten. Es legt aber nicht allein fest, wann jede Speicherwirkung für andere Beobachter sichtbar wird. Diese zusätzliche Unterscheidung ist besonders bei Stores erforderlich.
-:::
-
-## Ein Store hat mehr als einen Abschlusszeitpunkt
-
-::: {.section-label}
-3 / 5 · Reihenfolge und Bestätigung
-:::
-
-![](../assets/figures/07_moderne_cpu_architekturen/lsu.png){fig-alt="Eine Store-Operation berechnet Adresse und Daten, wartet in einer Queue, wird geordnet bestätigt und gelangt erst über den freigegebenen Speicherpfad zur Cache- oder Speicherebene."}
-
-Bestätigen, zum Speicherpfad weitergeben und extern sichtbar werden unterscheiden.
-
-::: notes
-Ein Store schreibt Daten an eine Adresse. Intern können seine Adresse und sein Datenwert bereits bereitliegen, obwohl noch nicht feststeht, ob der Befehl zum richtigen Programmweg gehört und ohne ältere Exception bestätigt werden darf. Die LSU, Load/Store Unit oder Lade-/Speichereinheit, kann diese vorbereiteten Informationen deshalb zunächst in einer Queue, einem Puffer, halten.
-
-Die Abbildung führt von der Vorbereitung über die Warteschlange zur geordneten Freigabe nach erfolgreichem Commit. Commit bezeichnet hier wie Retire die endgültige Bestätigung. Erst anschließend wird der Eintrag auf den freigegebenen Speicherpfad weitergegeben. Graue Bereiche kennzeichnen vorbereitete und wartende Arbeit, der rote Übergang deren Freigabe. Der Zeitpunkt der Bestätigung, die Änderung einer Cache-Kopie und die Sichtbarkeit für einen anderen Beobachter müssen nicht zusammenfallen.
-
-Ein solcher Beobachter kann ein weiterer Kern oder ein eigenständiger Datenübertragungscontroller sein. Letzterer heißt DMA, Direct Memory Access, und kann Daten bewegen, ohne dass die CPU jedes Wort selbst kopiert. Für die Aussage über den Store genügt diese Bedeutung; dessen weitere Funktionsweise wird hier nicht vorausgesetzt. CPU bedeutet Central Processing Unit, Prozessor.
-
-Bei einer älteren Exception darf ein jüngerer noch unbestätigter Store keine gewöhnliche bestätigte Speicherwirkung erhalten. In-Order-Retire garantiert jedoch nicht von allein jede globale Speicherordnung. Cache, Speichervertrag und gegebenenfalls Barrieren legen zusätzliche Regeln fest. Gerätezugriffe können zudem Seiteneffekte besitzen und benötigen besondere Plattformbedingungen; sie sind nicht beliebig wie gewöhnliche Speicherzugriffe spekulierbar. Das dargestellte Pufferverfahren erläutert diese Grenzen, ohne eine feste Registerstruktur jeder CPU zu behaupten.
+Ein Interrupt wird dagegen keinem fehlerhaften Befehl zugeordnet. Als asynchrone Anforderung, etwa einer Peripherie, wird er an einer zulässigen Grenze zwischen bestätigten Befehlen angenommen; welche Grenzen dafür genutzt werden, bestimmt die jeweilige Hardware. Auch dann enthält der sichtbare Zustand einen vollständig bestätigten Programmanfang und kein Gemisch beliebiger interner Fertigstellungen. Geordnete Bestätigung sichert so den Registerzustand. Für Speicherzugriffe genügt diese Verwaltung allein jedoch nicht, wie der folgende Aliasfall zeigt.
 :::
 
 ## Register-Renaming löst keine Speicheraliase
@@ -1092,7 +1036,7 @@ Physische Registerversionen trennen gleiche architektonische Registernamen. Für
 
 Für das dargestellte Modell werden gleich breite, ausgerichtete Wortzugriffe angenommen; verschiedene gezeichnete Speicherorte überlappen nicht. Im oberen Fall treffen die Zugriffe unterschiedliche Adressen. Eine voneinander unabhängige Bearbeitung kann dann möglich sein. Im unteren Fall zeigt der rote gemeinsame Platz dagegen dieselbe Adresse. Der jüngere Load braucht hier den gemäß Programmfolge zuletzt geschriebenen Wert und darf nicht unbemerkt eine ältere Speicherkopie verwenden. Schwarze Pfeile kennzeichnen die jeweiligen Zugriffswege.
 
-Eine konkrete LSU, Load/Store Unit, kann ältere Storeadressen prüfen, Daten aus einem Puffer weiterleiten oder eine zu früh spekulativ ausgeführte Ladeoperation erneut ausführen. Welche Verfahren verwendet werden, ist plattformspezifisch. Auch ein Compiler benötigt gültige Aliasannahmen, bevor er Speicheroperationen umordnet.
+Eine konkrete LSU, Load/Store Unit, kann ältere Storeadressen prüfen, die Daten eines älteren, noch nicht in den Speicher übernommenen Stores aus einem Puffer direkt an den Load weiterleiten oder eine zu früh spekulativ ausgeführte Ladeoperation erneut ausführen. Welche Verfahren verwendet werden, ist plattformspezifisch. Auch ein Compiler benötigt gültige Aliasannahmen, bevor er Speicheroperationen umordnet.
 
 Es genügt deshalb nicht, nur nach voneinander unabhängigen Registernamen zu suchen. Ein vorgezogener Zugriff bringt nur dann einen Nutzen, wenn der richtige Wert erhalten bleibt und mögliche Wiederholungen in die Betrachtung eingehen. Nach den Datenabhängigkeiten begrenzt somit auch die Kenntnis der tatsächlichen Adressen die nutzbare Parallelität.
 :::
@@ -1291,62 +1235,21 @@ Der ROB, Reorder Buffer, trägt zur korrekten Bestätigung bei. Erweist sich ein
 
 Nicht jeder interne Zustand muss dadurch auf seinen früheren Wert zurückgesetzt werden. Der untere rote Cacheweg zeigt eine mögliche bleibende Spur: Ein bereits ausgeführter Ladezugriff kann eine Cachezeile beschafft haben, die nach dem Verwerfen des Befehls weiterhin vorhanden ist. Weder die gesamte physische Registerdatei noch jeder Cache wird bei jeder Fehlvorhersage pauschal gelöscht.
 
-Das ist zunächst eine Trennung von Beobachtungsebenen. Vorläufige Arbeit kann die spätere bestätigte Rechnung beschleunigen, während ihre mikroarchitektonischen Spuren noch sichtbar sein können. Ob sich daraus eine Information über einen fremden Wert gewinnen lässt, erfordert weitere Voraussetzungen. Die Darstellung erläutert dieses Prinzip und behauptet keine gemessene Verwundbarkeit einer bestimmten Kursplattform.
-:::
+Das ist zunächst eine Trennung von Beobachtungsebenen. Vorläufige Arbeit kann die spätere bestätigte Rechnung beschleunigen, während ihre mikroarchitektonischen Spuren noch sichtbar sein können. Wird aus Zugriffszeiten, die von solchen Spuren abhängen, indirekt auf einen Wert geschlossen, spricht man von einem Seitenkanal; eine bekannte Angriffsklasse, die spekulative Ausführung auf diese Weise ausnutzt, heißt Spectre. Sie erfordert weitere Voraussetzungen und wird in dieser Einheit nicht vertieft. Die Darstellung erläutert das Prinzip und behauptet keine gemessene Verwundbarkeit einer bestimmten Kursplattform.
 
-## Ein Cache-Seitenkanal benötigt eine Wertkopplung
-
-::: {.section-label}
-4 / 5 · Sprünge und Vorhersage
-:::
-
-![](../assets/figures/07_moderne_cpu_architekturen/spectre.png){fig-alt="Im schematischen Spectre-v1-Fall läuft ein falscher Bounds-Pfad transient, ein Wert beeinflusst einen folgenden Probezugriff und dessen mögliche Cacheposition kann später über Zeit beobachtet werden."}
-
-Verworfener Programmwert und beobachtbare Cache-Spur sind verschiedene Dinge.
-
-::: notes
-Ein Seitenkanal überträgt Information indirekt, beispielsweise über Zugriffszeiten statt über einen regulär erlaubten Rückgabewert. Die schematische Spectre-v1-Situation verbindet einen transient bearbeiteten falschen Prüfpfad mit einer später beobachtbaren Cache-Spur. Transient heißt vorläufig intern bearbeitet. Die architektonische Bounds-Prüfung, also Bereichsprüfung, bleibt wirksam und bestätigt den falschen Pfad nicht.
-
-Die Abbildung verfolgt von links nach rechts die dafür nötige Kette: Eine Prüfung wird vorhergesagt, auf diesem angenommenen Pfad wird vorläufig ein Wert geladen, der Wert beeinflusst einen weiteren Probezugriff, und eine spätere Zeitbeobachtung kann dessen Cachewirkung untersuchen. Rot markiert die mögliche Informationsspur. Entscheidend ist die Wertkopplung: Der geladene Wert muss die Adresse der Probeoperation beeinflussen. Ein beliebiger schneller Load verrät nicht automatisch alle Bits eines beliebigen Geheimnisses.
-
-Nach dem Squash, dem Verwerfen unbestätigter Arbeit, kann die gewählte Cachezeile weiterhin vorhanden sein. Dadurch verändert sich gegebenenfalls eine später messbare Zeitverteilung, obwohl der verworfene Registerwert kein erlaubtes Programmausgabeergebnis wurde. Andere Zugriffe, Störungen und konkrete Plattformdetails beeinflussen diese Beobachtung. Ein einzelner schneller Zugriff ist daher noch kein eindeutiger Nachweis eines Geheimniswerts.
-
-Der Zusammenhang verwendet nur die bekannten Cachebegriffe und die Trennung von interner Fertigstellung und Bestätigung. Ein Exploit oder Hardwareangriff wird damit nicht als ausgeführt behauptet. Die Sicherheitsfrage entsteht aus dem Zusammenspiel dieser Mechanismen; sie lässt sich nicht allein durch das richtige Verwerfen des falschen Programmwegs beantworten.
-:::
-
-## Unterschiedliche Mechanismen brauchen passende Maßnahmen
-
-::: {.section-label}
-4 / 5 · Sprünge und Vorhersage · Vertiefung zur Lektüre
-:::
-
-| Fall | vereinfachte Grenze |
-|------|---------------------|
-| Spectre-v1 | falsch vorhergesagter Pfad einer Prüfung |
-| ursprünglicher Meltdown | Berechtigungsprüfung auf betroffenen Designs |
-
-Passende Barrieren, Maskierung und Speicherabbildung sind keine austauschbaren Universalrezepte.
-
-::: notes
-Aus einer möglichen Cache-Spur folgt noch kein einheitliches Gegenmittel für alle transienten Angriffe. Spectre-v1 betrifft hier die vorläufige Bearbeitung nach einer falsch vorhergesagten Bereichsprüfung. Der ursprüngliche Meltdown-Fall betraf dagegen bestimmte Designs, die geschützte Daten intern weiterreichen konnten, bevor der unzulässige Zugriff architektonisch als Fehler behandelt wurde. Diese Einordnung beschreibt unterschiedliche Mechanismen und keine Eigenschaft jedes modernen Kerns.
-
-Benutzerprogramme und privilegierter Betriebssystemcode besitzen unterschiedliche Zugriffsrechte. KPTI, Kernel Page Table Isolation, trennt bestimmte Abbildungen des Kerneladressraums von denen der Benutzerprogramme. Das richtet sich insbesondere gegen den ursprünglichen Meltdown-Weg und ist keine allgemeine Lösung für Spectre.
-
-Für bestimmte Spectre-Fälle können überprüfte Indexmaskierung oder geeignete Spekulationsbarrieren verwendet werden. Ob eine konkrete Anweisung diese Wirkung besitzt, muss ihr Architekturvertrag festlegen. ISA bedeutet Instruction Set Architecture, Befehlssatzarchitektur. In der RISC-V-Familie, RISC ausgeschrieben Reduced Instruction Set Computer, ordnet ein gewöhnliches `fence` Speicherzugriffe. Daraus darf ohne zusätzliche Vorgabe keine universelle Spekulationsbarriere abgeleitet werden.
-
-Andere Varianten verlangen gegebenenfalls andere Hardware-, Software- oder Betriebssystemmaßnahmen. Die vereinfachte Tabelle ordnet daher Ursachen und Grenzen ein, statt eine pauschale Sicherheitszusage zu geben. Das grundlegende Lernziel bleibt, einen korrekt bestätigten Programmzustand von möglichen internen Informationsspuren zu unterscheiden und Maßnahmen nur unter ihren tatsächlichen Voraussetzungen zu beurteilen.
+Damit sind die Hardwaremechanismen dieser Einheit beisammen: Überlappung, Breite, Auswahlreihenfolge, geordnete Bestätigung und Vorhersage. Welche Arbeit ein Kern überhaupt vorziehen kann, hängt jedoch auch von der Befehlsfolge ab, die zuvor der Compiler erzeugt hat.
 :::
 
 ## 5 · Wirkung prüfen und einordnen {.section-divider}
 
 Wann ist eine Optimierung funktional richtig – und wann schneller?
 
-Compiler → Abhängigkeiten → Funktionsnachweis → Zeitnachweis
+Compiler → Wertketten → Rechenregeln → Einstiegsfrage
 
 ::: notes
 Die bisher betrachteten Mechanismen erklären Möglichkeiten und Grenzen einer Mikroarchitektur. Ein C-Programm beschreibt diese Umsetzung jedoch nicht direkt. Der Compiler wählt zunächst eine konkrete Befehlsfolge, die Hardware bearbeitet sie anschließend unter ihren eigenen Ressourcen- und Zeitbedingungen.
 
-Der letzte Abschnitt verbindet beide Ebenen an Summenketten. Mehrere unabhängige Teilakkumulatoren können mehr nutzbare Befehlsparallelität erzeugen, benötigen aber eine abschließende Zusammenführung und passende Ressourcen. Eine andere Übersetzung oder ein funktional richtiges Hostprogramm beweist deshalb noch keinen Laufzeitgewinn auf einer bestimmten Zielplattform.
+Der letzte Abschnitt verbindet beide Ebenen an Summenketten. Mehrere unabhängige Teilakkumulatoren können mehr nutzbare Befehlsparallelität erzeugen, benötigen aber eine abschließende Zusammenführung und passende Ressourcen. Eine andere Übersetzung beweist deshalb noch keinen Laufzeitgewinn auf einer bestimmten Zielplattform, und nicht jede andere Klammerung erhält das Rechenergebnis.
 
 Die Rückkehr zur Einstiegsfrage fasst die Begründung zusammen: Eine zusätzliche Einheit hilft nur, wenn der vorbereitete Befehlspfad, die Eingabewerte und die übrigen Engpässe ihre Nutzung erlauben. Das Abschlussquiz und die Papieraufgaben prüfen diese Bedingungen an benannten Zeitfenstern und Zuständen. Vertiefte Implementierungsdetails können im Skript nachgelesen werden, ohne sie als Vorwissen vorauszusetzen.
 :::
@@ -1389,54 +1292,7 @@ Die obere Kette der Abbildung addiert die Werte eins, zwei, drei und vier zu ein
 
 Die getrennten Ketten bieten mehr ILP, Instruction-Level Parallelism. Ob sie gleichzeitig ausgeführt werden können, hängt anschließend von den Ressourcen ab. Zwei Quellcodevariablen garantieren weder genau zwei Maschinenbefehle noch einen festen Beschleunigungsfaktor. Weitere Akkumulatoren verursachen Registerbedarf, Verwaltungsarbeit und eine Schlussreduktion.
 
-Auch die Rechenregeln begrenzen die Umformung. Für vorzeichenlose Integeraddition mit gleicher Breite stimmt die Summe modulo der Wortbreite auch bei dieser Zerlegung. Bei Gleitkommaaddition kann eine andere Klammerung zu anderen Rundungsergebnissen führen. Das begleitende C-Programm prüft deshalb zuerst die funktionale Gleichheit im ausdrücklich gewählten vorzeichenlosen Modell; eine Aussage über Laufzeit erfordert zusätzlich eine passende Messung oder ein vollständiges Zeitmodell.
-:::
-
-## Übersetzung und Funktion sind eigene Nachweise
-
-::: {.section-label}
-5 / 5 · Compiler und Wirkung · Vertiefung zur Lektüre
-:::
-
-Vom Repository-Hauptordner:
-
-```bash
-gcc -std=c11 -O3 -Wall -Wextra -Werror \
-  labs/src/lab07_ilp.c -o /tmp/lab07_ilp
-/tmp/lab07_ilp
-```
-
-Host-C prüft Summen; Compiler Explorer zeigt Befehle, kein OoO-Timing.
-
-::: notes
-Der begleitende Hostversuch trennt die funktionale Prüfung einer Umformung von ihrer möglichen zeitlichen Wirkung. Host bezeichnet den gewöhnlichen Rechner, auf dem Compiler und Programm laufen. Die vorhandene Datei `labs/src/lab07_ilp.c` enthält eine einfache Summe und eine Variante mit zwei Teilakkumulatoren. Beide lesen gültige Arrayelemente, behandeln auch ungerade Längen und liefern mit `uint64_t` einen vorzeichenlosen Vierundsechzig-Bit-Wert.
-
-Der Aufruf verwendet GCC, GNU Compiler Collection. GNU heißt rekursiv GNU’s Not Unix und bezeichnet das freie Softwareprojekt. `-std=c11` wählt die C-Sprachfassung von 2011, `-O3` die Optimierungsstufe, `-Wall` und `-Wextra` zusätzliche Warnungen. `-Werror` macht diese Warnungen zu Fehlern, `-o` benennt die ausführbare Datei. Der Backslash setzt die Shellzeile fort. Nach dem Übersetzen vergleicht der Programmaufruf die Ergebnisse für leere, kurze, gerade und ungerade Eingaben sowie große Werte. Gerätezugriffe und ein Zykluszähler gehören nicht zu diesem Versuch.
-
-Eine konkrete Übersetzung kann anschließend mit Compiler Explorer, auch Godbolt genannt, untersucht werden. Die angezeigten Maschinenbefehle sind aber noch kein tatsächlicher OoO-Ablauf; OoO steht für Out-of-Order Execution. Ein Vergleich für RISC-V benötigt eine ausdrücklich gewählte Zielarchitektur und Compileroptionen. RISC bedeutet Reduced Instruction Set Computer.
-
-Auch Renode, der vorgesehene Systemsimulator, belegt ohne geeignetes Mikroarchitekturmodell nicht die Zeitpläne dieser Einheit. Ein erfolgreicher Hostlauf bestätigt die geprüften Summenergebnisse. Er ersetzt weder eine RISC-V-Zeitmessung noch den Nachweis einer bestimmten Befehlsrate auf einer realen CPU.
-:::
-
-## Abschlussquiz: Fenster, Version und Vorhersage nennen
-
-::: {.section-label}
-5 / 5 · Compiler und Wirkung
-:::
-
-- Zehn QuizAcademy-Fragen
-- Zehn Minuten bearbeiten, fünf Minuten auswerten
-- Bei jeder Entscheidung die benötigte Bedingung begründen
-- Vergleichbare Antwortlängen, genau eine richtige Option
-
-::: notes
-Die Quizfragen verbinden die einzelnen Begriffe wieder mit ihren erforderlichen Modellbedingungen. Eine Zeitangabe ist nur dann begründet, wenn Programm, Latenzen und Fenstergrenze bekannt sind. Bei Renaming entscheidet die Quellversion, die der betreffende Leser bei seiner Aufnahme erhalten hat. Ein Prädiktor verwendet seinen alten Zustand; das gerade erst beobachtete Ergebnis verändert die folgende Entscheidung.
-
-IPC, Instructions Per Cycle, und CPI, Cycles Per Instruction, brauchen dieselbe Zählbasis, wenn sie als Kehrwerte verglichen werden. Ein höheres IPC muss bei einer anderen Befehlszahl nicht die kürzere Laufzeit bedeuten. Mehrere intern fertige Operationen können im ROB, Reorder Buffer, weiterhin auf ihre Bestätigung warten. Ein verworfener falscher Programmweg kann dagegen schon eine interne Cache-Spur hinterlassen haben. Die richtige Antwort ergibt sich jeweils aus der Trennung dieser Ebenen.
-
-Für die zehn Fragen sind fünfzehn Minuten vorgesehen: zehn Minuten zur eigenen Bearbeitung und fünf zur begründeten Auswertung. Jede Frage enthält vier Optionen und genau eine richtige Antwort. Deren Länge ist kein zuverlässiger Auswahlhinweis. Die Erläuterungen führen kurz zur entscheidenden Bedingung oder zum passenden Gegenbeispiel zurück.
-
-Die Diagnose ergänzt die offenen Papieraufgaben. Sie soll typische Fehlvorstellungen sichtbar machen und die begründete Entscheidung aus vorhandenen Annahmen festigen. Eine bestimmte Desktop-Mikroarchitektur ohne Datenblatt oder Messung vorherzusagen ist dafür weder nötig noch durch die Lehrmodelle erlaubt.
+Auch die Rechenregeln begrenzen die Umformung. Für vorzeichenlose Integeraddition mit gleicher Breite stimmt die Summe modulo der Wortbreite auch bei dieser Zerlegung. Bei Gleitkommaaddition kann eine andere Klammerung zu anderen Rundungsergebnissen führen. Die optionale Vertiefung des Übungsblatts prüft deshalb mit der Datei `labs/src/lab07_ilp.c` auf dem eigenen Rechner zuerst die funktionale Gleichheit im ausdrücklich gewählten vorzeichenlosen Modell. Ein solcher Test belegt die Summenergebnisse, aber keine Laufzeit; dafür wären eine passende Messung oder ein vollständiges Zeitmodell nötig. Compiler Explorer zeigt ergänzend die erzeugten Maschinenbefehle für eine gewählte Zielarchitektur, jedoch keinen Out-of-Order-Ablauf. Auch der Systemsimulator Renode belegt ohne geeignetes Mikroarchitekturmodell nicht die Zeitpläne dieser Einheit.
 :::
 
 ## Zurück zu den zwei Recheneinheiten
@@ -1459,26 +1315,12 @@ Die Einstiegsfrage war absichtlich unvollständig. Zwei Addiereinheiten bei glei
 Das kurze Doppelstartbeispiel benötigte für vier Befehle drei Takte bis zum letzten Retire. Die abhängige Viererfolge brauchte mit derselben Hardware fünf. Ein dauerhaft einzelner Bestätigungspfad würde zusätzlich die mittlere bestätigte Rate auf höchstens eins begrenzen. In jedem Fall sind Anfang, Ende und Zählbasis anzugeben. Ein kurzer Abschnitt mit zwei Abschlüssen je Takt ist kein Beweis für IPC zwei im ganzen Programm.
 
 Out-of-Order beantwortet daneben eine andere Frage: Es kann jüngere bereite Arbeit nutzen, während ein älterer Befehl wartet. Die benötigten Daten und die Regeln korrekter Bestätigung verschwinden dadurch nicht. Compileränderungen wiederum können eine günstigere Befehlsfolge erzeugen, ohne allein eine bestimmte reale Laufzeit zu garantieren. Die begründete Antwort lautet deshalb: Mehr Breite ist dann nützlich, wenn Programm, Ressourcen und Zählfenster ihre Nutzung erlauben; eine pauschale Halbierung folgt aus der zweiten ALU nicht.
-:::
 
-## Was Sie jetzt erklären und prüfen können
+Zusammengefasst können Sie nach dieser Einheit Pipelineüberlappung, Breite und Auswahlreihenfolge unterscheiden, Wertabhängigkeiten und Registerversionen verfolgen, interne Fertigstellung von geordneter Bestätigung trennen und präzise Exceptions begründen, Vorhersagen aus dem alten Zustand samt ihren Kosten berechnen sowie Compilerresultat, Modellzeit und Messung auseinanderhalten. Eine Zeit- oder Ratenzahl erhält ihren Sinn erst durch Programm, Zählbasis und Anfangsbedingungen.
 
-::: {.section-label}
-5 / 5 · Compiler und Wirkung
-:::
-
-- Pipelineüberlappung, Breite und Reihenfolge unterscheiden
-- Wertabhängigkeiten und Registerversionen verfolgen
-- Fertigstellung, Retire und Speicherwirkung trennen
-- Vorhersage aus altem Zustand und ihre Kosten berechnen
-- Compilerresultat, Modellzeit und Messung auseinanderhalten
-
-::: notes
-Aus der anfänglichen Frage nach mehr Arbeit pro Takt entsteht ein zusammenhängendes Bild des Kerns. Eine Pipeline überlappt Bearbeitungsstufen. Mehr Breite schafft mehrere Plätze in einzelnen Stufen. Out-of-Order nutzt jüngere bereite Arbeit, während geordnete Bestätigung die gültige Programmfolge erhält. Wertabhängigkeiten, Registerversionen, Speicheradressen und endliche Ressourcen entscheiden gemeinsam, welche Gelegenheit tatsächlich genutzt werden kann.
-
-CPU bedeutet Central Processing Unit, Prozessor. Derselbe sichtbare Programmzustand kann auf verschiedenen Mikroarchitekturen mit unterschiedlichen Zeiten entstehen. Eine Zeit- oder Ratenzahl erhält ihren Sinn deshalb erst durch Programm, Zählbasis und Anfangsbedingungen. Auch Compilerresultat, analytisches Zeitmodell und tatsächliche Messung bleiben verschiedene Nachweise. Damit lässt sich der Nutzen interner Parallelität begründen, ohne aus bloßer Breite einen festen Beschleunigungsfaktor abzuleiten.
+Im Anschluss folgt das Abschlussquiz mit zehn QuizAcademy-Fragen: zehn Minuten eigene Bearbeitung und fünf Minuten begründete Auswertung. Jede Frage enthält vier Optionen und genau eine richtige Antwort; die Erläuterungen führen jeweils zur entscheidenden Modellbedingung zurück.
 
 Die Grundlagen orientieren sich an Harris/Harris, Digital Design and Computer Architecture — RISC-V Edition, und Patterson/Hennessy, Computer Organization and Design. RISC steht für Reduced Instruction Set Computer. Konkrete Verwaltungsprinzipien erläutern die [BOOM-Renamingbeschreibung](https://github.com/riscv-boom/riscv-boom/blob/master/docs/sections/rename-stage.rst), der [Reorder Buffer](https://github.com/riscv-boom/riscv-boom/blob/master/docs/sections/reorder-buffer.rst) und die [RISC-V-Integerbasis](https://github.com/riscv/riscv-isa-manual/blob/main/src/unpriv/rv32.adoc). BOOM heißt Berkeley Out-of-Order Machine.
 
-Die [GCC-Optionsbeschreibung](https://github.com/gcc-mirror/gcc/blob/master/gcc/doc/invoke.texi), die [Linux-Spectre-Dokumentation](https://github.com/torvalds/linux/blob/master/Documentation/admin-guide/hw-vuln/spectre.rst) und die [Linux-Dokumentation zur Kernel-Seitentabellentrennung](https://github.com/torvalds/linux/blob/master/Documentation/arch/x86/pti.rst) ergänzen Compiler- und Sicherheitseinordnung. GCC bedeutet GNU Compiler Collection, GNU rekursiv GNU’s Not Unix. Diese Quellen sind Architektur- und Implementierungsbeschreibungen, keine Messungen der Lehrmodelle. Die folgende Einheit über KI-Beschleuniger untersucht, warum regelmäßige Daten und Rechenmuster über diese allgemeine Kernparallelität hinaus spezialisierte Verarbeitung erlauben.
+Die [GCC-Optionsbeschreibung](https://github.com/gcc-mirror/gcc/blob/master/gcc/doc/invoke.texi) und die [Linux-Spectre-Dokumentation](https://github.com/torvalds/linux/blob/master/Documentation/admin-guide/hw-vuln/spectre.rst) ergänzen Compiler- und Sicherheitseinordnung. GCC bedeutet GNU Compiler Collection, GNU rekursiv GNU’s Not Unix. Diese Quellen sind Architektur- und Implementierungsbeschreibungen, keine Messungen der Lehrmodelle. Die folgende Einheit über KI-Beschleuniger untersucht, warum regelmäßige Daten und Rechenmuster über diese allgemeine Kernparallelität hinaus spezialisierte Verarbeitung erlauben.
 :::
