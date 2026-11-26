@@ -36,131 +36,7 @@ Die erste Einheit trennt Eigenschaften, die im Alltag oft vermischt werden. Flü
 
 In der Speicherhierarchie liegen Register, nahe Cache-Kopien, Arbeitsspeicher und nichtflüchtiger Speicher auf verschiedenen Ebenen. Ein Cache ist eine Rolle in dieser Hierarchie; er wird häufig, aber nicht begrifflich notwendig aus SRAM aufgebaut. Latenz ist die Wartezeit bis zu einem angefragten Datum, Bandbreite die übertragene Datenmenge pro Zeit. Vier unabhängige Anfragen mit je drei Zeitschritten Latenz enden seriell nach 3, 6, 9 und 12 Schritten, überlappt mit Startabstand eins nach 3, 4, 5 und 6. Die einzelne Latenz bleibt drei.
 
-Bei Größenangaben gehört die Basis dazu. Ein MiB sind $2^{20}=1\,048\,576$ Byte oder $8\,388\,608$ Bit, ein MB dagegen $10^6$ Byte. Für ein MiB benötigt klassisches 6T-SRAM $6\cdot8\,388\,608=50\,331\,648$ Zelltransistoren, 1T1C-DRAM je $8\,388\,608$ Transistoren und Kondensatoren; die Peripherie ist dabei nicht gezählt.
-:::
-
-## Flash: Programmieren ist kein beliebiger Store {.compact-figure}
-
-::: {.section-label}
-Vorlesung 1 · Speicherphysik & RAM-Typen
-:::
-
-![](../assets/figures/01_speicherphysik/flash-program-erase.png){fig-alt="FF nach A5 und A5 nach 81 setzen nur Einsen auf null. A5 nach AF benötigt null nach eins und damit vorheriges Löschen des ganzen Modellblocks."}
-
-Gelöscht $=1$ · Programmieren: Bits nur von $1$ nach $0$ · $0\rightarrow1$ nur durch Löschen des ganzen Blocks
-
-Ohne Löschen erreichbar, wenn $\mathit{alt}\ \&\ \mathit{neu}=\mathit{neu}$ gilt
-
-::: notes
-Flash speichert Information als Ladung, im behandelten Floating-Gate-Modell auf einem isolierten Gate. Mehr negative Ladung erhöht die Schwellspannung des Transistors; der Leseweg erkennt daran den gespeicherten Wert. Charge-Trap-Flash nutzt eine andere Speicherstruktur, folgt aber demselben Grundgedanken.
-
-Für die Firmware ist das Änderungsmodell entscheidend. Im Lehrmodell ist ein gelöschtes Bit eins. Programmieren kann ausgewählte Bits von eins nach null setzen, aber kein Bit von null zurück nach eins. Das gelingt nur durch Löschen, und zwar für einen ganzen Löschblock. Die Abbildung zeigt die Folge: `FF` nach `A5` und `A5` nach `81` sind reine Programmierschritte, denn $\texttt{A5}=1010\,0101_2$ und $\texttt{81}=1000\,0001_2$ verlangen nur zusätzliche Nullen. `A5` nach `AF` würde dagegen die Bits drei und eins von null nach eins ändern. Dafür muss zuerst der ganze Block gelöscht werden; andere noch benötigte Inhalte dieses Blocks sind vorher zu sichern und danach erneut zu programmieren.
-
-Als Prüfregel genügt eine bitweise Und-Verknüpfung: Ein neuer Wert ist ohne Löschen erreichbar, wenn $\mathit{alt}\ \&\ \mathit{neu}=\mathit{neu}$ gilt. Für `A5` und `81` ergibt die Verknüpfung `81`, für `A5` und `AF` dagegen `A5`.
-
-NOR und NAND bezeichnen die Zellanordnung: parallele Zellpfade beziehungsweise einen seriellen Zellstrang. Die äußere Schnittstelle ist eine eigene Eigenschaft. Page, Löschblock und CPU-Lesewort sind verschiedene Größen. Execute-in-Place (XIP), das Ausführen von Code direkt aus dem Flash, setzt einen speicherabbildbaren und ausführbaren Leseweg im System voraus; der Name NOR allein beweist ihn nicht. Wear Leveling verteilt Löschzyklen über mehrere Blöcke und senkt so die höchste Einzelbelastung. Es benötigt eine Zuordnung logischer zu physischen Adressen sowie freie Blöcke und schafft den Verschleiß nicht ab.
-:::
-
-## 6T-SRAM: Halten, Lesen, Schreiben
-
-::: {.section-label}
-Vorlesung 1 · Speicherphysik & RAM-Typen
-:::
-
-| Phase | WL | BL / BLB | Ergebnis |
-|-------|----|----------|----------|
-| Halten | $0$ | getrennt | Rückkopplung hält $Q$ und $Q_B=\neg Q$ |
-| Lesen | kurz $1$ | hoch vorgeladen, dann frei | kleine Differenz → Leseverstärker |
-| Schreiben | kurz $1$ | vor WL-Anstieg komplementär getrieben | Treiber erzwingen neuen Zustand |
-
-Zwei CMOS-Inverter, zwei Zugriffstransistoren · kein Refresh
-
-::: notes
-Eine 6T-SRAM-Zelle besteht aus zwei kreuzgekoppelten CMOS-Invertern und zwei nMOS-Zugriffstransistoren. Die Rückkopplung $Q=\neg Q_B$ und $Q_B=\neg Q$ besitzt zwei stabile Zustände. WL bezeichnet die Wortleitung (Word Line), die beide Zugriffstransistoren steuert; BL und BLB sind die komplementären Bitleitungen (Bit Lines) zu $Q$ und $Q_B$.
-
-Beim Halten ist WL null. Die Zugriffstransistoren sperren, die Bitleitungen spielen keine Rolle. Im Zustand $Q=0$, $Q_B=1$ leiten N_Q und P_QB, während P_Q und N_QB sperren. Solange die Versorgung anliegt, bleibt dieser Zustand ohne Auffrischen erhalten.
-
-Beim Lesen werden zuerst beide Bitleitungen hoch vorgeladen. Danach wird die Vorladung abgeschaltet und WL angehoben. Bei $Q=0$ sinkt BL über den Zugriffstransistor und N_Q leicht ab, BLB bleibt zunächst hoch. Ein Leseverstärker wertet diese kleine Differenz aus; anschließend fällt WL wieder. Die Zelle muss dabei lesestabil ausgelegt sein, damit der kleine Spannungshub an $Q$ den Zustand nicht kippt.
-
-Beim Schreiben, etwa von $Q=0$ nach $Q=1$, legen externe Treiber zuerst BL auf eins und BLB auf null. Erst dann steigt WL. Der niedrige Schreibpfad zieht $Q_B$ gegen den bisher leitenden P_QB herunter, wodurch über die Rückkopplung $Q$ steigt. Die Treiber halten ihre Werte bis nach dem Abfall von WL; danach hält die Zelle den neuen Zustand selbst. Die Reihenfolge „erst Bitleitungen, dann Wortleitung“ ist ein typischer Prüfungsgegenstand.
-
-SRAM ist schnell nutzbar und beliebig oft überschreibbar, braucht aber sechs Zelltransistoren plus Peripherie. Typische Rollen sind interne Arbeitsspeicher, Cache-Daten und kleine Puffer.
-:::
-
-## DRAM: Ladungsteilung, Sense und Restore
-
-::: {.section-label}
-Vorlesung 1 · Speicherphysik & RAM-Typen
-:::
-
-$$V_\mathrm{share}=\frac{C_\mathrm{cell}V_\mathrm{cell}+C_\mathrm{BL}V_\mathrm{pre}}{C_\mathrm{cell}+C_\mathrm{BL}}$$
-
-Lehrwerte: $C_\mathrm{cell}=30\,\mathrm{fF}$, $C_\mathrm{BL}=300\,\mathrm{fF}$, $V_\mathrm{pre}=0{,}6\,\mathrm{V}$
-
-| Zellpegel vorher | $V_\mathrm{share}$ | Abweichung von $V_\mathrm{pre}$ |
-|------------------|--------------------|--------------------------------|
-| $1{,}2\,\mathrm{V}$ | $0{,}6545\,\mathrm{V}$ | $+54{,}5\,\mathrm{mV}$ |
-| $0\,\mathrm{V}$ | $0{,}5455\,\mathrm{V}$ | $-54{,}5\,\mathrm{mV}$ |
-
-Precharge → WL hoch → Ladungsteilung → Sense und Restore → WL niedrig → Precharge
-
-::: notes
-Eine 1T1C-DRAM-Zelle besteht aus einem Zugriffstransistor und einem Kondensator. Ist die Wortleitung WL niedrig, bleibt die Ladung weitgehend isoliert; ist sie hoch, tauscht der Kondensator Ladung mit der Bitleitung BL aus. Mit Plattenpotenzial null speichert die Zelle bei $1{,}2\,\mathrm{V}$ die Ladung $q=C_\mathrm{cell}V_\mathrm{cell}=30\,\mathrm{fF}\cdot1{,}2\,\mathrm{V}=36\,\mathrm{fC}$. Leckströme verringern sie mit der Zeit. Deshalb muss jede Zelle innerhalb spezifizierter Intervalle gelesen und wiederhergestellt werden: Refresh erhält Inhalte, schreibt aber keine neuen Nutzdaten.
-
-Vor dem Lesen wird BL auf die halbe Modellversorgung $V_\mathrm{pre}=0{,}6\,\mathrm{V}$ vorgeladen und die Vorladung abgeschaltet. Steigt dann WL, teilen Zelle und Bitleitung ihre Ladung. Aus der Ladungserhaltung folgt die Formel: Die Summe $C_\mathrm{cell}V_\mathrm{cell}+C_\mathrm{BL}V_\mathrm{pre}$ verteilt sich auf die Gesamtkapazität. Einheitenprüfung: $\mathrm{fF}\cdot\mathrm{V}/\mathrm{fF}=\mathrm{V}$. Für die hohe Zelle ergibt sich $(36+180)\,\mathrm{fC}/330\,\mathrm{fF}\approx0{,}6545\,\mathrm{V}$, für die niedrige $180/330\,\mathrm{V}\approx0{,}5455\,\mathrm{V}$. Weil $C_\mathrm{BL}$ zehnmal größer ist als $C_\mathrm{cell}$, bleibt nur ein Signal von rund $\pm55\,\mathrm{mV}$.
-
-Zugleich hat die Zelle ihren ursprünglichen Pegel verloren. Der Leseverstärker (Sense) verstärkt die kleine Abweichung auf den vollen Pegel; weil WL dabei noch hoch ist, wird die Zelle zurückgeschrieben (Restore). Erst danach wird WL abgesenkt und BL erneut auf $0{,}6\,\mathrm{V}$ vorgeladen (Precharge). Restore findet also bei verbundener Zelle statt, Precharge nach deren Trennung.
-:::
-
-## DRAM-Organisation und Spitzenrate
-
-::: {.section-label}
-Vorlesung 1 · Speicherphysik & RAM-Typen
-:::
-
-Lehrmodell: $4$ Banks · $128$ Zeilen · $64$ Spalten · $2$ Byte $=65\,536\,\mathrm{Byte}=64\,\mathrm{KiB}$
-
-16-Bit-Adresse: Bank 15–14 · Zeile 13–7 · Spalte 6–1 · Byte 0
-
-| Zustand der Bank | Befehlsfolge für einen Lesezugriff |
-|------------------|-------------------------------------|
-| passende Zeile offen | READ |
-| Bank geschlossen | ACTIVATE, READ |
-| andere Zeile offen | PRECHARGE, ACTIVATE, READ |
-
-DDR: $200\,\mathrm{MHz}\cdot2\cdot8\,\mathrm{Byte}=3{,}2\,\mathrm{GB/s}$ als Spitzenrate
-
-::: notes
-DRAM-Zellen sind in Banks organisiert; jede Bank ist eine Matrix aus Zeilen und Spalten. Im frei gewählten Lehrmodell gibt es vier Banks mit je 128 Zeilen, 64 Spalten und zwei Byte je Spaltenelement. Die Kapazität ist das Produkt $4\cdot128\cdot64\cdot2=65\,536$ Byte, also $64\,\mathrm{KiB}$. Die Feldbreiten folgen aus den Zweierlogarithmen: zwei Bankbits, sieben Zeilenbits, sechs Spaltenbits und ein Bytebit ergeben genau 16 Adressbits. Für Bank zwei, Zeile fünf, Spalte neun und Byte eins lautet die Adresse $2\cdot2^{14}+5\cdot2^{7}+9\cdot2+1=33\,427=\texttt{0x8293}$.
-
-ACTIVATE öffnet eine Zeile und übernimmt ihren Inhalt in die Leseverstärker der Bank. READ wählt anschließend eine Spalte dieser offenen Zeile. PRECHARGE schließt die Zeile wieder. Ein Lesezugriff auf die bereits offene passende Zeile benötigt deshalb nur READ, eine geschlossene Bank zusätzlich ACTIVATE, eine andere offene Zeile zuerst PRECHARGE. Die Befehlsfolge erklärt den unterschiedlichen Aufwand; die tatsächlichen Wartezeiten stehen im Datenblatt und werden vom Speichercontroller eingehalten.
-
-DDR (Double Data Rate) überträgt Daten an beiden Taktflanken. Bei $200\,\mathrm{MHz}$ externem Takt und 64 Bit, also acht Byte Datenbreite, ergibt sich als theoretische Spitzenrate $200\cdot10^6\,\mathrm{s^{-1}}\cdot2\cdot8\,\mathrm{Byte}=3{,}2\cdot10^9\,\mathrm{Byte/s}=3{,}2\,\mathrm{GB/s}$. Die Taktfrequenz bleibt dabei $200\,\mathrm{MHz}$. Befehle, Zeilenwechsel und Refresh verhindern, dass diese Rate dauerhaft erreicht wird.
-:::
-
-## Memory Map, Abschnitte und Startup
-
-::: {.section-label}
-Vorlesung 1 · Speicherphysik & RAM-Typen
-:::
-
-- Bereich $[\mathrm{Start},\,\mathrm{Ende})$: Ende ist ausgeschlossen
-- 32-Bit-Zugriff: vier Byte im Bereich, Start durch vier teilbar
-
-| Abschnitt | Inhalt | Ladebild (LMA) | Laufzeit (VMA) |
-|-----------|--------|----------------|----------------|
-| `.text`, `.rodata` | Code, Konstanten | Flash | Flash |
-| `.data` | initialisierte Variablen | Flash | RAM |
-| `.bss` | nullinitialisierte Variablen | – | RAM |
-
-Startup: Stack → `.data` kopieren → `.bss` nullen → `main`
-
-::: notes
-Eine Memory Map ordnet Adressbereichen Speicher und Geräte zu. Bereiche werden halboffen angegeben: Der Start gehört dazu, das Ende ist die erste ausgeschlossene Adresse. Im Lehrmodell beginnt SRAM bei `0x10000000` und umfasst $64\,\mathrm{KiB}=\texttt{0x10000}$ Byte. Das exklusive Ende ist `0x10010000`, die letzte enthaltene Byteadresse `0x1000FFFF`. Ein 32-Bit-Zugriff ab `0x1000FFFC` ist zulässig: Er ist durch vier teilbar und belegt die Byte bis `0x1000FFFF`. Ab `0x1000FFFF` wäre er weder ausgerichtet noch vollständig im Bereich, ab `0x10010000` läge er ganz außerhalb.
-
-Der Linker ordnet C-Objekte in Abschnitte ein. Im typischen Modell stehen Code (`.text`) und Konstanten (`.rodata`) im Flash. Initialisierte veränderbare Variablen (`.data`) brauchen zwei Adressen: Ihr Anfangswert liegt als Ladebild im Flash, die Load Memory Address (LMA); zur Laufzeit liegen sie im RAM, an der Virtual Memory Address (VMA). Nullinitialisierte Variablen (`.bss`) benötigen nur RAM; das Abbild speichert keine Nullbytes. Im Linkerskript beschreibt `MEMORY` die Regionen mit `ORIGIN` und `LENGTH`, und `.data : { … } > RAM AT> FLASH` drückt genau diese Trennung aus.
-
-Der Linker berechnet die Anordnung, ausgeführt wird die Initialisierung vom Startup-Code: Nach dem Reset stellt er unter anderem den Stack bereit, kopiert die Anfangswerte von `.data` in den RAM, setzt `.bss` auf null und ruft dann `main` auf. Deshalb hat eine veränderte globale Variable nach einem Neustart wieder ihren Anfangswert. Das C-Schlüsselwort `const` garantiert übrigens keinen Flashort; die Platzierung legt das Linkerskript fest.
+Bei Größenangaben gehört die Basis dazu. Ein MiB sind $2^{20}=1\,048\,576$ Byte oder $8\,388\,608$ Bit, ein MB dagegen $10^6$ Byte. Für ein MiB benötigt klassisches 6T-SRAM, dessen Zelle aus sechs Transistoren besteht und ihr Bit durch zwei rückgekoppelte Inverter hält, $6\cdot8\,388\,608=50\,331\,648$ Zelltransistoren. 1T1C-DRAM speichert jedes Bit als Ladung in einem Kondensator hinter einem Zugriffstransistor und braucht deshalb je $8\,388\,608$ Transistoren und Kondensatoren sowie regelmäßiges Auffrischen; die Peripherie ist dabei nicht gezählt.
 :::
 
 ## Lokalität: Warum nahe Kopien wirken {.compact-figure}
@@ -282,33 +158,6 @@ Der Schreibverkehr unterscheidet sich deutlich: 100 Store-Hits auf dasselbe Wort
 Wird eine Dirty-Zeile verdrängt, gehört sie an ihre alte Adresse. Ersetzt `0x9000` im Direct-Mapped-Cache die Zeile von `0x1000`, so ergibt sich die Rückschreibadresse aus altem Tag null und Index 64: $(0\cdot512+64)\cdot64=\texttt{0x1000}$. Danach wird der neue Block geladen, mit Tag eins und Dirty null. Das Modell gilt für einen Prozessor und normalen Speicher; Geräte und weitere Kerne erfordern zusätzliche Regeln.
 :::
 
-## C-Zugriffsmuster entscheiden über Treffer
-
-::: {.section-label}
-Vorlesung 2 · Speicherhierarchie & Caches
-:::
-
-`uint32_t a[16][16]` ab `0x1000`: $\;\operatorname{Adresse}(a[r][c])=\texttt{0x1000}+4\,(16r+c)$
-
-Cache: $512$ Byte, Direct Mapped, 64-Byte-Zeilen, $8$ Sets, vor jedem Vergleich kalt
-
-| Besuchsreihenfolge | Misses | Hits | Hit Rate |
-|--------------------|--------|------|----------|
-| zeilenweise (`r` außen) | $16$ | $240$ | $93{,}75\,\%$ |
-| spaltenweise (`c` außen) | $256$ | $0$ | $0\,\%$ |
-
-Mit $1024$ Byte ($16$ Sets) auch spaltenweise: $16$ Misses, $240$ Hits
-
-::: notes
-C legt zweidimensionale Arrays zeilenweise (row-major) ab. Für `uint32_t a[16][16]` mit vier Byte je Element liegt die Nachbarspalte vier Byte, die nächste Zeile 64 Byte weiter. Damit füllt jede Arrayzeile genau eine Cache-Zeile. Das Modell zählt nur die 256 Daten-Loads, ohne Vorabladen und ohne weitere Anfragen.
-
-Der Set-Index einer Arrayzeile ist $i(r)=(\texttt{0x1000}/64+r)\bmod8=r\bmod8$. Zeilenweise lesend erzeugt das erste Element jeder Zeile einen Miss, die folgenden 15 Elemente sind Hits: 16 Misses und 240 Hits, also $93{,}75\,\%$. Spaltenweise lesend werden nacheinander die Zeilen 0 bis 15 berührt. Zeile $r$ und Zeile $r+8$ teilen dasselbe Set und verdrängen sich, bevor die nächste Spalte denselben Block wieder braucht. Jeder Zugriff ist ein Miss.
-
-Beide Schleifen berechnen dieselbe Summe, erzeugen aber verschiedene Adressfolgen. Deshalb gehören Layout, Besuchsreihenfolge und Cache-Modell immer gemeinsam in die Begründung. Mit $1024$ Byte Kapazität gibt es 16 Sets. Jede Arrayzeile erhält ein eigenes Set, und auch die spaltenweise Spur kommt auf 16 Kaltstart-Misses und 240 Hits.
-
-Auch die Schrittweite wirkt auf die Setnutzung: Bei 128 Byte Abstand ab `0x1000` werden im Achtermodell nur die Sets 0, 2, 4 und 6 genutzt, und `0x1200` verdrängt `0x1000`. Solche Spuren lassen sich in einem Cache-Simulator wie Ripes nachvollziehen; Simulatorzähler bestätigen die Trefferbilanz, sind aber keine allgemeine Laufzeitmessung.
-:::
-
 ## Ereignisse erfassen: Polling oder Interrupt {.compact-figure}
 
 ::: {.section-label}
@@ -422,32 +271,6 @@ Die Timeranforderung besteht, solange `mtime` $\geq$ `mtimecmp` gilt. `mret` set
 Für periodische Abläufe ist die Planungsregel entscheidend. Relativ geplant, als „jetzt plus Periode“, übernimmt jeder Termin die Eintrittsverspätung: Eine Behandlung bei $10{,}2\,\mathrm{ms}$ führt zu $11{,}2\,\mathrm{ms}$, und das Raster driftet. Im absoluten Sollraster folgt $d+\Delta=11\,\mathrm{ms}$.
 
 War die Behandlung länger verhindert, sind mehrere Termine fällig. Mit Solltermin $d=10\,\mathrm{ms}$, Periode $\Delta=1\,\mathrm{ms}$ und aktueller Zeit $n=15{,}3\,\mathrm{ms}$ gilt $k=\lfloor5{,}3\rfloor+1=6$ und $d'=16\,\mathrm{ms}$. Sechs Termine sind verstrichen, aber nur ein Handler-Aufruf hat stattgefunden. Ein Flag zählt keine Perioden; die verstrichene Zeit liefert die Zeitbasis selbst. Historische Messwerte lassen sich nachträglich nicht erzeugen – sie müssen zuvor gespeichert worden sein.
-:::
-
-## Reaktionszeit und Datenübergabe
-
-::: {.section-label}
-Vorlesung 3 · Interrupts & Timer
-:::
-
-Daten gesichert: $40+5+8=53\,\mu\mathrm{s}$ · Ergebnis fertig: $53+80+30=163\,\mu\mathrm{s}$
-
-ISR: $500$ Zyklen bei $100\,\mathrm{MHz}$ $=5\,\mu\mathrm{s}$; bei $1000\,\mathrm{s^{-1}}$: $U=0{,}5\,\%$ – kein Fristnachweis
-
-| Schritt | Hauptprogramm | ISR |
-|---------|---------------|-----|
-| $1$ | liest Flag $=1$ | |
-| $2$ | | setzt erneut Flag $=1$ |
-| $3$ | schreibt Flag $=0$ | |
-
-`volatile` erzwingt Zugriffe, keine Atomizität · Lesen und Löschen gemeinsam kurz schützen
-
-::: notes
-Eine Reaktionszeit ist erst mit einem festgelegten Endpunkt eindeutig. Im Lehrbeispiel ist der Interrupt höchstens $40\,\mu\mathrm{s}$ blockiert, der Eintritt dauert $5\,\mu\mathrm{s}$, die Datensicherung $8\,\mu\mathrm{s}$. Die Daten sind also nach $53\,\mu\mathrm{s}$ gesichert. Wartet die eigentliche Auswertung danach weitere $80\,\mu\mathrm{s}$ im Hauptprogramm und dauert sie $30\,\mu\mathrm{s}$, ist das Ergebnis erst nach $163\,\mu\mathrm{s}$ fertig. Eine Frist von $100\,\mu\mathrm{s}$ erfüllt nur der erste Endpunkt. Interrupt-Latenz, Behandlungsdauer und Reaktionszeit sind daher verschiedene Größen.
-
-Eine kleine mittlere Last beweist keine Frist. Eine ISR (Interrupt Service Routine) mit 500 Zyklen bei $100\,\mathrm{MHz}$ dauert $5\,\mu\mathrm{s}$; bei 1000 Aufrufen pro Sekunde belegt sie $0{,}5\,\%$ der Prozessorzeit. Über den ungünstigsten Einzelfall sagt das nichts. Deshalb bleibt in der ISR nur das zeitkritisch Nötige: Daten vor dem Überschreiben sichern, Geräteursache quittieren, nächsten Timertermin setzen, Quelle abschließen. Längere Auswertung folgt im Hauptprogramm.
-
-Dabei greifen ISR und Hauptprogramm verschränkt auf gemeinsame Daten zu. Die Tabelle zeigt einen verlorenen Hinweis: Das Hauptprogramm liest das Flag als eins, dann setzt die ISR es für ein neues Ereignis erneut, und schließlich löscht das Hauptprogramm es. Die zweite Markierung ist verloren. `volatile` verhindert das nicht; es sorgt nur dafür, dass Zugriffe tatsächlich stattfinden. Abhilfe im Ein-Hart-Modell: vorherige Freigabe merken, relevanten Interrupt sperren, Flag lokal übernehmen und löschen, Freigabe wiederherstellen und erst danach die längere Arbeit erledigen. Je nach benötigter Aussage genügt ein Flag, oder es braucht einen konsistent übernommenen Zähler oder einen Datenpuffer.
 :::
 
 ## Pipeline: Durchlaufzeit und Ergebnisrate {.compact-figure}
@@ -596,56 +419,6 @@ Entscheidend ist die Reihenfolge: zuerst aus dem alten Zustand vorhersagen, dann
 Die Kosten zeigt ein additives Modell: Sind $20\,\%$ der Befehle Sprünge, werden davon $10\,\%$ falsch vorhergesagt und kostet jeder Fehler 15 Takte, steigt das CPI um $0{,}20\cdot0{,}10\cdot15=0{,}30$ auf $1{,}30$. Die Laufzeit wächst um $30\,\%$, der Durchsatz sinkt aber auf $1/1{,}30\approx0{,}769$, also um $23{,}1\,\%$. Vorhersagetabellen können sich Einträge teilen, und verworfene Befehle können interne Spuren hinterlassen, etwa geladene Cache-Zeilen.
 :::
 
-## Neuron, Aktivierung und Entscheidung
-
-::: {.section-label}
-Vorlesung 8 · KI-Beschleuniger & Edge AI
-:::
-
-$$z=w_1x_1+w_2x_2+b,\qquad h=\operatorname{ReLU}(z)=\max(0,z)$$
-
-Beispiel: $x=(1;\,0{,}2)$, $w=(-1;\,5)$, $b=0{,}5$ $\;\Rightarrow\;$ $z=0{,}5$, $h=0{,}5$
-
-- $z=0$ ist eine Trenngerade: Gewichte bestimmen die Richtung, der Bias verschiebt
-- Aktivitätsmodell: $96$ Eingaben → $16$ ReLU-Werte → $3$ Scores → $\operatorname{argmax}$
-- Scores sind Vergleichswerte, keine Wahrscheinlichkeiten
-
-::: notes
-Vorlesung 8 beginnt bei der Frage, wie ein Gerät aus Beschleunigungswerten eine Aktivität wie Stehen, Gehen oder Laufen erkennt. Grundbaustein ist die gewichtete Summe eines Neurons: Jedes Eingabemerkmal $x_i$ wird mit einem Gewicht $w_i$ multipliziert, die Produkte werden addiert und um den Bias $b$ ergänzt. Im Zahlenbeispiel ergibt sich $z=-1\cdot1+5\cdot0{,}2+0{,}5=0{,}5$.
-
-Bei zwei Merkmalen, etwa Mittelwert und Standardabweichung des Beschleunigungsbetrags eines Fensters, ist $z=0$ eine Gerade in der Merkmalsebene. Die Gewichte legen ihre Normalenrichtung fest, ein geänderter Bias verschiebt sie parallel. Eine Aktivierungsfunktion verarbeitet $z$ weiter; ReLU (Rectified Linear Unit) liefert $\max(0,z)$, hier also $0{,}5$, bei $z=-0{,}25$ dagegen null. Diese Nichtlinearität ist wesentlich: Ohne sie lassen sich mehrere Schichten zu einer einzigen affinen Abbildung zusammenfassen. Mit ReLU verbinden verborgene Schichten lineare Teilbereiche zu komplexeren Grenzen.
-
-Das trainierte Aktivitätsmodell der Vorlesung erhält ein Fenster aus 32 Zeitpunkten mit je drei Achsen, also 96 Eingaben. Eine Dense-Schicht bildet 16 ReLU-Werte, eine zweite drei Scores. Für ein Testfenster einer neuen Person beim Gehen lauten die Scores $-6{,}243$, $0{,}901$ und $-1{,}240$. Der größte Score gehört zu Index eins, also Gehen. Scores sind Vergleichswerte; sie sind weder positiv noch summieren sie sich zu eins und dürfen deshalb nicht als Wahrscheinlichkeiten gelesen werden.
-:::
-
-## Training und Inferenz trennen
-
-::: {.section-label}
-Vorlesung 8 · KI-Beschleuniger & Edge AI
-:::
-
-Training ändert die Parameter $\theta$: $\;w_\mathrm{neu}=w-\eta\,\dfrac{\mathrm dL}{\mathrm dw}=1-0{,}1\cdot(-8)=1{,}8$
-
-Inferenz: neue Eingabe mit festen Parametern auswerten, ein Vorwärtslauf je Entscheidung
-
-| Datenrolle | Personen | Verwendung |
-|------------|----------|------------|
-| Training | 1–16 | Gewichte und Bias anpassen |
-| Validierung | 17–20 | Einstellungen beurteilen |
-| Test | 21–24 | festgelegtes Modell an neuen Personen bewerten |
-
-Beobachtet: $768/768$ Trainingsfenster, aber $159/192\approx82{,}8\,\%$ Testfenster richtig
-
-::: notes
-Training und Inferenz sind verschiedene Phasen mit verschiedenen Anforderungen. Beim Training werden die Modellparameter $\theta$, also Gewichte und Biaswerte, anhand von Beispielen mit bekanntem Zielwert (Label) angepasst. Ein Verlust $L$ bewertet die Abweichung; der Gradient gibt an, in welche Richtung der Verlust lokal steigt. Ein Gradientenschritt geht mit der Lernrate $\eta$ in die Gegenrichtung. Für $L(w)=(2w-4)^2$ gilt $\mathrm dL/\mathrm dw=4(2w-4)$, bei $w=1$ also $-8$. Mit $\eta=0{,}1$ folgt $w_\mathrm{neu}=1{,}8$; der Verlust sinkt von $4$ auf $0{,}16$, das Minimum liegt bei $w=2$.
-
-Bei der Inferenz bleiben die Parameter fest. Eine neue Eingabe wird in einem Vorwärtslauf ausgewertet, und das Ergebnis liefert eine Entscheidung. In der Vorlesung wird auf dem Entwicklungsrechner trainiert und auf dem Gerät nur noch ausgewertet. Für den Mikrocontroller zählen deshalb vor allem Speicher, Rechenarbeit und Zeit der Inferenz.
-
-Ob ein Modell brauchbar ist, zeigt erst ein getrennter Test. Die MotionSense-Daten werden nach Personen aufgeteilt: Training mit den Personen 1–16, Validierung zur Wahl von Einstellungen mit 17–20, Test des festgelegten Modells mit 21–24. Benachbarte Fenster derselben Aufnahme bleiben in derselben Gruppe, damit der Test nicht fast identische Ausschnitte bewertet. Das trainierte Modell klassifiziert alle 768 Trainingsfenster richtig, aber nur 159 von 192 Testfenstern. Eine perfekte Trainingsquote belegt also keine zuverlässige Erkennung bei neuen Personen; auch ein endlicher Test ist keine Garantie für jede reale Eingabe.
-
-Eine 1D-Faltung (Conv1D) erweitert diese Idee: Sie bildet wie ein FIR-Filter lokale gewichtete Summen über ein Zeitfenster, lernt die Koeffizienten aber aus Daten.
-:::
-
 ## Parameter, MACs und Roofline {.compact-figure}
 
 ::: {.section-label}
@@ -659,7 +432,9 @@ Dense $n\rightarrow m$: $mn+m$ Parameter · $mn$ MACs · $2mn$ Operationen
 $I=O/D,\quad P\le\min(P_\mathrm{peak},\,B\cdot I)$ · Tiles erhöhen $I$
 
 ::: notes
-Eine Dense-Schicht verbindet jeden ihrer $n$ Eingänge mit jedem ihrer $m$ Ausgänge über ein eigenes Gewicht und ergänzt je Ausgang einen Bias. Gespeichert werden also $mn+m$ Parameter. Rechenarbeit sind die $mn$ MACs (Multiply-Accumulate: Produkt bilden und zur laufenden Summe addieren); in der Konvention „eine MAC gleich zwei Operationen“ sind das $2mn$ Operationen. Parameter sind gespeicherte Zahlen, MACs Arbeit je Auswertung, und beides ist keine Befehls- oder Taktzahl. Für das Aktivitätsmodell mit $96\rightarrow16\rightarrow3$ ergeben sich $1552+51=1603$ Parameter und $1536+48=1584$ MACs je Fenster.
+Vorlesung 8 verfolgt ein durchgängiges Beispiel: Ein Gerät soll aus Beschleunigungswerten erkennen, ob eine Person steht, geht oder läuft. Ausgewertet wird jeweils ein Sensorfenster aus 32 Zeitpunkten mit je drei Achsen, also 96 Eingabewerten. Das trainierte Aktivitätsmodell bildet daraus in einer ersten Schicht 16 Zwischenwerte, begrenzt sie mit der Aktivierungsfunktion ReLU auf nichtnegative Werte ($\max(0,z)$) und berechnet in einer zweiten Schicht drei Vergleichswerte (Scores), je einen pro Aktivität. Der größte Score bestimmt die Entscheidung.
+
+Beide Schichten sind Dense-Schichten. Eine Dense-Schicht verbindet jeden ihrer $n$ Eingänge mit jedem ihrer $m$ Ausgänge über ein eigenes Gewicht und ergänzt je Ausgang einen Bias, einen eingabeunabhängigen Summanden: $y_j=\sum_i w_{ji}x_i+b_j$. Gespeichert werden also $mn+m$ Parameter. Rechenarbeit sind die $mn$ MACs (Multiply-Accumulate: Produkt bilden und zur laufenden Summe addieren); in der Konvention „eine MAC gleich zwei Operationen“ sind das $2mn$ Operationen. Parameter sind gespeicherte Zahlen, MACs Arbeit je Auswertung, und beides ist keine Befehls- oder Taktzahl. Für das Aktivitätsmodell mit $96\rightarrow16\rightarrow3$ ergeben sich $1552+51=1603$ Parameter und $1536+48=1584$ MACs je Sensorfenster.
 
 Ob ein Rechenwerk diese Arbeit schnell erledigt, hängt auch von der Datenversorgung ab. Die Rechenintensität $I=O/D$ setzt Operationen $O$ ins Verhältnis zu den über eine benannte Speichergrenze übertragenen Bytes $D$. Das Roofline-Modell begrenzt die erreichbare Rate durch $P\le\min(P_\mathrm{peak},B\cdot I)$ mit Rechenpeak $P_\mathrm{peak}$ und Bandbreite $B$. Im Bild steigt die Grenze bis zum Knick bei $I=P_\mathrm{peak}/B$ linear an und bleibt danach waagrecht. Im Modell R mit acht Operationen und acht Byte je Takt liegt der Knick bei einer Operation je Byte. Bei $I=0{,}25$ sind höchstens zwei Operationen je Takt möglich. Ein verdoppelter Peak ändert diese Grenze nicht; nur mehr Bandbreite oder höhere Intensität hilft.
 
@@ -686,36 +461,9 @@ Ein Lane-Überlauf verfälscht unbemerkt – deshalb verbreiternde Befehle
 ::: notes
 Auf dem Mikrocontroller werden Gewichte und Aktivierungen häufig als Int8 gespeichert, also als 8-Bit-Ganzzahlen von $-128$ bis $127$. Gegenüber Float32 sinkt der Speicherbedarf je Wert auf ein Viertel, und Flash, SRAM und Transfers werden entlastet. Skala und Nullpunkt ordnen den Integercodes reale Werte zu.
 
-Schmal gespeichert heißt aber nicht schmal gerechnet. Das Produkt zweier Int8-Werte liegt zwischen $-128\cdot127=-16\,256$ und $(-128)\cdot(-128)=16\,384$ und passt exakt in Int16. Schon zwei solche Produkte ergeben $32\,768$ und sprengen Int16. Akkumuliert wird deshalb in Int32; dort passen auch die 96 Produkte einer Zeile des Aktivitätsmodells, denn $96\cdot16\,384=1\,572\,864<2^{31}$. Der Bias wird als Int32 in derselben Produktskala addiert. Erst am Schichtende folgen Aktivierung und Requantisierung: skalieren, runden, um den Ausgangsnullpunkt verschieben und auf $-128$ bis $127$ begrenzen. Diese Sättigung ist gewollt; Werte schlagen nicht modulo um.
+Schmal gespeichert heißt aber nicht schmal gerechnet. Das Produkt zweier Int8-Werte liegt zwischen $-128\cdot127=-16\,256$ und $(-128)\cdot(-128)=16\,384$ und passt exakt in Int16. Schon zwei solche Produkte ergeben $32\,768$ und sprengen Int16. Akkumuliert wird deshalb in Int32; dort passen auch die 96 Produkte einer Ausgangssumme in der ersten Schicht des Aktivitätsmodells, denn $96\cdot16\,384=1\,572\,864<2^{31}$. Der Bias wird als Int32 in derselben Produktskala addiert. Erst am Schichtende folgen Aktivierung und Requantisierung: skalieren, runden, um den Ausgangsnullpunkt verschieben und auf $-128$ bis $127$ begrenzen. Diese Sättigung ist gewollt; Werte schlagen nicht modulo um.
 
 Datenparallelität (DLP, Data-Level Parallelism) bedeutet, dieselbe Arbeit auf vielen Daten auszuführen. SIMD-Befehle (Single Instruction, Multiple Data) nutzen sie mit gemeinsamer Steuerung für mehrere Lanes. Jede Lane respektiert ihre Elementgrenze: Vier vorzeichenlose 8-Bit-Lanes addieren $1+2=3$, $16+32=48$, $127+1=128$ und $255+1=0$ modulo 256, ohne Übertrag in die Nachbarlane. Ein solcher Überlauf bleibt unbemerkt. Befehlssätze bieten deshalb verbreiternde Multiplikationen, MAC- oder Skalarproduktbefehle, die Int8 lesen und breitere Ergebnisse schreiben. Welche davon eine Plattform besitzt und wie schnell sie arbeiten, legen Befehlssatz und Mikroarchitektur fest.
-:::
-
-## RVV: Die Hardware wählt die aktive Länge
-
-::: {.section-label}
-Vorlesung 8 · KI-Beschleuniger & Edge AI
-:::
-
-$$\mathrm{VLMAX}=\mathrm{LMUL}\cdot\frac{\mathrm{VLEN}}{\mathrm{SEW}}$$
-
-| VLEN | SEW | LMUL | VLMAX |
-|------|-----|------|-------|
-| $128$ Bit | $32$ Bit | $1$ | $4$ |
-| $1024$ Bit | $32$ Bit | $1$ | $32$ |
-| $128$ Bit | $32$ Bit | $8$ | $32$ |
-
-- `vsetvli` liefert $\mathrm{VL}\le\mathrm{VLMAX}$; Schleife rückt um VL weiter
-- Verbreitern: $2\cdot\mathrm{SEW}$ Bit, $\mathrm{EMUL}=2\cdot\mathrm{LMUL}$
-
-::: notes
-Die RISC-V Vector Extension (RVV 1.0) legt die Vektorlänge nicht im Befehlssatz fest. VLEN ist die Bitbreite eines Vektorregisters der konkreten Hardware, SEW (Selected Element Width) die gewählte Elementbreite und LMUL (Vector Register Group Multiplier) die Zahl zusammengefasster Register. Daraus folgt die Kapazität $\mathrm{VLMAX}=\mathrm{LMUL}\cdot\mathrm{VLEN}/\mathrm{SEW}$: Bei 128 Bit und 32-Bit-Elementen sind es vier, bei 1024 Bit 32 Elemente. VLMAX sagt nichts über die Zahl physischer Rechen-Lanes; ein Kern mit zwei Lanes braucht für vier Elemente zwei Takte je Befehl.
-
-Derselbe Maschinencode läuft auf beiden Kernen. In jeder Schleifeniteration fordert `vsetvli` mit dem Rest AVL (Application Vector Length) eine aktive Länge an und erhält VL zurück. Die Schleife lädt, rechnet und speichert VL Elemente, rückt Zeiger um VL Elemente weiter und verringert den Rest um VL. Dieses Strip-Mining kommt ohne skalaren Nachspann aus. Für den Fortschritt zählt die tatsächliche Rückgabe von `vsetvli`; sie ist nicht in jedem Fall das Minimum aus AVL und VLMAX, weil die Hardware einen Rest zwischen VLMAX und $2\cdot$VLMAX gleichmäßiger aufteilen darf.
-
-Größeres LMUL verlängert die Vektoren, verringert aber die Zahl nutzbarer Registergruppen. Verbreiternde Befehle wie `vwmul` schreiben Ergebnisse doppelter Breite in eine Registergruppe mit $\mathrm{EMUL}=2\cdot\mathrm{LMUL}$; so entstehen aus Int8-Werten exakte Int16-Produkte und Int32-Teilsummen.
-
-Auch hier gilt: Latenz ist nicht Initiationsintervall. Bei Latenz drei und einem Start je Takt enden vier unabhängige Operationen in den Takten drei bis sechs. Chaining reicht fertige Elemente direkt an die nächste Operation weiter, statt auf den ganzen Vektor zu warten.
 :::
 
 ## GPU, NPU und Herstellerbindung
@@ -767,30 +515,4 @@ Im Lehrbeispiel braucht der CPU-Pfad $2+10+3+1=16\,\mathrm{ms}$. Mit Beschleunig
 Das Amdahlsche Gesetz beschreibt diese Grenze allgemein. Ist $f$ der bisherige Zeitanteil des beschleunigten Teils und $s$ dessen Teilfaktor, gilt ohne zusätzliche Übergabekosten $S=1/((1-f)+f/s)$. Hier ist $f=10/16$; die Kopie ergänzt im Nenner den Anteil $1/16$: $1/(6/16+1/16+1/16)=2$. Selbst eine Dense-Zeit von null ließe $2+1+3+1=7\,\mathrm{ms}$ übrig, also höchstens den Faktor $16/7\approx2{,}29$. Der nicht beschleunigte Rest bestimmt die Obergrenze.
 
 Die Rechnung begründet eine Latenzaussage, noch keine Energieersparnis. Gerade bei kleinen Modellen können Übergabe und übrige Firmwarearbeit die Hardwarewahl stärker bestimmen als der isolierte Rechenpeak. Ein kleiner Gesamtgewinn rechtfertigt dann auch keine starke Herstellerbindung. Aus einem Sensorfenster wird erst dann eine brauchbare Entscheidung, wenn Modell, Operatoren, Zahlenformate, Speicher, Reaktionszeit, Energie und Werkzeugkette gemeinsam passen.
-:::
-
-## Querverbindungen der fünf Einheiten
-
-| Leitfrage | Wiederkehrende Beispiele |
-|-----------|--------------------------|
-| Latenz oder Rate? | DRAM-Zugriff und DDR · AMAT · Interrupt-Latenz · Pipeline · Roofline |
-| Welches Modell, welche Annahmen? | Lehrwerte · kalter Cache · ein Hart · M1–M3 · Bewertungsgrenze |
-| Zustand oder Ereignis? | Dirty-Bit · Pending · Flag oder Zähler · ROB-Status |
-| Welche Grenze ist die engste? | Bandbreite · Bestätigungsbreite · serieller Anteil |
-| Wer stellt Korrektheit her? | Startup-Code · Claim und Complete · geordnetes Retire · Requantisierung |
-
-Ergebnisse immer mit Einheit, Anfangszustand und Modellannahmen angeben
-
-::: notes
-Die fünf Einheiten behandeln verschiedene Themen, folgen aber wiederkehrenden Denkfiguren. Die erste ist die Trennung von Latenz und Rate. Ein DRAM-Zugriff hat eine Latenz, DDR beschreibt eine Spitzenrate. AMAT gewichtet die zusätzliche Miss-Zeit, eine Interrupt-Latenz ist etwas anderes als die gesamte Reaktionszeit, eine Pipeline erhöht die Ergebnisrate, ohne den einzelnen Befehl zu beschleunigen, und die Roofline trennt Rechenpeak und Bandbreite.
-
-Die zweite Denkfigur sind ausdrückliche Modellannahmen. Alle Rechnungen gelten für benannte Lehrwerte: ein kalter oder warmer Cache, ein Hart ohne Verschachtelung, die Zeitmodelle M1 bis M3, eine festgelegte Bewertungsgrenze von Sensorfenster bis Entscheidung. Ein Ergebnis ohne diese Angaben ist nicht prüfbar.
-
-Drittens wird zwischen Zustand und Ereignis unterschieden. Ein Dirty-Bit hält eine noch nicht weitergegebene Änderung fest, ein Pending-Bit eine wartende Anforderung, ein Flag zählt keine Ereignisse, und der ROB-Status trennt Fertigstellung von Bestätigung.
-
-Viertens begrenzt jeweils der engste Abschnitt das Ganze: die Bandbreite in der Roofline, die Bestätigungsbreite im superskalaren Kern, der nicht beschleunigte Anteil im Amdahlschen Gesetz.
-
-Fünftens braucht Korrektheit einen zuständigen Mechanismus: Der Startup-Code stellt C-Anfangswerte her, Claim, Gerätequittierung und Complete schließen einen Interrupt vollständig ab, geordnetes Retire erhält die Programmwirkung trotz Out-of-Order-Ausführung, und Requantisierung mit Sättigung hält Int8-Ergebnisse im zulässigen Bereich.
-
-Für Übungen und Prüfung folgt daraus eine Arbeitsweise: Annahmen und Anfangszustand nennen, Größen mit Einheiten angeben, schrittweise rechnen und das Ergebnis mit einer zweiten Überlegung oder Rückrechnung kontrollieren.
 :::
