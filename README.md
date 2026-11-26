@@ -19,7 +19,7 @@ Modulhandbuch mit Fassung und verbindlichen Prüfungsregeln liegt hier nicht vor
 | Modul und Zielgruppe | Mikrocomputertechnik 3, Bachelor Elektro- und Informationstechnik, fünftes Semester |
 | Voraussetzungen | MCT1/2, binäre und hexadezimale Zahlen, C-Zeiger und Arrays, Bitoperationen und Schleifen; bekannte STM32-Timer mit Prescaler und ARR |
 | Zeitplanung | Je Einheit vier Schulstunden (180 Minuten) einschließlich Übung und Quiz; zusätzliche selbstständige Bearbeitungszeiten stehen auf den Übungsblättern |
-| Prüfungsvorbereitung | Probeklausur mit 60 Minuten und 60 Punkten, Multiple Choice und offenen Papieraufgaben; verbindliche Prüfungsform und Hilfsmittel sind gesondert festzulegen |
+| Prüfungsvorbereitung | Probeklausur mit 44 Punkten: 12 Multiple-Choice-Fragen mit je drei Antworten und vier offene Papieraufgaben; verbindliche Prüfungsform und Hilfsmittel sind gesondert festzulegen |
 | Technischer Rahmen | RISC-V-Lehrmodelle, RV32 soweit angegeben; C-Lehrcode und Hostversuche mit jeweils ausdrücklich genannten Voraussetzungen; konkrete Registeradressen und Zeitwerte sind plattformabhängig |
 
 Nach Abschluss der Veranstaltung können Sie:
@@ -52,7 +52,7 @@ Pro Einheit: Folien (Reveal.js), Handout-PDF sowie Übungsblatt (Studierende / M
 
 | Dokument | Studierende | Musterlösung |
 |----------|:-----------:|:------------:|
-| Probeklausur zu den Einheiten 1–3, 7 und 8 (60 Min., 60 Punkte) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur.pdf) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur-musterloesung.pdf) |
+| Probeklausur zu den Einheiten 1–3, 7 und 8 (44 Punkte) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur.pdf) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur-musterloesung.pdf) |
 
 ## Literatur
 
