@@ -7,7 +7,7 @@ Herzlich willkommen zur Vorlesung **Mikrocomputertechnik 3 (MCT3)** an der Duale
 *Hinweis: Quellen im Repo unter [`vorlesungen/`](vorlesungen/) und [`labs/`](labs/).*  
 **Repository:** [github.com/dantschi/mct3](https://github.com/dantschi/mct3)
 
-Das Modul vertieft digitale Rechnerarchitektur und die Hardware/Software-Schnittstelle am Beispiel der **RISC-V**-Architektur. Aufbauend auf MCT1 zoomen wir vom isolierten CPU-Kern hinaus zum **System-on-Chip (SoC)**: Speicherphysik und -hierarchie, Interrupts und Timer, moderne CPU-Architekturen, KI-Beschleuniger und Multicore — bis hin zu hardwarenaher C-Programmierung am Gesamtsystem.
+Das Modul vertieft digitale Rechnerarchitektur und die Hardware/Software-Schnittstelle am Beispiel der **RISC-V**-Architektur. Aufbauend auf MCT1 zoomen wir vom isolierten CPU-Kern hinaus zum **System-on-Chip (SoC)**: Speicherphysik und -hierarchie, Interrupts und Timer, moderne CPU-Architekturen und KI-Beschleuniger — bis hin zu hardwarenaher C-Programmierung am Gesamtsystem.
 
 ## Kursrahmen und Lernziele
 
@@ -27,13 +27,13 @@ Nach Abschluss der Veranstaltung können Sie:
 - Speicherarten und Cacheorganisationen erklären, Zugriffe zerlegen und deren Folgen berechnen.
 - Interrupt-, Timer- und Peripherieabläufe herleiten und Reaktionsfristen unter benannten Annahmen prüfen.
 - Befehls- und Datenparallelität unterscheiden und gemeinsame Datenzugriffe einschließlich Fehlerfällen begründet entwerfen.
-- Prozessorparallelität, KI-Beschleuniger und Multicore im Hinblick auf Durchsatz, Speicher und Synchronisation beurteilen.
+- Prozessorparallelität und KI-Beschleuniger im Hinblick auf Durchsatz, Speicher und Gesamtzeit beurteilen.
 
 ## Aktuelle Kursübersicht
 
 Der rote Faden der Veranstaltung:
 
-**Speicherzelle → Caches → Interrupts und Timer → CPU-Architekturen → KI-Beschleuniger → Multicore**
+**Speicherzelle → Caches → Interrupts und Timer → CPU-Architekturen → KI-Beschleuniger**
 
 Pro Einheit: Folien (Reveal.js), Handout-PDF sowie Übungsblatt (Studierende / Musterlösung). Links verweisen auf die Kurswebsite.
 
@@ -44,15 +44,15 @@ Pro Einheit: Folien (Reveal.js), Handout-PDF sowie Übungsblatt (Studierende / M
 | 3 | Interrupts & Timer | Ereignis- und Trap-Pfad, PLIC, Timer-Raster, Reaktionszeit, ISR/Hauptprogramm | [HTML](https://dantschi.github.io/mct3/vorlesungen/03_interrupts_timer.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/03_interrupts_timer-handout.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_03_interrupts_timer.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_03_interrupts_timer-musterloesung.pdf) |
 | 7 | Moderne CPU-Architekturen | Pipeline und Superskalarität, ILP, Out-of-Order, Branch Prediction | [HTML](https://dantschi.github.io/mct3/vorlesungen/07_moderne_cpu_architekturen.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/07_moderne_cpu_architekturen-handout.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_07_moderne_cpu_architekturen.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_07_moderne_cpu_architekturen-musterloesung.pdf) |
 | 8 | KI-Beschleuniger & Edge AI | KI-Grundlagen, gewichtete Summen und Matrizen, Speicherbedarf, RVV, GPU-/NPU-Programmierung und Vendor-Lock-in | [HTML](https://dantschi.github.io/mct3/vorlesungen/08_ki_beschleuniger_edge_ai.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/08_ki_beschleuniger_edge_ai-handout.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_08_ki_beschleuniger_edge_ai.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_08_ki_beschleuniger_edge_ai-musterloesung.pdf) |
-| 9 | Paralleles Rechnen & Multicore | Arbeitsteilung, Cache-Kohärenz, Atomics, Speicherordnung und Skalierung | [HTML](https://dantschi.github.io/mct3/vorlesungen/09_paralleles_rechnen_multicore.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/09_paralleles_rechnen_multicore-handout.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_09_paralleles_rechnen_multicore.pdf) | [PDF](https://dantschi.github.io/mct3/labs/lab_09_paralleles_rechnen_multicore-musterloesung.pdf) |
+| Σ | Zusammenfassung | Kernaussagen, Modelle und Rechenmuster der Einheiten 1–3, 7 und 8 | [HTML](https://dantschi.github.io/mct3/vorlesungen/zusammenfassung.html) | [PDF](https://dantschi.github.io/mct3/vorlesungen/zusammenfassung-handout.pdf) | – | – |
 
-**Hinweise:** Folien im Browser öffnen (Speaker View: Taste **S**). Handout-PDF = Folieninhalt mit Skriptnotizen. Quelltexte unter [`vorlesungen/`](vorlesungen/) und [`labs/`](labs/).
+**Hinweise:** Die Zusammenfassung hat kein eigenes Übungsblatt; zur Prüfungsvorbereitung dient die Probeklausur. Folien im Browser öffnen (Speaker View: Taste **S**). Handout-PDF = Folieninhalt mit Skriptnotizen. Quelltexte unter [`vorlesungen/`](vorlesungen/) und [`labs/`](labs/).
 
 ### Probeklausur
 
 | Dokument | Studierende | Musterlösung |
 |----------|:-----------:|:------------:|
-| Probeklausur (60 Min., 60 Punkte) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur.pdf) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur-musterloesung.pdf) |
+| Probeklausur zu den Einheiten 1–3, 7 und 8 (60 Min., 60 Punkte) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur.pdf) | [PDF](https://dantschi.github.io/mct3/labs/probeklausur-musterloesung.pdf) |
 
 ## Literatur
 
