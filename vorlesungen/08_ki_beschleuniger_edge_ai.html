@@ -297,24 +297,24 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 </tr>
 <tr class="even">
 <td>2</td>
-<td>Datenparallelität und RVV: 25 min</td>
-<td>nach Folie 31: 3.1, 3.2, 3.4 · 15 min</td>
+<td>Datenparallelität und RVV: 30 min</td>
+<td>nach Folie 33: 3.1, 3.2, 3.4 · 15 min</td>
 </tr>
 <tr class="odd">
 <td>3</td>
 <td>Systolisches Array: 25 min</td>
-<td>nach Folie 40: 4.1–4.3 · 15 min</td>
+<td>nach Folie 42: 4.1–4.3 · 15 min</td>
 </tr>
 <tr class="even">
 <td>4</td>
-<td>Quantisierung, Firmware und Amdahl: 30 min</td>
-<td>nach Folie 51: 5.1, 5.3, 6.3 · 15 min</td>
+<td>Quantisierung, Firmware und Amdahl: 25 min</td>
+<td>nach Folie 53: 5.1, 5.3, 6.3 · 15 min</td>
 </tr>
 </tbody>
 </table>
 <p>Abschließend: zwölf Quizfragen · 15 Minuten.</p>
 <aside class="notes">
-<p>Die Planung umfasst 180 Minuten: 110 Minuten für Erklärung, kurze Vorhersagen und gemeinsame Lösungsbesprechung, 55 Minuten für angeleitete Papierarbeit und 15 Minuten für das abschließende Quiz. Die ersten drei Themenblöcke dauern einschließlich Papierphase je vierzig Minuten. Der letzte Block dauert mit dem anschließenden Quiz sechzig Minuten; diese Blöcke sind keine einzelnen Schulstunden. Die Abschnitte beginnen mit einer Orientierung; längere Rechnungen erhalten mehr gemeinsame Zeit als eine kurze Begriffszuordnung. Die Notizen dienen zusätzlich als zusammenhängender Lerntext zum Nachlesen.</p>
+<p>Die Planung umfasst 180 Minuten: 110 Minuten für Erklärung, kurze Vorhersagen und gemeinsame Lösungsbesprechung, 55 Minuten für angeleitete Papierarbeit und 15 Minuten für das abschließende Quiz. Der erste und der dritte Themenblock dauern einschließlich Papierphase je vierzig Minuten, der zweite fünfundvierzig. Er enthält zusätzlich die übliche Int8-Praxis und verbreiternde Befehle; dafür ist der letzte Block um fünf Minuten kürzer, weil die Int8-Formate dort bereits bekannt sind. Mit dem anschließenden Quiz dauert er fünfundfünfzig Minuten; diese Blöcke sind keine einzelnen Schulstunden. Die Abschnitte beginnen mit einer Orientierung; längere Rechnungen erhalten mehr gemeinsame Zeit als eine kurze Begriffszuordnung. Die Notizen dienen zusätzlich als zusammenhängender Lerntext zum Nachlesen.</p>
 <p>Teil A des Übungsblatts enthält sechs Aufgaben mit 44 Orientierungspunkten. In der Präsenz werden die hier genannten Teilaufgaben ausgewählt und bei Bedarf mit gemeinsamen Zwischenständen bearbeitet. Die vollständige selbstständige Bearbeitung umfasst weitere Teile. Teil B enthält drei längere, verkettete Aufgaben mit weiteren 44 Punkten und einem geschätzten Umfang von 75 Minuten zur Nachbereitung. Diese Richtwerte sind keine verbindliche Klausurvorgabe. Zwölf Quizfragen verbinden am Ende die behandelten Modelle. Eigene kurze Vorhersagen zwischendurch prüfen den aktuellen Gedanken. Die abschließenden Hintergrundfolien zu Begriffen, Quellen und eigenen Messungen dienen dem Nachlesen und verlängern den Pflichtvortrag nicht.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
@@ -920,6 +920,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <aside class="notes">
 <p>Das Aktivitätsmodell enthält viele ähnliche Produkte. Datenparallelität nutzt diese Gleichartigkeit; Befehlsparallelität nutzt unabhängige Maschinenbefehle. Die Begriffe beschreiben unterschiedliche Ebenen und können gemeinsam auftreten. Eine breite Operation bedeutet außerdem noch nicht, dass für jedes Element dauerhaft ein eigenes Rechenwerk vorhanden ist.</p>
 <p>Die Zahlen- und Zeitannahmen stehen am Anfang des Abschnitts. Gepackte Bytes werden im Beispiel getrennt modulo 256 addiert. Bei der RISC-V-Vektorerweiterung RVV 1.0 unterscheiden wir Registerkapazität, aktive Länge und physische Lanes. Für Zeitbilder gilt: Ein Start in Takt <span class="math inline">\(t\)</span> mit Latenz <span class="math inline">\(L\)</span> liefert sein Ergebnis am Ende von <span class="math inline">\(t+L-1\)</span>; ein abhängiger Nutzer beginnt frühestens danach. Diese Verträge erlauben einen nachvollziehbaren Vergleich, während der Befehlssatz selbst die Wirkung der Operationen beschreibt.</p>
+<p>Der Abschnitt führt von Lane-Grenzen und Akkumulatorbreite zur üblichen Int8-Praxis: schmal speichern, breit rechnen. Danach fassen drei Folien die Grundideen von RVV zusammen, bevor verbreiternde Befehle zeigen, was diese Praxis an Registern und Takten kostet.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -939,9 +940,11 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 </div>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/simd.png" alt="Vier unsigned Acht-Bit-Lanes addieren getrennt 1+2,16+32,127+1 und255+1 zu3,48,128 und0; kein Übertrag in die Nachbarlane."></p>
 <p>DLP: gleiche Arbeit an mehreren Daten · SIMD: gemeinsame Befehlssteuerung</p>
+<p>Int8-Netze: Ein Lane-Überlauf verfälscht unbemerkt.</p>
 <aside class="notes">
 <p>Gleiche Arbeit an vielen Werten ist Datenparallelität, DLP oder Data-Level Parallelism. SIMD, Single Instruction, Multiple Data, ist eine mögliche Umsetzung mit gemeinsamer Befehlssteuerung. ILP aus der CPU-Vorlesung kann gleichzeitig unabhängige Befehle oder Ausgabesummen nutzen. Innerhalb einer einzelnen Akkumulation bleibt deren Wertabhängigkeit bestehen.</p>
 <p>Die Abbildung betrachtet vier vorzeichenlose Acht-Bit-Felder in einem breiteren Register. Jede Lane addiert ihre beiden Bytes modulo 256: Es entstehen 3, 48, 128 und 0, hexadezimal 03, 30, 80 und 00. Ein Übertrag verlässt das betreffende Feld nicht. Ein gewöhnliches 32-Bit-<code>add</code> behandelt dagegen das gesamte Wort als eine Zahl und kann einen Byteübertrag weiterreichen. Das Beispiel zeigt deshalb eine bestimmte gepackte Semantik, keinen beliebigen RISC-V-Basisbefehl. Sättigung wäre nochmals eine andere Regel; sie begrenzt statt umzuschlagen.</p>
+<p>Für Int8-Netze ist diese Regel entscheidend. Gepackte Rechnungen sind schnell, liefern aber nur dann richtige Werte, wenn jedes Ergebnis in seine Lane passt. Produkte und Summen tun das meist nicht: <span class="math inline">\(20\cdot20=400\)</span> ergibt in einer Acht-Bit-Lane modulo 256 den Wert 144, als vorzeichenbehafteter Int8-Wert also <span class="math inline">\(144-256=-112\)</span>. Ein solcher Fehler löst keine Ausnahme aus. Die beiden folgenden Folien zeigen, welche Breite eine Produktsumme benötigt und wie Integer-Netzkerne deshalb üblicherweise vorgehen.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -963,7 +966,66 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <p>Int8 speichert die Operanden; es legt die Akkumulatorbreite nicht fest.</p>
 <aside class="notes">
 <p>Ein kleines Eingabeformat begrenzt nicht den Wert eines Produkts. Int8 reicht von <span class="math inline">\(-128\)</span> bis 127. Bereits <span class="math inline">\(20\cdot20=400\)</span> und die Summe dreier solcher Produkte, 1200, passen dort nicht hinein. Der Akkumulator muss den Wertebereich der ganzen Produktsumme einschließlich Bias und Nullpunktkorrektur aufnehmen.</p>
-<p>Deshalb verwenden Integer-Netzkerne häufig Int8-Operanden und eine breitere Int32-Akkumulation. Auch deren Bereich ist endlich. Schon zwei maximal positive Produkte <span class="math inline">\((-128)(-128)\)</span> überschreiten den Int16-Bereich. Die Breite muss aus Zeilenlänge und Operandenbereichen begründet werden. Verbreitern, englisch Widening, muss vor einer zu schmalen Rechnung erfolgen; abgeschnittene Bits entstehen durch einen späteren Cast nicht neu. Der begleitende Hostcode rechnet für seine Bereichsprüfung zunächst in Int64. Die spätere Rückskalierung auf einen Ausgangscode heißt Requantisierung und wird im Firmwareabschnitt behandelt.</p>
+<p>Deshalb verwenden Integer-Netzkerne häufig Int8-Operanden und eine breitere Int32-Akkumulation. Auch deren Bereich ist endlich. Schon zwei maximal positive Produkte <span class="math inline">\((-128)(-128)\)</span> überschreiten den Int16-Bereich. Die Breite muss aus Zeilenlänge und Operandenbereichen begründet werden. Verbreitern, englisch Widening, muss vor einer zu schmalen Rechnung erfolgen; abgeschnittene Bits entstehen durch einen späteren Cast nicht neu. Der begleitende Hostcode rechnet für seine Bereichsprüfung zunächst in Int64. Die spätere Rückskalierung auf einen Ausgangscode heißt Requantisierung und wird im Firmwareabschnitt behandelt. Wie Speicherformat, Rechenformat und Ausgabeformat in der Praxis zusammenspielen, fasst die nächste Folie zusammen.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="schmal-speichern-breit-rechnen" class="slide level2">
+<h2>Schmal speichern, breit rechnen</h2>
+<div class="section-label">
+<p>3 / 6 · Datenparallelität</p>
+</div>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Schritt</th>
+<th>Format</th>
+<th>Zweck</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Gewichte, Aktivierungen speichern</td>
+<td>Int8</td>
+<td>Flash, SRAM und Transfers sparen</td>
+</tr>
+<tr class="even">
+<td>Multiplizieren</td>
+<td>Int8 · Int8 → Int16</td>
+<td>jedes Produkt exakt</td>
+</tr>
+<tr class="odd">
+<td>Akkumulieren, Bias addieren</td>
+<td>Int32</td>
+<td>ganze Zeile ohne Überlauf</td>
+</tr>
+<tr class="even">
+<td>Schichtende</td>
+<td>Int32 → Int8</td>
+<td>requantisieren, sättigen</td>
+</tr>
+</tbody>
+</table>
+<p>Statt Int8-Produkten mit Überlauf: verbreiternde Multiplikations-, MAC- oder Skalarproduktbefehle.</p>
+<aside class="notes">
+<p>Die beiden vorigen Folien beschreiben eine Gefahr und eine Bedingung: Eine schmale Lane verfälscht ein zu großes Ergebnis ohne Meldung, und eine Produktsumme braucht mehr Bits als ihre Operanden. Integer-Netzkerne lösen beides üblicherweise, indem sie das Speicherformat vom Rechenformat trennen. Die Tabelle liest sich von oben nach unten als Weg eines Werts durch eine Schicht.</p>
+<p>Gewichte und Aktivierungen liegen als Int8 im Speicher. Ein Wert belegt dann ein Byte statt vier Byte bei Int32 oder Float32. Das schont Flash und SRAM, und jeder Ladevorgang bringt über dieselbe Busbreite viermal so viele Werte heran. Bei geringer Rechenintensität begrenzen gerade diese übertragenen Bytes die nutzbare Rate, wie die Roofline-Betrachtung im zweiten Abschnitt gezeigt hat.</p>
+<p>Beim Rechnen wird verbreitert. Das Produkt zweier Int8-Werte liegt zwischen <span class="math inline">\(-128\cdot127=-16\,256\)</span> und <span class="math inline">\((-128)\cdot(-128)=16\,384\)</span> und passt damit exakt in Int16. Für die Summe genügt Int16 nicht: Schon zwei Produkte von <span class="math inline">\(16\,384\)</span> ergeben <span class="math inline">\(32\,768\)</span>. Akkumuliert wird deshalb in Int32. Dort passen auch die 96 Produkte einer Zeile des Aktivitätsmodells mit großer Reserve, denn <span class="math inline">\(96\cdot16\,384=1\,572\,864&lt;2^{31}\)</span>. Der Bias wird als Int32 in derselben Produktskala addiert. Viele Befehlssätze bieten dafür verbreiternde Multiplikationen, Multiply-Accumulate-Befehle oder Skalarproduktbefehle. Sie lesen Int8-Operanden und schreiben breitere Ergebnisse oder summieren direkt in breitere Elemente. Ein Int8-Produkt mit Überlauf, das erst danach umgewandelt würde, entsteht so gar nicht.</p>
+<p>Erst am Schichtende, wenn die Int32-Summe vollständig ist, folgen Aktivierung wie ReLU und Skalierung. Für eine nachfolgende Int8-Schicht wird der Wert requantisiert: skaliert, gerundet, um den Nullpunkt verschoben und auf <span class="math inline">\(-128\)</span> bis <span class="math inline">\(127\)</span> begrenzt. Diese Sättigung ist hier gewollt; der fünfte Abschnitt rechnet sie an einem Beispiel durch. Welche verbreiternden Befehle eine Plattform besitzt und wie schnell sie arbeiten, bestimmen Befehlssatz und Mikroarchitektur. Nach den RVV-Grundideen zeigen zwei Folien am Ende dieses Abschnitts ein Beispiel.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -983,9 +1045,10 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 </div>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/pipeline.png" alt="Vier unabhängige Operationen starten in1,2,3,4. Bei Latenz3 enden sie in3,4,5,6; der Startabstand beträgt1."></p>
 <p>Ergebnislatenz <span class="math inline">\(3\)</span> Takte · Initiationsintervall <span class="math inline">\(1\)</span> Takt</p>
+<p>Folge für Netze: Viele unabhängige Ausgabesummen halten die Pipeline voll.</p>
 <aside class="notes">
 <p>Latenz und Initiationsintervall bestimmen verschiedene Teile eines Zeitplans. Latenz ist die Dauer bis zum fertigen Ergebnis; das Initiationsintervall ist der kleinste Abstand zweier Starts auf derselben Ressource. Eine gepipelinete Einheit kann eine neue unabhängige Operation beginnen, während ältere noch spätere Stufen durchlaufen.</p>
-<p>Im Bild starten vier Operationen in den Takten eins bis vier. Bei Latenz drei entstehen ihre Ergebnisse an den Enden der Takte drei bis sechs. Die roten letzten Stufen markieren Fertigstellung. Das kurze Fenster enthält damit vier Operationen in sechs Takten; ein langer Strom könnte trotzdem ein Ergebnis pro Takt liefern. Bei einer einzigen abhängigen Akkumulatorkette ist dieser Startabstand allein nicht ausreichend: Der nächste Schritt benötigt sein Vorgängerergebnis. Mehrere unabhängige Ausgabesummen des Netzes können solche Latenzlücken füllen. Auch die spätere Vektorlänge sagt daher allein noch nichts über die Laufzeit eines Befehls.</p>
+<p>Im Bild starten vier Operationen in den Takten eins bis vier. Bei Latenz drei entstehen ihre Ergebnisse an den Enden der Takte drei bis sechs. Die roten letzten Stufen markieren Fertigstellung. Das kurze Fenster enthält damit vier Operationen in sechs Takten; ein langer Strom könnte trotzdem ein Ergebnis pro Takt liefern. Bei einer einzigen abhängigen Akkumulatorkette ist dieser Startabstand allein nicht ausreichend: Der nächste Schritt benötigt sein Vorgängerergebnis. Mehrere unabhängige Ausgabesummen des Netzes können solche Latenzlücken füllen. Auch die spätere Vektorlänge sagt daher allein noch nichts über die Laufzeit eines Befehls. Am Ende des Abschnitts verwendet eine Kette aus verbreiternder Multiplikation und Addition genau dieses Modell mit Latenz drei und Initiationsintervall eins.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -998,8 +1061,8 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
           display:block!important;
       }</style></aside>
 </section>
-<section id="rvv-registerplätze-sind-noch-keine-rechen-lanes" class="slide level2">
-<h2>RVV: Registerplätze sind noch keine Rechen-Lanes</h2>
+<section id="rvv-idee-1-die-hardware-wählt-die-aktive-länge" class="slide level2">
+<h2>RVV-Idee 1: Die Hardware wählt die aktive Länge</h2>
 <div class="section-label">
 <p>3 / 6 · Datenparallelität</p>
 </div>
@@ -1028,10 +1091,11 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 </tr>
 </tbody>
 </table>
-<p>VL ist die aktuell aktive Elementzahl und kann kleiner sein.</p>
+<p>Derselbe Code erhält zur Laufzeit von <code>vsetvli</code> die aktive Länge <span class="math inline">\(\mathrm{VL}\leq\mathrm{VLMAX}\)</span>.</p>
 <aside class="notes">
-<p>Die Registerbreite einer Vektoreinheit beschreibt zuerst Speicherplätze. RVV stellt 32 architektonische Vektorregister von <code>v0</code> bis <code>v31</code> bereit. VLEN ist deren implementierte Breite in Bit. SEW, Selected Element Width, ist die gewählte Elementbreite, LMUL die Größe der verwendeten Registergruppe. Aus diesen Größen folgt VLMAX, die maximale Elementzahl einer unterstützten Konfiguration.</p>
-<p>Bei LMUL eins ergeben 128 Registerbits und 32 Bit je Element vier Plätze; 1024 Registerbits ergeben zweiunddreißig. Die aktuell aktive Länge VL kann darunter liegen. Plätze hinter ihr sind Tail, also inaktiver Rest. Diese Zahlen sind keine Anzahl physischer Rechenwerke. Eine Mikroarchitektur kann eine große Registergruppe mit wenigen Lanes über mehrere Takte bearbeiten. Für die Programmlogik wird daher zunächst bestimmt, wie viele Elemente tatsächlich aktiv sind; für die Zeitrechnung kommen anschließend die verfügbaren Rechenpfade hinzu.</p>
+<p>Die RISC-V-Vektorerweiterung RVV legt im Programm keine feste Vektorbreite fest. Sie stellt 32 architektonische Vektorregister <code>v0</code> bis <code>v31</code> bereit. VLEN ist deren implementierte Breite in Bit. SEW, Selected Element Width, ist die gewählte Elementbreite und LMUL die Größe der verwendeten Registergruppe. Daraus folgt VLMAX, die maximale Elementzahl einer unterstützten Konfiguration.</p>
+<p>Bei LMUL eins ergeben 128 Registerbits und 32 Bit je Element vier Plätze, 1024 Registerbits zweiunddreißig. Das Programm fragt deshalb mit <code>vsetvli</code> nach, wie viele Elemente ein Vektorbefehl jetzt bearbeiten darf. Die zurückgegebene aktive Länge VL ist höchstens VLMAX und kann kleiner sein; Plätze dahinter heißen Tail, inaktiver Rest. Der praktische Nutzen: Derselbe Maschinencode läuft auf Kernen mit 128 oder 1024 Registerbits, ohne dass für jede Breite eine eigene Schleife geschrieben werden muss. Bei SIMD-Erweiterungen mit fester Registerbreite steht die Elementzahl dagegen im Befehl; eine breitere Einheit verlangt andere Befehle oder eine neue Übersetzung.</p>
+<p>VL zählt die Elemente eines Befehls, nicht die physischen Rechenwerke. Eine Lane ist ein tatsächlich vorhandener elementweiser Rechenpfad. Eine Implementierung kann VL Elemente mit wenigen Lanes über mehrere Takte bearbeiten; die Befehlswirkung bleibt dieselbe. Für die Programmlogik zählt daher zuerst die aktive Länge, für die Zeitrechnung kommen Lanes und Datenversorgung hinzu. Offen bleibt, wie eine Schleife eine beliebige Elementzahl mit diesen wechselnden Längen vollständig bearbeitet.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1044,55 +1108,8 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
           display:block!important;
       }</style></aside>
 </section>
-<section id="die-zurückgegebene-länge-steuert-den-fortschritt" class="slide level2">
-<h2>Die zurückgegebene Länge steuert den Fortschritt</h2>
-<div class="section-label">
-<p>3 / 6 · Datenparallelität</p>
-</div>
-<table class="caption-top">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Angeforderter Rest AVL</th>
-<th>Zulässige aktive Länge VL</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><span class="math inline">\(\mathrm{AVL}\leq\mathrm{VLMAX}\)</span></td>
-<td><span class="math inline">\(\mathrm{VL}=\mathrm{AVL}\)</span></td>
-</tr>
-<tr class="even">
-<td><span class="math inline">\(\mathrm{VLMAX}&lt;\mathrm{AVL}&lt;2\mathrm{VLMAX}\)</span></td>
-<td><span class="math inline">\(\lceil\mathrm{AVL}/2\rceil\leq\mathrm{VL}\leq\mathrm{VLMAX}\)</span></td>
-</tr>
-<tr class="odd">
-<td><span class="math inline">\(\mathrm{AVL}\geq2\mathrm{VLMAX}\)</span></td>
-<td><span class="math inline">\(\mathrm{VL}=\mathrm{VLMAX}\)</span></td>
-</tr>
-</tbody>
-</table>
-<p>Rest <span class="math inline">\(40\)</span>, VLMAX <span class="math inline">\(32\)</span>: <span class="math inline">\(32+8\)</span> und <span class="math inline">\(20+20\)</span> sind zulässig.</p>
-<aside class="notes">
-<p>Eine portable Vektorschleife muss den tatsächlichen Abschnitt statt einer vermuteten Registerbreite verwenden. <code>vsetvli</code> konfiguriert Elementbreite und Registergruppe und gibt die gewählte aktive Länge in einem Integerregister zurück. AVL, Application Vector Length, bezeichnet dabei den angeforderten Rest. Die Tabelle fasst die RVV-1.0-Regel für unterstützte Konfigurationen zusammen.</p>
-<p>Passt der Rest vollständig, wird er exakt bearbeitet. Ab doppelter Kapazität wird ein voller Abschnitt gewählt. Dazwischen sind die ganzzahligen Längen von der aufgerundeten Hälfte bis VLMAX erlaubt. Bei Rest 40 und Kapazität 32 ist die erste Länge also mindestens 20: <span class="math inline">\(32+8\)</span> und <span class="math inline">\(20+20\)</span> sind erlaubt, <span class="math inline">\(16+24\)</span> beginnt unzulässig. Eine Implementierung entscheidet für dieselben Eingaben deterministisch, andere Implementierungen können anders aufteilen. Bei 1000 Elementen sind zunächst 30 volle Abschnitte erzwungen, danach zwei Restabschnitte. Die Schleife benötigt somit 32 Iterationen und aktualisiert ihre Zeiger jeweils mit dem zurückgegebenen VL.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="eine-schleife-für-elementweise-addition" class="slide level2">
-<h2>Eine Schleife für elementweise Addition</h2>
+<section id="rvv-idee-2-strip-mining-ohne-nachspann" class="slide level2">
+<h2>RVV-Idee 2: Strip-Mining ohne Nachspann</h2>
 <div class="section-label">
 <p>3 / 6 · Datenparallelität</p>
 </div>
@@ -1112,9 +1129,11 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <span id="cb2-14"><a aria-label="14"></a>    bnez a0<span class="op">,</span> loop</span>
 <span id="cb2-15"><a aria-label="15"></a><span class="fu">done:</span></span>
 <span id="cb2-16"><a aria-label="16"></a>    <span class="cf">ret</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Rest und Zeiger rücken um das zurückgegebene VL weiter.</p>
 <aside class="notes">
-<p>Die Schleife setzt den Längenvertrag in Zeigerfortschritt um. Die RVV-1.0-Lehrfolge erwartet N gültige, ausgerichtete <code>uint32_t</code>-Elemente je Array. <code>a0</code> hält den Rest, <code>a1</code> bis <code>a3</code> die Adressen von A, B und C. C überschneidet sich nicht mit den Quellen; Bytefortschritt und Adressen bleiben darstellbar. Bei N null überspringt <code>beqz</code> alle Zugriffe.</p>
-<p><code>vsetvli</code> wählt <code>e32</code> und <code>m1</code> und schreibt VL nach <code>t0</code>. <code>ta</code> und <code>ma</code> erlauben, unbenutzte Tail- beziehungsweise maskierte Inhalte nicht zu erhalten. Die beiden Loads holen aktive Elemente; <code>vadd.vv</code> addiert sie modulo <span class="math inline">\(2^{32}\)</span> und der Store schreibt nur aktive Ergebnisse. <code>slli</code> berechnet mit dem Shift um zwei genau vier mal VL Byte. Um diese Bytezahl rücken die Zeiger; der Rest sinkt dagegen um VL Elemente. Die Folge zeigt elementweise Addition und kein Skalarprodukt. Sie wurde hier nicht als RISC-V-Programm ausgeführt; ihre Zeigerregel lässt sich jedoch direkt aus dem Vertrag prüfen.</p>
+<p>Reale Datenlängen sind nicht immer ein Vielfaches der aktiven Länge; die 96 Eingänge des Aktivitätsmodells sind es beispielsweise bei VLMAX 64 nicht. Strip-Mining zerlegt ein Array deshalb in aufeinanderfolgende Streifen der jeweils gewählten Länge VL. In jedem Durchlauf fordert die Schleife mit dem verbleibenden Rest an, bearbeitet die zurückgegebenen VL Elemente und zieht VL vom Rest ab, bis nichts mehr übrig ist. Ein eigener skalarer Nachspann für die letzten Elemente entfällt, weil der letzte Streifen einfach kürzer ist.</p>
+<p>Den angeforderten Rest nennt RVV AVL, Application Vector Length. RVV 1.0 legt für unterstützte Konfigurationen fest: Passt der Rest, gilt <span class="math inline">\(\mathrm{VL}=\mathrm{AVL}\)</span>. Ab <span class="math inline">\(\mathrm{AVL}\geq2\,\mathrm{VLMAX}\)</span> gilt <span class="math inline">\(\mathrm{VL}=\mathrm{VLMAX}\)</span>. Dazwischen darf die Hardware jede Länge von <span class="math inline">\(\lceil\mathrm{AVL}/2\rceil\)</span> bis VLMAX wählen und so die letzten beiden Streifen ausgleichen. Bei Rest 40 und VLMAX 32 sind <span class="math inline">\(32+8\)</span> und <span class="math inline">\(20+20\)</span> zulässig, <span class="math inline">\(16+24\)</span> dagegen nicht. Bei 1000 Elementen sind zunächst 30 volle Streifen erzwungen, danach zwei Reststreifen, zusammen 32 Durchläufe. Eine Schleife darf also weder VLMAX noch das Minimum aus AVL und VLMAX voraussetzen; sie verwendet stets die Rückgabe von <code>vsetvli</code>.</p>
+<p>Die RVV-1.0-Lehrfolge setzt das für eine elementweise Addition um. <code>a0</code> hält den Rest, <code>a1</code> bis <code>a3</code> die Adressen gültiger, ausgerichteter <code>uint32_t</code>-Arrays A, B und C; C überschneidet sich nicht mit den Quellen. Bei N null überspringt <code>beqz</code> alle Zugriffe. <code>vsetvli</code> wählt <code>e32</code> und <code>m1</code> und schreibt VL nach <code>t0</code>; <code>ta</code> und <code>ma</code> erlauben, Tail- und maskierte Inhalte nicht zu erhalten. Die Loads holen die aktiven Elemente, <code>vadd.vv</code> addiert modulo <span class="math inline">\(2^{32}\)</span>, und der Store schreibt nur aktive Ergebnisse. <code>slli</code> berechnet mit dem Shift um zwei genau <span class="math inline">\(4\cdot\mathrm{VL}\)</span> Byte; um diese Bytezahl rücken die Zeiger, der Rest sinkt dagegen um VL Elemente. Die Folge wurde hier nicht als RISC-V-Programm ausgeführt; ihre Zeigerregel lässt sich direkt aus dem Vertrag prüfen. SIMD-Erweiterungen mit fester Breite brauchen für denselben Rest dagegen eigenen Code, etwa einen skalaren Nachspann oder Masken.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1127,16 +1146,54 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
           display:block!important;
       }</style></aside>
 </section>
-<section id="vier-aktive-elemente-brauchen-nicht-vier-lanes" class="slide level2">
-<h2>Vier aktive Elemente brauchen nicht vier Lanes</h2>
+<section id="rvv-idee-3-gruppen-tauschen-anzahl-gegen-länge" class="slide level2">
+<h2>RVV-Idee 3: Gruppen tauschen Anzahl gegen Länge</h2>
 <div class="section-label">
 <p>3 / 6 · Datenparallelität</p>
 </div>
-<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/lanes.png" alt="Vier aktive Elemente benötigen im ausgeblendeten Lade-/Startmodell auf einer Lane vier Schritte, auf zwei Lanes zwei Schritte."></p>
-<p>Gleiche Befehlssatzwirkung · unterschiedliche interne Breite und Zeit</p>
+<p>VLEN <span class="math inline">\(128\)</span> Bit, SEW <span class="math inline">\(32\)</span> Bit, Lehrmodell mit zwei Lanes:</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: right;">LMUL</th>
+<th style="text-align: right;">Registergruppen</th>
+<th style="text-align: right;">VLMAX</th>
+<th style="text-align: right;">Takte je Befehl</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;"><span class="math inline">\(1\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(32\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(4\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(2\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: right;"><span class="math inline">\(2\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(16\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(8\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(4\)</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;"><span class="math inline">\(4\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(8\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(16\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(8\)</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: right;"><span class="math inline">\(8\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(4\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(32\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(16\)</span></td>
+</tr>
+</tbody>
+</table>
+<p>Verbreiternde Befehle belegen für doppelt breite Ergebnisse <span class="math inline">\(\mathrm{EMUL}=2\,\mathrm{LMUL}\)</span> Register.</p>
 <aside class="notes">
-<p>VL bestimmt die Zahl der wirksamen Elemente, nicht die physische Ausführungsbreite. Eine Lane ist hier ein tatsächlich vorhandener elementweiser Rechenpfad. Das Bild nimmt vier unabhängige Additionen und ein Ergebnis je Lane und Schritt an; Laden, Speichern und Startkosten sind ausgeblendet.</p>
-<p>Mit einer Lane werden die vier Elemente in vier internen Schritten bearbeitet, mit zwei Lanes in zwei. Die nummerierten Felder zeigen Daten, ihre horizontalen Gruppen einen Rechenschritt. Beide Umsetzungen liefern dieselbe Befehlssatzwirkung. Deshalb kann ein großes Vektorregister durch wenige Rechenpfade mehrfach durchlaufen werden. Umgekehrt benötigt ein breiter Pfad genügend Operanden, um tatsächlich beschäftigt zu sein. Die Datenversorgung aus dem vorherigen Abschnitt bleibt also relevant. Portable VL-Schleifen sichern die logische Abschnittsverarbeitung; eine Zeit- oder Energieaussage verlangt zusätzlich Angaben zur Mikroarchitektur und zu den übertragenen Bytes.</p>
+<p>LMUL fasst mehrere Vektorregister zu einer logischen Gruppe zusammen. Mit LMUL zwei bilden etwa <code>v2</code> und <code>v3</code> eine Gruppe, die im Befehl über <code>v2</code> angesprochen wird; eine Gruppe beginnt deshalb bei einer durch LMUL teilbaren Registernummer. Gruppen helfen, wenn ein einzelnes Register für einen Schritt zu wenige Elemente fasst oder breitere Zwischenwerte gehalten werden müssen. RVV erlaubt für schmale Typen außerdem gebrochene Werte wie ein halb; sie werden hier nicht benötigt.</p>
+<p>Die Tabelle rechnet beide Seiten der Abwägung für VLEN 128 und SEW 32. VLMAX wächst proportional zu LMUL von 4 auf 32. Eine Schleife braucht damit weniger Durchläufe sowie weniger <code>vsetvli</code>- und Zeigerbefehle. Zugleich sinkt die Zahl unabhängig nutzbarer Gruppen von 32 auf 4. Schon die Additionsschleife benötigt drei Gruppen für A, B und C. Bei LMUL acht blieben nur <code>v0</code>, <code>v8</code>, <code>v16</code> und <code>v24</code>; <code>v0</code> dient bei maskierten Befehlen zusätzlich als Maske.</p>
+<p>Die letzte Spalte verwendet das Lehrzeitmodell der Übung: Ein arithmetischer Befehl mit VL aktiven Elementen belegt auf zwei Lanes <span class="math inline">\(\lceil\mathrm{VL}/2\rceil\)</span> Takte, hier mit VL gleich VLMAX. Eine größere Gruppe macht die Arbeit je Element also nicht schneller; jeder einzelne Befehl dauert länger. VL bestimmt die wirksamen Elemente, die Lanes die interne Bearbeitungszeit.</p>
+<p>Für Int8-Netze ist diese Abwägung besonders wichtig. Ein verbreiternder Befehl schreibt Ergebnisse doppelter Elementbreite: EEW, Effective Element Width, ist gleich zweimal SEW. Damit dieselben VL Elemente Platz finden, belegt das Ergebnis eine Gruppe mit EMUL, Effective LMUL, gleich zweimal LMUL. Bei LMUL acht ist deshalb kein verbreiternder Befehl möglich. Nach der Weitergabe fertiger Elemente zeigt ein Beispiel am Ende des Abschnitts, wie sich diese Registerfolge auswirkt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1158,7 +1215,111 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <p>Multiplikationslatenz <span class="math inline">\(2\)</span>, Additionslatenz <span class="math inline">\(1\)</span>, je ein Start pro Takt</p>
 <aside class="notes">
 <p>Chaining verkürzt das Warten zwischen zwei elementweisen Operationen. Ein fertiges Produkt kann bereits zur zugehörigen Addition gelangen, während spätere Produkte noch gerechnet werden. Die Abbildung verbindet vier unabhängige Multiplikationen mit vier unabhängigen Additionen; sie zeigt keine einzige abhängige Summenkette und keine verschmolzene FMA-Operation.</p>
-<p>Die Produkte starten in eins bis vier und enden bei Latenz zwei in zwei bis fünf. Mit Weitergabe beginnen die Additionen frühestens im Folgetakt, also in drei bis sechs. Bei Additionslatenz eins enden sie in denselben Takten. Ohne Chaining wartet das Vergleichsmodell zuerst auf alle Produkte und beginnt dann in sechs bis neun. Der Ausschnitt endet folglich in sechs statt neun. Die roten Ergebnisse markieren den früheren Abschluss. Dieser Gewinn setzt die angegebenen Startabstände und passende Ports voraus. Die Papieraufgabe verändert anschließend die Latenzen und das Initiationsintervall, um gerade diese Bedingung zu prüfen.</p>
+<p>Die Produkte starten in eins bis vier und enden bei Latenz zwei in zwei bis fünf. Mit Weitergabe beginnen die Additionen frühestens im Folgetakt, also in drei bis sechs. Bei Additionslatenz eins enden sie in denselben Takten. Ohne Chaining wartet das Vergleichsmodell zuerst auf alle Produkte und beginnt dann in sechs bis neun. Der Ausschnitt endet folglich in sechs statt neun. Die roten Ergebnisse markieren den früheren Abschluss. Dieser Gewinn setzt die angegebenen Startabstände und passende Ports voraus. Die beiden nächsten Folien wenden Chaining auf verbreiternde Befehle an; die Papieraufgabe verändert danach die Latenzen und das Initiationsintervall, um gerade diese Bedingung zu prüfen.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="verbreitern-verdoppelt-die-registergruppe" class="slide level2">
+<h2>Verbreitern verdoppelt die Registergruppe</h2>
+<div class="section-label">
+<p>3 / 6 · Datenparallelität</p>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb3-1"><a aria-label="1"></a>vsetvli  t0<span class="op">,</span> a0<span class="op">,</span> e8<span class="op">,</span> m1<span class="op">,</span> ta<span class="op">,</span> ma   <span class="op">#</span> SEW <span class="dv">8</span><span class="op">,</span> LMUL <span class="dv">1</span></span>
+<span id="cb3-2"><a aria-label="2"></a>vle8<span class="op">.</span>v   v1<span class="op">,</span> <span class="op">(</span>a1<span class="op">)</span>                 <span class="op">#</span> Int8<span class="op">-</span>Aktivierungen</span>
+<span id="cb3-3"><a aria-label="3"></a>vle8<span class="op">.</span>v   v2<span class="op">,</span> <span class="op">(</span>a2<span class="op">)</span>                 <span class="op">#</span> Int8<span class="op">-</span>Gewichte</span>
+<span id="cb3-4"><a aria-label="4"></a>vwmul<span class="op">.</span>vv v4<span class="op">,</span> v1<span class="op">,</span> v2               <span class="op">#</span> Int16<span class="op">-</span>Produkte</span>
+<span id="cb3-5"><a aria-label="5"></a>vsetvli  x0<span class="op">,</span> x0<span class="op">,</span> e16<span class="op">,</span> m2<span class="op">,</span> tu<span class="op">,</span> ma  <span class="op">#</span> gleiche VL</span>
+<span id="cb3-6"><a aria-label="6"></a>vwadd<span class="op">.</span>wv v8<span class="op">,</span> v8<span class="op">,</span> v4               <span class="op">#</span> Int32<span class="op">-</span>Teilsummen</span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Werte</th>
+<th style="text-align: right;">Elementbreite</th>
+<th>Registergruppe</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Aktivierungen, Gewichte</td>
+<td style="text-align: right;"><span class="math inline">\(8\)</span> Bit</td>
+<td><code>v1</code>, <code>v2</code></td>
+</tr>
+<tr class="even">
+<td>Produkte</td>
+<td style="text-align: right;"><span class="math inline">\(16\)</span> Bit</td>
+<td><code>v4</code>–<code>v5</code>, EMUL <span class="math inline">\(2\)</span></td>
+</tr>
+<tr class="odd">
+<td>Teilsummen</td>
+<td style="text-align: right;"><span class="math inline">\(32\)</span> Bit</td>
+<td><code>v8</code>–<code>v11</code>, EMUL <span class="math inline">\(4\)</span></td>
+</tr>
+</tbody>
+</table>
+<aside class="notes">
+<p>Die übliche Int8-Rechnung von der Folie „Schmal speichern, breit rechnen“ lässt sich mit RVV-Befehlen formulieren. Die RVV-1.0-Lehrfolge zeigt einen Durchlauf eines Int8-Skalarprodukts nach dem Strip-Mining-Muster. Schleifenrahmen, Zeigerfortschritt und das vorherige Nullsetzen der Teilsummen sind ausgelassen. <code>a0</code> hält den Rest, <code>a1</code> und <code>a2</code> zeigen auf gültige Int8-Arrays mit Aktivierungen und Gewichten.</p>
+<p><code>vsetvli</code> wählt SEW acht und LMUL eins und liefert VL nach <code>t0</code>. Die beiden <code>vle8.v</code> laden je VL Bytes; aus dem Speicher kommen also weiterhin schmale Werte. <code>vwmul.vv</code> ist eine verbreiternde vorzeichenbehaftete Multiplikation: Sie liest Int8-Elemente und schreibt Int16-Produkte. Die Ergebnisbreite EEW, Effective Element Width, ist doppelt so groß wie SEW. Damit dieselben VL Elemente Platz finden, belegt das Ergebnis eine Gruppe mit EMUL, Effective LMUL, gleich zwei: <code>v4</code> und <code>v5</code>.</p>
+<p>Das zweite <code>vsetvli</code> mit <code>x0</code> als Ziel und Quelle behält die aktive Länge und wechselt auf SEW 16 mit LMUL zwei. Diese Form ist nur zulässig, weil das Verhältnis von SEW zu LMUL gleich bleibt und sich VLMAX daher nicht ändert. <code>tu</code>, tail undisturbed, lässt Teilsummen hinter der aktuellen VL unverändert; das ist nötig, weil der letzte Streifen kürzer sein kann. <code>vwadd.wv</code> addiert die vorzeichenerweiterten Int16-Produkte zu Int32-Teilsummen. Breite Quelle und Ziel sind dieselbe Gruppe <code>v8</code> bis <code>v11</code> mit EMUL vier. Jede Elementposition führt ihre eigene Teilsumme; nach dem letzten Streifen addiert eine Reduktion wie <code>vredsum.vs</code> mit SEW 32 alle Teilsummen zur Zeilensumme. Alternativ summiert <code>vwredsum.vs</code> Int16-Produkte direkt in ein 32-Bit-Ergebnis.</p>
+<p>Die Tabelle zeigt die Kosten im Registersatz: Aus je einem Register für die Quellen werden zwei für die Produkte und vier für die Teilsummen. Bei fester VLEN bleiben dadurch weniger Gruppen für weitere Werte, und mit LMUL acht wäre schon <code>vwmul.vv</code> nicht erlaubt. Die Folge wurde nicht als RISC-V-Programm ausgeführt. Offen ist noch, ob die doppelte Breite auch Zeit kostet.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="doppelte-breite-halbiert-elemente-je-datenpfad" class="slide level2">
+<h2>Doppelte Breite halbiert Elemente je Datenpfad</h2>
+<div class="section-label">
+<p>3 / 6 · Datenparallelität</p>
+</div>
+<p>Je Befehl: Latenz <span class="math inline">\(3\)</span>, Initiationsintervall <span class="math inline">\(1\)</span>, Chaining</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Datenpfad</th>
+<th><code>vwmul</code> fertig</th>
+<th><code>vwadd</code> fertig</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>ein Element je Takt, VL <span class="math inline">\(4\)</span></td>
+<td>Ende <span class="math inline">\(3\)</span> bis <span class="math inline">\(6\)</span></td>
+<td>Ende <span class="math inline">\(6\)</span> bis <span class="math inline">\(9\)</span></td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(32\)</span> Ergebnisbit je Takt, VL <span class="math inline">\(8\)</span></td>
+<td><span class="math inline">\(4\)</span> Takte: Ende <span class="math inline">\(3\)</span> bis <span class="math inline">\(6\)</span></td>
+<td><span class="math inline">\(8\)</span> Takte: Ende <span class="math inline">\(6\)</span> bis <span class="math inline">\(13\)</span></td>
+</tr>
+</tbody>
+</table>
+<p>Elementmodell: keine Zusatztakte · Bitmodell: doppelte Breite, halbe Elementrate.</p>
+<aside class="notes">
+<p>Ob das Verbreitern Zeit kostet, hängt davon ab, was die Hardware je Takt bewegt. Beide Tabellenzeilen verwenden das Zeitmodell dieses Abschnitts: Jeder Befehl startet mit Initiationsintervall eins, ein Ergebnis mit Start <span class="math inline">\(t\)</span> liegt am Ende von <span class="math inline">\(t+2\)</span> vor, und Chaining beginnt die Addition eines Elements frühestens im Takt nach seinem Produkt. Laden, Speichern und der Typwechsel durch <code>vsetvli</code> kosten in diesem Modell keine Zeit.</p>
+<p>Die erste Zeile überträgt den Fall der Folie „Ein Start pro Takt ist nicht Latenz eins“ auf die beiden verbreiternden Befehle. Eine Lane bearbeitet je Befehl ein Element pro Takt und kann dabei ein ganzes Int32-Ergebnis aufnehmen. Element <span class="math inline">\(e\)</span> startet die Multiplikation in Takt <span class="math inline">\(1+e\)</span> und ist am Ende von <span class="math inline">\(3+e\)</span> fertig. Die zugehörige Addition beginnt in <span class="math inline">\(4+e\)</span> und endet in <span class="math inline">\(6+e\)</span>. Für die vier Elemente ergeben sich die Enden drei bis sechs und sechs bis neun. Das sind dieselben Takte wie bei einer nicht verbreiternden Multiplikation mit Addition. Chaining gelingt, weil die Addition je Takt ein Element annimmt, genauso schnell wie die Multiplikation liefert; beide Befehle arbeiten auf denselben VL Elementen.</p>
+<p>Die zweite Zeile legt stattdessen 32 Ergebnisbits je Befehl und Takt fest, wie bei einem Datenpfad fester Breite. Darin passen vier Int8-, zwei Int16- oder ein Int32-Ergebnis. Für VL acht bräuchte eine schmale Int8-Multiplikation nur zwei Takte, rechnete aber modulo 256 falsch. <code>vwmul.vv</code> benötigt vier Takte: Je Takt startet ein Paar, und die Paare enden in den Takten drei bis sechs. <code>vwadd.wv</code> schreibt Int32 und schafft nur ein Element je Takt. Mit Chaining beginnen die Additionen deshalb in den Takten vier bis elf und enden in sechs bis dreizehn; die Addition ist der Engpass.</p>
+<p>Im Elementmodell kostet das Verbreitern also keine zusätzlichen Takte, im Bitmodell halbiert jede Verdopplung der Ergebnisbreite die Elementrate. Darum fassen Skalarproduktbefehle mehrere Int8-Produkte zusammen, bevor sie einen Int32-Wert schreiben, und MAC-Zellen halten ihren breiten Akkumulator lokal. Das systolische Array des nächsten Abschnitts folgt diesem Gedanken. Alle Takte sind Annahmen des Lehrmodells; ein realer Kern kann insbesondere Chaining über einen Typwechsel hinweg anders behandeln.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
