@@ -197,6 +197,9 @@
       margin-right: 0; 
     }
   </style>
+  <script src="../site_libs/quarto-diagram/mermaid.min.js"></script>
+  <script src="../site_libs/quarto-diagram/mermaid-init.js"></script>
+  <link href="../site_libs/quarto-diagram/mermaid.css" rel="stylesheet">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
@@ -254,11 +257,12 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 <li>Vorwissen: C-Arrays und Zeiger, Caches, gewichtete Summen und Befehlsparallelität</li>
 <li>Heute: aus Messdaten ein Modell und daraus ein regelmäßiges Rechenmuster entwickeln</li>
 <li>Edge: Die Auswertung findet nahe am Sensor statt</li>
+<li>Beschleuniger: wie GPU und NPU programmiert werden und wo Herstellerbindung entsteht</li>
 <li>Am Ende: Rechenarbeit, Datenverkehr, Speicher und Gesamtzeit begründet vergleichen</li>
 </ul>
 <aside class="notes">
 <p>Ein Sensorgerät kann Messwerte lokal auswerten und eine Entscheidung liefern, ohne jedes Fenster an einen entfernten Server zu senden. Diesen Verarbeitungsort bezeichnet Edge. Er legt noch keinen bestimmten Prozessortyp fest: Eine geeignete Anwendung kann auf einem gewöhnlichen Mikrocontroller laufen. Ein neuronaler Beschleuniger wird erst dann interessant, wenn sein Rechenmuster und seine Kosten zur Aufgabe passen.</p>
-<p>Aus Vorlesung 7 ist bekannt, dass abhängige Summen auf ihre Vorgänger warten und unabhängige Arbeit andere Rechenplätze nutzen kann. Ein Cache hält nahe Kopien von Speicherblöcken; begrenzte Bandbreite kann deshalb auch bei vielen verfügbaren Rechenwerken den Durchsatz bestimmen. Diese Überlegungen werden auf wiederholte gewichtete Summen übertragen. Die benötigten KI-Grundlagen entstehen im ersten Abschnitt aus dem Sensorbeispiel. Besondere Kenntnisse eines Lernframeworks werden nicht vorausgesetzt. Das Ziel ist, von einer verständlichen Entscheidung über die benötigten Zahlen und Operationen zu einer begründeten Hardware- und Firmwarewahl zu gelangen.</p>
+<p>Aus Vorlesung 7 ist bekannt, dass abhängige Summen auf ihre Vorgänger warten und unabhängige Arbeit andere Rechenplätze nutzen kann. Ein Cache hält nahe Kopien von Speicherblöcken; begrenzte Bandbreite kann deshalb auch bei vielen verfügbaren Rechenwerken den Durchsatz bestimmen. Diese Überlegungen werden auf wiederholte gewichtete Summen übertragen. Die benötigten KI-Grundlagen entstehen im ersten Abschnitt aus dem Sensorbeispiel. Besondere Kenntnisse eines Lernframeworks werden nicht vorausgesetzt. Das Ziel ist, von einer verständlichen Entscheidung über die benötigten Zahlen und Operationen zu einer begründeten Hardware- und Firmwarewahl zu gelangen. Dazu gehört auch, wie Beschleuniger programmiert werden und welche Herstellerbindung dabei entsteht.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -302,20 +306,20 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 </tr>
 <tr class="odd">
 <td>3</td>
-<td>Systolisches Array: 25 min</td>
-<td>nach Folie 42: 4.1–4.3 · 15 min</td>
+<td>NPU und GPU programmieren: 25 min</td>
+<td>nach Folie 40: 4.1–4.3 · 15 min</td>
 </tr>
 <tr class="even">
 <td>4</td>
-<td>Quantisierung, Firmware und Amdahl: 25 min</td>
-<td>nach Folie 53: 5.1, 5.3, 6.3 · 15 min</td>
+<td>Gesamtbilanz und Amdahl: 20 min</td>
+<td>nach Folie 45: 5.1, 5.2 · 10 min</td>
 </tr>
 </tbody>
 </table>
 <p>Abschließend: zwölf Quizfragen · 15 Minuten.</p>
 <aside class="notes">
-<p>Die Planung umfasst 180 Minuten: 110 Minuten für Erklärung, kurze Vorhersagen und gemeinsame Lösungsbesprechung, 55 Minuten für angeleitete Papierarbeit und 15 Minuten für das abschließende Quiz. Der erste und der dritte Themenblock dauern einschließlich Papierphase je vierzig Minuten, der zweite fünfundvierzig. Er enthält zusätzlich die übliche Int8-Praxis und verbreiternde Befehle; dafür ist der letzte Block um fünf Minuten kürzer, weil die Int8-Formate dort bereits bekannt sind. Mit dem anschließenden Quiz dauert er fünfundfünfzig Minuten; diese Blöcke sind keine einzelnen Schulstunden. Die Abschnitte beginnen mit einer Orientierung; längere Rechnungen erhalten mehr gemeinsame Zeit als eine kurze Begriffszuordnung. Die Notizen dienen zusätzlich als zusammenhängender Lerntext zum Nachlesen.</p>
-<p>Teil A des Übungsblatts enthält sechs Aufgaben mit 44 Orientierungspunkten. In der Präsenz werden die hier genannten Teilaufgaben ausgewählt und bei Bedarf mit gemeinsamen Zwischenständen bearbeitet. Die vollständige selbstständige Bearbeitung umfasst weitere Teile. Teil B enthält drei längere, verkettete Aufgaben mit weiteren 44 Punkten und einem geschätzten Umfang von 75 Minuten zur Nachbereitung. Diese Richtwerte sind keine verbindliche Klausurvorgabe. Zwölf Quizfragen verbinden am Ende die behandelten Modelle. Eigene kurze Vorhersagen zwischendurch prüfen den aktuellen Gedanken. Die abschließenden Hintergrundfolien zu Begriffen, Quellen und eigenen Messungen dienen dem Nachlesen und verlängern den Pflichtvortrag nicht.</p>
+<p>Die Planung umfasst 180 Minuten: 105 Minuten für Erklärung, kurze Vorhersagen und gemeinsame Lösungsbesprechung, 50 Minuten für angeleitete Papierarbeit, 15 Minuten für das abschließende Quiz und zehn Minuten Puffer für Rückfragen. Der erste und der dritte Themenblock dauern einschließlich Papierphase je vierzig Minuten, der zweite fünfundvierzig. Der zweite enthält zusätzlich die übliche Int8-Praxis und verbreiternde Befehle. Der dritte Block behandelt die Programmierung von GPU und NPU sowie die daraus entstehende Herstellerbindung nur im Überblick. Der vierte Block umfasst dreißig Minuten, danach folgt das Quiz; diese Blöcke sind keine einzelnen Schulstunden. Die Abschnitte beginnen mit einer Orientierung; längere Rechnungen erhalten mehr gemeinsame Zeit als eine kurze Begriffszuordnung. Die Notizen dienen zusätzlich als zusammenhängender Lerntext zum Nachlesen.</p>
+<p>Teil A des Übungsblatts enthält fünf Aufgaben mit 32 Orientierungspunkten. In der Präsenz werden die hier genannten Teilaufgaben ausgewählt und bei Bedarf mit gemeinsamen Zwischenständen bearbeitet. Die vollständige selbstständige Bearbeitung umfasst weitere Teile. Teil B enthält zwei längere Aufgaben mit weiteren 28 Punkten und einem geschätzten Umfang von 50 Minuten zur Nachbereitung. Diese Richtwerte sind keine verbindliche Klausurvorgabe. Zwölf Quizfragen verbinden am Ende die behandelten Modelle. Eigene kurze Vorhersagen zwischendurch prüfen den aktuellen Gedanken. Die abschließenden Hintergrundfolien zu Begriffen, Quellen und eigenen Messungen dienen dem Nachlesen und verlängern den Pflichtvortrag nicht.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -363,7 +367,7 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 <section id="welche-eigenschaft-trennt-die-bewegungen" class="slide level2 compact-figure sensor-plot">
 <h2>Welche Eigenschaft trennt die Bewegungen?</h2>
 <div class="section-label">
-<p>1 / 6 · Von Messdaten zum Modell</p>
+<p>1 / 5 · Von Messdaten zum Modell</p>
 </div>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/revision/traces.png" alt="Echte MotionSense-Zeitverläufe des Beschleunigungsbetrags für Stehen, Gehen und Laufen. Zeit und Betrag sind mit Einheiten beschriftet; die drei Aktivitäten sind zusätzlich durch getrennte Bahnen gekennzeichnet."></p>
 <p>Ein Schwellenwert auf einem einzelnen Messwert oder auf einem ganzen Fenster?</p>
@@ -385,7 +389,7 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 <section id="zwei-merkmale-machen-viele-fenster-sichtbar" class="slide level2 compact-figure sensor-plot">
 <h2>Zwei Merkmale machen viele Fenster sichtbar</h2>
 <div class="section-label">
-<p>1 / 6 · Von Messdaten zum Modell</p>
+<p>1 / 5 · Von Messdaten zum Modell</p>
 </div>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/revision/features.png" alt="Streudiagramm vieler MotionSense-Fenster: Mittelwert und Standardabweichung des Beschleunigungsbetrags, jeweils in g. Farben und Markierungen unterscheiden Stehen, Gehen und Laufen."></p>
 <p>Jeder Punkt steht für ein Fenster mit 32 Zeitpunkten, nicht für einen Einzelwert.</p>
@@ -407,7 +411,7 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 <section id="ein-neuron-legt-eine-trenngerade-fest" class="slide level2 compact-figure">
 <h2>Ein Neuron legt eine Trenngerade fest</h2>
 <div class="section-label">
-<p>1 / 6 · Von Messdaten zum Modell</p>
+<p>1 / 5 · Von Messdaten zum Modell</p>
 </div>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/revision/boundary.png" alt="Didaktische Trenngeraden in der Zwei-Merkmal-Ebene. Geänderte Gewichte verändern die Normalenrichtung, ein geänderter Bias verschiebt die Grenze. Die Linien sind keine Ausgabe des Rohdatenmodells."></p>
 <p><span class="math display">\[z=w_1x_1+w_2x_2+b;\qquad z=0\ \text{ist die Grenze.}\]</span></p>
@@ -430,7 +434,7 @@ Prof.&nbsp;Dr.-Ing. Daniel Klünder
 <section id="aus-der-gewichteten-summe-wird-eine-aktivierung" class="slide level2">
 <h2>Aus der gewichteten Summe wird eine Aktivierung</h2>
 <div class="section-label">
-<p>1 / 6 · Von Messdaten zum Modell</p>
+<p>1 / 5 · Von Messdaten zum Modell</p>
 </div>
 <p>Didaktisches Zwei-Merkmal-Beispiel:</p>
 <p><span class="math display">\[
@@ -457,7 +461,7 @@ w=\begin{bmatrix}-1\\5\end{bmatrix},\quad b=0{,}5
 <section id="verborgene-schichten-verbinden-lineare-teilbereiche" class="slide level2 compact-figure">
 <h2>Verborgene Schichten verbinden lineare Teilbereiche</h2>
 <div class="section-label">
-<p>1 / 6 · Von Messdaten zum Modell</p>
+<p>1 / 5 · Von Messdaten zum Modell</p>
 </div>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/revision/relu_regions.png" alt="Didaktisches Zwei-Merkmal-Beispiel: Vier ReLU-Terme bilden eine rautenförmige Nullgrenze. Die Grenze besteht aus vier Geradenstücken und ist nicht aus den MotionSense-Daten gelernt."></p>
 <p>Das Hauptmodell verbindet 96 Eingaben über 16 ReLU-Werte mit drei Scores.</p>
@@ -479,7 +483,7 @@ w=\begin{bmatrix}-1\\5\end{bmatrix},\quad b=0{,}5
 <section id="drei-scores-werden-zu-einer-entscheidung" class="slide level2">
 <h2>Drei Scores werden zu einer Entscheidung</h2>
 <div class="section-label">
-<p>1 / 6 · Von Messdaten zum Modell</p>
+<p>1 / 5 · Von Messdaten zum Modell</p>
 </div>
 <p>Tatsächlich berechnetes Beispiel: Person 21, Gehen, Fenster 0.</p>
 <table class="caption-top">
@@ -524,7 +528,7 @@ w=\begin{bmatrix}-1\\5\end{bmatrix},\quad b=0{,}5
 <section id="lernen-verändert-gewichte-in-richtung-kleinerer-fehler" class="slide level2 compact-figure">
 <h2>Lernen verändert Gewichte in Richtung kleinerer Fehler</h2>
 <div class="section-label">
-<p>1 / 6 · Von Messdaten zum Modell</p>
+<p>1 / 5 · Von Messdaten zum Modell</p>
 </div>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/revision/gradient.png" alt="Verlustkurve L(w) gleich (2w minus 4) zum Quadrat. Ein Gradienten-Schritt führt von w gleich 1 mit Verlust 4 zu w gleich 1,8 mit Verlust 0,16; das Minimum liegt bei w gleich 2."></p>
 <p><span class="math display">\[w_{\mathrm{neu}}=w-\eta\frac{\mathrm dL}{\mathrm dw}
@@ -547,7 +551,7 @@ w=\begin{bmatrix}-1\\5\end{bmatrix},\quad b=0{,}5
 <section id="training-bestimmt-parameter-inferenz-verwendet-sie" class="slide level2">
 <h2>Training bestimmt Parameter, Inferenz verwendet sie</h2>
 <div class="section-label">
-<p>1 / 6 · Von Messdaten zum Modell</p>
+<p>1 / 5 · Von Messdaten zum Modell</p>
 </div>
 <p><span class="math display">\[s=f_\theta(x),\qquad \theta=\{W_1,b_1,W_2,b_2\}\]</span></p>
 <table class="caption-top">
@@ -595,7 +599,7 @@ w=\begin{bmatrix}-1\\5\end{bmatrix},\quad b=0{,}5
 <section id="neue-personen-brauchen-einen-getrennten-test" class="slide level2">
 <h2>Neue Personen brauchen einen getrennten Test</h2>
 <div class="section-label">
-<p>1 / 6 · Von Messdaten zum Modell</p>
+<p>1 / 5 · Von Messdaten zum Modell</p>
 </div>
 <table class="caption-top">
 <thead>
@@ -643,7 +647,7 @@ w=\begin{bmatrix}-1\\5\end{bmatrix},\quad b=0{,}5
 <section id="eine-1d-faltung-knüpft-an-bekannte-fir-filter-an" class="slide level2">
 <h2>Eine 1D-Faltung knüpft an bekannte FIR-Filter an</h2>
 <div class="section-label">
-<p>1 / 6 · Von Messdaten zum Modell</p>
+<p>1 / 5 · Von Messdaten zum Modell</p>
 </div>
 <p><span class="math display">\[u[t]=\sum_{k=0}^{K-1}h[k]x[t-k]\]</span></p>
 <ul>
@@ -670,7 +674,7 @@ w=\begin{bmatrix}-1\\5\end{bmatrix},\quad b=0{,}5
 <section id="formen-machen-die-regelmäßige-matrixrechnung-sichtbar" class="slide level2">
 <h2>Formen machen die regelmäßige Matrixrechnung sichtbar</h2>
 <div class="section-label">
-<p>1 / 6 · Von Messdaten zum Modell</p>
+<p>1 / 5 · Von Messdaten zum Modell</p>
 </div>
 <p><span class="math display">\[H=\operatorname{ReLU}(W_1X+b_1\mathbf{1}_B^T),\qquad
 S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
@@ -739,7 +743,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="parameter-sind-gespeicherte-zahlen-macs-sind-arbeit" class="slide level2">
 <h2>Parameter sind gespeicherte Zahlen, MACs sind Arbeit</h2>
 <div class="section-label">
-<p>2 / 6 · Rechenarbeit und Daten</p>
+<p>2 / 5 · Rechenarbeit und Daten</p>
 </div>
 <p>Dense mit <span class="math inline">\(n\)</span> Eingängen und <span class="math inline">\(m\)</span> Ausgängen:</p>
 <table class="caption-top">
@@ -772,7 +776,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <span id="cb1-6"><a aria-label="6"></a>    sum <span class="op">+=</span> <span class="op">(</span><span class="dt">int64_t</span><span class="op">)</span>input<span class="op">[</span>i<span class="op">]</span> <span class="op">*</span> weight<span class="op">[</span>i<span class="op">];</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
 <aside class="notes">
 <p>Parameterzahl und Rechenarbeit beantworten verschiedene Fragen. Die Matrix einer Dense-Schicht enthält für jedes Eingangs-/Ausgangspaar ein Gewicht, insgesamt <span class="math inline">\(mn\)</span>. Dazu kommt ein Bias je Ausgang. Eine neue Eingabe verändert diese Parameter nicht; sie benötigt aber erneut <span class="math inline">\(mn\)</span> Produkte mit Akkumulation. Ein Batch wiederholt die Arbeit für mehrere Eingaben und verwendet dieselben Parameter weiter.</p>
-<p>Der C-Ausschnitt zeigt eine einzelne Zeile nach Quantisierung mit Nullpunkten null und einem Bias in der Produktskala. Bei anderen Nullpunkten müssen diese vor der Multiplikation abgezogen werden; die Quantisierung wird im fünften Abschnitt erklärt. <code>sum</code> beginnt mit dem Bias. Jede Iteration liest ein Wertepaar und erweitert die laufende Summe. Die Typumwandlung vor der Multiplikation verbreitert die Rechnung; passende Wertebereiche bleiben Voraussetzung. Innerhalb der Summe benötigt jeder Schritt den vorherigen Akkumulatorwert. Verschiedene Ausgangszeilen haben dagegen eigene Summen und können unabhängig fortschreiten. Deshalb sind Parameter, Operationen und Maschinenbefehle getrennt zu zählen: Eine MAC kann je nach Zielhardware einen Befehl, mehrere Befehle oder einen Teil eines größeren Auftrags bilden.</p>
+<p>Der C-Ausschnitt zeigt eine einzelne Zeile nach Quantisierung mit Nullpunkten null und einem Bias in der Produktskala. Bei anderen Nullpunkten müssen diese vor der Multiplikation abgezogen werden; wie Int8-Werte gespeichert und am Schichtende requantisiert werden, zeigt die Folie „Schmal speichern, breit rechnen“ im dritten Abschnitt. <code>sum</code> beginnt mit dem Bias. Jede Iteration liest ein Wertepaar und erweitert die laufende Summe. Die Typumwandlung vor der Multiplikation verbreitert die Rechnung; passende Wertebereiche bleiben Voraussetzung. Innerhalb der Summe benötigt jeder Schritt den vorherigen Akkumulatorwert. Verschiedene Ausgangszeilen haben dagegen eigene Summen und können unabhängig fortschreiten. Deshalb sind Parameter, Operationen und Maschinenbefehle getrennt zu zählen: Eine MAC kann je nach Zielhardware einen Befehl, mehrere Befehle oder einen Teil eines größeren Auftrags bilden.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -788,7 +792,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="mehr-peak-mehr-nutzbare-rate" class="slide level2 compact-figure">
 <h2>Mehr Peak – mehr nutzbare Rate?</h2>
 <div class="section-label">
-<p>2 / 6 · Rechenarbeit und Daten</p>
+<p>2 / 5 · Rechenarbeit und Daten</p>
 </div>
 <p>Was ändert ein verdoppelter Peak bei unveränderter Datenversorgung?</p>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/roofline.png" alt="Roofline R: Peak acht Operationen je Takt, Bandbreite acht Byte je Takt. Die Grenze steigt bis Intensität eins linear und bleibt danach bei acht."></p>
@@ -811,7 +815,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="dieselbe-matrixrechnung-mit-wiederverwendung" class="slide level2">
 <h2>Dieselbe Matrixrechnung mit Wiederverwendung</h2>
 <div class="section-label">
-<p>2 / 6 · Rechenarbeit und Daten</p>
+<p>2 / 5 · Rechenarbeit und Daten</p>
 </div>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/tile.png" alt="A=[[1,2],[3,4]], B=[[5,6],[7,8]] und C=[[19,22],[43,50]]. Acht MACs verwenden acht unterschiedliche Eingangswerte mehrfach."></p>
 <p>Ein Tile ist ein gemeinsam lokal gehaltener Matrixausschnitt.</p>
@@ -833,7 +837,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="auch-ausgaben-und-wartezeiten-gehören-zur-bilanz" class="slide level2">
 <h2>Auch Ausgaben und Wartezeiten gehören zur Bilanz</h2>
 <div class="section-label">
-<p>2 / 6 · Rechenarbeit und Daten</p>
+<p>2 / 5 · Rechenarbeit und Daten</p>
 </div>
 <table class="caption-top">
 <thead>
@@ -884,7 +888,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="papierphase-1-rechnung-und-speichergrenze" class="slide level2">
 <h2>Papierphase 1: Rechnung und Speichergrenze</h2>
 <div class="section-label">
-<p>2 / 6 · Rechenarbeit und Daten</p>
+<p>2 / 5 · Rechenarbeit und Daten</p>
 </div>
 <p>Teil A: 1.1, 1.2 und 2.1 · 10 Minuten</p>
 <ul>
@@ -936,7 +940,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="datenparallelität-respektiert-elementgrenzen" class="slide level2">
 <h2>Datenparallelität respektiert Elementgrenzen</h2>
 <div class="section-label">
-<p>3 / 6 · Datenparallelität</p>
+<p>3 / 5 · Datenparallelität</p>
 </div>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/simd.png" alt="Vier unsigned Acht-Bit-Lanes addieren getrennt 1+2,16+32,127+1 und255+1 zu3,48,128 und0; kein Übertrag in die Nachbarlane."></p>
 <p>DLP: gleiche Arbeit an mehreren Daten · SIMD: gemeinsame Befehlssteuerung</p>
@@ -960,13 +964,13 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="schmale-operanden-brauchen-breite-produktsummen" class="slide level2">
 <h2>Schmale Operanden brauchen breite Produktsummen</h2>
 <div class="section-label">
-<p>3 / 6 · Datenparallelität</p>
+<p>3 / 5 · Datenparallelität</p>
 </div>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/wide.png" alt="Zwei Int8-Werte20 ergeben Produkt400; drei solche Produkte ergeben1200. Der Akkumulator benötigt mehr als acht Bit."></p>
 <p>Int8 speichert die Operanden; es legt die Akkumulatorbreite nicht fest.</p>
 <aside class="notes">
 <p>Ein kleines Eingabeformat begrenzt nicht den Wert eines Produkts. Int8 reicht von <span class="math inline">\(-128\)</span> bis 127. Bereits <span class="math inline">\(20\cdot20=400\)</span> und die Summe dreier solcher Produkte, 1200, passen dort nicht hinein. Der Akkumulator muss den Wertebereich der ganzen Produktsumme einschließlich Bias und Nullpunktkorrektur aufnehmen.</p>
-<p>Deshalb verwenden Integer-Netzkerne häufig Int8-Operanden und eine breitere Int32-Akkumulation. Auch deren Bereich ist endlich. Schon zwei maximal positive Produkte <span class="math inline">\((-128)(-128)\)</span> überschreiten den Int16-Bereich. Die Breite muss aus Zeilenlänge und Operandenbereichen begründet werden. Verbreitern, englisch Widening, muss vor einer zu schmalen Rechnung erfolgen; abgeschnittene Bits entstehen durch einen späteren Cast nicht neu. Der begleitende Hostcode rechnet für seine Bereichsprüfung zunächst in Int64. Die spätere Rückskalierung auf einen Ausgangscode heißt Requantisierung und wird im Firmwareabschnitt behandelt. Wie Speicherformat, Rechenformat und Ausgabeformat in der Praxis zusammenspielen, fasst die nächste Folie zusammen.</p>
+<p>Deshalb verwenden Integer-Netzkerne häufig Int8-Operanden und eine breitere Int32-Akkumulation. Auch deren Bereich ist endlich. Schon zwei maximal positive Produkte <span class="math inline">\((-128)(-128)\)</span> überschreiten den Int16-Bereich. Die Breite muss aus Zeilenlänge und Operandenbereichen begründet werden. Verbreitern, englisch Widening, muss vor einer zu schmalen Rechnung erfolgen; abgeschnittene Bits entstehen durch einen späteren Cast nicht neu. Der begleitende Hostcode rechnet für seine Bereichsprüfung zunächst in Int64. Die spätere Rückskalierung auf einen Ausgangscode heißt Requantisierung. Wie Speicherformat, Rechenformat und Ausgabeformat in der Praxis zusammenspielen, fasst die nächste Folie zusammen.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -982,7 +986,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="schmal-speichern-breit-rechnen" class="slide level2">
 <h2>Schmal speichern, breit rechnen</h2>
 <div class="section-label">
-<p>3 / 6 · Datenparallelität</p>
+<p>3 / 5 · Datenparallelität</p>
 </div>
 <table class="caption-top">
 <colgroup>
@@ -1025,7 +1029,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <p>Die beiden vorigen Folien beschreiben eine Gefahr und eine Bedingung: Eine schmale Lane verfälscht ein zu großes Ergebnis ohne Meldung, und eine Produktsumme braucht mehr Bits als ihre Operanden. Integer-Netzkerne lösen beides üblicherweise, indem sie das Speicherformat vom Rechenformat trennen. Die Tabelle liest sich von oben nach unten als Weg eines Werts durch eine Schicht.</p>
 <p>Gewichte und Aktivierungen liegen als Int8 im Speicher. Ein Wert belegt dann ein Byte statt vier Byte bei Int32 oder Float32. Das schont Flash und SRAM, und jeder Ladevorgang bringt über dieselbe Busbreite viermal so viele Werte heran. Bei geringer Rechenintensität begrenzen gerade diese übertragenen Bytes die nutzbare Rate, wie die Roofline-Betrachtung im zweiten Abschnitt gezeigt hat.</p>
 <p>Beim Rechnen wird verbreitert. Das Produkt zweier Int8-Werte liegt zwischen <span class="math inline">\(-128\cdot127=-16\,256\)</span> und <span class="math inline">\((-128)\cdot(-128)=16\,384\)</span> und passt damit exakt in Int16. Für die Summe genügt Int16 nicht: Schon zwei Produkte von <span class="math inline">\(16\,384\)</span> ergeben <span class="math inline">\(32\,768\)</span>. Akkumuliert wird deshalb in Int32. Dort passen auch die 96 Produkte einer Zeile des Aktivitätsmodells mit großer Reserve, denn <span class="math inline">\(96\cdot16\,384=1\,572\,864&lt;2^{31}\)</span>. Der Bias wird als Int32 in derselben Produktskala addiert. Viele Befehlssätze bieten dafür verbreiternde Multiplikationen, Multiply-Accumulate-Befehle oder Skalarproduktbefehle. Sie lesen Int8-Operanden und schreiben breitere Ergebnisse oder summieren direkt in breitere Elemente. Ein Int8-Produkt mit Überlauf, das erst danach umgewandelt würde, entsteht so gar nicht.</p>
-<p>Erst am Schichtende, wenn die Int32-Summe vollständig ist, folgen Aktivierung wie ReLU und Skalierung. Für eine nachfolgende Int8-Schicht wird der Wert requantisiert: skaliert, gerundet, um den Nullpunkt verschoben und auf <span class="math inline">\(-128\)</span> bis <span class="math inline">\(127\)</span> begrenzt. Diese Sättigung ist hier gewollt; der fünfte Abschnitt rechnet sie an einem Beispiel durch. Welche verbreiternden Befehle eine Plattform besitzt und wie schnell sie arbeiten, bestimmen Befehlssatz und Mikroarchitektur. Nach den RVV-Grundideen zeigen zwei Folien am Ende dieses Abschnitts ein Beispiel.</p>
+<p>Erst am Schichtende, wenn die Int32-Summe vollständig ist, folgen Aktivierung wie ReLU und Skalierung. Für eine nachfolgende Int8-Schicht wird der Wert requantisiert: skaliert, gerundet, um den Nullpunkt verschoben und auf <span class="math inline">\(-128\)</span> bis <span class="math inline">\(127\)</span> begrenzt. Mit den Skalen <span class="math inline">\(s_x\)</span> und <span class="math inline">\(s_w\)</span> von Eingängen und Gewichten sowie Skala <span class="math inline">\(s_y\)</span> und Nullpunkt <span class="math inline">\(z_y\)</span> des Ausgangs gilt <span class="math inline">\(q_y=\operatorname{clip}_{[-128,127]}\bigl(\operatorname{round}(a\,s_xs_w/s_y)+z_y\bigr)\)</span>; dabei enthält die Summe <span class="math inline">\(a\)</span> bereits die korrigierten Nullpunkte von Eingängen und Gewichten. Die Begrenzung, also Sättigung, ist hier gewollt: Werte außerhalb des Int8-Bereichs werden auf den nächsten Rand gesetzt, statt modulo umzuschlagen. Welche verbreiternden Befehle eine Plattform besitzt und wie schnell sie arbeiten, bestimmen Befehlssatz und Mikroarchitektur. Nach den RVV-Grundideen zeigen zwei Folien am Ende dieses Abschnitts ein Beispiel.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1041,7 +1045,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="ein-start-pro-takt-ist-nicht-latenz-eins" class="slide level2">
 <h2>Ein Start pro Takt ist nicht Latenz eins</h2>
 <div class="section-label">
-<p>3 / 6 · Datenparallelität</p>
+<p>3 / 5 · Datenparallelität</p>
 </div>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/pipeline.png" alt="Vier unabhängige Operationen starten in1,2,3,4. Bei Latenz3 enden sie in3,4,5,6; der Startabstand beträgt1."></p>
 <p>Ergebnislatenz <span class="math inline">\(3\)</span> Takte · Initiationsintervall <span class="math inline">\(1\)</span> Takt</p>
@@ -1064,7 +1068,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="rvv-idee-1-die-hardware-wählt-die-aktive-länge" class="slide level2">
 <h2>RVV-Idee 1: Die Hardware wählt die aktive Länge</h2>
 <div class="section-label">
-<p>3 / 6 · Datenparallelität</p>
+<p>3 / 5 · Datenparallelität</p>
 </div>
 <p><span class="math display">\[\mathrm{VLMAX}=\mathrm{LMUL}\,\frac{\mathrm{VLEN}}{\mathrm{SEW}}\]</span></p>
 <table class="caption-top">
@@ -1111,7 +1115,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="rvv-idee-2-strip-mining-ohne-nachspann" class="slide level2">
 <h2>RVV-Idee 2: Strip-Mining ohne Nachspann</h2>
 <div class="section-label">
-<p>3 / 6 · Datenparallelität</p>
+<p>3 / 5 · Datenparallelität</p>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb2-1"><a aria-label="1"></a># RVV <span class="fl">1.0</span><span class="co">; a0=N, a1=A, a2=B, a3=C; uint32_t-Arrays</span></span>
 <span id="cb2-2"><a aria-label="2"></a>beqz a0<span class="op">,</span> done</span>
@@ -1149,7 +1153,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="rvv-idee-3-gruppen-tauschen-anzahl-gegen-länge" class="slide level2">
 <h2>RVV-Idee 3: Gruppen tauschen Anzahl gegen Länge</h2>
 <div class="section-label">
-<p>3 / 6 · Datenparallelität</p>
+<p>3 / 5 · Datenparallelität</p>
 </div>
 <p>VLEN <span class="math inline">\(128\)</span> Bit, SEW <span class="math inline">\(32\)</span> Bit, Lehrmodell mit zwei Lanes:</p>
 <table class="caption-top">
@@ -1209,7 +1213,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="chaining-gibt-fertige-elemente-direkt-weiter" class="slide level2">
 <h2>Chaining gibt fertige Elemente direkt weiter</h2>
 <div class="section-label">
-<p>3 / 6 · Datenparallelität</p>
+<p>3 / 5 · Datenparallelität</p>
 </div>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/chain.png" alt="Vier Produkte enden in2 bis5. Mit Weitergabe starten zugehörige Additionen in3 bis6, ohne erst in6 bis9."></p>
 <p>Multiplikationslatenz <span class="math inline">\(2\)</span>, Additionslatenz <span class="math inline">\(1\)</span>, je ein Start pro Takt</p>
@@ -1231,7 +1235,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="verbreitern-verdoppelt-die-registergruppe" class="slide level2">
 <h2>Verbreitern verdoppelt die Registergruppe</h2>
 <div class="section-label">
-<p>3 / 6 · Datenparallelität</p>
+<p>3 / 5 · Datenparallelität</p>
 </div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource asm number-lines code-with-copy"><code class="sourceCode fasm"><span id="cb3-1"><a aria-label="1"></a>vsetvli  t0<span class="op">,</span> a0<span class="op">,</span> e8<span class="op">,</span> m1<span class="op">,</span> ta<span class="op">,</span> ma   <span class="op">#</span> SEW <span class="dv">8</span><span class="op">,</span> LMUL <span class="dv">1</span></span>
 <span id="cb3-2"><a aria-label="2"></a>vle8<span class="op">.</span>v   v1<span class="op">,</span> <span class="op">(</span>a1<span class="op">)</span>                 <span class="op">#</span> Int8<span class="op">-</span>Aktivierungen</span>
@@ -1285,7 +1289,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="doppelte-breite-halbiert-elemente-je-datenpfad" class="slide level2">
 <h2>Doppelte Breite halbiert Elemente je Datenpfad</h2>
 <div class="section-label">
-<p>3 / 6 · Datenparallelität</p>
+<p>3 / 5 · Datenparallelität</p>
 </div>
 <p>Je Befehl: Latenz <span class="math inline">\(3\)</span>, Initiationsintervall <span class="math inline">\(1\)</span>, Chaining</p>
 <table class="caption-top">
@@ -1319,7 +1323,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <p>Ob das Verbreitern Zeit kostet, hängt davon ab, was die Hardware je Takt bewegt. Beide Tabellenzeilen verwenden das Zeitmodell dieses Abschnitts: Jeder Befehl startet mit Initiationsintervall eins, ein Ergebnis mit Start <span class="math inline">\(t\)</span> liegt am Ende von <span class="math inline">\(t+2\)</span> vor, und Chaining beginnt die Addition eines Elements frühestens im Takt nach seinem Produkt. Laden, Speichern und der Typwechsel durch <code>vsetvli</code> kosten in diesem Modell keine Zeit.</p>
 <p>Die erste Zeile überträgt den Fall der Folie „Ein Start pro Takt ist nicht Latenz eins“ auf die beiden verbreiternden Befehle. Eine Lane bearbeitet je Befehl ein Element pro Takt und kann dabei ein ganzes Int32-Ergebnis aufnehmen. Element <span class="math inline">\(e\)</span> startet die Multiplikation in Takt <span class="math inline">\(1+e\)</span> und ist am Ende von <span class="math inline">\(3+e\)</span> fertig. Die zugehörige Addition beginnt in <span class="math inline">\(4+e\)</span> und endet in <span class="math inline">\(6+e\)</span>. Für die vier Elemente ergeben sich die Enden drei bis sechs und sechs bis neun. Das sind dieselben Takte wie bei einer nicht verbreiternden Multiplikation mit Addition. Chaining gelingt, weil die Addition je Takt ein Element annimmt, genauso schnell wie die Multiplikation liefert; beide Befehle arbeiten auf denselben VL Elementen.</p>
 <p>Die zweite Zeile legt stattdessen 32 Ergebnisbits je Befehl und Takt fest, wie bei einem Datenpfad fester Breite. Darin passen vier Int8-, zwei Int16- oder ein Int32-Ergebnis. Für VL acht bräuchte eine schmale Int8-Multiplikation nur zwei Takte, rechnete aber modulo 256 falsch. <code>vwmul.vv</code> benötigt vier Takte: Je Takt startet ein Paar, und die Paare enden in den Takten drei bis sechs. <code>vwadd.wv</code> schreibt Int32 und schafft nur ein Element je Takt. Mit Chaining beginnen die Additionen deshalb in den Takten vier bis elf und enden in sechs bis dreizehn; die Addition ist der Engpass.</p>
-<p>Im Elementmodell kostet das Verbreitern also keine zusätzlichen Takte, im Bitmodell halbiert jede Verdopplung der Ergebnisbreite die Elementrate. Darum fassen Skalarproduktbefehle mehrere Int8-Produkte zusammen, bevor sie einen Int32-Wert schreiben, und MAC-Zellen halten ihren breiten Akkumulator lokal. Das systolische Array des nächsten Abschnitts folgt diesem Gedanken. Alle Takte sind Annahmen des Lehrmodells; ein realer Kern kann insbesondere Chaining über einen Typwechsel hinweg anders behandeln.</p>
+<p>Im Elementmodell kostet das Verbreitern also keine zusätzlichen Takte, im Bitmodell halbiert jede Verdopplung der Ergebnisbreite die Elementrate. Darum fassen Skalarproduktbefehle mehrere Int8-Produkte zusammen, bevor sie einen Int32-Wert schreiben, und MAC-Zellen halten ihren breiten Akkumulator lokal. NPUs mit lokalen MAC-Feldern folgen diesem Gedanken; der nächste Abschnitt zeigt, wie man sie und GPUs programmiert. Alle Takte sind Annahmen des Lehrmodells; ein realer Kern kann insbesondere Chaining über einen Typwechsel hinweg anders behandeln.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1335,7 +1339,7 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="papierphase-2-vektorlängen-und-ablauf" class="slide level2">
 <h2>Papierphase 2: Vektorlängen und Ablauf</h2>
 <div class="section-label">
-<p>3 / 6 · Datenparallelität</p>
+<p>3 / 5 · Datenparallelität</p>
 </div>
 <p>Teil A: 3.1, 3.2 und 3.4 · 15 Minuten</p>
 <ul>
@@ -1359,18 +1363,13 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
           display:block!important;
       }</style></aside>
 </section>
-<section id="daten-lokal-durch-ein-array-führen" class="slide level2 section-divider">
-<h2>4 · Daten lokal durch ein Array führen</h2>
-<p>Wie treffen die richtigen Operanden in den richtigen Zellen zusammen?</p>
-<p>Modellannahmen für diesen Abschnitt:</p>
-<ul>
-<li>Pro gültigem Paar höchstens eine MAC je Zelle und Takt.</li>
-<li>Nachbarweitergabe benötigt einen Takt; Summen starten bei null.</li>
-<li>Vorladen und Auslesen liegen außerhalb des internen Rechenfensters.</li>
-</ul>
+<section id="beschleuniger-programmieren" class="slide level2 section-divider">
+<h2>4 · Beschleuniger programmieren</h2>
+<p>Wie gelangt ein Modell auf eine GPU oder NPU – und wer legt den Weg fest?</p>
+<p>Modell → Werkzeugkette des Herstellers → Laufzeit und Treiber → Hardware</p>
 <aside class="notes">
-<p>Ein räumliches Rechengitter kann Operanden von Nachbar zu Nachbar weiterreichen und dadurch ihre lokale Wiederverwendung organisieren. Dieses systolische Prinzip ergänzt die zuvor betrachteten Vektoren. Die Mathematik bleibt eine Matrixmultiplikation; geändert werden Datenwege, Pufferorte und zeitliche Ankunft.</p>
-<p>Die Annahmen der nächsten Zeitbilder sind hier zusammengefasst. Eine Zelle darf ein gültiges Operandenpaar in einem Takt multiplizieren und zur Summe addieren. Ein Wert erreicht den Nachbarn erst im folgenden Takt. Alle Summen beginnen bei null; das Zeitfenster umfasst weder Vorladen noch anschließendes Auslesen. Eine numerische Null ist weiterhin ein gültiger Operand und darf nicht mit einem fehlenden Paar verwechselt werden. An vier Zellen lässt sich nun vollständig verfolgen, wie das Gitter gefüllt wird, welche Teilsumme wann entsteht und weshalb seine momentane Belegung schwankt.</p>
+<p>Die bisherigen Abschnitte haben gezeigt, welche Rechenarbeit ein Netz verursacht und wie Vektoren dieselben Produkte organisieren. Ein Beschleuniger nützt der Anwendung aber erst, wenn ein Programm oder Modell ihn tatsächlich erreicht. Dieser Weg unterscheidet sich zwischen GPU und NPU deutlich, und in beiden Fällen prägt ihn der Hersteller stark.</p>
+<p>Der Abschnitt betrachtet deshalb nicht die innere Taktung eines Rechenfelds, sondern die Programmierung. Für eine GPU schreibt man Kernelfunktionen, die in sehr vielen Threads parallel laufen, oder ruft Bibliotheken auf, die solche Funktionen enthalten. Eine NPU erreicht man meist nur über einen Modellcompiler des Herstellers, der ein trainiertes Modell in einen Befehlsstrom für genau diese Hardware übersetzt. Aus beiden Wegen entsteht leicht eine Herstellerbindung, englisch Vendor-Lock-in. Zum Schluss des Abschnitts geht es darum, wie sich diese Abhängigkeit begrenzen lässt. Der letzte Abschnitt bilanziert anschließend, was ein Beschleuniger der gesamten Anwendung tatsächlich bringt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1386,14 +1385,14 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
 <section id="eine-produktsumme-mehrere-hardwareorganisationen" class="slide level2 compact-figure">
 <h2>Eine Produktsumme, mehrere Hardwareorganisationen</h2>
 <div class="section-label">
-<p>4 / 6 · Systolisches Array</p>
+<p>4 / 5 · Beschleuniger programmieren</p>
 </div>
 <p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/cpu-gpu-npu.png" alt="Skalare CPU akkumuliert1,3,5,14. GPU-Prinzip bildet Produkte2,2,9 und reduziert sie mit Bias1. NPU-Prinzip hält ladbare Gewichte lokal und gibt Teilsummen3,5,14 weiter."></p>
 <p><span class="math inline">\(y_0=1+1\cdot2+2\cdot1+3\cdot3=14\)</span></p>
 <p>Auch ein Entscheidungsbaum im Sensor kann Aktivitäten erkennen, etwa beim LSM6DSOX.</p>
 <aside class="notes">
 <p>Die Hardwareklasse verändert die Organisation, nicht das Sollresultat. CPU bezeichnet den allgemeinen Prozessor, GPU eine ursprünglich für Grafik entwickelte breite Parallelorganisation und NPU einen Beschleuniger neuronaler Verarbeitung. Die Grafik zeigt drei mögliche Wege für einen kleinen Rechenkern; seine Zahlen illustrieren eine einzelne Produktsumme und sind keine neu gelernten Parameter des Aktivitätsmodells.</p>
-<p>Links verwendet der skalare CPU-Pfad eine MAC wiederholt: Aus Bias eins werden die Teilsummen drei, fünf und vierzehn. In der Mitte entstehen die Produkte zwei, zwei und neun parallel; eine Reduktion addiert sie und den Bias zum gleichen Resultat. Rechts bleiben ladbare Gewichte während des Nutzungsabschnitts lokal, während Eingaben und Teilsummen weitergegeben werden. Die Pfeile stellen Informationswege und keine Taktzahlen dar. Eine CPU kann selbst SIMD und mehrere Rechenwerke besitzen; eine NPU muss nicht genau diesen Datenfluss verwenden. Die Auswahl folgt Operatoren, Formen, Datentypen und Übergabekosten. Ein anderer Ansatz kommt ohne neuronales Netz aus: Das <a href="https://github.com/STMicroelectronics/st-mems-machine-learning-core/blob/main/examples/activity_recognition_for_mobile/lsm6dsox/README.md">Aktivitätserkennungsbeispiel von ST für den LSM6DSOX</a> dokumentiert statistische Merkmale und einen Entscheidungsbaum im Sensor, unter anderem für Stationary, Walking und Jogging. Edge bezeichnet den Ort der Auswertung und keine NPU-Pflicht; eine feste Zahl parallel arbeitender Bäume wird hier nicht vorausgesetzt. Der nächste Schritt konkretisiert einen dieser lokalen Datenflüsse als getaktetes Array.</p>
+<p>Links verwendet der skalare CPU-Pfad eine MAC wiederholt: Aus Bias eins werden die Teilsummen drei, fünf und vierzehn. In der Mitte entstehen die Produkte zwei, zwei und neun parallel; eine Reduktion addiert sie und den Bias zum gleichen Resultat. Rechts bleiben ladbare Gewichte während des Nutzungsabschnitts lokal, während Eingaben und Teilsummen weitergegeben werden. Die Pfeile stellen Informationswege und keine Taktzahlen dar. Eine CPU kann selbst SIMD und mehrere Rechenwerke besitzen; eine NPU muss nicht genau diesen Datenfluss verwenden. Die Auswahl folgt Operatoren, Formen, Datentypen und Übergabekosten. Ein anderer Ansatz kommt ohne neuronales Netz aus: Das <a href="https://github.com/STMicroelectronics/st-mems-machine-learning-core/blob/main/examples/activity_recognition_for_mobile/lsm6dsox/README.md">Aktivitätserkennungsbeispiel von ST für den LSM6DSOX</a> dokumentiert statistische Merkmale und einen Entscheidungsbaum im Sensor, unter anderem für Stationary, Walking und Jogging. Edge bezeichnet den Ort der Auswertung und keine NPU-Pflicht; eine feste Zahl parallel arbeitender Bäume wird hier nicht vorausgesetzt. Für die Anwendung zählt neben dieser Organisation, wie Software sie erreicht: Eine GPU wird mit Kernelfunktionen programmiert, eine NPU meist über einen Modellcompiler des Herstellers.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1406,16 +1405,30 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
           display:block!important;
       }</style></aside>
 </section>
-<section id="eine-zelle-rechnet-und-reicht-weiter" class="slide level2">
-<h2>Eine Zelle rechnet und reicht weiter</h2>
+<section id="gpu-eine-kernelfunktion-läuft-in-vielen-threads" class="slide level2">
+<h2>GPU: Eine Kernelfunktion läuft in vielen Threads</h2>
 <div class="section-label">
-<p>4 / 6 · Systolisches Array</p>
+<p>4 / 5 · Beschleuniger programmieren</p>
 </div>
-<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/cell.png" alt="Die Zelle empfängt A von links und B von oben, addiert das Produkt zur lokalen Summe C und reicht A rechts sowie B unten weiter."></p>
-<p>Output-Stationary: Die Ausgabeteilsumme bleibt während des Tiles lokal.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource cpp number-lines code-with-copy"><code class="sourceCode cpp"><span id="cb4-1"><a aria-label="1"></a><span class="co">// CUDA C++, Lehrcode: ein Thread je Ausgang j</span></span>
+<span id="cb4-2"><a aria-label="2"></a>__global__ <span class="dt">void</span> dense<span class="op">(</span><span class="at">const</span> <span class="dt">float</span> <span class="op">*</span>W<span class="op">,</span> <span class="at">const</span> <span class="dt">float</span> <span class="op">*</span>x<span class="op">,</span></span>
+<span id="cb4-3"><a aria-label="3"></a>    <span class="at">const</span> <span class="dt">float</span> <span class="op">*</span>b<span class="op">,</span> <span class="dt">float</span> <span class="op">*</span>y<span class="op">,</span> <span class="dt">int</span> n<span class="op">,</span> <span class="dt">int</span> m<span class="op">)</span></span>
+<span id="cb4-4"><a aria-label="4"></a><span class="op">{</span></span>
+<span id="cb4-5"><a aria-label="5"></a>    <span class="dt">int</span> j <span class="op">=</span> blockIdx<span class="op">.</span>x <span class="op">*</span> blockDim<span class="op">.</span>x <span class="op">+</span> threadIdx<span class="op">.</span>x<span class="op">;</span></span>
+<span id="cb4-6"><a aria-label="6"></a>    <span class="cf">if</span> <span class="op">(</span>j <span class="op">&lt;</span> m<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-7"><a aria-label="7"></a>        <span class="dt">float</span> sum <span class="op">=</span> b<span class="op">[</span>j<span class="op">];</span></span>
+<span id="cb4-8"><a aria-label="8"></a>        <span class="cf">for</span> <span class="op">(</span><span class="dt">int</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> n<span class="op">;</span> <span class="op">++</span>i<span class="op">)</span></span>
+<span id="cb4-9"><a aria-label="9"></a>            sum <span class="op">+=</span> W<span class="op">[</span>j <span class="op">*</span> n <span class="op">+</span> i<span class="op">]</span> <span class="op">*</span> x<span class="op">[</span>i<span class="op">];</span></span>
+<span id="cb4-10"><a aria-label="10"></a>        y<span class="op">[</span>j<span class="op">]</span> <span class="op">=</span> sum<span class="op">;</span></span>
+<span id="cb4-11"><a aria-label="11"></a>    <span class="op">}</span></span>
+<span id="cb4-12"><a aria-label="12"></a><span class="op">}</span></span>
+<span id="cb4-13"><a aria-label="13"></a><span class="co">// Start im Hostprogramm, blocks = (m + 127) / 128:</span></span>
+<span id="cb4-14"><a aria-label="14"></a><span class="co">// dense&lt;&lt;&lt;blocks, 128&gt;&gt;&gt;(dW, dx, db, dy, n, m);</span></span></code></pre></div><button title="In die Zwischenablage kopieren" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Speicher anfordern und Daten kopieren steuert das Hostprogramm auf der CPU.</p>
 <aside class="notes">
-<p>Eine systolische Zelle verbindet lokale Rechnung mit regelmäßiger Nachbarweitergabe. Der Name erinnert an rhythmisches Pumpen: Operanden bewegen sich in einer getakteten Welle durch das Gitter. Im gezeigten Output-Stationary-Datenfluss bleibt die Ausgabeteilsumme während des Tiles, also des bearbeiteten Matrixausschnitts, an ihrem Platz.</p>
-<p>A kommt von links und wird unverändert nach rechts gegeben; B kommt von oben und wandert unverändert nach unten. Die Zelle leitet weder das Produkt als neues A noch die Summe als neues B weiter. Bei einem gültigen zusammengehörigen Paar aktualisiert sie <span class="math inline">\(C\leftarrow C+AB\)</span>. Die rote Umrandung markiert den lokalen Zustand. Fehlt ein gültiger Operand, bleibt die Summe in diesem Takt unverändert. Vier solcher Zellen können gemeinsam vier Ausgänge bilden. Entscheidend ist nun, dass Werte mit demselben inneren Summenindex gleichzeitig an derselben Zelle eintreffen.</p>
+<p>Eine GPU, Graphics Processing Unit, enthält sehr viele einfache Recheneinheiten und ist auf Datenparallelität ausgelegt. Ein verbreitetes Programmiermodell dafür ist CUDA von NVIDIA. Der Lehrcode berechnet die Dense-Schicht aus dem ersten Abschnitt: Jeder Thread, also jeder unabhängig laufende Programmfaden, bildet genau einen Ausgang <span class="math inline">\(y_j=b_j+\sum_i W_{ji}x_i\)</span>. Die Gewichtsmatrix liegt zeilenweise im Speicher; Zeile <span class="math inline">\(j\)</span> beginnt bei Index <span class="math inline">\(j\cdot n\)</span>.</p>
+<p><code>__global__</code> kennzeichnet eine Kernelfunktion, die auf der GPU läuft und vom Hostprogramm auf der CPU gestartet wird. Die Threads sind in Blöcke gruppiert. <code>blockIdx.x</code>, <code>blockDim.x</code> und <code>threadIdx.x</code> liefern Blocknummer, Threads je Block und Position im Block; daraus entsteht der Ausgangsindex <code>j</code>. Der Start mit <code>&lt;&lt;&lt;blocks, 128&gt;&gt;&gt;</code> erzeugt <code>blocks</code> Blöcke zu je 128 Threads. Mit <code>blocks = (m + 127) / 128</code> rundet die Ganzzahldivision auf, sodass alle m Ausgänge abgedeckt sind. Der letzte Block kann überzählige Threads enthalten. Die Bedingung <code>j &lt; m</code> verhindert, dass sie außerhalb der Arrays lesen oder schreiben. NVIDIA-GPUs führen Threads in Gruppen von 32, sogenannten Warps, gemeinsam aus.</p>
+<p>Ausgelassen sind die Schritte des Hostprogramms: GPU-Speicher anfordern, W, x und b kopieren, den Kernel starten und y zurückkopieren. Die Startzeile übergibt deshalb die Zeiger <code>dW</code>, <code>dx</code>, <code>db</code> und <code>dy</code> auf die Kopien im GPU-Speicher. Diese Kopien kosten Zeit und gehören zur Gesamtbilanz des letzten Abschnitts. Für Netze schreibt man selten eigene Kernel; man ruft optimierte Herstellerbibliotheken auf, etwa cuBLAS für Matrixprodukte oder cuDNN für Netzoperatoren, und Frameworks wie PyTorch tun das automatisch. CUDA-Code wird mit NVIDIAs Compiler für NVIDIA-GPUs übersetzt. AMDs HIP verwendet eine sehr ähnliche Schreibweise für AMD- und NVIDIA-GPUs; offene Standards wie OpenCL oder SYCL zielen auf Geräte mehrerer Hersteller. Der Lehrcode wurde hier nicht auf einer GPU ausgeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1428,105 +1441,36 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
           display:block!important;
       }</style></aside>
 </section>
-<section id="die-randeinspeisung-passt-die-ankunftszeiten-an" class="slide level2">
-<h2>Die Randeinspeisung passt die Ankunftszeiten an</h2>
+<section id="npu-ein-modellcompiler-statt-eigener-kernel" class="slide level2">
+<h2>NPU: Ein Modellcompiler statt eigener Kernel</h2>
 <div class="section-label">
-<p>4 / 6 · Systolisches Array</p>
+<p>4 / 5 · Beschleuniger programmieren</p>
 </div>
-<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/array.png" alt="Vier Zellen C00,C01,C10,C11 bilden das Zwei-mal-zwei-Gitter. A wandert zeilenweise rechts, B spaltenweise unten, C bleibt lokal."></p>
-<p><span class="math inline">\(A_{ik}\)</span> links in <span class="math inline">\(1+k+i\)</span>, <span class="math inline">\(B_{kj}\)</span> oben in <span class="math inline">\(1+k+j\)</span></p>
-<p>Gemeinsame Ankunft in <span class="math inline">\((i,j)\)</span>: <span class="math inline">\(1+k+i+j\)</span></p>
-<aside class="notes">
-<p>Die räumliche Anordnung reicht für eine richtige Rechnung noch nicht aus. Die Randeinspeisung muss zusätzlich die Laufwege ausgleichen. Im Zwei-mal-zwei-Beispiel gelten wieder <span class="math inline">\(A=[[1,2],[3,4]]\)</span> und <span class="math inline">\(B=[[5,6],[7,8]]\)</span>. Die Indizes beginnen bei null. Zelle <span class="math inline">\(C_{ij}\)</span> benötigt für jeden Summenschritt die Werte <span class="math inline">\(A_{ik}\)</span> und <span class="math inline">\(B_{kj}\)</span> mit demselben k.</p>
-<p>A wird links in Takt <span class="math inline">\(1+k+i\)</span> und B oben in <span class="math inline">\(1+k+j\)</span> eingespeist. Nach j Schritten nach rechts beziehungsweise i nach unten erreichen beide die Zielzelle in <span class="math inline">\(1+k+i+j\)</span>. Bei <span class="math inline">\(C_{00}\)</span> sind das die Paare <span class="math inline">\((1,5)\)</span> in eins und <span class="math inline">\((2,7)\)</span> in zwei. Bei <span class="math inline">\(C_{11}\)</span> treffen <span class="math inline">\((3,6)\)</span> erst in drei und <span class="math inline">\((4,8)\)</span> in vier ein. Diese Staffelung heißt auch Skewing. Leere Zeitplätze sind ungültig; sie dürfen nicht als numerische Nullprodukte mitgezählt werden. Aus den Ankünften folgt nun die ganze Rechenwelle.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="welche-zelle-ist-zuerst-vollständig-fertig" class="slide level2 compact-figure">
-<h2>Welche Zelle ist zuerst vollständig fertig?</h2>
-<div class="section-label">
-<p>4 / 6 · Systolisches Array</p>
+<div class="cell" data-reveal="true" data-layout-align="default">
+<div class="cell-output-display">
+<div>
+<p></p><figure class=""><p></p>
+<div>
+
+<pre class="mermaid mermaid-js">flowchart LR
+  M["Trainiertes Modell&lt;br/&gt;TFLite oder ONNX, Int8"] --&gt; C["Compiler des&lt;br/&gt;NPU-Herstellers"]
+  C --&gt; N["NPU-Befehlsstrom&lt;br/&gt;für unterstützte Teile"]
+  C --&gt; R["Unveränderte Operatoren&lt;br/&gt;für die CPU"]
+  N --&gt; L["Laufzeit und Treiber&lt;br/&gt;auf dem Gerät"]
+  R --&gt; L
+  style C fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important;
+  style N fill:#FFFFFF,stroke:#E2001A,stroke-width:2px !important;
+</pre>
 </div>
-<p>Verfolgen Sie zur aktiven Zelle auch ihre Summe am Taktende.</p>
-<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/wave.png" alt="Die aktiven Zellen pro Takt sind C00; dann C00,C01,C10; dann C01,C10,C11; zuletzt C11. Es entstehen1,3,3,1 gültige MACs."></p>
-<aside class="notes">
-<p>Die erste vollständige Ausgabe liegt in <span class="math inline">\(C_{00}\)</span> am Ende von Takt zwei. Lassen Sie zuerst zwischen einer aktiven Zelle und einer bereits fertigen Ausgabe unterscheiden. In eins rechnet nur <span class="math inline">\(C_{00}\)</span> und hält fünf. In zwei entsteht dort <span class="math inline">\(5+2\cdot7=19\)</span>; zugleich beginnen <span class="math inline">\(C_{01}\)</span> mit sechs und <span class="math inline">\(C_{10}\)</span> mit fünfzehn. In drei enden diese beiden mit 22 und 43, während <span class="math inline">\(C_{11}\)</span> erst achtzehn hält. In vier endet die letzte Summe mit 50.</p>
-<p>Die Zustände am Taktende lauten damit <span class="math inline">\([[5,0],[0,0]]\)</span>, <span class="math inline">\([[19,6],[15,0]]\)</span>, <span class="math inline">\([[19,22],[43,18]]\)</span> und <span class="math inline">\([[19,22],[43,50]]\)</span>. Die gültigen MAC-Zahlen sind eins, drei, drei und eins, insgesamt acht. Das Gitter ist in keinem Takt vollständig beschäftigt. Eine noch unveränderte Null ist ein Anfangszustand und keine zusätzliche geleistete MAC. Fertig in der Zelle bedeutet außerdem erst nach einem geeigneten Ausleseschritt außerhalb des Arrays verfügbar.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="stationary-welcher-wert-bleibt-lokal" class="slide level2">
-<h2>Stationary: welcher Wert bleibt lokal?</h2>
-<div class="section-label">
-<p>4 / 6 · Systolisches Array</p>
+<p></p></figure><p></p>
 </div>
-<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/stationary.png" alt="Output-Stationary hält eine Teilsumme lokal und bewegt Operanden. Weight-Stationary hält ein Gewicht und bewegt Eingaben sowie Teilsummen."></p>
-<p>Ortsfeste Werte sparen Wiederholungen; alle anderen Datenwege bleiben nötig.</p>
-<aside class="notes">
-<p>Stationary bezeichnet den Wert, der während eines Nutzungsabschnitts ortsfest bleibt. Links hält Output-Stationary eine Ausgabeteilsumme in der Zelle; passende Operanden kommen nacheinander dazu. Rechts hält Weight-Stationary ein Gewicht lokal, während Aktivierungen und Teilsummen nach einem anderen Plan bewegt werden. Rot markiert den jeweils bleibenden Wert, graue Pfeile die weitergegebenen Größen.</p>
-<p>Der bisherige Vier-Takte-Ablauf gehört zur linken Organisation. Für die rechte müssen Einspeisung, Summenweitergabe und Reduktion neu festgelegt werden. Ein ortsfestes Gewicht ist dabei ladbar und nicht unveränderlich in Silizium eingebaut. Beim nächsten Tile oder einer anderen Schicht können neue Gewichte nötig sein. Welche Variante besonders wenig Verkehr verursacht, hängt von Matrixformen, verfügbaren Puffern und Wiederverwendung ab. Die beiden Bilder liefern daher eine Frage zur Datenorganisation, keine pauschale Rangliste von Geschwindigkeit oder Energie.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="räumliche-belegung-und-zeitliche-auslastung-trennen" class="slide level2">
-<h2>Räumliche Belegung und zeitliche Auslastung trennen</h2>
-<div class="section-label">
-<p>4 / 6 · Systolisches Array</p>
 </div>
-<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/util.png" alt="Das einzelne Zwei-mal-zwei-Tile belegt vier Zellen. Im2×2-Array acht von16 Zell-Takten; im sonst leeren4×4-Array acht von64. Räumliche Belegung dort25Prozent."></p>
-<p><span class="math inline">\(U=\dfrac{\text{gültige MACs}}{\text{Zellen}\cdot\text{Takte}}\)</span></p>
-<aside class="notes">
-<p>Die Auslastung zählt genutzte Rechengelegenheiten über ein benanntes Zeitfenster. Weil jede Zelle höchstens eine MAC je Takt ausführen kann, ist ein Zell-Takt eine solche Gelegenheit. Unser einzelnes Tile erledigt acht gültige MACs. Auf vier Zellen in vier Takten sind das <span class="math inline">\(8/16=50\,\%\)</span>. Wird es allein in den oberen linken vier Zellen eines sonst leeren 4×4-Arrays ausgeführt, sind es <span class="math inline">\(8/64=12{,}5\,\%\)</span>.</p>
-<p>Räumlich belegt dasselbe Tile dort vier von sechzehn Zellen, also 25 Prozent. Bezogen nur auf diese aktiven vier bleiben es über die vier Takte fünfzig Prozent zeitliche Auslastung. Die Bezugsmenge gehört deshalb zur Zahl. Für ein vollständig belegtes <span class="math inline">\(M\times N\)</span>-Array mit innerer Dimension K folgt aus der Ankunftsformel das Fenster <span class="math inline">\(K+M+N-2\)</span> und <span class="math inline">\(U=K/(K+M+N-2)\)</span>. Größere K verringern den relativen Anteil des Füllens und Leerens. Zusätzliche Tiles oder eine andere Überlappung benötigen einen eigenen Ablauf.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="tpu-v1-einen-peak-richtig-lesen" class="slide level2 compact-figure">
-<h2>TPU v1: einen Peak richtig lesen</h2>
-<div class="section-label">
-<p>4 / 6 · Systolisches Array</p>
 </div>
-<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/tops.png" alt="256×256 Int8-MAC-Zellen bei700MHz ergeben45,8752TMAC/s und bei zweiOperationen jeMAC91,7504TOPS, gerundet92."></p>
-<p>Historisches Rechenzentrumsbeispiel · Hintergrund zur Einordnung</p>
+<p>Beispiel Arm Ethos-U: Der Compiler Vela ersetzt beschleunigbare Teile durch einen NPU-Operator.</p>
 <aside class="notes">
-<p>Ein dokumentierter Peak lässt sich rechnerisch einordnen. Die erste TPU-Generation aus der Arbeit von Jouppi und Mitautoren von 2017 besitzt <span class="math inline">\(256\cdot256=65\,536\)</span> Int8-MAC-Einheiten bei 700 MHz. TPU heißt Tensor Processing Unit und bezeichnet hier einen Rechenzentrumsbeschleuniger, kein kleines Sensorgerät.</p>
-<p>Unter voller Versorgung entstehen <span class="math inline">\(65\,536\cdot700\cdot10^6=45{,}8752\cdot10^{12}\)</span> MACs pro Sekunde. Mit zwei gezählten Operationen je MAC sind das <span class="math inline">\(91{,}7504\)</span> TOPS, gerundet 92. TOPS bedeutet Billionen arithmetische Operationen je Sekunde. Die Grafik führt genau diese Zählkette vor. Für die Übung wichtig ist ihre Methode, nicht das Auswendiglernen der Chipzahl: Datentyp und MAC-Konvention müssen zur Peakangabe gehören. Inferenzen je Sekunde brauchen zusätzlich die Modellarbeit und die erreichte Auslastung. Energie je Inferenz verlangt darüber hinaus eine passende Leistungsaufnahme und dieselbe Systemgrenze.</p>
+<p>Eine NPU, Neural Processing Unit, wird in Mikrocontrollern selten mit eigenen Kernelfunktionen programmiert; ihr interner Befehlssatz ist meist nicht für Anwendungsentwickler beschrieben. Stattdessen liefert man ein trainiertes Modell in einem Austauschformat, etwa im TFLite-Format von LiteRT, früher TensorFlow Lite, oder in ONNX, Open Neural Network Exchange. Viele NPUs verlangen ein nach den Regeln des Herstellers auf Int8 quantisiertes Modell, also schmal gespeicherte Werte wie im dritten Abschnitt.</p>
+<p>Die Abbildung liest sich von links nach rechts. Der Compiler des Herstellers prüft jeden Operator auf Unterstützung, Form und Datentyp. Unterstützte Teile übersetzt er in einen Befehlsstrom samt Speicherplan und Gewichtsanordnung für genau diese NPU; die rot umrandeten Kästen markieren diese herstellergebundenen Schritte. Nicht unterstützte Operatoren bleiben unverändert und werden später auf dem Prozessor ausgeführt. Auf dem Gerät ruft eine Laufzeit wie TFLM, TensorFlow Lite for Microcontrollers, die Operatoren nacheinander auf und übergibt die NPU-Teile über einen Treiber an die Hardware.</p>
+<p>Beim Arm Ethos-U heißt der Compiler Vela. Er erzeugt aus einem TFLite-Modell wieder ein TFLite-Modell, in dem die beschleunigbaren Teile durch einen herstellerspezifischen Operator mit dem Befehlsstrom ersetzt sind; nicht beschleunigbare Teile bleiben unverändert. Andere Hersteller bieten vergleichbare Werkzeugketten, etwa NXP eIQ oder ST Edge AI, die untereinander nicht austauschbar sind. Für die Leistung zählt deshalb nicht nur der Rechenpeak der NPU. Jeder nicht unterstützte Operator zwischen zwei NPU-Teilen erzwingt eine Übergabe an den Prozessor und zurück. Der Compilerbericht, welche Operatoren tatsächlich auf der NPU laufen, gehört damit zur Hardwarebewertung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1539,162 +1483,105 @@ S=W_2H+b_2\mathbf{1}_B^T\]</span></p>
           display:block!important;
       }</style></aside>
 </section>
-<section id="papierphase-3-das-array-selbst-verfolgen" class="slide level2">
-<h2>Papierphase 3: das Array selbst verfolgen</h2>
+<section id="vendor-lock-in-entsteht-in-der-werkzeugkette" class="slide level2">
+<h2>Vendor-Lock-in entsteht in der Werkzeugkette</h2>
 <div class="section-label">
-<p>4 / 6 · Systolisches Array</p>
+<p>4 / 5 · Beschleuniger programmieren</p>
+</div>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Bindung</th>
+<th>GPU-Beispiel</th>
+<th>NPU-Beispiel</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Programmiermodell, Bibliotheken</td>
+<td>CUDA, cuBLAS, cuDNN</td>
+<td>Compiler mit eigener Operatorliste</td>
+</tr>
+<tr class="even">
+<td>Binärformat, Treiber</td>
+<td>Code für NVIDIA-GPUs</td>
+<td>Befehlsstrom für eine NPU-Familie</td>
+</tr>
+<tr class="odd">
+<td>Zahlenformat, Optimierung</td>
+<td>Tuning je GPU-Generation</td>
+<td>Quantisierungsregeln, Speicherplan</td>
+</tr>
+</tbody>
+</table>
+<p>Wechselkosten: Code anpassen, Modell neu übersetzen, Ergebnisse neu prüfen.</p>
+<aside class="notes">
+<p>Vendor-Lock-in, deutsch Herstellerbindung, bezeichnet eine Abhängigkeit, bei der ein Wechsel zu einem anderen Anbieter so hohe Kosten verursacht, dass er praktisch unterbleibt. Bei Beschleunigern entsteht diese Bindung nicht an einer einzelnen Stelle, sondern auf jeder Ebene der Werkzeugkette. Die Tabelle ordnet diese Ebenen zeilenweise.</p>
+<p>Programmiermodell und Bibliotheken: CUDA-Code und Aufrufe von cuBLAS oder cuDNN setzen NVIDIAs Werkzeuge und Hardware voraus. Viele Frameworks, Beispiele und Fachleute sind zuerst darauf ausgerichtet; dieser Vorsprung des Ökosystems verstärkt die Bindung. Bei NPUs bestimmt die Operatorliste des Herstellercompilers, welche Netzstrukturen überhaupt beschleunigt werden. Ein Modell wird deshalb oft so umgebaut, dass es zu dieser Liste passt.</p>
+<p>Binärformat und Treiber: Übersetzter GPU-Code und ein NPU-Befehlsstrom entstehen für eine bestimmte Hardwarefamilie. Ein für NPU A kompiliertes Modell lässt sich nicht auf NPU B laden. Es muss mit dem Compiler von B neu übersetzt werden, sofern dieser alle Operatoren unterstützt.</p>
+<p>Zahlenformat und Optimierung: Quantisierungsregeln, Rundung und Speicherplan können sich zwischen Herstellern unterscheiden. Dieselbe Eingabe kann dann leicht abweichende Scores liefern; Genauigkeit, Zeit und Speicher müssen neu geprüft werden. Auch Kernel-Tuning und Profilerwissen gelten meist nur für eine Hardwaregeneration.</p>
+<p>Die Wechselkosten umfassen damit Programmänderungen, eine neue Modellübersetzung, erneute Validierung und in regulierten Produkten gegebenenfalls eine erneute Freigabe. Herstellerbindung ist nicht automatisch falsch: Herstellerwerkzeuge liefern oft die beste Leistung und den schnellsten Einstieg. Sie ist aber eine Entwurfsentscheidung mit Risiken wie Lieferengpässen, Preisänderungen oder dem Ende der Unterstützung und sollte bewusst getroffen werden.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="abhängigkeiten-bewusst-begrenzen" class="slide level2">
+<h2>Abhängigkeiten bewusst begrenzen</h2>
+<div class="section-label">
+<p>4 / 5 · Beschleuniger programmieren</p>
+</div>
+<ul>
+<li>Modell im offenen Format halten: ONNX oder TFLite</li>
+<li>Portable Referenz auf der CPU mit festen Testfenstern</li>
+<li>Herstellerteile hinter einer schmalen Schnittstelle kapseln</li>
+<li>Offene Programmiermodelle prüfen: OpenCL, SYCL, Vulkan Compute</li>
+<li>Erst den Gewinn messen, dann sich binden</li>
+</ul>
+<aside class="notes">
+<p>Herstellerbindung lässt sich selten ganz vermeiden, aber begrenzen. Das trainierte Modell wird in einem offenen Austauschformat wie ONNX oder TFLite gespeichert, zusammen mit dem dokumentierten Exportweg. Damit lässt es sich für eine andere Zielplattform erneut übersetzen; ob deren Compiler alle Operatoren unterstützt, bleibt allerdings zu prüfen.</p>
+<p>Eine portable Referenzimplementierung auf der CPU, etwa das NumPy-Lehrmodell dieser Vorlesung oder ein C-Programm, liefert für feste Testfenster die erwarteten Scores. Jede Zielplattform wird gegen diese Referenz mit einer vereinbarten Toleranz geprüft. Der Eingabe- und Ausgabevertrag aus dem nächsten Abschnitt gehört dazu: Fensterlänge, Reihenfolge und Klassenzuordnung bleiben herstellerunabhängig.</p>
+<p>Herstellerspezifische Aufrufe wie Laufzeitinitialisierung oder Treiberfunktionen werden hinter einer schmalen eigenen Schnittstelle gekapselt, etwa einer Funktion <code>classify</code> für ein Fenster. Ein Wechsel betrifft dann wenige Dateien statt der ganzen Firmware. Für GPUs gibt es offene Programmiermodelle wie OpenCL, SYCL oder Vulkan Compute; Compilerprojekte wie Apache TVM oder IREE erzeugen Code für mehrere Zielplattformen. Auch sie benötigen passende Hardware-Backends und erreichen nicht in jedem Fall die Leistung der Herstellerbibliotheken.</p>
+<p>Zuletzt gilt: Eine Bindung lohnt nur für einen nachgewiesenen Gewinn. Ob die schnellere Matrixphase die gesamte Entscheidung spürbar verkürzt, zeigt erst die Gesamtbilanz im nächsten Abschnitt. Ein großer Teilfaktor bei kleinem Zeitanteil rechtfertigt selten hohe Wechselkosten.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="papierphase-3-portierung-bewerten" class="slide level2">
+<h2>Papierphase 3: Portierung bewerten</h2>
+<div class="section-label">
+<p>4 / 5 · Beschleuniger programmieren</p>
 </div>
 <p>Teil A: 4.1–4.3 · 15 Minuten</p>
 <ul>
-<li>Gültige Paare und Teilsummen je Takt eintragen</li>
-<li>Nullprodukt von einem leeren Platz unterscheiden</li>
-<li>Zeitliche Auslastung und räumliche Belegung getrennt nennen</li>
-</ul>
-<p>Die Verallgemeinerung in 4.4–4.5 vertieft den Datenfluss.</p>
-<aside class="notes">
-<p>Das Übungsblatt verlängert die innere Dimension des Tiles auf drei. Mit derselben Einspeiseregel entstehen fünf Takte. Die vier Teilsummen lauten nacheinander <span class="math inline">\([[2,0],[0,0]]\)</span>, <span class="math inline">\([[0,8],[3,0]]\)</span>, <span class="math inline">\([[-5,11],[3,12]]\)</span>, <span class="math inline">\([[-5,12],[13,12]]\)</span> und <span class="math inline">\([[-5,12],[13,10]]\)</span>. Die letzten gültigen MACs liegen in drei für <span class="math inline">\(C_{00}\)</span>, vier für <span class="math inline">\(C_{01}\)</span> und <span class="math inline">\(C_{10}\)</span> sowie fünf für <span class="math inline">\(C_{11}\)</span>.</p>
-<p>Bei <span class="math inline">\(C_{11}\)</span> treffen <span class="math inline">\((3,4)\)</span>, <span class="math inline">\((0,3)\)</span> und <span class="math inline">\((2,-1)\)</span> in drei, vier und fünf ein. Das Nullprodukt in vier bleibt eine gültige MAC. Die Zahlen pro Takt sind eins, drei, vier, drei und eins, insgesamt zwölf. Auf vier Zellen in fünf Takten folgen sechzig Prozent, auf allen sechzehn Zellen eines ansonsten leeren 4×4-Arrays fünfzehn Prozent; die räumliche Belegung dort beträgt 25 Prozent. Die allgemeine Vollbelegungsformel ergibt für 4×4 mindestens neunzig Prozent erst ab K 54. Vorladen und Auslesen sind weiterhin gesonderte Phasen.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="das-modell-in-die-firmware-bringen" class="slide level2 section-divider">
-<h2>5 · Das Modell in die Firmware bringen</h2>
-<p>Welche Zahlen und Speicherbereiche muss das Gerät tatsächlich bereitstellen?</p>
-<p>Modellannahmen für diesen Abschnitt:</p>
-<ul>
-<li>Flash hält Modelldaten; SRAM hält unter anderem Aktivierungen und Arbeitsbereich.</li>
-<li>Int8: <span class="math inline">\([-128,127]\)</span>; Skala positiv; Halbfälle werden weg von null gerundet.</li>
-<li>Beispiele mit einer Skala je Tensor; Bias mit Produktskala und Nullpunkt null.</li>
+<li>Portable und herstellergebundene Ergebnisse unterscheiden</li>
+<li>Compilerberichte zweier Plattformen in Zeiten übersetzen</li>
+<li>Einen herstellereigenen Kernel gegen die Bindung abwägen</li>
 </ul>
 <aside class="notes">
-<p>Eine passende Rechenarchitektur braucht weiterhin ein ausführbares Modell mit einem eindeutigen Zahlenvertrag. Zuerst wird geprüft, welche Daten im Flash und welche während der Inferenz im Arbeitsspeicher leben. Erst daraus lässt sich beurteilen, ob ein anderes Zahlenformat eine sinnvolle Lösung für ein Speicherproblem ist.</p>
-<p>Die folgenden Beispielzahlen verwenden Int8-Codes von <span class="math inline">\(-128\)</span> bis 127 und eine positive Skala. Gerundet wird zum nächsten Integer, bei exakten Halbfällen weg von null. Eingaben und Gewichte besitzen jeweils eine Skala und einen Nullpunkt; Biaswerte verwenden die Produktskala. Die Laufzeit muss dieselben Vereinbarungen wie die Modellvorbereitung verwenden. Konkrete Operatorvarianten können kanalweise Skalen oder andere festgelegte Rundungen haben. Solche Verträge werden bei der Integration geprüft, statt aus dem Dateinamen oder der Speicherbreite geraten zu werden.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="flash-und-tensor-arena-getrennt-planen" class="slide level2">
-<h2>Flash und Tensor Arena getrennt planen</h2>
-<div class="section-label">
-<p>5 / 6 · Quantisierung und Speicher</p>
-</div>
-<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/arena.png" alt="Fiktives Budget:128KiB Flash mit40KiB Firmware,24KiB Modell,64KiB frei;32KiB SRAM mit12KiB Arena,1,5KiB Quelle,6KiB Stack,4KiB übrigen Daten,8,5KiB frei."></p>
-<p>Reine Gewichte: Float32 braucht viermal so viele Bytes wie Int8.</p>
-<aside class="notes">
-<p>Dauerhafte Parameter und laufende Arbeit belegen unterschiedliche Budgets. Flash hält nichtflüchtige Daten; SRAM ist flüchtiger Arbeitsspeicher. Die Tensor Arena ist ein geplanter zusammenhängender Bereich für Tensoren, vorübergehende Kernelpuffer und Verwaltungsdaten. Ihre Größe folgt aus Lebensdauern und Operatoren, nicht allein aus der Modelldatei.</p>
-<p>Das Bild zeigt ein ausdrücklich anderes, fiktives Plattformbudget: Im Flash bleiben <span class="math inline">\(128-40-24=64\)</span> KiB frei, im SRAM <span class="math inline">\(32-12-1{,}5-6-4=8{,}5\)</span> KiB. Ein KiB sind 1024 Byte. Der Int8-Eingabetensor ist bereits in der Arena enthalten; das Float32-Quellfenster liegt daneben. Für größere Modelle kann Float32 die Flashreserve überschreiten. Int8 reduziert reine Gewichtbytes auf ein Viertel, lässt Bias, Verwaltungsdaten und Arena aber nicht automatisch im gleichen Verhältnis schrumpfen. Auch das kleinere Aktivitätsmodell muss mit seiner konkreten Arena geplant werden. <code>const</code> allein bestimmt nicht die physische Ablage; dazu gehören Linkerplatzierung und Startcode.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="quantisierung-ordnet-codes-reale-werte-zu" class="slide level2">
-<h2>Quantisierung ordnet Codes reale Werte zu</h2>
-<div class="section-label">
-<p>5 / 6 · Quantisierung und Speicher</p>
-</div>
-<p><span class="math display">\[\widehat r=s(q-z),\qquad
-q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right)\]</span></p>
-<ul>
-<li><span class="math inline">\(s&gt;0\)</span>: realer Wert je Codeschritt</li>
-<li><span class="math inline">\(z\)</span>: Code für die reale Null</li>
-<li><span class="math inline">\(q\)</span>: gespeicherter Int8-Code</li>
-</ul>
-<p>Kleinere Codes sparen Speicher; Skala und Nullpunkt erhalten ihre Bedeutung.</p>
-<aside class="notes">
-<p>Quantisierung stellt reale Werte durch endlich viele Codes dar. Ein Int8-Code hat für sich allein noch keine physikalische oder mathematische Bedeutung. Diese entsteht erst durch Skala s und Nullpunkt z. Zum Kodieren wird durch s geteilt, gerundet, z addiert und auf den Codebereich begrenzt. Zum Rückrechnen wird z subtrahiert und mit s multipliziert.</p>
-<p>Bei Nullpunkt minus drei repräsentiert Code minus drei die reale Null: <span class="math inline">\(s((-3)-(-3))=0\)</span>. Code null muss somit nicht dem realen Wert null entsprechen. Der Skalierungsschritt bestimmt Auflösung und Wertebereich zugleich. Ohne Begrenzung ist der absolute Rundungsfehler höchstens <span class="math inline">\(s/2\)</span>. Außerhalb des darstellbaren Bereichs tritt Sättigung auf; dort gilt diese kleine Fehlerschranke nicht. Die gewählten Quantisierungsparameter müssen anhand repräsentativer Daten festgelegt und bei der späteren Inferenz unverändert korrekt benutzt werden. Die resultierende Modellgüte bleibt Teil der Prüfung an neuen Daten.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="rundungsfehler-und-sättigung-unterscheiden" class="slide level2">
-<h2>Rundungsfehler und Sättigung unterscheiden</h2>
-<div class="section-label">
-<p>5 / 6 · Quantisierung und Speicher</p>
-</div>
-<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/quant.png" alt="MitSkala0,1 undNullpunkt0 wird1,24 zuCode12 undRückwert1,2;Wert20 sättigt auf127 undRückwert12,7."></p>
-<p>Mehr Wertebereich und feinere Auflösung stehen im Zielkonflikt.</p>
-<aside class="notes">
-<p>Rundung und Sättigung verlieren auf unterschiedliche Weise Information. Bei <span class="math inline">\(s=0{,}1\)</span> und <span class="math inline">\(z=0\)</span> wird <span class="math inline">\(1{,}24/0{,}1=12{,}4\)</span> auf zwölf gerundet. Der Rückwert 1,2 hat Fehler 0,04 und bleibt innerhalb der Schranke 0,05. Der entsprechende negative Wert wird zu minus zwölf und Rückwert minus 1,2.</p>
-<p>Für zwanzig wäre der Code zweihundert nötig. Er liegt außerhalb von Int8 und wird auf 127 begrenzt. Der Rückwert 12,7 hat nun Fehler 7,3. Minus zwanzig wird auf minus 128 und Rückwert minus 12,8 begrenzt. Die untere Zeile der Grafik zeigt diesen anderen Fehlerfall. Eine größere Skala kann den Bereich erweitern, macht aber jeden Codeschritt gröber. Ob die geringeren Gewichtbytes die Erkennung weiterhin ausreichend genau erlauben, wird deshalb am quantisierten Modell und nicht allein am Speichergewinn beurteilt.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="quantisierte-produkte-brauchen-eine-produktskala" class="slide level2">
-<h2>Quantisierte Produkte brauchen eine Produktskala</h2>
-<div class="section-label">
-<p>5 / 6 · Quantisierung und Speicher</p>
-</div>
-<p><span class="math display">\[a=\sum_i(q_{x,i}-z_x)(q_{w,i}-z_w)+q_b,\qquad r_y\approx s_xs_w a\]</span></p>
-<p>Rechenkern: <span class="math inline">\(q_x=[12,-4]\)</span>, <span class="math inline">\(z_x=-3\)</span>, <span class="math inline">\(q_w=[2,3]\)</span>, <span class="math inline">\(z_w=0\)</span>.</p>
-<p><span class="math inline">\(s_x=0{,}1\)</span>, <span class="math inline">\(s_w=0{,}2\)</span>, <span class="math inline">\(q_b=5\)</span> ergeben <span class="math inline">\(a=32\)</span> und <span class="math inline">\(r_y\approx0{,}64\)</span>.</p>
-<aside class="notes">
-<p>Ein quantisiertes Skalarprodukt muss vor dem Multiplizieren seine Nullpunkte berücksichtigen. Der Biascode besitzt hier Nullpunkt null und dieselbe Skala <span class="math inline">\(s_xs_w\)</span> wie die Produktsumme. Dadurch lassen sich alle Beiträge im breiten Akkumulator a addieren. Das kleine Zahlenbeispiel isoliert diese Rechenregel; es ist keine Behauptung über einen bestimmten trainierten Neuronenausgang.</p>
-<p>Nach der Korrektur sind die Eingaben <span class="math inline">\(15\)</span> und <span class="math inline">\(-1\)</span>, die Gewichte zwei und drei. Die Produktsumme ist <span class="math inline">\(15\cdot2-1\cdot3=27\)</span>, mit Bias fünf also 32. Die Produktskala ist 0,02 und liefert Realwert 0,64. Für eine anschließende Int8-Ausgabe mit <span class="math inline">\(s_y=0{,}05\)</span> und <span class="math inline">\(z_y=-2\)</span> wird erneut gerundet: <span class="math inline">\(q_y=\operatorname{round}(0{,}64/0{,}05)-2=11\)</span>. Der Rückwert ist 0,65. Requantisierung fügt somit einen eigenen Fehler hinzu. Biaswerte und Akkumulatoren werden dabei weiterhin mit ihrer breiten Darstellung budgetiert.</p>
-<style type="text/css">
-        span.MJX_Assistive_MathML {
-          position:absolute!important;
-          clip: rect(1px, 1px, 1px, 1px);
-          padding: 1px 0 0 0!important;
-          border: 0!important;
-          height: 1px!important;
-          width: 1px!important;
-          overflow: hidden!important;
-          display:block!important;
-      }</style></aside>
-</section>
-<section id="modelldaten-laden-laufzeit-einrichten-status-prüfen" class="slide level2 compact-figure">
-<h2>Modelldaten laden, Laufzeit einrichten, Status prüfen</h2>
-<div class="section-label">
-<p>5 / 6 · Quantisierung und Speicher</p>
-</div>
-<p><img data-src="../assets/figures/08_ki_beschleuniger_edge_ai/runtime.png" alt="SetupprüftModell,Operatoren,Arena undTensorvertrag. DerZyklus schreibtEingaben,prüftInvoke undliestAusgabennurbeiErfolg. Fehlerführen zumFehlerpfad."></p>
-<p>Eine <code>.tflite</code>-Datei oder ein C-Byte-Array enthält Modelldaten, keinen Modell-Maschinencode.</p>
-<aside class="notes">
-<p>Ein exportiertes Modell wird erst zusammen mit passenden Operator-Kerneln und einer Laufzeit ausführbar. Eine <code>.tflite</code>-Datei kann beispielsweise als C-Byte-Array in die Firmware eingebunden werden. Das verändert die Darstellung der Daten, erzeugt aber keine Maschinenbefehle aus ihren Gewichten. Der Interpreter organisiert die Operationen; ein Resolver ordnet sie den vorhandenen Implementierungen zu.</p>
-<p>Vor dem ersten Aufruf werden Modellstruktur und unterstützte Operatoren geprüft, die Tensorpuffer in der Arena geplant und Formen, Datentypen sowie Quantisierungsparameter kontrolliert. Die Werkzeugfamilie LiteRT setzt TensorFlow Lite fort; die gepflegte Mikrocontroller-Laufzeit heißt in ihrem Repository weiterhin TensorFlow Lite for Microcontrollers, kurz TFLM. Die Namen vorhandener Klassen und API-Aufrufe werden deshalb nicht pauschal geändert. In der TFLM-Schnittstelle gehört dazu ein erfolgreicher Status von <code>AllocateTensors()</code>. Modell, Interpreter und Arena müssen während sämtlicher späterer Aufrufe leben. Der Zyklus schreibt passende Eingaben, ruft <code>Invoke()</code> auf und liest nur nach Erfolg eine neue Ausgabe. Ein alter Puffer nach einem Fehler ist keine neue Entscheidung. Die Abbildung zeigt diese Zustände und Fehlerpfade, den vorgesehenen Gerätezustand. Unser NumPy-Modell wurde tatsächlich trainiert und ausgewertet; ein TFLM-Export und ein Mikrocontrollerlauf sind weitere, hier nicht ausgeführte Schritte.</p>
+<p>Die Aufgabe überträgt die Werkzeugkette auf zwei NPU-Plattformen für das Aktivitätsmodell. Weiterverwendbar sind das quantisierte TFLite-Modell als Eingabe für den neuen Compiler sowie die Testfenster mit Referenzscores der CPU-Implementierung. Das von Compiler A erzeugte Modell mit Befehlsstrom und ein mit der Kernel-Schnittstelle von A geschriebener Kernel sind an A gebunden.</p>
+<p>Im Lehrzeitmodell kostet jeder zusammenhängende NPU-Abschnitt <span class="math inline">\(0{,}10\)</span> ms plus <span class="math inline">\(0{,}02\)</span> ms je enthaltenem Teil. Plattform A rechnet die Normierung auf der CPU in <span class="math inline">\(0{,}08\)</span> ms, Dense, ReLU und Dense in einem NPU-Abschnitt mit <span class="math inline">\(0{,}16\)</span> ms und argmax in <span class="math inline">\(0{,}02\)</span> ms: zusammen <span class="math inline">\(0{,}26\)</span> ms. Plattform B führt zwar vier Teile auf der NPU aus, muss die ReLU aber auf der CPU rechnen. Das teilt die NPU-Arbeit in zwei Abschnitte zu je <span class="math inline">\(0{,}14\)</span> ms; mit <span class="math inline">\(0{,}01\)</span> ms ReLU ergeben sich <span class="math inline">\(0{,}29\)</span> ms. Mehr NPU-Teile bedeuten also nicht automatisch weniger Zeit, weil jeder Abschnitt eine Übergabe kostet.</p>
+<p>Ein eigener Normierungskernel für A verlängert dessen einzigen NPU-Abschnitt auf vier Teile mit <span class="math inline">\(0{,}18\)</span> ms; mit argmax sind es <span class="math inline">\(0{,}20\)</span> ms statt <span class="math inline">\(0{,}26\)</span> ms. Bei einem neuen Fenster alle <span class="math inline">\(0{,}5\)</span> s ist dieser Gewinn für die Reaktionszeit unerheblich, die Bindung an die Schnittstelle von A dagegen dauerhaft. Sinnvolle Maßnahmen sind eine portable Referenz der Normierung mit Testfenstern, die Kapselung herstellerspezifischer Aufrufe und eine Messung des tatsächlichen Gewinns vor der Entscheidung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1708,7 +1595,7 @@ q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right)\]</
       }</style></aside>
 </section>
 <section id="die-gesamte-anwendung-beurteilen" class="slide level2 section-divider">
-<h2>6 · Die gesamte Anwendung beurteilen</h2>
+<h2>5 · Die gesamte Anwendung beurteilen</h2>
 <p>Wann wird aus einer schnellen Matrixphase eine brauchbare Aktivitätserkennung?</p>
 <p>Gemeinsame Bewertungsgrenze:</p>
 <ul>
@@ -1734,7 +1621,7 @@ q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right)\]</
 <section id="amdahl-teilgewinn-und-gesamtgewinn" class="slide level2">
 <h2>Amdahl: Teilgewinn und Gesamtgewinn</h2>
 <div class="section-label">
-<p>6 / 6 · Firmware und Gesamtbilanz</p>
+<p>5 / 5 · Gesamtbilanz</p>
 </div>
 <p>Dense zehnmal schneller: Welchen Gesamtfaktor erwarten Sie?</p>
 <p>Serielle Zeiten in Millisekunden; gleicher Input und gleiche Ausgabe:</p>
@@ -1776,7 +1663,7 @@ q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right)\]</
 </table>
 <aside class="notes">
 <p>Das Amdahlsche Gesetz begrenzt den Gesamtgewinn einer Teilbeschleunigung. Der CPU-Pfad braucht <span class="math inline">\(2+10+3+1=16\)</span> Millisekunden. Mit Beschleuniger sind es <span class="math inline">\(2+1+1+3+1=8\)</span> Millisekunden einschließlich der Kopie. Die Dense-Phase wird Faktor zehn schneller, die gesamte Entscheidung Faktor zwei. Lassen Sie zuerst eine Vermutung begründen und anschließend die komplette Grenze bilanzieren.</p>
-<p>Ohne neue Übergabekosten lautet die bekannte Form <span class="math inline">\(S=1/((1-f)+f/s)\)</span>: f ist der bisherige Zeitanteil des beschleunigten Teils und s dessen Teilfaktor. Hier gilt <span class="math inline">\(f=10/16\)</span>; die zusätzliche Kopie ergänzt im Nenner den Anteil <span class="math inline">\(1/16\)</span>. Selbst eine Dense-Zeit null lässt sieben Millisekunden übrig, also höchstens Faktor <span class="math inline">\(16/7\)</span>. Die Rechnung begründet eine Latenzaussage, noch keine Energieersparnis. Gerade beim kleinen Aktivitätsmodell können Übergabe und übrige Firmwarearbeit die Hardwarewahl stärker bestimmen als der isolierte Rechenpeak.</p>
+<p>Ohne neue Übergabekosten lautet die bekannte Form <span class="math inline">\(S=1/((1-f)+f/s)\)</span>: f ist der bisherige Zeitanteil des beschleunigten Teils und s dessen Teilfaktor. Hier gilt <span class="math inline">\(f=10/16\)</span>; die zusätzliche Kopie ergänzt im Nenner den Anteil <span class="math inline">\(1/16\)</span>. Selbst eine Dense-Zeit null lässt sieben Millisekunden übrig, also höchstens Faktor <span class="math inline">\(16/7\)</span>. Die Rechnung begründet eine Latenzaussage, noch keine Energieersparnis. Gerade beim kleinen Aktivitätsmodell können Übergabe und übrige Firmwarearbeit die Hardwarewahl stärker bestimmen als der isolierte Rechenpeak. Ein kleiner Gesamtgewinn rechtfertigt dann auch keine starke Herstellerbindung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1792,7 +1679,7 @@ q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right)\]</
 <section id="sensorfenster-und-ausgabe-brauchen-einen-vertrag" class="slide level2">
 <h2>Sensorfenster und Ausgabe brauchen einen Vertrag</h2>
 <div class="section-label">
-<p>6 / 6 · Firmware und Gesamtbilanz</p>
+<p>5 / 5 · Gesamtbilanz</p>
 </div>
 <p>Aktivitätsmodell aus der Übung: 32 Zeitpunkte × drei Achsen → 96 Eingabewerte</p>
 <ul>
@@ -1803,7 +1690,7 @@ q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right)\]</
 </ul>
 <aside class="notes">
 <p>Die Bedeutung einer Eingabe folgt nicht allein aus ihrer Länge. Für das Aktivitätsmodell der Übung werden 32 Zeitpunkte mit je drei Achsen zeitpunktweise angeordnet. Das ergibt 96 Elemente. Dieselbe Anzahl in einer anderen Reihenfolge oder mit anderer Vorverarbeitung beschreibt jedoch eine andere Eingabe. Auch ein Zeiger enthält nur die Adresse: <code>sizeof</code> eines Zeigers liefert keine Arraylänge.</p>
-<p>Ein Float32-Quellfenster und ein quantisierter Int8-Eingabetensor besitzen unterschiedliche Größen und können zeitweise zugleich leben. Der Zieltensor liegt gegebenenfalls bereits in der Arena und wird dann im Budget nicht erneut addiert. Am Ausgang sind drei Scores zunächst drei Bewertungswerte. Argmax wählt deren größten und liefert den Klassenindex; Wahrscheinlichkeiten benötigen zusätzlich eine entsprechend definierte Ausgabe. Eine korrekt erkannte Klasse Gehen ist außerdem noch keine Schrittzahl. Dieser Vertrag führt die konkrete Klassifikationsaufgabe und die Firmwareintegration zusammen.</p>
+<p>Ein Float32-Quellfenster und ein quantisierter Int8-Eingabetensor besitzen unterschiedliche Größen und können zeitweise zugleich leben. Der Zieltensor liegt gegebenenfalls bereits im Arbeitsspeicher der Laufzeit und wird dann im Budget nicht erneut addiert. Am Ausgang sind drei Scores zunächst drei Bewertungswerte. Argmax wählt deren größten und liefert den Klassenindex; Wahrscheinlichkeiten benötigen zusätzlich eine entsprechend definierte Ausgabe. Eine korrekt erkannte Klasse Gehen ist außerdem noch keine Schrittzahl. Dieser Vertrag führt die konkrete Klassifikationsaufgabe und die Firmwareintegration zusammen. Er ist zugleich die herstellerunabhängige Schnittstelle, gegen die jede Beschleunigerplattform geprüft wird.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1819,18 +1706,19 @@ q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right)\]</
 <section id="die-funktion-bestimmt-die-hardwarewahl" class="slide level2">
 <h2>Die Funktion bestimmt die Hardwarewahl</h2>
 <div class="section-label">
-<p>6 / 6 · Firmware und Gesamtbilanz</p>
+<p>5 / 5 · Gesamtbilanz</p>
 </div>
 <p>Aus dem Sensorfenster wird eine brauchbare Entscheidung, wenn …</p>
 <ul>
 <li>Modell und Vorverarbeitung an neuen Fällen bestehen,</li>
 <li>Operatoren, Formen und Zahlenformate zusammenpassen,</li>
-<li>Speicher, Reaktionszeit und Energie im Gesamtsystem passen.</li>
+<li>Speicher, Reaktionszeit und Energie im Gesamtsystem passen,</li>
+<li>Werkzeugkette und Herstellerbindung tragbar bleiben.</li>
 </ul>
-<p>CPU, Vektoren und NPU sind mögliche Werkzeuge für diese Anforderungen.</p>
+<p>CPU, Vektoren, GPU und NPU sind mögliche Werkzeuge für diese Anforderungen.</p>
 <aside class="notes">
 <p>Die Einstiegsfrage nach dem Programmieren von Stehen, Gehen und Laufen hat jetzt eine vollständige Antwort. Messdaten werden zu einem festgelegten Eingabefenster, das Modell berechnet daraus Scores und die Anwendung interpretiert die gewählte Klasse. Training und unabhängige Prüfung begründen, ob diese Entscheidung für die beabsichtigten neuen Fälle geeignet ist. Mehr Multiplikationsleistung kann diese Prüfung nicht ersetzen.</p>
-<p>Die Hardware folgt dem Bedarf. Ein kleines Modell kann auf einer CPU laufen; Vektoren oder eine passende NPU können regelmäßige Teilrechnungen anders organisieren. Entscheidend bleiben Datenversorgung und Operatorunterstützung. Auch Nullgewichte sparen erst mit einer passenden dünnbesetzten Darstellung oder einem tatsächlich überspringenden Kernel Bytes beziehungsweise Arbeit. Ein funktionaler Host- oder Simulatorlauf prüft wiederum andere Eigenschaften als eine Hardwaremessung. Für die Bewertung werden deshalb numerische Korrektheit, Modellgüte, Speicher, Zeit und Energie getrennt nachgewiesen und anschließend unter derselben Anwendungsgrenze zusammengeführt.</p>
+<p>Die Hardware folgt dem Bedarf. Ein kleines Modell kann auf einer CPU laufen; Vektoren, eine GPU oder eine passende NPU können regelmäßige Teilrechnungen anders organisieren. Entscheidend bleiben Datenversorgung und Operatorunterstützung. Zur Wahl gehört auch die Werkzeugkette: Je stärker eine Lösung an Compiler, Bibliotheken und Treiber eines Herstellers gebunden ist, desto teurer wird ein späterer Wechsel. Auch Nullgewichte sparen erst mit einer passenden dünnbesetzten Darstellung oder einem tatsächlich überspringenden Kernel Bytes beziehungsweise Arbeit. Ein funktionaler Host- oder Simulatorlauf prüft wiederum andere Eigenschaften als eine Hardwaremessung. Für die Bewertung werden deshalb numerische Korrektheit, Modellgüte, Speicher, Zeit und Energie getrennt nachgewiesen und anschließend unter derselben Anwendungsgrenze zusammengeführt.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1843,21 +1731,20 @@ q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right)\]</
           display:block!important;
       }</style></aside>
 </section>
-<section id="papierphase-4-quantisierung-und-firmware" class="slide level2">
-<h2>Papierphase 4: Quantisierung und Firmware</h2>
+<section id="papierphase-4-sensorfenster-und-gesamtzeit" class="slide level2">
+<h2>Papierphase 4: Sensorfenster und Gesamtzeit</h2>
 <div class="section-label">
-<p>6 / 6 · Firmware und Gesamtbilanz</p>
+<p>5 / 5 · Gesamtbilanz</p>
 </div>
-<p>Teil A: 5.1, 5.3 und 6.3 · 15 Minuten</p>
+<p>Teil A: 5.1 und 5.2 · 10 Minuten</p>
 <ul>
-<li>Negative Werte quantisieren und Fehler erklären</li>
-<li>Produktskalen und Requantisierung verfolgen</li>
-<li>Lebensdauer, Zeigergröße und Fehlerstatus diagnostizieren</li>
+<li>Quellfenster und Int8-Eingang bemessen</li>
+<li>Gesamtzeit und Gesamtfaktor eines Beschleunigers bilanzieren</li>
+<li>Grenzen für Teilgewinn und Kopierzeit bestimmen</li>
 </ul>
-<p>Weitere Budget- und Gesamtzeitfragen dienen der Nachbereitung.</p>
 <aside class="notes">
-<p>Bei Skala 0,2 und Nullpunkt null liefert <span class="math inline">\(-1{,}37\)</span> den Code <span class="math inline">\(-7\)</span>, Rückwert <span class="math inline">\(-1{,}4\)</span> und Fehler 0,03. <span class="math inline">\(-30\)</span> sättigt dagegen auf <span class="math inline">\(-128\)</span>, Rückwert <span class="math inline">\(-25{,}6\)</span> und Fehler 4,4. Im getrennten Skalarprodukt der Aufgabe entsteht nach Nullpunktkorrektur <span class="math inline">\(6(-2)+(-4)3+4=-20\)</span>. Mit Produktskala 0,025 sind das <span class="math inline">\(-0{,}5\)</span>; Requantisierung führt zu Code <span class="math inline">\(-3\)</span> und Rückwert <span class="math inline">\(-0{,}48\)</span>.</p>
-<p>Im separaten Firmwarefall des Übungsblatts werden C-Grundlagen auf ein anderes Sensorfenster angewendet. Lokale Arena und lokaler Interpreter leben nach Verlassen von <code>setup</code> nicht weiter. Eine globale Zeigervariable verlängert ihre Lebensdauer nicht. <code>sizeof(window)</code> ergibt im RV32-Vertrag vier Zeigerbytes, nicht die benötigten 400 Elemente. Außerdem müssen Initialisierung, Tensorvertrag und Fehlerstatus geprüft werden. Die separat budgetierte dauerhafte Arena ersetzt den ungültigen lokalen Speicher; sie wird nicht als zweite Arena hinzuaddiert. Die vollständigen Korrekturen und weiteren Zeitrechnungen stehen im Lösungsprofil.</p>
+<p>Die Aufgabe wendet den Eingabevertrag und die Amdahl-Bilanz auf neue Zahlen an. Ein Fenster mit 200 Zeitpunkten und zwei Kanälen enthält 400 Elemente: als Float32-Quelle 1600 Byte, als Int8-Eingabetensor 400 Byte.</p>
+<p>Auf der CPU dauert die Entscheidung <span class="math inline">\(1{,}5+12+2{,}5+0{,}5=16{,}5\)</span> ms, mit Beschleuniger einschließlich Kopie <span class="math inline">\(1{,}5+0{,}75+2+2{,}5+0{,}5=7{,}25\)</span> ms. Dense wird um Faktor sechs schneller, die ganze Anwendung nur um etwa Faktor 2,28. Für Gesamtfaktor 2,5 dürfte Dense höchstens 1,35 ms dauern; selbst bei Dense-Zeit null bleibt der Gesamtfaktor unter <span class="math inline">\(16{,}5/5{,}25\approx3{,}14\)</span>. Ab einer Kopierzeit von 10 ms ist der beschleunigte Pfad nicht mehr schneller als die CPU. Die vollständigen Rechenwege stehen im Lösungsprofil.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1873,7 +1760,7 @@ q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right)\]</
 <section id="abschlussquiz-grenzen-begründen" class="slide level2">
 <h2>Abschlussquiz: Grenzen begründen</h2>
 <div class="section-label">
-<p>6 / 6 · Firmware und Gesamtbilanz</p>
+<p>5 / 5 · Gesamtbilanz</p>
 </div>
 <p>Zwölf QuizAcademy-Fragen · 15 Minuten</p>
 <ul>
@@ -1881,10 +1768,10 @@ q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right)\]</
 <li>Parameter, MACs, Bytes und Takte auseinanderhalten</li>
 <li>Fehlerfälle und geänderte Bedingungen prüfen</li>
 </ul>
-<p>Teil B des Übungsblatts: drei längere Fälle zur selbstständigen Vertiefung</p>
+<p>Teil B des Übungsblatts: zwei längere Fälle zur selbstständigen Vertiefung</p>
 <aside class="notes">
-<p>Das vollständige Quiz schließt die inhaltliche Arbeit ab. Es verbindet die Begriffe wieder mit konkreten Bedingungen: Parameter werden im Batch wiederverwendet, MACs je Eingabe erneut ausgeführt. Ein Roofline-Peak ist eine obere Rate; eine große Vektorkapazität ist keine Lanezahl. Ein zurückgesetzter Rechenpfad und ein gültiger neuer Ausgang sind ebenfalls verschiedene Aussagen.</p>
-<p>Für die zwölf Fragen sind fünfzehn Minuten vorgesehen, etwa zwölf zur eigenen Entscheidung und drei zur gezielten Besprechung ausgewählter Fehlvorstellungen. Die drei schwierigeren Fragen verlangen die Übertragung von bekannten Regeln auf neue Größen. Jede Frage besitzt vier Optionen und genau eine richtige Antwort. Die Diskussion sollte die entscheidende Annahme benennen, nicht nur eine Optionsnummer. Die längeren Fälle aus Teil B verbinden anschließend selbstständig Modellformen, Speicher, Wartezeit, Quantisierung und Datenbreite. Zeitrichtwerte und Orientierungspunkte ersetzen keine verbindliche, gesondert festzulegende Klausurregelung.</p>
+<p>Das vollständige Quiz schließt die inhaltliche Arbeit ab. Es verbindet die Begriffe wieder mit konkreten Bedingungen: Parameter werden im Batch wiederverwendet, MACs je Eingabe erneut ausgeführt. Ein Roofline-Peak ist eine obere Rate; eine große Vektorkapazität ist keine Lanezahl. Ein für eine NPU übersetztes Modell und ein portables Modell sind ebenfalls verschiedene Ergebnisse.</p>
+<p>Für die zwölf Fragen sind fünfzehn Minuten vorgesehen, etwa zwölf zur eigenen Entscheidung und drei zur gezielten Besprechung ausgewählter Fehlvorstellungen. Die drei schwierigeren Fragen verlangen die Übertragung von bekannten Regeln auf neue Größen. Jede Frage besitzt vier Optionen und genau eine richtige Antwort. Die Diskussion sollte die entscheidende Annahme benennen, nicht nur eine Optionsnummer. Die beiden längeren Fälle aus Teil B verbinden anschließend selbstständig Modellformen, Speicher, Wartezeit, Gesamtzeit und Datenbreite. Zeitrichtwerte und Orientierungspunkte ersetzen keine verbindliche, gesondert festzulegende Klausurregelung.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1912,36 +1799,36 @@ q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right)\]</
 <tr class="header">
 <th>Daten und Modell</th>
 <th>Rechnen und Datenwege</th>
-<th>Firmware</th>
+<th>Programmierung</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td>Merkmal · feature</td>
 <td>MAC · Multiply-Accumulate</td>
-<td>Inferenz · inference</td>
+<td>Kernel · GPU-Funktion</td>
 </tr>
 <tr class="even">
 <td>Gewichte · weights</td>
 <td>SIMD · Single Instruction, Multiple Data</td>
-<td>Tensor Arena · Arbeitsbereich</td>
+<td>Modellcompiler · model compiler</td>
 </tr>
 <tr class="odd">
 <td>Aktivierung · activation</td>
 <td>RVV · RISC-V Vector Extension</td>
-<td>Nullpunkt · zero point</td>
+<td>Laufzeit · runtime</td>
 </tr>
 <tr class="even">
-<td>Verlust · loss</td>
-<td>Roofline · Rechen-/Bandbreitengrenze</td>
-<td>Requantisierung · requantization</td>
+<td>Inferenz · inference</td>
+<td>Verbreitern · widening</td>
+<td>Herstellerbindung · vendor lock-in</td>
 </tr>
 </tbody>
 </table>
 <p><a href="../GLOSSAR.md">Definitionen und weitere Kursbegriffe im Glossar</a></p>
 <aside class="notes">
 <p>Ein Fachbegriff hilft, wenn seine Bedeutung und seine Grenze klar bleiben. Ein Merkmal beschreibt eine Eingabe; ein Gewicht ist ein fester Modellparameter während der betrachteten Inferenz. Eine Aktivierung entsteht dagegen für das aktuelle Fenster. Die Aktivierungsfunktion ist die Regel, die auf eine Voraktivierung angewendet wird. Diese Unterscheidungen verbinden die ersten Messdaten mit der späteren Speicherbilanz.</p>
-<p>Ebenso bezeichnet eine MAC eine Rechenoperation mit Multiplikation und Akkumulation, aber keine feste Zahl von Prozessortakten. Die Vektorkapazität begrenzt die Zahl aktiver Elemente; die physischen Lanes und ihre Datenversorgung bestimmen das zeitliche Verhalten. Das Kursglossar ordnet die deutschen und englischen Bezeichnungen zusammen und nennt die Stellen der Einführung. Es dient zum Nachlesen, nicht als zusätzliche Liste auswendig zu lernender Abkürzungen. Die Tabelle fasst die drei Ebenen Daten, Rechnung und Firmware zusammen; die folgenden Quellen ermöglichen das gezielte Vertiefen einzelner Ebenen.</p>
+<p>Ebenso bezeichnet eine MAC eine Rechenoperation mit Multiplikation und Akkumulation, aber keine feste Zahl von Prozessortakten. Die Vektorkapazität begrenzt die Zahl aktiver Elemente; die physischen Lanes und ihre Datenversorgung bestimmen das zeitliche Verhalten. Das Kursglossar ordnet die deutschen und englischen Bezeichnungen zusammen und nennt die Stellen der Einführung. Es dient zum Nachlesen, nicht als zusätzliche Liste auswendig zu lernender Abkürzungen. Ein Kernel ist eine Funktion, die auf einer GPU in vielen Threads läuft. Ein Modellcompiler übersetzt ein Modell für eine bestimmte NPU, und eine Laufzeit führt es auf dem Gerät aus; aus solchen Werkzeugketten entsteht die Herstellerbindung. Die Tabelle fasst die drei Ebenen Daten, Rechnung und Programmierung zusammen; die folgenden Quellen ermöglichen das gezielte Vertiefen einzelner Ebenen.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
           position:absolute!important;
@@ -1962,13 +1849,14 @@ q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right)\]</
 <ul>
 <li>Harris &amp; Harris: <em>Digital Design and Computer Architecture — RISC-V Edition</em></li>
 <li><a href="https://doi.org/10.1145/1498765.1498785">Williams, Waterman, Patterson (2009): Roofline</a></li>
-<li><a href="https://doi.org/10.1109/MC.1982.1653825">Kung (1982): Why Systolic Architectures?</a></li>
-<li><a href="https://github.com/riscv/riscv-v-spec/blob/v1.0/v-spec.adoc">RISC-V Vector 1.0</a> · <a href="https://github.com/tensorflow/tflite-micro/blob/main/docs/memory_management.md">TFLM-Speicherplanung</a></li>
+<li><a href="https://github.com/riscv/riscv-v-spec/blob/v1.0/v-spec.adoc">RISC-V Vector 1.0</a> · <a href="https://doi.org/10.1109/MC.1982.1653825">Kung (1982): Why Systolic Architectures?</a></li>
+<li><a href="https://docs.nvidia.com/cuda/cuda-c-programming-guide/">CUDA C++ Programming Guide</a> · <a href="https://rocm.docs.amd.com/projects/HIP/en/latest/">HIP</a> · <a href="https://www.khronos.org/opencl/">OpenCL</a></li>
+<li><a href="https://pypi.org/project/ethos-u-vela/">Arm Ethos-U Vela</a> · <a href="https://onnx.ai/">ONNX</a> · <a href="https://github.com/tensorflow/tflite-micro">TFLM</a></li>
 <li><a href="../assets/data/08_motion_sense/README.md">MotionSense: Daten, Urheberschaft und MIT-Lizenz</a></li>
 </ul>
 <aside class="notes">
 <p>Die Grundlagen orientieren sich an Sarah L. Harris und David Money Harris, Digital Design and Computer Architecture, RISC-V Edition. David A. Patterson und John L. Hennessy, Computer Organization and Design, RISC-V Edition, vertiefen die Verbindung von Software und Rechnerorganisation. Die aktuellen technischen Einzelheiten werden zusätzlich an den jeweils genannten Primärquellen geprüft.</p>
-<p>Das Roofline-Modell stammt von Samuel Williams, Andrew Waterman und David Patterson: Roofline: An Insightful Visual Performance Model for Multicore Architectures, Communications of the ACM 52(4), 2009, Seiten 65–76. H. T. Kungs Beitrag Why Systolic Architectures?, Computer, 1982, erläutert den Ansatz lokaler regelmäßiger Datenflüsse. Die eigenen Lehrabbildungen übernehmen keine Grafiken aus diesen Artikeln. Für die aktive Vektorlänge ist die RISC-V Vector Extension Version 1.0 maßgeblich; TFLMs Dokumentation beschreibt die tatsächliche Mikrocontroller-Speicherplanung.</p>
+<p>Das Roofline-Modell stammt von Samuel Williams, Andrew Waterman und David Patterson: Roofline: An Insightful Visual Performance Model for Multicore Architectures, Communications of the ACM 52(4), 2009, Seiten 65–76. H. T. Kungs Beitrag Why Systolic Architectures?, Computer, 1982, erläutert den Ansatz lokaler regelmäßiger Datenflüsse. Die eigenen Lehrabbildungen übernehmen keine Grafiken aus diesen Artikeln. Für die aktive Vektorlänge ist die RISC-V Vector Extension Version 1.0 maßgeblich. Die GPU- und NPU-Beispiele stützen sich auf die Herstellerdokumentation zu CUDA, HIP und Vela sowie auf die Projektseiten von OpenCL, ONNX und TFLM; sie beschreiben Programmiermodelle und Werkzeuge, keine Messungen der Lehrmodelle. Der CUDA-Ausschnitt ist eigener Lehrcode.</p>
 <p>Die MotionSense-Messungen stammen von Mohammad Malekzadeh, Richard G. Clegg, Andrea Cavallaro und Hamed Haddadi; die Original-README nennt Mobile Sensor Data Anonymization, IoTDI 2019, Seiten 49–58, DOI 10.1145/3302505.3310068. Im Repository stehen ein gepinnter Datenausschnitt, Herkunft und ursprünglicher MIT-Lizenztext. Die Zeitverläufe und Diagramme dieser Einheit wurden daraus beziehungsweise aus den angegebenen Gleichungen selbst erzeugt. Die Ausführung des NumPy-Lehrmodells und die abstrakten Hardware-Zeitmodelle sind getrennte Nachweise.</p>
 <style type="text/css">
         span.MJX_Assistive_MathML {
