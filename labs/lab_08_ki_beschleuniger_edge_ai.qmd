@@ -1,6 +1,6 @@
 ---
 title: "Übungsblatt 8: KI-Beschleuniger & Edge AI"
-subtitle: "Mikrocomputertechnik 3 · Teil A: 44 Orientierungspunkte · Teil B: 44 Punkte, ca. 75 Minuten"
+subtitle: "Mikrocomputertechnik 3 · Teil A: 32 Orientierungspunkte · Teil B: 28 Punkte, ca. 50 Minuten"
 highlight-style: ../assets/styles/dhbw-code.theme
 header-includes: |
   \usepackage{needspace}
@@ -42,8 +42,8 @@ MAC gezählt. Indizes beginnen bei null; Zahlen und Zeiten sind Lehrannahmen.
    a. Bestimmen Sie die Modellparameterbytes beider Schichten.
    b. Wie viele Int8-Aktivierungsbytes müssen in diesem Puffermodell höchstens
       gleichzeitig gültig sein? Temporäre Akkumulatoren werden hier noch nicht gezählt.
-   c. Ordnen Sie Parameter und Aktivierungen im Lehrmodell von Folie 44 Flash
-      beziehungsweise Tensor Arena zu. Nennen Sie zwei zusätzliche Arena-Anteile.
+   c. Ordnen Sie Parameter und Aktivierungen Flash beziehungsweise SRAM zu
+      und begründen Sie die Zuordnung.
 
 ::: {.content-hidden when-profile="solution"}
 \Needspace{8\baselineskip}
@@ -97,11 +97,11 @@ MAC gezählt. Indizes beginnen bei null; Zahlen und Zeiten sind Lehrannahmen.
    $3+1=4$ Byte. Der Spitzenbedarf des angegebenen Lebensdauermodells beträgt
    fünf Byte, nicht die Summe aller Tensoren über alle Phasen.
 
-   Die konstanten Parameter werden im Lehrmodell im Flash gespeichert;
-   Aktivierungspuffer gehören zum SRAM-Bereich der Tensor Arena. Zur tatsächlichen
-   Arena können zum Beispiel Int32-Akkumulatoren beziehungsweise Scratch-Puffer,
-   Tensor-Metadaten und Ausrichtungslücken hinzukommen. Die 25 Modellbytes sind
-   daher weder der gesamte Flashbedarf noch die gesamte Arena.
+   Die konstanten Parameter ändern sich während der Inferenz nicht und liegen
+   im nichtflüchtigen Flash; die Aktivierungen entstehen für jedes Fenster neu
+   und liegen im SRAM. Zum tatsächlichen SRAM-Bedarf können zum Beispiel
+   Int32-Akkumulatoren, Zwischenpuffer, Tensor-Metadaten und Ausrichtungslücken
+   hinzukommen. Die 25 Modellbytes sind daher nicht der gesamte Speicherbedarf.
    **Bewertung:** Parameterbytes 1 P, Aktivierungsspitze und Zuordnung 1 P.
 :::
 
@@ -342,256 +342,100 @@ done:
 
 {{< pagebreak >}}
 
-## Teil A · Aufgabe 4: Ein längeres Tile im systolischen Array (9 Punkte)
+## Teil A · Aufgabe 4: Ein Modell, zwei NPU-Plattformen (7 Punkte)
 
-$$
-A=\begin{bmatrix}2&1&-1\\3&0&2\end{bmatrix},\qquad
-B=\begin{bmatrix}1&4\\-2&3\\5&-1\end{bmatrix},\qquad C=AB.
-$$
+**Papieraufgabe.** Das Aktivitätsmodell besteht aus einer Normierung der
+96 Eingabewerte, Dense $96\rightarrow16$, ReLU, Dense $16\rightarrow3$ und
+argmax. Es liegt als Int8-quantisiertes TFLite-Modell vor; alle
+$0{,}5\,\mathrm{s}$ entsteht ein neues Fenster. Zwei Mikrocontroller mit NPU
+verschiedener Hersteller kommen in Frage. Die Compilerberichte zeigen, wo die
+Teile laufen:
 
-Vier Output-Stationary-Zellen bilden ein $2\times2$-Array. Ihre Summen beginnen
-bei null; jede Zelle führt höchstens eine gültige MAC je Takt aus. $A$ wandert
-nach rechts, $B$ nach unten, je einen Nachbarn pro Takt. $A_{ik}$ wird links in
-Takt $1+k+i$, $B_{kj}$ oben in Takt $1+k+j$ eingespeist.
-Es gelten $i,j\in\{0,1\}$ und $k\in\{0,1,2\}$.
-Vorladen und Auslesen liegen außerhalb des Fensters.
+| Teil | Plattform A | Plattform B |
+|---|---|---|
+| Normierung | CPU, $0{,}08\,\mathrm{ms}$ | NPU |
+| Dense $96\rightarrow16$ | NPU | NPU |
+| ReLU | NPU | CPU, $0{,}01\,\mathrm{ms}$ |
+| Dense $16\rightarrow3$ | NPU | NPU |
+| argmax | CPU, $0{,}02\,\mathrm{ms}$ | NPU |
 
-1. Tragen Sie die vier Teilsummen am Ende jedes Takts ein. Zählen Sie die
-   gültigen MACs je Takt und markieren Sie je Zelle die letzte gültige MAC. (3 P)
-2. Welche Operandenpaare erreichen $C_{11}$ in welchen Takten?
-   Warum ist ein Produkt mit dem Wert null anders zu zählen als ein leerer Platz? (1 P)
-3. Bestimmen Sie die zeitliche Auslastung über die fünf Takte. Dasselbe Tile
-   belegt allein die oberen linken vier Zellen eines sonst leeren
-   $4\times4$-Arrays. Bestimmen Sie dessen Auslastung, normiert auf alle
-   physischen Zellen, und die räumliche Belegung. Was fehlt noch, bevor $C$
-   außerhalb des Arrays verfügbar ist? (2 P)
-4. Verallgemeinern Sie auf ein voll belegtes $M\times N$-Array für
-   $(M\times K)\cdot(K\times N)$ mit demselben Einspeiseschema.
-   Wann erfolgt die letzte gültige MAC? Leiten Sie $U(K,M,N)$ her und prüfen
-   Sie die Formel an Folie 40 sowie am vorliegenden Tile.
-   Ab welchem ganzzahligen $K$ erreicht ein voll belegtes $4\times4$-Array
-   mindestens 90 Prozent zeitliche Auslastung? (2 P)
-5. In einer Weight-Stationary-Organisation: Welcher Wert bliebe lokal, welche
-   Werte müssten sich bewegen, und weshalb ist der Zeitplan aus Teil 1
-   nicht einfach übertragbar? (1 P)
+Lehrzeitmodell: Alle Teile laufen nacheinander. Jeder zusammenhängende
+NPU-Abschnitt kostet einschließlich Übergabe $0{,}10\,\mathrm{ms}$ plus
+$0{,}02\,\mathrm{ms}$ je enthaltenem Teil. Alle Zeiten sind Lehrannahmen,
+keine Messwerte realer Bausteine.
+
+1. Beim Wechsel von A nach B liegen vor: das quantisierte TFLite-Modell, das
+   von Compiler A erzeugte Modell mit NPU-Befehlsstrom, zehn Testfenster mit
+   Referenzscores aus einer portablen CPU-Implementierung und ein mit der
+   Kernel-Schnittstelle von Hersteller A geschriebener Normierungskernel.
+   Welche Ergebnisse lassen sich für B weiterverwenden? Begründen Sie jeweils. (2 P)
+2. Bestimmen Sie für beide Plattformen die NPU-Abschnitte und die Gesamtzeit
+   je Fenster. Warum entscheidet die Zahl der Teile auf der NPU nicht allein
+   über die Zeit? (2 P)
+3. Für Plattform A schlägt ein Kollege vor, die Normierung mit der
+   Kernel-Schnittstelle von A ebenfalls auf die NPU zu bringen. Bestimmen Sie
+   die neue Gesamtzeit und bewerten Sie den Vorschlag im Hinblick auf
+   Zeitgewinn und Herstellerbindung. Nennen Sie zwei Maßnahmen, die einen
+   späteren Wechsel erleichtern. (3 P)
 
 ::: {.content-hidden when-profile="solution"}
-\Needspace{12\baselineskip}
-
-| Taktende | $C_{00}$ | $C_{01}$ | $C_{10}$ | $C_{11}$ | Gültige MACs |
-|---|---|---|---|---|---|
-| 1 | | | | | |
-| 2 | | | | | |
-| 3 | | | | | |
-| 4 | | | | | |
-| 5 | | | | | |
+\Needspace{8\baselineskip}
 
 **Ihre Lösung:**
 
-\vspace*{5cm}
+\vspace*{6cm}
 :::
 
 ::: {.content-visible when-profile="solution"}
-\Needspace{13\baselineskip}
+\Needspace{4\baselineskip}
 
 **Musterlösung A4**
 
-Die Operanden zum Produkt $A_{ik}B_{kj}$ treffen sich in Takt $1+k+i+j$.
-Ein Stern kennzeichnet in der Tabelle die letzte gültige MAC der jeweiligen Zelle.
+1. Weiterverwendbar sind das quantisierte TFLite-Modell und die Testfenster
+   mit Referenzscores. Das Modell liegt in einem offenen Austauschformat und
+   dient als Eingabe für den Compiler von B; dessen Bericht zeigt, dass er alle
+   Teile abbilden kann. Ob B andere Quantisierungsregeln verlangt, ist im
+   Allgemeinen zu prüfen. Testfenster und Referenzscores sind
+   herstellerunabhängig und bilden den Maßstab, gegen den B mit einer
+   vereinbarten Toleranz geprüft wird. Das kompilierte Modell enthält
+   Befehlsstrom und Speicherplan für NPU A; B kann es nicht laden. Der
+   Normierungskernel nutzt die proprietäre Schnittstelle von A und müsste für B
+   neu geschrieben werden; dort läuft die Normierung laut Bericht ohnehin auf
+   der NPU. **Bewertung:** je zwei richtig begründete Zuordnungen 1 P.
 
-| Taktende | $C_{00}$ | $C_{01}$ | $C_{10}$ | $C_{11}$ | Gültige MACs |
-|---|---:|---:|---:|---:|---:|
-| 1 | 2 | 0 | 0 | 0 | 1 |
-| 2 | 0 | 8 | 3 | 0 | 3 |
-| 3 | $-5^*$ | 11 | 3 | 12 | 4 |
-| 4 | $-5$ | $12^*$ | $13^*$ | 12 | 3 |
-| 5 | $-5$ | 12 | 13 | $10^*$ | 1 |
+2. Plattform A hat einen NPU-Abschnitt mit Dense, ReLU und Dense:
+   $$T_A=0{,}08+(0{,}10+3\cdot0{,}02)+0{,}02=0{,}26\,\mathrm{ms}.$$
+   Plattform B rechnet die ReLU auf der CPU. Dadurch zerfällt die NPU-Arbeit
+   in zwei Abschnitte, Normierung mit Dense sowie Dense mit argmax:
+   $$T_B=(0{,}10+2\cdot0{,}02)+0{,}01+(0{,}10+2\cdot0{,}02)=0{,}29\,\mathrm{ms}.$$
+   B führt vier Teile auf der NPU aus, A nur drei, und ist trotzdem langsamer.
+   Jeder zusätzliche Abschnitt kostet eine Übergabe. Welche Teile auf der CPU
+   bleiben und wie sie die NPU-Arbeit zerteilen, bestimmt deshalb die Zeit.
+   **Bewertung:** beide Zeiten 1 P, Begründung mit Abschnitten und Übergaben 1 P.
 
-
-1. Zum Beispiel rechnet $C_{00}$ in den ersten drei Takten
-   $2\cdot1$, $1(-2)$ und $(-1)\cdot5$: Die Teilsummen sind 2, 0 und $-5$.
-   Entsprechend ist
-   $$
-   C=\begin{bmatrix}-5&12\\13&10\end{bmatrix}.
-   $$
-   Insgesamt werden zwölf MACs ausgeführt.
-   **Bewertung:** Summenverlauf 2 P, MAC-Zählung und letzte MACs 1 P.
-
-2. $C_{11}$ erhält $(A_{10},B_{01})=(3,4)$ in Takt 3,
-   $(A_{11},B_{11})=(0,3)$ in Takt 4 und
-   $(A_{12},B_{21})=(2,-1)$ in Takt 5.
-   Das mittlere Produkt verändert die Summe nicht, ist aber eine gültige MAC
-   mit bereitstehenden Operanden. Ein leerer Platz enthält kein gültiges
-   Operandenpaar und wird nicht als MAC gezählt. **Bewertung:** 1 P.
-
-3. Über alle vier Zellen und fünf Takte gilt $U=12/(4\cdot5)=60\,\%$.
-   Im sonst leeren $4\times4$-Array sind es
-   $U=12/(16\cdot5)=15\,\%$; die räumliche Belegung beträgt
-   $4/16=25\,\%$. Auf die tatsächlich belegten vier Zellen normiert bleiben es
-   60 Prozent, also $25\,\%\cdot60\,\%=15\,\%$ für das ganze Array.
-   Die Ergebnisse müssen danach noch aus den Akkumulatoren ausgelesen und
-   übertragen werden; gegebenenfalls folgt eine Requantisierung. Diese Zeiten
-   waren ausgeschlossen. **Bewertung:** Auslastungen/Belegung 1 P, Auslesen 1 P.
-
-4. Die späteste Zelle hat $i=M-1$, $j=N-1$, ihr letztes Produkt $k=K-1$:
-   $$
-   T_{\mathrm{letzte\ MAC}}=1+(K-1)+(M-1)+(N-1)=K+M+N-2.
-   $$
-   Es gibt $MNK$ gültige MACs und $MN(K+M+N-2)$ Zell-Takte:
-   $$
-   U(K,M,N)=\frac{K}{K+M+N-2}.
-   $$
-   Folie 40 verwendet $M=N=K=2$, also $T=4$ und $U=1/2$.
-   Hier sind $M=N=2$, $K=3$, also $T=5$ und $U=3/5$.
-   Für das nur teilweise belegte größere Array darf die Vollbelegungsformel
-   nicht mit $M=N=4$ eingesetzt werden; dort bleibt die gesonderte Rechnung
-   $12/(16\cdot5)=15\,\%$ aus Teil 3 maßgebend.
-   Für ein voll belegtes $4\times4$-Array folgt
-   $K/(K+6)\geq0{,}9$, also $K\geq54$.
-   **Bewertung:** Zeit/Herleitung 1 P, Prüfungen und Mindest-$K$ 1 P.
-
-5. Bei Weight-Stationary bleiben zugeordnete Gewichtswerte in den Zellen.
-   Aktivierungen und je nach Organisation Teilsummen müssen bewegt oder
-   weitergereicht werden. In Output-Stationary bleibt dagegen gerade die
-   Ausgangssumme lokal. Gewichtsbelegung, Zuführung und Reduktionswege ändern
-   sich; ohne ein neues Abbildungs- und Zeitmodell lässt sich der vorherige
-   Plan deshalb nicht übernehmen. **Bewertung:** 1 P.
+3. Mit der Normierung auf der NPU umfasst der einzige Abschnitt vier Teile:
+   $$T_A'=(0{,}10+4\cdot0{,}02)+0{,}02=0{,}20\,\mathrm{ms}.$$
+   Das spart $0{,}06\,\mathrm{ms}$ oder etwa $23\,\%$ der Modellzeit. Bei einem
+   neuen Fenster alle $0{,}5\,\mathrm{s}=500\,\mathrm{ms}$ ist dieser Gewinn
+   für die Reaktionszeit unerheblich; eine Energieersparnis wäre erst zu
+   messen. Dem steht eine dauerhafte Bindung gegenüber: Der Kernel läuft nur
+   mit der Schnittstelle und den Werkzeugen von A und muss bei jeder neuen
+   Werkzeugversion gepflegt und erneut geprüft werden. Ohne weitere
+   Anforderungen lohnt sich der Vorschlag daher nicht. Erleichternde Maßnahmen
+   sind beispielsweise: die Normierung im offenen Modell und in der portablen
+   CPU-Referenz halten und mit festen Testfenstern prüfen, herstellerspezifische
+   Aufrufe hinter einer schmalen eigenen Schnittstelle kapseln und den Gewinn
+   vor der Entscheidung auf der Zielhardware messen.
+   **Bewertung:** neue Zeit 1 P, begründete Bewertung 1 P, zwei Maßnahmen 1 P.
 :::
 
 {{< pagebreak >}}
 
-## Teil A · Aufgabe 5: Negative Werte, Nullpunkte und Akkumulatorbreite (7 Punkte)
-
-Für Int8 gilt der Codebereich $[-128,127]$:
-$$
-q=\operatorname{clip}_{[-128,127]}\!\left(\operatorname{round}(r/s)+z\right),
-\qquad \widehat r=s(q-z).
-$$
-Runden Sie zur nächsten ganzen Zahl, halbe Werte weg von null.
-
-1. Skala $s=0{,}2$, Nullpunkt $z=0$: Bestimmen Sie Code, Rückwert und absoluten
-   Fehler für $r=-1{,}37$ und $r=-30$. Benennen Sie die Fehlerart und geben Sie,
-   wo möglich, eine allgemeine Fehlerschranke an. (2 P)
-2. Skala $0{,}2$, Nullpunkt fünf: Welcher Code repräsentiert reale null?
-   Welcher reale Wertebereich ist ohne Begrenzung darstellbar? (1 P)
-3. Separat: $q_x=[7,-3]$, $z_x=1$, $s_x=0{,}25$;
-   $q_w=[-2,3]$, $z_w=0$, $s_w=0{,}1$.
-   Der Biascode ist vier mit Skala $s_xs_w$ und Nullpunkt null.
-   Bestimmen Sie die Integer-Akkumulation und ihren Realwert.
-   Requantisieren Sie mit $s_y=0{,}08$, $z_y=3$, einmal über den Realwert und
-   einmal mit $M=s_xs_w/s_y$. Geben Sie den Rückwert an. (2 P)
-4. Int8-Eingaben und Int8-Gewichte, beide mit Nullpunkt null, werden ohne Bias
-   aufsummiert. Bestimmen Sie den betragsgrößten Einzelbeitrag.
-   Ab wie vielen Produkten kann Int16 überlaufen, und bis zu wie vielen
-   Produkten ist ein Int32-Akkumulator für alle zulässigen Operanden sicher? (1 P)
-5. Ein Modell hat 180 000 Gewichte und 600 Biaswerte. Vergleichen Sie Float32
-   für beide mit Int8-Gewichten und Int32-Biaswerten. Berechnen Sie die
-   Ersparnis nur für Gewichte sowie für Gewichte einschließlich Bias.
-   Warum beschreibt keiner der Werte die Ersparnis der Tensor Arena? (1 P)
-
-::: {.content-hidden when-profile="solution"}
-\Needspace{12\baselineskip}
-
-**Ihre Lösung:**
-
-\vspace*{7cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-\Needspace{5\baselineskip}
-
-**Musterlösung A5**
-
-
-1. Für $-1{,}37$ ist $r/s=-6{,}85$, somit $q=-7$,
-   $\widehat r=-1{,}4$ und $|r-\widehat r|=0{,}03$.
-   Es liegt nur Rundungsfehler vor. Ohne Begrenzung gilt allgemein
-   $|r-\widehat r|\leq s/2=0{,}1$.
-
-   Für $-30$ ergäbe Runden zunächst $-150$; der Int8-Code wird auf $-128$
-   begrenzt. $\widehat r=-25{,}6$, absoluter Fehler $4{,}4$:
-   Sättigung beziehungsweise Clipping. Die Rundungsschranke $s/2$ gilt für
-   diesen Fall nicht; außerhalb des darstellbaren Bereichs wächst der Fehler
-   mit dem Abstand zum Randwert. **Bewertung:** beide Rechnungen 1 P,
-   Fehlerarten und Schranke 1 P.
-
-2. Reale null wird als $q=z=5$ gespeichert. Die darstellbaren Randwerte sind
-   $0{,}2(-128-5)=-26{,}6$ und $0{,}2(127-5)=24{,}4$.
-   Dazwischen liegen diskrete Werte im Abstand 0,2; eine beliebige Zahl im
-   Intervall muss weiterhin gerundet werden. **Bewertung:** 1 P.
-
-3. Es gilt
-   $$
-   a=(7-1)(-2)+(-3-1)\cdot3+4=-12-12+4=-20,
-   \qquad r_y=(0{,}25\cdot0{,}1)(-20)=-0{,}5.
-   $$
-   Über den Realwert folgt
-   $q_y=\operatorname{round}(-0{,}5/0{,}08)+3=-6+3=-3$.
-   Ebenso ergibt $M=0{,}025/0{,}08=0{,}3125$ den Wert
-   $\operatorname{round}(Ma)+3=\operatorname{round}(-6{,}25)+3=-3$.
-   Es ist keine Sättigung nötig; der Rückwert lautet
-   $\widehat r_y=0{,}08(-3-3)=-0{,}48$.
-   Der Biascode vier repräsentiert $0{,}1$.
-   **Bewertung:** Akkumulation/Realwert 1 P, beide Requantisierungen/Rückwert 1 P.
-
-4. Der betragsgrößte Beitrag ist $(-128)(-128)=16384$.
-   Schon zwei solche Produkte ergeben 32768 und überschreiten Int16-Maximum
-   32767. Für Int32 ist der positive Grenzfall maßgeblich:
-   $$
-   \left\lfloor\frac{2^{31}-1}{16384}\right\rfloor=131071.
-   $$
-   Der negativste Einzelbeitrag $-128\cdot127=-16256$ verletzt bei dieser
-   Länge auch die negative Grenze nicht. 131 072 maximal positive Produkte
-   würden $2^{31}$ ergeben und überlaufen. Dies ist eine Grenzwertrechnung;
-   sie erfordert keinen tatsächlich ausgeführten vorzeichenbehafteten
-   Überlauf in C. **Bewertung:** 1 P.
-
-5. Gewichte: 720 000 Byte in Float32 statt 180 000 Byte in Int8,
-   also 540 000 Byte beziehungsweise 75 Prozent Ersparnis.
-   Mit Bias: $4(180000+600)=722400$ Byte gegenüber
-   $180000+4\cdot600=182400$ Byte. Die gleiche absolute Ersparnis
-   entspricht dann $540000/722400\approx74{,}751\,\%$.
-   Biaswerte bleiben vier Byte breit. Die Tensor Arena speichert
-   Aktivierungen und Arbeitsbereiche; deren Formen, Lebensdauern und
-   temporäre Breiten können sich anders ändern als die Modellparameter.
-   **Bewertung:** 1 P.
-:::
-
-{{< pagebreak >}}
-
-## Teil A · Aufgabe 6: Speicher, Lebensdauer und Gesamtzeit (7 Punkte)
+## Teil A · Aufgabe 5: Sensorfenster und Gesamtzeit (4 Punkte)
 
 1. Ein Sensorfenster umfasst 200 Zeitpunkte mit je zwei Kanälen.
    Bestimmen Sie die Größe der Float32-Quelle und des Int8-Eingabetensors. (1 P)
-2. Plattform: 192 KiB Flash, davon 52 KiB Firmware und 36 KiB vollständiges
-   Modell. 48 KiB SRAM, davon 18 KiB Tensor Arena, das Float32-Quellfenster
-   aus Teil 1, 7 KiB Stackreserve und 5 KiB übrige Daten. Der Int8-Eingabetensor
-   liegt bereits in der Arena; $1\,\mathrm{KiB}=1024$ Byte.
-   Bestimmen Sie die freien Flash- und SRAM-Budgets. (1 P)
-
-Zu Teil 3: C++-artiger Pseudocode, an TensorFlow Lite Micro (TFLM) angelehnt.
-RV32, Zeigerbreite vier Byte. Der dritte Parameter von `quantize` ist die Anzahl
-zu verarbeitender Float32-Elemente. `AllocateTensors` und `Invoke` melden einen
-Status; die konkrete API und zusätzliche Fehlerbehandlung sind vereinfacht.
-
-~~~cpp
-static Interpreter *g_interp;
-void setup(void) {
-    alignas(16) uint8_t arena[18 * 1024];
-    Interpreter interp(model, resolver, arena, sizeof(arena));
-    interp.AllocateTensors();
-    g_interp = &interp;
-}
-int classify(const float *window) {
-    quantize(window, g_interp->input(0), sizeof(window));
-    g_interp->Invoke();
-    return argmax(g_interp->output(0));
-}
-~~~
-
-3. Finden Sie mindestens vier Fehler, begründen Sie deren Folgen und
-   korrigieren Sie diese. Beziehen Sie das Speicherbudget aus Teil 2 ein. (2 P)
-4. Serielle Lehrzeiten auf der CPU: Vorverarbeitung 1,5 ms, Dense 12 ms,
+2. Serielle Lehrzeiten auf der CPU: Vorverarbeitung 1,5 ms, Dense 12 ms,
    übrige Operatoren 2,5 ms, Nachbereitung 0,5 ms.
    Mit Beschleuniger kommt eine Kopie von 0,75 ms hinzu, Dense dauert 2 ms. (3 P)
    a. Bestimmen Sie beide Gesamtzeiten, den Dense-Faktor und den Gesamtfaktor.
@@ -610,79 +454,13 @@ int classify(const float *window) {
 ::: {.content-visible when-profile="solution"}
 \Needspace{5\baselineskip}
 
-**Musterlösung A6**
+**Musterlösung A5**
 
 
 1. $200\cdot2=400$ Elemente benötigen als Float32 $400\cdot4=1600$ Byte
    und als Int8 400 Byte. **Bewertung:** 1 P.
 
-2. Flash: $192-52-36=104\,\mathrm{KiB}$ frei.
-   SRAM:
-   $$
-   48\cdot1024-18\cdot1024-1600-7\cdot1024-5\cdot1024
-   =16832\,\mathrm{Byte}=16{,}4375\,\mathrm{KiB}.
-   $$
-   Die 400 Int8-Bytes werden nicht nochmals abgezogen, weil sie in den
-   18 KiB Arena enthalten sind. **Bewertung:** beide Budgets 1 P.
-
-3. Wesentliche Fehler und ihre Folgen:
-   - Die lokale Arena lebt nur bis zum Ende von `setup`. Spätere Inferenz würde
-     auf einen abgelaufenen Speicherbereich zugreifen.
-   - Der lokale Interpreter hat dieselbe kurze Lebensdauer. `g_interp` zeigt
-     nach Rückkehr auf kein gültiges Interpreterobjekt.
-   - Die lokale Arena beansprucht außerdem 18 KiB Stack, obwohl nur 7 KiB
-     Stackreserve eingeplant sind. Sie gehört in dauerhaft reservierten SRAM,
-     zum Beispiel in einen statischen, passend ausgerichteten Bereich.
-   - `sizeof(window)` ist auf RV32 vier, weil `window` ein Zeiger ist. Beim
-     angegebenen Vertrag würden nur vier statt 400 Elemente quantisiert.
-     Ein Zeiger trägt keine Arraylänge.
-   - Der Status von `AllocateTensors` und `Invoke` wird ignoriert. Nach einem
-     Fehler dürfen Tensoren beziehungsweise Ausgaben nicht als neu gültig
-     verwendet werden; auch ein Aufruf vor erfolgreichem `setup` ist abzufangen.
-
-   Eine mögliche Korrektur als Pseudocode lautet:
-
-~~~cpp
-alignas(16) static uint8_t arena[18 * 1024];
-static Interpreter *g_interp = nullptr;
-
-bool setup(void) {
-    static Interpreter interp(model, resolver, arena, sizeof(arena));
-    g_interp = nullptr;
-    if (interp.AllocateTensors() != OK)
-        return false;
-    g_interp = &interp;
-    return true;
-}
-
-bool classify(const float *window, size_t n, int *label) {
-    if (g_interp == nullptr || window == nullptr ||
-        label == nullptr || n != 400)
-        return false;
-    // Vorausgesetzt: Tensorform, Datentyp und Quantisierungsparameter
-    // wurden beim Setup gegen den Modellvertrag geprueft.
-    quantize(window, g_interp->input(0), n);
-    if (g_interp->Invoke() != OK)
-        return false;
-    *label = argmax(g_interp->output(0));
-    return true;
-}
-~~~
-
-   `OK`, `quantize` und die Interpreterklasse sind hier bewusst symbolische
-   Schnittstellen, kein unmittelbar kompilierbares TFLM-Programm. Modell und
-   Resolver müssen ebenfalls ausreichend lange leben. Die statische Arena ist
-   dieselbe schon budgetierte 18-KiB-Arena, keine zweite zusätzliche Allokation.
-   Interpreter-Metadaten und sonstige Objekte müssen in die reservierten
-   übrigen Daten passen; ohne deren Größe ist kein genauerer Budgetnachweis
-   möglich. Eine Fehlerbehandlung liefert keine vermeintlich frische Klasse.
-   **Bewertung:** mindestens vier Fehler mit Folgen 1 P,
-   tragfähige Korrektur einschließlich Speicherbudget 1 P.
-
-\Needspace{12\baselineskip}
-
-
-4. Die CPU benötigt
+2. Die CPU benötigt
    $T_{\mathrm{CPU}}=1{,}5+12+2{,}5+0{,}5=16{,}5\,\mathrm{ms}$.
    Beschleunigt sind es
    $T_{\mathrm{acc}}=1{,}5+0{,}75+2+2{,}5+0{,}5=7{,}25\,\mathrm{ms}$.
@@ -704,20 +482,19 @@ bool classify(const float *window, size_t n, int *label) {
    Kopierschwelle 1 P.
 :::
 
-<!-- Autorenprüfung Teil A: Die sechs Papierfälle übernehmen den gelieferten
-Entwurf mit 44 Orientierungspunkten. A1 verbindet Schichten, Nichtlinearität
-und Tensorlebensdauer; A2 verlangt Tile-Dimensionierung statt bloßer Peak-Rechnung.
-A3 verbindet RVV-Längenauswahl mit Fehlerdiagnose und getrennten Timingannahmen.
-A4 leitet einen vollständigen systolischen Ablauf und seine Skalierung her.
-A5 trennt Rundung, Begrenzung, Nullpunkte und Akkumulatorbreite. A6 verbindet
-Speicherbudget, Lebensdauer und die Gesamtwirkung einer Teilbeschleunigung.
-Die vorgegebenen Zahlen sind Lehrmodelle; die Zeitrichtwerte und Zuordnung der
-Papierphasen stehen im begleitenden Autorenbericht. Reale RVV-Laufzeiten,
-TFLM-API-Aufrufe und Hardwaremessungen werden hier nicht behauptet. -->
+<!-- Autorenprüfung Teil A: Fünf Papierfälle mit 32 Orientierungspunkten.
+A1 verbindet Schichten, Nichtlinearität und Tensorlebensdauer; A2 verlangt
+Tile-Dimensionierung statt bloßer Peak-Rechnung. A3 verbindet RVV-Längenauswahl
+mit Fehlerdiagnose und getrennten Timingannahmen. A4 überträgt die
+NPU-Werkzeugkette auf zwei Plattformen: portable gegen herstellergebundene
+Ergebnisse, Abschnittsbildung aus Compilerberichten und die Abwägung eines
+herstellereigenen Kernels. A5 verbindet Eingabevertrag und Gesamtwirkung einer
+Teilbeschleunigung. Die vorgegebenen Zahlen sind Lehrmodelle; reale RVV-Laufzeiten,
+Compilerberichte und Hardwaremessungen werden hier nicht behauptet. -->
 
 {{< pagebreak >}}
 
-## Teil B · K1: Aktivitätserkennung auf dem Mikrocontroller (20 Punkte, ca. 35 Minuten)
+## Teil B · K1: Aktivitätserkennung auf dem Mikrocontroller (16 Punkte, ca. 30 Minuten)
 
 Ein Sensorgerät unterscheidet Stehen, Gehen und Laufen. Ein Fenster enthält
 32 Zeitpunkte mit je drei Beschleunigungsachsen, zeitpunktweise geordnet.
@@ -741,8 +518,7 @@ Alle folgenden Zeiten und Raten sind Lehrannahmen.
    Wie viele quantisierte Aktivierungsbytes müssen höchstens gleichzeitig
    gültig sein? Verwenden Sie vollständige Eingangs- und Ausgangstensoren pro
    Schicht, ReLU im selben Puffer und Freigabe nach der letzten Nutzung;
-   die Float32-Quelle liegt separat außerhalb der Arena. Nennen Sie zwei weitere
-   Anteile, die die Arena vergrößern können. (2 P)
+   die Float32-Quelle liegt in einem separaten Puffer. (2 P)
 4. Die Gewichte liegen im Flash und passieren je Auswertung genau einmal die
    Grenze Flash $\rightarrow$ Rechenwerk, mit einem Byte je Gewicht. Biaswerte
    und Aktivierungen liegen lokal und werden an dieser Grenze nicht gezählt.
@@ -758,17 +534,9 @@ Alle folgenden Zeiten und Raten sind Lehrannahmen.
    c. Bewerten Sie das Sammeln von Fenstern zu einem Batch für diese Anwendung.
       Der Batch startet erst, wenn alle seine Fenster vorliegen. Berücksichtigen
       Sie Wartezeit, Reaktionsanforderung und Rechenzeit in Mikrosekunden. (5 P)
-5. Schicht 1 wird auf ein $4\times4$-Output-Stationary-Array abgebildet, als
-   Tiles $(4\times96)\cdot(96\times N)$, wobei $N\leq4$ die Zahl gleichzeitig
-   ausgewerteter Fenster ist. Nutzen Sie das Einspeiseschema aus Aufgabe 4:
-   Die letzte MAC eines aktiven $M\times N$-Tiles liegt in Takt $K+M+N-2$.
-   Laden, Auslesen und Überlappung zwischen Tiles liegen außerhalb dieses Modells.
-   Bestimmen Sie für $N=1$ und $N=4$ Tilezahl, Takte je Tile, zeitliche Auslastung
-   und Takte je Fenster. Unterscheiden Sie die Auslastung der aktiven Zellen
-   von der über alle 16 physischen Zellen. (4 P)
 \Needspace{20\baselineskip}
 
-6. Für eine getrennte Gesamtbewertung gelten serielle Lehrzeiten:
+5. Für eine getrennte Gesamtbewertung gelten serielle Lehrzeiten:
 
    | Pfad | Vorverarbeitung | Kopie | Modell | Nachverarbeitung |
    |---|---:|---:|---:|---:|
@@ -832,10 +600,8 @@ Alle folgenden Zeiten und Raten sind Lehrannahmen.
    $96+16=112\,\mathrm{Byte}$. Danach reichen für $h$ und $y$ noch
    $16+3=19\,\mathrm{Byte}$. Die maximale gleichzeitig lebende Aktivierungsmenge
    beträgt im angegebenen Puffermodell also $112\,\mathrm{Byte}$.
-   Die separate Float32-Quelle kommt zusätzlich hinzu und ist hier kein
-   quantisierter Aktivierungstensor der Arena. Temporäre Operator-Arbeitsbereiche,
-   Verwaltungsdaten und Ausrichtung können den Arena-Bedarf erhöhen.
-   **Bewertung:** Quelle/Eingang 1 P, Lebensdauer und zwei Zusatzanteile 1 P.
+   Die separate Float32-Quelle kommt zusätzlich hinzu.
+   **Bewertung:** Quelle/Eingang 1 P, Lebensdauer 1 P.
 
 
 4. Die gewählte Speichergrenze zählt $1584\,\mathrm{Byte}$ je Gewichtsübertragung.
@@ -870,30 +636,7 @@ Alle folgenden Zeiten und Raten sind Lehrannahmen.
    Wartezeit/Fristbewertung 1 P.
 
 
-5. Die 16 Ausgänge der ersten Schicht werden in vier Gruppen zu je vier
-   Ausgängen zerlegt. Daher sind in beiden Fällen vier Tiles nötig.
-
-   | Größe | $N=1$ | $N=4$ |
-   |---|---:|---:|
-   | aktive Zellen je Tile | 4 | 16 |
-   | letzte MAC / Takte je Tile | $96+4+1-2=99$ | $96+4+4-2=102$ |
-   | MACs je Tile | $4\cdot96=384$ | $16\cdot96=1536$ |
-   | zeitliche Auslastung aktiver Zellen | $96/99\approx96{,}97\,\%$ | $96/102\approx94{,}12\,\%$ |
-   | räumliche Belegung | $25\,\%$ | $100\,\%$ |
-   | Auslastung aller 16 Zellen | $384/(16\cdot99)\approx24{,}24\,\%$ | $94{,}12\,\%$ |
-   | vier Tiles, gesamtes Fenster/Batch | 396 Takte | 408 Takte |
-   | Takte je Fenster | 396 | $408/4=102$ |
-
-   Bei $N=1$ ist die zeitliche Auslastung der vier genutzten Zellen hoch,
-   während drei Viertel des Arrays räumlich ungenutzt bleiben. Bei $N=4$
-   verteilt sich der Füll- und Leeraufwand auf vier Fenster. Dies ist nur die
-   erste Schicht und ein anderes, zusätzlich eingeschränktes Zeitmodell als
-   die Roofline-Bilanz des gesamten Modells aus Teil 4.
-   **Bewertung:** Tilezahl 1 P, Takte je Tile 1 P,
-   Auslastung mit eindeutiger Bezugsgröße 1 P, Takte je Fenster 1 P.
-
-
-6. Ohne Batching ergeben sich
+5. Ohne Batching ergeben sich
    $$T_{\mathrm{CPU}}=0{,}4+0{,}9+0{,}1=1{,}4\,\mathrm{ms},$$
    $$T_{\mathrm{NPU}}=0{,}4+0{,}2+0{,}05+0{,}1=0{,}75\,\mathrm{ms},$$
    $$S=1{,}4/0{,}75\approx1{,}867.$$
@@ -902,7 +645,8 @@ Alle folgenden Zeiten und Raten sind Lehrannahmen.
 
    Weitere Kriterien sind beispielsweise Energie pro vollständiger Entscheidung
    einschließlich Übergabe und Leerlauf, unterstützte Operatoren und mögliche
-   CPU-Rückfälle, zusätzlicher Speicherbedarf oder Integrationsaufwand.
+   CPU-Rückfälle, zusätzlicher Speicherbedarf, Integrationsaufwand oder die
+   Herstellerbindung der Werkzeugkette.
    Die Wahl muss anhand der konkreten Anwendung begründet werden; ein
    höherer Rechenpeak allein entscheidet sie nicht.
 
@@ -921,123 +665,7 @@ Alle folgenden Zeiten und Raten sind Lehrannahmen.
 
 {{< pagebreak >}}
 
-## Teil B · K2: Eine quantisierte Dense-Zeile von Realwerten bis Int8 (12 Punkte, ca. 20 Minuten)
-
-Eine Dense-Ausgangszeile mit zwei Eingängen wird in Integer-Arithmetik ausgewertet.
-Verwenden Sie Int8 $[-128,127]$ und Runden zur nächsten ganzen Zahl, bei halben
-Werten weg von null. Der Biascode hat Nullpunkt null und die Skala $s_xs_w$.
-
-| Größe | Realwerte | Skala | Nullpunkt | Datentyp |
-|---|---|---|---:|---|
-| Eingang $x$ | $[0{,}92;-0{,}35]$ | $s_x=0{,}05$ | $z_x=-10$ | Int8 |
-| Gewichte $w$ | $[0{,}43;-0{,}75]$ | $s_w=0{,}03$ | $z_w=0$ | Int8 |
-| Bias $b$ | $0{,}1$ | $s_xs_w$ | 0 | Int32 |
-| Ausgang $y$ | zu berechnen | $s_y=0{,}01$ | $z_y=-50$ | Int8 |
-
-$$q=\operatorname{clip}_{[-128,127]}\bigl(\operatorname{round}(r/s)+z\bigr),
-\qquad \widehat r=s(q-z),$$
-$$a=\sum_i(q_{x,i}-z_x)(q_{w,i}-z_w)+q_b,
-\qquad r_y\approx s_xs_w a.$$
-
-1. Quantisieren Sie Eingänge und Gewichte. Geben Sie Codes, Rückwerte und
-   absolute Fehler an. (3 P)
-2. Bestimmen Sie Biascode und Bias-Rückwert. Berechnen Sie Akkumulation $a$
-   und ihren Realwert. Berechnen Sie zum Vergleich die Float-Referenz
-   $w\cdot x+b$ mit den unquantisierten Ausgangswerten. (3 P)
-3. Requantisieren Sie mit $M=s_xs_w/s_y$. Geben Sie $q_y$, den Rückwert
-   und den Fehler gegenüber der Float-Referenz an. Ordnen Sie den Fehler den
-   beteiligten Rundungsschritten zu. Welcher reale Ausgangsbereich ist ohne
-   Begrenzung darstellbar? (3 P)
-4. Prüfen Sie die Robustheit:
-
-   a. Ein Ausreißer liefert $x_0=7{,}0$. Bestimmen Sie Code und Rückwert und
-      benennen Sie die Fehlerart.
-
-   b. Eine Zeile mit 96 Eingängen verwendet dieselben Nullpunkte. Alle
-      Eingangs- und Gewichtscodes können den vollen Int8-Bereich annehmen.
-      Bestimmen Sie den betragsgrößten Einzelbeitrag $(q_x-z_x)q_w$ und die
-      Mindestbreite eines vorzeichenbehafteten Akkumulators ohne Bias.
-      Reicht Int32? (3 P)
-
-::: {.content-hidden when-profile="solution"}
-\Needspace{12\baselineskip}
-
-**Ihre Lösung zu K2:**
-
-\vspace*{8cm}
-:::
-
-::: {.content-visible when-profile="solution"}
-\Needspace{4\baselineskip}
-
-**Musterlösung K2**
-
-
-1. Die Nullpunkte werden nach dem Runden addiert:
-
-   | Wert | Code | Rückwert | absoluter Fehler |
-   |---|---:|---:|---:|
-   | $x_0=0{,}92$ | $18-10=8$ | $0{,}90$ | $0{,}02$ |
-   | $x_1=-0{,}35$ | $-7-10=-17$ | $-0{,}35$ | 0 |
-   | $w_0=0{,}43$ | 14 | $0{,}42$ | $0{,}01$ |
-   | $w_1=-0{,}75$ | $-25$ | $-0{,}75$ | 0 |
-
-   Alle vier Codes liegen im Int8-Bereich; hier tritt noch keine Sättigung auf.
-   **Bewertung:** Eingangscodes 1 P, Gewichtscodes 1 P,
-   vollständige Rückwerte und Fehler 1 P.
-
-
-2. Die Produktskala ist $s_xs_w=0{,}0015$. Deshalb
-   $$q_b=\operatorname{round}(0{,}1/0{,}0015)=67,
-   \qquad\widehat b=67\cdot0{,}0015=0{,}1005.$$
-   Die korrigierten Eingänge sind $18$ und $-7$:
-   $$a=18\cdot14+(-7)(-25)+67=252+175+67=494,$$
-   $$\widehat r_{\mathrm{vor\ Ausgang}}=494\cdot0{,}0015=0{,}741.$$
-   Die unquantisierte Referenz beträgt
-   $$r_{\mathrm{ref}}=0{,}43\cdot0{,}92+(-0{,}75)(-0{,}35)+0{,}1
-   =0{,}7581.$$
-   **Bewertung:** Bias 1 P, Akkumulation/Realwert 1 P, Referenz 1 P.
-
-
-3. Mit $M=0{,}0015/0{,}01=0{,}15$ folgt
-   $$q_y=\operatorname{clip}\bigl(\operatorname{round}(0{,}15\cdot494)-50\bigr)
-   =74-50=24,$$
-   $$\widehat y=0{,}01(24+50)=0{,}74.$$
-   Der absolute Fehler gegenüber der Referenz ist $0{,}0181$.
-   Vor dem Ausgangsrunden entsteht durch Eingangs-/Gewichtsrundung
-   $0{,}9\cdot0{,}42-0{,}92\cdot0{,}43=-0{,}0176$; die Biasrundung
-   fügt $+0{,}0005$ hinzu. Somit liegen vor der Requantisierung
-   $-0{,}0171$ Abweichung vor. Die Ausgangsrundung von $0{,}741$ auf
-   $0{,}74$ trägt weitere $-0{,}001$ bei. Es gibt hier keine Sättigung.
-
-   Der darstellbare Bereich ergibt sich aus den äußersten Codes:
-   $$\left[0{,}01(-128+50),\;0{,}01(127+50)\right]
-   =[-0{,}78;1{,}77].$$
-   **Bewertung:** Code/Rückwert 1 P, Fehler und Rundungsbeiträge 1 P,
-   Bereich 1 P.
-
-
-4. Für $x_0=7$ wäre der unbeschränkte Code
-   $\operatorname{round}(7/0{,}05)-10=130$. Int8 begrenzt ihn auf 127.
-   Der Rückwert ist $0{,}05(127+10)=6{,}85$, mit Sättigungsfehler
-   $0{,}15$. Der Eingangsbereich reicht nur bis $6{,}85$.
-
-   Da $q_x-z_x=q_x+10\in[-118,137]$ und $q_w\in[-128,127]$ gilt,
-   liegen die Produktgrenzen bei
-   $$p_{\min}=137(-128)=-17536,\qquad p_{\max}=137\cdot127=17399.$$
-   Die anderen Endpunktprodukte sind kleiner im Betrag. Für 96 Summanden
-   entsteht der Bereich
-   $$[-96\cdot17536,\;96\cdot17399]=[-1683456;1670304].$$
-   Ein vorzeichenbehafteter 21-Bit-Wert reicht nur von $-2^{20}$ bis
-   $2^{20}-1$ und ist zu schmal. 22 Bit reichen von $-2^{21}$ bis
-   $2^{21}-1$ und genügen; Int32 ist daher ausreichend. Die Aussage verwendet
-   den vorgegebenen Zeilenumfang und vernachlässigt Bias wie verlangt.
-   **Bewertung:** Ausreißer 1 P, Produktgrenzen 1 P, Mindestbreite/Int32 1 P.
-:::
-
-{{< pagebreak >}}
-
-## Teil B · K3: Vektorschleife, Lanes und Bandbreite (12 Punkte, ca. 20 Minuten)
+## Teil B · K2: Vektorschleife, Lanes und Bandbreite (12 Punkte, ca. 20 Minuten)
 
 Elementweise wird $y[i]=w[i]x[i]+b[i]$ für $N=70$ Int32-Elemente berechnet.
 Die Produkte passen in vorzeichenbehaftete 32 Bit; die Addition folgt der
@@ -1095,7 +723,7 @@ done:
 ::: {.content-hidden when-profile="solution"}
 \Needspace{12\baselineskip}
 
-**Ihre Lösung zu K3:**
+**Ihre Lösung zu K2:**
 
 \vspace*{8cm}
 :::
@@ -1103,7 +731,7 @@ done:
 ::: {.content-visible when-profile="solution"}
 \Needspace{4\baselineskip}
 
-**Musterlösung K3**
+**Musterlösung K2**
 
 
 1. L1 ist `e32`, L2 ist `2`, und L3 besteht aus den vier Zeigerupdates:
@@ -1184,15 +812,11 @@ Beschleunigerlaufzeit.
 1. Prüfen Sie das zweischichtige Netz aus Aufgabe 1 mit und ohne ReLU sowie die
    zusammengefasste affine Schicht $W',b'$. Zeigen Sie sowohl eine Übereinstimmung
    als auch eine Abweichung zwischen dem Netz mit ReLU und der Zusammenfassung.
-2. Prüfen Sie ein allgemeines Matrixprodukt $(M\times K)\cdot(K\times N)$ am
-   $2\times3$-mal-$3\times2$-Fall aus Aufgabe 4.
-3. Bilden Sie die RVV-Längenregel für unterstützte Konfigurationen nach, mit den
+2. Bilden Sie die RVV-Längenregel für unterstützte Konfigurationen nach, mit den
    Strategien „möglichst voll“ und „gleichmäßig teilen“. Simulieren Sie damit
    die Zeigerfehler aus Aufgabe 3.3 ausschließlich als Indexbereiche;
    führen Sie keine Zugriffe außerhalb echter Arrays aus.
-4. Prüfen Sie die negativen Quantisierungsfälle aus Aufgabe 5 und die komplette
-   Zeile K2 einschließlich unquantisierter Referenz und Fehler.
-5. Bestimmen Sie für Summen von $(-128)(-128)$ das kleinste $N$, dessen
+3. Bestimmen Sie für Summen von $(-128)(-128)$ das kleinste $N$, dessen
    mathematisches Ergebnis nicht in Int16 beziehungsweise Int32 passt.
    Rechnen Sie dafür in `int64_t` und vergleichen Sie vor einer Konvertierung
    mit den Bereichsgrenzen. Erzeugen Sie keinen vorzeichenbehafteten
@@ -1206,24 +830,18 @@ Beschleunigerlaufzeit.
 - Für $x=[3;-2]$ liefert das Netz mit ReLU 10, ohne ReLU und nach affiner
   Zusammenfassung jeweils $-19$. Für $x=[1;1]$ sind die Voraktivierungen
   $[0;3;3]$ nichtnegativ; beide Wege liefern dann 6.
-- Das Matrixprodukt aus Aufgabe 4 ergibt
-  $C=\begin{bmatrix}-5&12\\13&10\end{bmatrix}$.
 - Bei VLMAX 32 und 70 Elementen liefern die beiden Strategien beispielsweise
   $32+32+6$ beziehungsweise $32+19+19$. Vergleichen Sie die gezeichneten
   Indexbereiche mit den vollständigen Lösungen zu Aufgabe 3.
-- K2 endet mit Ausgangscode 24 und Rückwert $0{,}74$; die vorherigen
-  Akkumulations- und Rundungsschritte müssen ebenfalls geprüft werden.
 - Ein Produkt beträgt 16384. Int16 wird erstmals bei $N=2$ überschritten,
   Int32 bei $N=131072$. Die Prüfung mit `int64_t` erkennt diese Grenze,
   ohne einen unzulässigen Signed-Overflow-Lauf auszuführen.
 :::
 
-<!-- Autorenprüfung Teil B: K1 verknüpft Formen, Modell-/Aktivierungsspeicher,
-Roofline, Batch-Wartezeit, systolische Auslastung, Gesamtzeit und personenweise
-Evaluation. K2 verfolgt Nullpunktkorrektur, Bias-/Produktskala, Requantisierung
-und Akkumulatorgrenzen durch einen vollständigen Zahlenfall. K3 verbindet
+<!-- Autorenprüfung Teil B: K1 verknüpft Formen, Modell- und Aktivierungsspeicher,
+Roofline, Batch-Wartezeit, Gesamtzeit und personenweise Evaluation. K2 verbindet
 korrekte RVV-Schleifenführung mit Lane-Rundung, Speichergrenze und Datenbreite.
-Teil B hat 44 Orientierungspunkte und die vorgegebenen geschätzten Zeiten
-35+20+20=75 Minuten. Dies sind Übungsannahmen, keine garantierte Entsprechung
-zu nicht dokumentierten Prüfungsregeln. Alle Raten und Zeiten sind Lehrmodelle.
-Die optionalen Rechnerprüfungen sind zusätzliche Funktionsversuche. -->
+Teil B hat 28 Orientierungspunkte und die geschätzten Zeiten 30+20=50 Minuten.
+Dies sind Übungsannahmen, keine garantierte Entsprechung zu nicht dokumentierten
+Prüfungsregeln. Alle Raten und Zeiten sind Lehrmodelle. Die optionalen
+Rechnerprüfungen sind zusätzliche Funktionsversuche. -->
