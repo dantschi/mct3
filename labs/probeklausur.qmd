@@ -57,7 +57,7 @@ Welche Aussagen über Speichereigenschaften treffen zu?
 
 Betrachten Sie die klassische 6T-SRAM-Zelle und die 1T1C-DRAM-Zelle. Welche Aussagen sind richtig?
 
-- $\square$ A. Beim SRAM-Schreiben wird die Wortleitung aktiviert, bevor die Bitleitungen ihre Schreibwerte erhalten.
+- $\square$ A. Eine 6T-SRAM-Zelle benötigt weniger Transistoren je Bit als eine 1T1C-DRAM-Zelle.
 - $\square$ B. Die SRAM-Zelle hält ihren Zustand über zwei kreuzgekoppelte Inverter.
 - $\square$ C. Eine DRAM-Zelle muss regelmäßig aufgefrischt werden (Refresh).
 
@@ -133,7 +133,7 @@ Welche Aussagen über Pipeline, CPI und Laufzeit sind richtig?
 
 - $\square$ A. Eine Pipeline verkürzt die Durchlaufzeit jedes einzelnen Befehls auf einen Takt.
 - $\square$ B. $200$ Befehle mit CPI $1{,}5$ benötigen bei $100$ MHz genau $3\,\mu$s.
-- $\square$ C. Bei gleicher Taktfrequenz ist die Übersetzung mit dem kleineren CPI immer schneller.
+- $\square$ C. Bei gleicher Taktfrequenz ist ein Programm mit kleinerem CPI immer schneller als eines mit größerem CPI, unabhängig von der Zahl der ausgeführten Befehle.
 
 \Needspace{9\baselineskip}
 
@@ -157,13 +157,13 @@ Welche Aussagen sind richtig?
 
 \Needspace{9\baselineskip}
 
-### A12: Beschleuniger (1 Punkt)
+### A12: NPU-Datenfluss (1 Punkt)
 
-Welche Aussagen über GPU, NPU und Herstellerbindung sind richtig?
+Eine NPU berechnet die Produktsummen einer Dense-Schicht für viele aufeinanderfolgende Eingaben mit denselben Gewichten. Welche Aussagen sind richtig?
 
-- $\square$ A. Ein NPU-Modellcompiler kann nicht unterstützte Operatoren auf der CPU belassen.
-- $\square$ B. Ein GPU-Kernel läuft in vielen Threads; jeder bestimmt über seinen Index seinen Datenteil.
-- $\square$ C. Ein offenes Modellformat wie ONNX verringert Wechselkosten, beseitigt aber nicht jede Herstellerbindung.
+- $\square$ A. Die NPU kann die Gewichte während dieses Abschnitts lokal halten und nur Eingaben und Teilsummen weiterreichen.
+- $\square$ B. Lokal gehaltene Gewichte verringern die Zahl der MACs je Auswertung.
+- $\square$ C. Die Gewichte müssen nicht für jede Eingabe erneut aus dem externen Speicher geladen werden; das erhöht die Rechenintensität.
 
 ::: {.content-visible when-profile="solution"}
 
@@ -177,7 +177,7 @@ Keine Teilpunkte für einzelne Markierungen.
 | Frage | Richtige Antworten | Begründung |
 |------|----------------|------------------------------------------------------------------------------|
 | A1 | A, C | SRAM und DRAM sind flüchtig, Flash ist nichtflüchtig. Ein Cache ist eine Rolle in der Speicherhierarchie, keine Zelltechnologie. |
-| A2 | B, C | Die Rückkopplung zweier Inverter hält das SRAM-Bit; DRAM-Ladung muss aufgefrischt werden. Beim SRAM-Schreiben liegen die Schreibwerte vor dem WL-Anstieg an. |
+| A2 | B, C | Die Rückkopplung zweier Inverter hält das SRAM-Bit; DRAM-Ladung muss aufgefrischt werden. SRAM braucht sechs Transistoren je Bit, DRAM einen Transistor und einen Kondensator. |
 | A3 | A, B | Der Cache holt ganze Zeilen und nutzt so räumliche Lokalität; er liefert Kopien derselben Adressen und verschiebt nichts. |
 | A4 | C | $\mathrm{AMAT}=2+0{,}1\cdot50=7$ Takte. A gewichtet die Hitzeit fälschlich mit $0{,}9$, B ist die Gesamtzeit eines Misses. |
 | A5 | A | Weitergabe (Through/Back) und Store-Miss-Regel (Allocate) sind getrennte Entscheidungen. Bei Write-Back darf die untere Ebene zunächst einen älteren Wert enthalten. |
@@ -187,7 +187,7 @@ Keine Teilpunkte für einzelne Markierungen.
 | A9 | B | $200\cdot1{,}5=300$ Takte zu je $10$ ns ergeben $3\,\mu$s. Die Pipeline erhöht die Rate, nicht die Geschwindigkeit des Einzelbefehls; bei verschiedener Befehlsanzahl entscheidet $N\cdot\mathrm{CPI}$. |
 | A10 | A, B | Geordnetes Retire erhält die Programmwirkung. `11` geht durch NT nach `10` und sagt weiter T vorher. Superskalare Breite ist eine Kapazität, keine Garantie. |
 | A11 | C | Scores sind Vergleichswerte. Erst ein getrennter Test mit neuen Personen bewertet die Erkennung. |
-| A12 | A, B, C | Alle drei Aussagen beschreiben die in Vorlesung 8 behandelten Programmierwege und deren Bindung zutreffend. |
+| A12 | A, C | Die Gewichte werden lokal wiederverwendet, weitergereicht werden nur Eingaben und Teilsummen. Das spart Bytes über die Speichergrenze und erhöht die Rechenintensität. Die Zahl der MACs hängt nur von der Schichtgröße ab, nicht vom Speicherort der Gewichte. |
 
 :::
 
@@ -305,8 +305,8 @@ Typischer Fehler: Exception- und Interruptcode verwechseln oder Timer-Ticks mit 
 
 1. Eine fünfstufige Pipeline ohne Wartezyklen bearbeitet $12$ unabhängige Befehle.
    Bestimmen Sie die Taktzahl $C$ vom ersten IF bis zum letzten WB sowie IPC und CPI. (2 P)
-2. Zwei Übersetzungen desselben Programms laufen bei $100$ MHz:
-   A mit $400$ Befehlen und CPI $1{,}5$, B mit $250$ Befehlen und CPI $2$.
+2. Ein Compiler erzeugt aus demselben C-Programm zwei Maschinenprogramme A und B.
+   Beide laufen bei $100$ MHz: A mit $400$ Befehlen und CPI $1{,}5$, B mit $250$ Befehlen und CPI $2$.
    Berechnen Sie beide Laufzeiten. Welche ist schneller? (2 P)
 3. Betrachten Sie die Befehle in Programmreihenfolge:
 
@@ -359,7 +359,7 @@ T bedeutet Sprung genommen, NT nicht genommen.
    $\mathrm{CPI}=16/12=4/3$. (2 P)
 2. Ein Takt dauert bei $100$ MHz $10$ ns.
    A: $400\cdot1{,}5=600$ Takte, also $6\,\mu$s. B: $250\cdot2=500$ Takte, also $5\,\mu$s.
-   B ist trotz höheren CPI schneller, weil sie weniger Befehle ausführt. (2 P)
+   B ist trotz höheren CPI schneller, weil es weniger Befehle ausführt. (2 P)
 3. (I1, I2): RAW auf `t0`; (I2, I3): WAR auf `t0`; (I1, I3): WAW auf `t0` (je 0,5 P).
    Renaming beseitigt WAR und WAW; die RAW-Abhängigkeit bleibt (0,5 P).
    Nicht gefragt, aber sichtbar: I4 liest `t0` von I3 und `t1` von I2 (jeweils RAW).
