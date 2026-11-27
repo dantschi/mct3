@@ -20,7 +20,7 @@ In Teil B werden nachvollziehbare Rechenwege und Begründungen mit Teilpunkten b
 ## Hinweise und Punkte
 
 - Maximal erreichbare Punktzahl: 44 Punkte
-- Hilfsmittel: nicht programmierbarer Taschenrechner
+- Hilfsmittel: zweiseitige Formelsammlung; kein Taschenrechner
 - Alle angegebenen Hardware- und Zahlenmodelle gelten nur für diese Aufgaben.
 
 | Teil | Umfang | Punkte |
@@ -34,6 +34,7 @@ In Teil B werden nachvollziehbare Rechenwege und Begründungen mit Teilpunkten b
 
 Die Klausur behandelt die Vorlesungen 1, 2, 3, 7 und 8.
 In Teil B sind Annahmen, Einheiten und Zwischenschritte anzugeben.
+Alle Rechnungen sind ohne Taschenrechner lösbar; Ergebnisse dürfen als Bruch angegeben werden.
 KiB bedeutet $2^{10}$ Byte; ein Byte enthält acht Bit.
 
 {{< pagebreak >}}
@@ -224,12 +225,14 @@ AMAT bedeutet Average Memory Access Time: $\mathrm{AMAT}=t_H+(1-h)\cdot p$.
 
 1. $4096/16=256$ Sets. Offset $\log_2 16=4$ Bit, Index $\log_2 256=8$ Bit,
    Tag $32-4-8=20$ Bit. (2 P)
-2. Offset `0x8` $=8$, Index `0xA4` $=164$, Tag `0x3`; Zeilenbasis `0x00003A40`.
-   Kontrolle: $3\cdot4096+164\cdot16+8=14\,920=\mathtt{0x3A48}$. (2 P)
+2. Die Felder liegen auf Hexziffergrenzen: Offset = letzte Hexziffer `0x8`,
+   Index = die beiden Ziffern davor `0xA4` ($=164$), Tag = der Rest `0x00003`.
+   Zeilenbasis `0x00003A40` (Offset null). Kontrolle: `3` · `A4` · `8` ergibt wieder `0x3A48`. (2 P)
 3. Miss (Kaltstart), Hit (gleiche Zeile `0x3A40`), Miss (Index 164, Tag 4; verdrängt Tag 3),
    Miss: Conflict Miss, denn beide Blöcke konkurrieren um denselben Platz. (1 P)
-   2-Way: $128$ Sets, beide Blöcke fallen in Set $36$ und passen in die zwei Ways;
-   der letzte Zugriff ist ein Hit. (1 P)
+   2-Way: $128$ Sets, der Set-Index besteht aus den unteren sieben der bisherigen acht Indexbits.
+   Gleicher DM-Index bedeutet daher auch gleiches Set (`0x24`); die beiden Blöcke belegen
+   dessen zwei Ways, der letzte Zugriff ist ein Hit. (1 P)
 4. $\mathrm{AMAT}=1+0{,}05\cdot40=3$ Takte. Ein Takt dauert $5$ ns, also $15$ ns. (2 P)
 
 Typischer Fehler: Hitzeit mit $h$ gewichten oder die Penalty als Gesamtzeit des Misses lesen.
@@ -302,8 +305,8 @@ Typischer Fehler: Exception- und Interruptcode verwechseln oder Timer-Ticks mit 
 
 1. Eine fünfstufige Pipeline ohne Wartezyklen bearbeitet $12$ unabhängige Befehle.
    Bestimmen Sie die Taktzahl $C$ vom ersten IF bis zum letzten WB sowie IPC und CPI. (2 P)
-2. Zwei Übersetzungen desselben Programms laufen bei $200$ MHz:
-   A mit $400$ Befehlen und CPI $1{,}2$, B mit $320$ Befehlen und CPI $1{,}4$.
+2. Zwei Übersetzungen desselben Programms laufen bei $100$ MHz:
+   A mit $400$ Befehlen und CPI $1{,}5$, B mit $250$ Befehlen und CPI $2$.
    Berechnen Sie beide Laufzeiten. Welche ist schneller? (2 P)
 3. Betrachten Sie die Befehle in Programmreihenfolge:
 
@@ -353,10 +356,10 @@ T bedeutet Sprung genommen, NT nicht genommen.
 **Musterlösung B3**
 
 1. $C=N+k-1=12+5-1=16$ Takte; $\mathrm{IPC}=12/16=0{,}75$,
-   $\mathrm{CPI}=16/12\approx1{,}33$. (2 P)
-2. A: $400\cdot1{,}2=480$ Takte, $480/(200\cdot10^6\,\mathrm{s^{-1}})=2{,}4\,\mu$s.
-   B: $320\cdot1{,}4=448$ Takte, $2{,}24\,\mu$s. B ist trotz höheren CPI schneller,
-   weil sie weniger Befehle ausführt. (2 P)
+   $\mathrm{CPI}=16/12=4/3$. (2 P)
+2. Ein Takt dauert bei $100$ MHz $10$ ns.
+   A: $400\cdot1{,}5=600$ Takte, also $6\,\mu$s. B: $250\cdot2=500$ Takte, also $5\,\mu$s.
+   B ist trotz höheren CPI schneller, weil sie weniger Befehle ausführt. (2 P)
 3. (I1, I2): RAW auf `t0`; (I2, I3): WAR auf `t0`; (I1, I3): WAW auf `t0` (je 0,5 P).
    Renaming beseitigt WAR und WAW; die RAW-Abhängigkeit bleibt (0,5 P).
    Nicht gefragt, aber sichtbar: I4 liest `t0` von I3 und `t1` von I2 (jeweils RAW).
@@ -404,14 +407,14 @@ Lehrmodell:
 2. Ergänzen Sie die Tabelle für die Out-of-Order-Ausführung. (3 P)
 3. In-Order-Variante mit sonst gleichen Regeln: Ein wartender Befehl blockiert alle jüngeren Starts.
    In welchem Takt wird E bestätigt? Geben Sie für beide Varianten die Taktzahl bis zum letzten
-   Retire und das IPC an. (1 P)
+   Retire und das CPI an. (1 P)
 4. Beschreiben Sie den ROB-Zustand der Out-of-Order-Variante am Ende von Takt 4:
    Welche Befehle sind fertig, welcher wartet, welche sind bestätigt?
    Warum dürfen C, D und E trotz Fertigstellung noch nicht bestätigt werden? (2 P)
 5. Variante: A meldet am Ende von Takt 4 einen Zugriffsfehler statt eines Werts.
    Welche der Befehle A bis E werden architektonisch bestätigt? (1 P)
 
-IPC = Instructions Per Cycle: bestätigte Befehle geteilt durch Takte vom ersten Start bis zum letzten Retire.
+CPI = Cycles Per Instruction: Takte vom ersten Start bis zum letzten Retire geteilt durch die Zahl bestätigter Befehle.
 
 ```{=latex}
 \renewcommand{\arraystretch}{1.6}
@@ -456,8 +459,9 @@ IPC = Instructions Per Cycle: bestätigte Befehle geteilt durch Takte vom ersten
    Takt 4: E, Takt 5: B (A erst am Ende von Takt 4 fertig).
    Retire geordnet: A in 5; B frühestens in 6, C mit ihm in 6; D und E in 7. (3 P: Start 1,5 P, Retire 1,5 P)
 3. In-Order: A 1, B 5, C 6, D 7, E 8; Retire A 5, B 6, C 7, D 8, E 9.
-   E wird in Takt 9 bestätigt. In-Order: 9 Takte, $\mathrm{IPC}=5/9\approx0{,}556$;
-   Out-of-Order: 7 Takte, $\mathrm{IPC}=5/7\approx0{,}714$. (1 P)
+   E wird in Takt 9 bestätigt. In-Order: 9 Takte, $\mathrm{CPI}=9/5=1{,}8$;
+   Out-of-Order: 7 Takte, $\mathrm{CPI}=7/5=1{,}4$. (1 P)
+   Gleichwertig als IPC-Brüche $5/9$ bzw. $5/7$.
    Out-of-Order nutzt die Ladezeit für C, D und E, verkürzt sie aber nicht.
 4. Ende Takt 4: A, C, D und E sind fertig, B wartet noch auf den Start; bestätigt ist noch keiner.
    Kopf des ROB ist A. Bestätigt wird nur in Programmreihenfolge: C, D und E müssen auf
@@ -482,6 +486,9 @@ auf neue Werte bzw. eine neue Befehlsfolge an und ergänzen eine kurze Begründu
 Sonderfälle oder ungewöhnliche Annahmen sind bewusst vermieden.
 Die Einschätzung „mittleres bis leichtes Niveau“ ist eine begründete Schätzung
 und noch nicht an Bearbeitungsdaten kalibriert.
+Alle Rechnungen sind ohne Taschenrechner lösbar: Sie verwenden Zweierpotenzen, Hexadezimalziffern,
+kleine Produkte und einfache Brüche; Ergebnisse dürfen als Bruch stehen bleiben.
+Als Hilfsmittel ist eine zweiseitige Formelsammlung vorgesehen.
 Teil A umfasst zwölf überwiegend begriffliche Fragen mit je drei Antworten, zwei bis drei je Vorlesung;
 reine Rechenfragen, die eine Teil-B-Aufgabe vorwegnehmen würden, sind dort bewusst ausgelassen.
 

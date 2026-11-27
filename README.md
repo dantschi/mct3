@@ -19,7 +19,7 @@ Modulhandbuch mit Fassung und verbindlichen Prüfungsregeln liegt hier nicht vor
 | Modul und Zielgruppe | Mikrocomputertechnik 3, Bachelor Elektro- und Informationstechnik, fünftes Semester |
 | Voraussetzungen | MCT1/2, binäre und hexadezimale Zahlen, C-Zeiger und Arrays, Bitoperationen und Schleifen; bekannte STM32-Timer mit Prescaler und ARR |
 | Zeitplanung | Je Einheit vier Schulstunden (180 Minuten) einschließlich Übung und Quiz; zusätzliche selbstständige Bearbeitungszeiten stehen auf den Übungsblättern |
-| Prüfungsvorbereitung | Probeklausur mit 44 Punkten: 12 Multiple-Choice-Fragen mit je drei Antworten und vier offene Papieraufgaben; verbindliche Prüfungsform und Hilfsmittel sind gesondert festzulegen |
+| Prüfungsvorbereitung | Probeklausur mit 44 Punkten: 12 Multiple-Choice-Fragen mit je drei Antworten und vier offene Papieraufgaben; Hilfsmittel der Probeklausur: zweiseitige Formelsammlung, kein Taschenrechner; verbindliche Prüfungsform und Hilfsmittel sind gesondert festzulegen |
 | Technischer Rahmen | RISC-V-Lehrmodelle, RV32 soweit angegeben; C-Lehrcode und Hostversuche mit jeweils ausdrücklich genannten Voraussetzungen; konkrete Registeradressen und Zeitwerte sind plattformabhängig |
 
 Nach Abschluss der Veranstaltung können Sie:
